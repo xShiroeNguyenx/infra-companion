@@ -6,10 +6,28 @@ on:
       - 'v*.*.*'
 
 jobs:
-  release:
+  # Stage 1: tạo GitHub Release trước — chỉ 1 job, không race
+  create-release:
+    runs-on: ubuntu-latest
     permissions:
       contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create GitHub Release
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes "Release ${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+          || echo "Release already exists, continuing…"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Stage 2: build song song 3 OS, upload vào release vừa tạo
+  build:
+    needs: create-release
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
