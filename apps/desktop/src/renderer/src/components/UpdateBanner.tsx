@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useT } from '../i18n'
 
 type UpdateState =
   | { phase: 'idle' }
@@ -7,6 +8,7 @@ type UpdateState =
   | { phase: 'ready'; version: string }
 
 export function UpdateBanner() {
+  const t = useT()
   const [state, setState] = useState<UpdateState>({ phase: 'idle' })
 
   useEffect(() => {
@@ -29,21 +31,21 @@ export function UpdateBanner() {
   if (state.phase === 'idle') return null
 
   return (
-    <div className="flex items-center gap-3 border-b border-yellow-700/50 bg-yellow-950/60 px-4 py-1.5 text-xs text-yellow-200">
+    <div className="border-warning/40 bg-warning/15 text-warning flex items-center gap-3 border-b px-4 py-1.5 text-xs">
       {state.phase === 'available' && (
         <>
-          <span>Update available — v{state.version}</span>
+          <span>{t('update.available', { version: state.version })}</span>
           <button
-            className="rounded bg-yellow-700/60 px-2 py-0.5 hover:bg-yellow-600/70"
+            className="bg-warning/25 hover:bg-warning/40 rounded px-2 py-0.5"
             onClick={() => {
               setState({ phase: 'downloading', version: state.version, percent: 0 })
               void window.infra.update.download()
             }}
           >
-            Download
+            {t('update.download')}
           </button>
           <button
-            className="ml-auto text-yellow-500 hover:text-yellow-300"
+            className="hover:text-content ml-auto"
             onClick={() => setState({ phase: 'idle' })}
           >
             ✕
@@ -53,31 +55,31 @@ export function UpdateBanner() {
 
       {state.phase === 'downloading' && (
         <>
-          <span>Downloading v{state.version}…</span>
-          <div className="h-1.5 w-32 overflow-hidden rounded-full bg-yellow-900">
+          <span>{t('update.downloading', { version: state.version })}</span>
+          <div className="bg-warning/20 h-1.5 w-32 overflow-hidden rounded-full">
             <div
-              className="h-full rounded-full bg-yellow-400 transition-all"
+              className="bg-warning h-full rounded-full transition-all"
               style={{ width: `${state.percent}%` }}
             />
           </div>
-          <span className="text-yellow-400">{state.percent}%</span>
+          <span>{state.percent}%</span>
         </>
       )}
 
       {state.phase === 'ready' && (
         <>
-          <span>v{state.version} ready to install</span>
+          <span>{t('update.ready', { version: state.version })}</span>
           <button
-            className="rounded bg-yellow-700/60 px-2 py-0.5 hover:bg-yellow-600/70"
+            className="bg-warning/25 hover:bg-warning/40 rounded px-2 py-0.5"
             onClick={() => window.infra.update.install()}
           >
-            Restart & Install
+            {t('update.restart')}
           </button>
           <button
-            className="ml-auto text-yellow-500 hover:text-yellow-300"
+            className="hover:text-content ml-auto"
             onClick={() => setState({ phase: 'idle' })}
           >
-            Later
+            {t('update.later')}
           </button>
         </>
       )}

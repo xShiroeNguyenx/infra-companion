@@ -4,10 +4,11 @@ import { FitAddon } from '@xterm/addon-fit'
 import { SearchAddon } from '@xterm/addon-search'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { WebLinksAddon } from '@xterm/addon-web-links'
-import { WebglAddon } from '@xterm/addon-webgl'
 import { subscribeTermData } from '../../lib/termBus'
 import { useTabsStore, type Pane } from '../../stores/tabs'
-import { defaultTerminalTheme } from './theme'
+import { useSettingsStore } from '../../stores/settings'
+import { useT } from '../../i18n'
+import { terminalTheme } from './theme'
 
 interface TerminalPaneProps {
   tabId: string
@@ -31,13 +32,15 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
   const [findText, setFindText] = useState('')
   const findInputRef = useRef<HTMLInputElement>(null)
   const closePane = useTabsStore((s) => s.closePane)
+  const themeMode = useSettingsStore((s) => s.theme)
+  const t = useT()
 
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
 
     const term = new Terminal({
-      theme: defaultTerminalTheme,
+      theme: terminalTheme(useSettingsStore.getState().theme),
       fontFamily: '"Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace',
       fontSize: 14,
       lineHeight: 1.2,
@@ -81,11 +84,8 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     })
 
     term.open(host)
-    try {
-      term.loadAddon(new WebglAddon())
-    } catch {
-      // GPU không hỗ trợ WebGL2 → fallback renderer thường
-    }
+    // Dùng DOM renderer mặc định (không WebGL): đổi theme light/dark repaint nền tin cậy,
+    // không bị "khung đen" do WebGL cache nền. Đủ mượt cho phiên SSH.
 
     fit.fit()
     window.infra.terminal.resize(pane.sessionId, term.cols, term.rows)
@@ -139,6 +139,13 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     return () => cancelAnimationFrame(frame)
   }, [tabVisible, paneActive])
 
+  // Đổi theme khi user chuyển light/dark — DOM renderer repaint nền ngay khi set options.theme
+  useEffect(() => {
+    const term = termRef.current
+    if (!term) return
+    term.options.theme = terminalTheme(themeMode)
+  }, [themeMode])
+
   const findNext = (backward: boolean): void => {
     if (!findText) return
     if (backward) searchRef.current?.findPrevious(findText)
@@ -157,7 +164,7 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
       <div ref={hostRef} className="terminal-host h-full w-full" />
 
       {findOpen && (
-        <div className="absolute top-2 right-3 z-30 flex items-center gap-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 shadow-lg">
+        <div className="absolute top-2 right-3 z-30 flex items-center gap-1 rounded border border-edge-strong bg-elevated px-2 py-1 shadow-lg">
           <input
             ref={findInputRef}
             value={findText}
@@ -166,35 +173,35 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
               if (e.key === 'Enter') findNext(e.shiftKey)
               if (e.key === 'Escape') closeFind()
             }}
-            placeholder="Tìm…"
-            className="w-36 bg-transparent text-xs text-zinc-200 placeholder-zinc-600 outline-none"
+            placeholder={t('terminal.findPlaceholder')}
+            className="w-36 bg-transparent text-xs text-content placeholder-subtle outline-none"
           />
-          <button className="px-1 text-xs text-zinc-400 hover:text-zinc-100" onClick={() => findNext(true)}>↑</button>
-          <button className="px-1 text-xs text-zinc-400 hover:text-zinc-100" onClick={() => findNext(false)}>↓</button>
-          <button className="px-1 text-xs text-zinc-500 hover:text-zinc-100" onClick={closeFind}>✕</button>
+          <button className="px-1 text-xs text-muted hover:text-content" onClick={() => findNext(true)}>↑</button>
+          <button className="px-1 text-xs text-muted hover:text-content" onClick={() => findNext(false)}>↓</button>
+          <button className="px-1 text-xs text-subtle hover:text-content" onClick={closeFind}>✕</button>
         </div>
       )}
 
       {pane.status === 'connecting' && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0b0e14]/80">
-          <div className="flex items-center gap-3 text-sm text-zinc-400">
-            <span className="size-2 animate-pulse rounded-full bg-amber-400" />
-            Đang kết nối {pane.subtitle ?? pane.title}…
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-app/80">
+          <div className="flex items-center gap-3 text-sm text-muted">
+            <span className="size-2 animate-pulse rounded-full bg-warning" />
+            {pane.subtitle ?? pane.title}…
           </div>
         </div>
       )}
 
       {pane.status === 'exited' && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60">
-          <div className="max-w-[90%] rounded-lg border border-zinc-700 bg-zinc-900 px-5 py-3 text-center shadow-xl">
-            <p className="text-xs text-zinc-300">
-              {pane.exitReason ?? `Phiên đã kết thúc (exit code ${pane.exitCode ?? '?'})`}
+          <div className="bg-elevated border-edge-strong max-w-[90%] rounded-lg border px-5 py-3 text-center shadow-xl">
+            <p className="text-content text-xs">
+              {pane.exitReason ?? `exit code ${pane.exitCode ?? '?'}`}
             </p>
             <button
-              className="mt-2.5 rounded bg-zinc-700 px-4 py-1 text-xs text-zinc-100 hover:bg-zinc-600"
+              className="bg-hover text-content hover:bg-edge-strong mt-2.5 rounded px-4 py-1 text-xs"
               onClick={() => closePane(tabId, pane.id)}
             >
-              Đóng pane
+              {t('common.close')}
             </button>
           </div>
         </div>

@@ -3,9 +3,11 @@ import type { AuthType, GroupDto } from '@infra/shared'
 import { useDataStore } from '../stores/data'
 import { Button, ConfirmModal, Field, Modal, Select, TextArea, TextInput } from './ui'
 import { envToText, textToEnv } from '../lib/env'
+import { useT } from '../i18n'
 
 /** Editor group + các field cấu hình mà hosts bên trong kế thừa (P22). */
 export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; onClose: () => void }) {
+  const t = useT()
   const { keys, snippets, saveGroup, deleteGroup } = useDataStore()
   const [name, setName] = useState(group?.name ?? '')
   const [username, setUsername] = useState(group?.username ?? '')
@@ -19,8 +21,8 @@ export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; o
 
   const submit = async (): Promise<void> => {
     setError(null)
-    if (!name.trim()) return setError('Nhập tên group')
-    if (authType === 'key' && !keyId) return setError('Chọn SSH key cho group')
+    if (!name.trim()) return setError(t('group.errName'))
+    if (authType === 'key' && !keyId) return setError(t('group.errKey'))
     setBusy(true)
     const saved = await saveGroup({
       id: group?.id,
@@ -36,39 +38,37 @@ export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; o
   }
 
   return (
-    <Modal title={group ? `Group: ${group.name}` : 'Tạo group'} onClose={onClose} closeOnBackdrop={false}>
+    <Modal title={group ? t('group.titleEdit', { name: group.name }) : t('group.titleNew')} onClose={onClose} closeOnBackdrop={false}>
       <form
         onSubmit={(e) => {
           e.preventDefault()
           void submit()
         }}
       >
-        <Field label="Tên group">
+        <Field label={t('group.name')}>
           <TextInput autoFocus value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
 
-        <p className="mb-2 text-[11px] leading-relaxed text-zinc-500">
-          Các field dưới đây là <b>mặc định kế thừa</b> cho mọi host trong group (host có thể override).
-        </p>
+        <p className="text-subtle mb-2 text-[11px] leading-relaxed">{t('group.inheritNote')}</p>
 
-        <Field label="Username mặc định">
-          <TextInput value={username} onChange={(e) => setUsername(e.target.value)} placeholder="(không đặt)" />
+        <Field label={t('group.defaultUsername')}>
+          <TextInput value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t('common.notSet')} />
         </Field>
 
-        <Field label="Xác thực mặc định">
+        <Field label={t('group.defaultAuth')}>
           <Select value={authType} onChange={(e) => setAuthType(e.target.value as '' | AuthType)}>
-            <option value="">(không đặt)</option>
-            <option value="password">Password (hỏi khi kết nối)</option>
-            <option value="key">SSH Key</option>
-            <option value="agent">SSH Agent (OS)</option>
-            <option value="none">Không cần xác thực (server cho vào thẳng)</option>
+            <option value="">{t('common.notSet')}</option>
+            <option value="password">{t('auth.passwordAsk')}</option>
+            <option value="key">{t('auth.key')}</option>
+            <option value="agent">{t('auth.agent')}</option>
+            <option value="none">{t('auth.none')}</option>
           </Select>
         </Field>
 
         {authType === 'key' && (
-          <Field label="SSH Key">
+          <Field label={t('auth.key')}>
             <Select value={keyId} onChange={(e) => setKeyId(e.target.value)}>
-              <option value="">— Chọn key —</option>
+              <option value="">{t('auth.chooseKey')}</option>
               {keys.map((k) => (
                 <option key={k.id} value={k.id}>
                   {k.label} ({k.keyType})
@@ -78,13 +78,13 @@ export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; o
           </Field>
         )}
 
-        <Field label="Biến môi trường (KEY=VALUE, mỗi dòng một biến)">
+        <Field label={t('group.env')}>
           <TextArea rows={3} value={envText} onChange={(e) => setEnvText(e.target.value)} placeholder="APP_ENV=production" />
         </Field>
 
-        <Field label="Startup snippet (chạy sau khi login)">
+        <Field label={t('group.startup')}>
           <Select value={startupSnippetId} onChange={(e) => setStartupSnippetId(e.target.value)}>
-            <option value="">(không có)</option>
+            <option value="">{t('common.none')}</option>
             {snippets.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.label}
@@ -93,25 +93,20 @@ export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; o
           </Select>
         </Field>
 
-        {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
+        {error && <p className="text-danger mb-3 text-xs">{error}</p>}
 
         <div className="flex items-center justify-between pt-1">
           {group ? (
             <Button type="button" variant="danger" onClick={() => setConfirmDelete(true)}>
-              Xoá group
+              {t('group.delete')}
             </Button>
           ) : (
             <span />
           )}
           {confirmDelete && group && (
             <ConfirmModal
-              title="Xoá group"
-              message={
-                <>
-                  Xoá group <b>{group.name}</b>? Host bên trong không bị xoá nhưng sẽ mất cấu hình kế thừa
-                  (username/auth/env mặc định).
-                </>
-              }
+              title={t('group.delete')}
+              message={t('group.deleteMsg', { name: group.name })}
               onConfirm={() => {
                 setConfirmDelete(false)
                 void deleteGroup(group.id).then((ok) => {
@@ -123,10 +118,10 @@ export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; o
           )}
           <div className="flex gap-2">
             <Button type="button" onClick={onClose}>
-              Huỷ
+              {t('common.cancel')}
             </Button>
             <Button type="submit" variant="primary" disabled={busy}>
-              {busy ? 'Đang lưu…' : 'Lưu'}
+              {busy ? t('common.saving') : t('common.save')}
             </Button>
           </div>
         </div>

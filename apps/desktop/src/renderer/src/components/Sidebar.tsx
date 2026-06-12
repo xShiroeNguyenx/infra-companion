@@ -7,18 +7,20 @@ import { useUiStore, type AppModal } from '../stores/ui'
 import { GroupEditorModal } from './GroupEditorModal'
 import { HostEditorModal } from './HostEditorModal'
 import { Button } from './ui'
+import { useT } from '../i18n'
 
 const QUICK_PATTERN = /^[^@\s]+@[^@\s]+$/
 
 // Modal toàn cục (bulk/monitor/ai…) chuyển sang useUiStore — App là nơi mount duy nhất.
 // Sidebar chỉ giữ editor host/group (cần props).
 type OpenModal =
-  | { kind: 'host'; host: HostDto | null }
+  | { kind: 'host'; host: HostDto | null; duplicate?: boolean }
   | { kind: 'group'; group: GroupDto | null }
   | null
 
 /** Cột trái: Quick Connect / tìm kiếm, hosts theo group, lịch sử, menu công cụ. */
 export function Sidebar() {
+  const t = useT()
   const { hosts, groups, history, refreshAll } = useDataStore()
   const { openSsh, openQuick, openSftp, splitSsh } = useTabsStore()
   const [query, setQuery] = useState('')
@@ -82,7 +84,7 @@ export function Sidebar() {
   }
 
   return (
-    <div className="flex w-60 shrink-0 flex-col border-r border-zinc-800 bg-[#0e121b] select-none">
+    <div className="border-edge bg-panel flex w-60 shrink-0 flex-col border-r select-none">
       <div className="p-2">
         <input
           value={query}
@@ -93,15 +95,15 @@ export function Sidebar() {
               else if (filtered.length === 1) void openSsh(filtered[0]!.id)
             }
           }}
-          placeholder="Tìm host hoặc user@host…"
-          className="w-full rounded border border-zinc-800 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 outline-none focus:border-blue-600"
+          placeholder={t('sidebar.searchPlaceholder')}
+          className="border-edge bg-input text-content placeholder-subtle focus:border-accent w-full rounded border px-2.5 py-1.5 text-xs outline-none"
         />
         {isQuick && (
           <button
-            className="mt-1.5 flex w-full items-center gap-1.5 rounded border border-blue-900/60 bg-blue-950/40 px-2.5 py-1.5 text-left text-xs text-blue-300 hover:bg-blue-900/40"
+            className="border-accent/40 bg-accent-soft/40 text-accent-fg hover:bg-accent-soft/60 mt-1.5 flex w-full items-center gap-1.5 rounded border px-2.5 py-1.5 text-left text-xs"
             onClick={connectQuick}
           >
-            <span className="text-blue-500">→</span> Kết nối {query.trim()}
+            <span className="text-accent">→</span> {t('sidebar.connectTo', { target: query.trim() })}
           </button>
         )}
       </div>
@@ -110,13 +112,13 @@ export function Sidebar() {
         {sections.map((section) => (
           <div key={section.group?.id ?? '__ungrouped__'} className="mb-2">
             <div className="group/header flex items-center px-1 py-1">
-              <span className="flex-1 text-[10px] font-semibold tracking-wider text-zinc-600 uppercase">
-                {section.group?.name ?? (groups.length > 0 ? 'Khác' : 'Hosts')}
+              <span className="text-subtle flex-1 text-[10px] font-semibold tracking-wider uppercase">
+                {section.group?.name ?? (groups.length > 0 ? t('sidebar.other') : t('sidebar.global'))}
               </span>
               {section.group && (
                 <button
-                  className="rounded p-0.5 text-zinc-600 opacity-0 group-hover/header:opacity-100 hover:bg-zinc-800 hover:text-zinc-300"
-                  title="Sửa group"
+                  className="text-subtle hover:bg-hover hover:text-content rounded p-0.5 opacity-0 group-hover/header:opacity-100"
+                  title={t('sidebar.editGroup')}
                   onClick={() => setModal({ kind: 'group', group: section.group })}
                 >
                   <PencilIcon />
@@ -126,24 +128,24 @@ export function Sidebar() {
             {section.hosts.map((host) => (
               <div
                 key={host.id}
-                className="group flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-zinc-800/70"
+                className="group hover:bg-hover flex cursor-pointer items-center gap-2 rounded px-2 py-1.5"
                 onClick={() => void openSsh(host.id)}
                 title={`${host.username ?? '(group)'}@${host.hostname}:${host.port}${host.jumpChain?.length ? ` (qua ${host.jumpChain.length} jump)` : ''}`}
               >
-                <span className="size-1.5 shrink-0 rounded-full bg-zinc-600 group-hover:bg-emerald-500" />
+                <span className="bg-subtle size-1.5 shrink-0 rounded-full group-hover:bg-success" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs text-zinc-200">
+                  <div className="text-content truncate text-xs">
                     {host.label}
-                    {host.jumpChain?.length ? <span className="ml-1 text-[9px] text-amber-500/80">⛓{host.jumpChain.length}</span> : null}
+                    {host.jumpChain?.length ? <span className="text-warning/80 ml-1 text-[9px]">⛓{host.jumpChain.length}</span> : null}
                   </div>
-                  <div className="truncate text-[10px] text-zinc-500">
+                  <div className="text-subtle truncate text-[10px]">
                     {host.username ? `${host.username}@` : ''}
                     {host.hostname}
                   </div>
                 </div>
                 <button
-                  className="rounded p-1 text-zinc-500 opacity-0 group-hover:opacity-100 hover:bg-zinc-700 hover:text-amber-300"
-                  title="Mở trong pane mới của tab hiện tại (split — để broadcast nhiều server)"
+                  className="text-subtle hover:bg-edge-strong hover:text-warning rounded p-1 opacity-0 group-hover:opacity-100"
+                  title={t('sidebar.splitHost')}
                   onClick={(e) => {
                     e.stopPropagation()
                     void splitSsh(host.id)
@@ -152,8 +154,8 @@ export function Sidebar() {
                   <SplitIcon />
                 </button>
                 <button
-                  className="rounded p-1 text-zinc-500 opacity-0 group-hover:opacity-100 hover:bg-zinc-700 hover:text-zinc-200"
-                  title="Mở SFTP"
+                  className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
+                  title={t('sidebar.openSftp')}
                   onClick={(e) => {
                     e.stopPropagation()
                     void openSftp(host.id)
@@ -162,8 +164,18 @@ export function Sidebar() {
                   <FolderIcon />
                 </button>
                 <button
-                  className="rounded p-1 text-zinc-500 opacity-0 group-hover:opacity-100 hover:bg-zinc-700 hover:text-zinc-200"
-                  title="Sửa host"
+                  className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
+                  title={t('sidebar.duplicateHost')}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setModal({ kind: 'host', host, duplicate: true })
+                  }}
+                >
+                  <CopyIcon />
+                </button>
+                <button
+                  className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
+                  title={t('sidebar.editHost')}
                   onClick={(e) => {
                     e.stopPropagation()
                     setModal({ kind: 'host', host })
@@ -177,22 +189,20 @@ export function Sidebar() {
         ))}
 
         {hosts.length === 0 && (
-          <p className="px-2 py-6 text-center text-[11px] leading-relaxed text-zinc-600">
-            Chưa có host nào.
-            <br />
-            Bấm <b>+ Host</b> để thêm, gõ <b>user@host</b> để Quick Connect, hoặc menu ⋯ để import từ ssh_config.
+          <p className="text-subtle px-2 py-6 text-center text-[11px] leading-relaxed">
+            {t('sidebar.empty')}
           </p>
         )}
 
         {history.length > 0 && (
-          <div className="mt-3 border-t border-zinc-800/70 pt-2">
-            <div className="px-1 py-1 text-[10px] font-semibold tracking-wider text-zinc-600 uppercase">
-              Gần đây
+          <div className="border-edge/70 mt-3 border-t pt-2">
+            <div className="text-subtle px-1 py-1 text-[10px] font-semibold tracking-wider uppercase">
+              {t('sidebar.recent')}
             </div>
             {history.map((entry) => (
               <button
                 key={entry.id}
-                className="block w-full truncate rounded px-2 py-1 text-left text-[11px] text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-200"
+                className="text-muted hover:bg-hover hover:text-content block w-full truncate rounded px-2 py-1 text-left text-[11px]"
                 onClick={() => {
                   if (entry.hostId) void openSsh(entry.hostId)
                   else void openQuick(entry.target.replace(/:22$/, ''))
@@ -205,35 +215,39 @@ export function Sidebar() {
         )}
       </div>
 
-      <div className="flex gap-1.5 border-t border-zinc-800 p-2" ref={menuRef}>
+      <div className="border-edge flex gap-1.5 border-t p-2" ref={menuRef}>
         <Button className="flex-1 !py-1 !text-xs" variant="primary" onClick={() => setModal({ kind: 'host', host: null })}>
-          + Host
+          {t('sidebar.addHost')}
         </Button>
         <Button className="flex-1 !py-1 !text-xs" onClick={() => openAppModal('keys')}>
-          Keys
+          {t('sidebar.keys')}
         </Button>
         <div className="relative">
-          <Button className="!px-2 !py-1 !text-xs" onClick={() => setMenuOpen((v) => !v)} title="Công cụ khác">
+          <Button className="!px-2 !py-1 !text-xs" onClick={() => setMenuOpen((v) => !v)} title={t('sidebar.moreTools')}>
             ⋯
           </Button>
           {menuOpen && (
-            <div className="absolute bottom-9 right-0 z-50 min-w-44 rounded-md border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
-              <MenuItem label="⚡ Bulk Execution (chạy đa host)" onClick={() => { setMenuOpen(false); openAppModal('bulk') }} />
-              <MenuItem label="📊 Monitoring Dashboard" onClick={() => { setMenuOpen(false); openAppModal('monitor') }} />
-              <MenuItem label="🤖 Trợ lý AI" onClick={() => { setMenuOpen(false); openAppModal('ai') }} />
-              <MenuItem label="⏯ Bản ghi phiên (replay)" onClick={() => { setMenuOpen(false); openAppModal('recordings') }} />
-              <MenuItem label="🛰 Network Toolbox" onClick={() => { setMenuOpen(false); openAppModal('net') }} />
-              <MenuItem label="🔄 Sync (E2EE)" onClick={() => { setMenuOpen(false); openAppModal('sync') }} />
-              <MenuItem label="⚡ Snippets" onClick={() => { setMenuOpen(false); openAppModal('snippets') }} />
-              <MenuItem label="⇄ Tunnels (port forwarding)" onClick={() => { setMenuOpen(false); openAppModal('tunnels') }} />
-              <MenuItem label="🗂 Tạo group" onClick={() => { setMenuOpen(false); setModal({ kind: 'group', group: null }) }} />
-              <MenuItem label="📥 Import từ ssh_config…" onClick={() => void runImport()} />
+            <div className="border-edge-strong bg-elevated absolute right-0 bottom-9 z-50 min-w-44 rounded-md border py-1 shadow-xl">
+              <MenuItem label={t('menu.bulk')} onClick={() => { setMenuOpen(false); openAppModal('bulk') }} />
+              <MenuItem label={t('menu.monitor')} onClick={() => { setMenuOpen(false); openAppModal('monitor') }} />
+              <MenuItem label={t('menu.ai')} onClick={() => { setMenuOpen(false); openAppModal('ai') }} />
+              <MenuItem label={t('menu.recordings')} onClick={() => { setMenuOpen(false); openAppModal('recordings') }} />
+              <MenuItem label={t('menu.net')} onClick={() => { setMenuOpen(false); openAppModal('net') }} />
+              <MenuItem label={t('menu.sync')} onClick={() => { setMenuOpen(false); openAppModal('sync') }} />
+              <MenuItem label={t('menu.snippets')} onClick={() => { setMenuOpen(false); openAppModal('snippets') }} />
+              <MenuItem label={t('menu.tunnels')} onClick={() => { setMenuOpen(false); openAppModal('tunnels') }} />
+              <MenuItem label={t('menu.createGroup')} onClick={() => { setMenuOpen(false); setModal({ kind: 'group', group: null }) }} />
+              <MenuItem label={t('menu.import')} onClick={() => void runImport()} />
+              <div className="border-edge my-1 border-t" />
+              <MenuItem label={t('menu.settings')} onClick={() => { setMenuOpen(false); openAppModal('settings') }} />
             </div>
           )}
         </div>
       </div>
 
-      {modal?.kind === 'host' && <HostEditorModal host={modal.host} onClose={() => setModal(null)} />}
+      {modal?.kind === 'host' && (
+        <HostEditorModal host={modal.host} duplicate={modal.duplicate} onClose={() => setModal(null)} />
+      )}
       {modal?.kind === 'group' && <GroupEditorModal group={modal.group} onClose={() => setModal(null)} />}
     </div>
   )
@@ -246,7 +260,7 @@ function openAppModal(kind: AppModal): void {
 function MenuItem({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
-      className="block w-full px-3 py-1.5 text-left text-xs text-zinc-300 hover:bg-zinc-700/60 hover:text-zinc-100"
+      className="text-muted hover:bg-hover hover:text-content block w-full px-3 py-1.5 text-left text-xs whitespace-nowrap"
       onClick={onClick}
     >
       {label}
@@ -266,6 +280,15 @@ function FolderIcon() {
   return (
     <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
       <path d="M1.5 2h4l1.5 2h7.5a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" />
+    </svg>
+  )
+}
+
+function CopyIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
+      <rect x="5" y="5" width="9" height="9" rx="1.5" />
+      <path d="M11 5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2" />
     </svg>
   )
 }

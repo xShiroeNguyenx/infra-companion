@@ -3,6 +3,7 @@ import type { AuthType, HostDto, HostInput, HostProtocol, LoginStep, SerialPortI
 import { useDataStore } from '../stores/data'
 import { envToText, textToEnv } from '../lib/env'
 import { Button, ConfirmModal, Field, Modal, Select, TextArea, TextInput } from './ui'
+import { useT } from '../i18n'
 
 const NEW_GROUP = '__new__'
 const BAUD_RATES = [9600, 19200, 38400, 57600, 115200, 230400]
@@ -15,10 +16,22 @@ const SU_SSH_TEMPLATE: LoginStep[] = [
   { expect: '$', send: 'ssh <user>@<server-B>', secret: false }
 ]
 
-export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClose: () => void }) {
+export function HostEditorModal({
+  host,
+  duplicate = false,
+  onClose
+}: {
+  host: HostDto | null
+  /** Nhân bản: dùng host làm mẫu nhưng lưu thành host MỚI (bỏ id). */
+  duplicate?: boolean
+  onClose: () => void
+}) {
+  const t = useT()
   const { hosts, groups, keys, snippets, saveHost, deleteHost, saveGroup } = useDataStore()
+  // isEdit = đang sửa host có sẵn. Nhân bản tuy có `host` mẫu nhưng vẫn là tạo mới.
+  const isEdit = host !== null && !duplicate
   const [protocol, setProtocol] = useState<HostProtocol>(host?.protocol ?? 'ssh')
-  const [label, setLabel] = useState(host?.label ?? '')
+  const [label, setLabel] = useState(duplicate && host ? `${host.label} (copy)` : (host?.label ?? ''))
   const [hostname, setHostname] = useState(host?.hostname ?? '')
   const [port, setPort] = useState(String(host?.port ?? 22))
   const [serialPorts, setSerialPorts] = useState<SerialPortInfo[]>([])
@@ -46,7 +59,7 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  const hostLabel = (id: string): string => hosts.find((h) => h.id === id)?.label ?? '(đã xoá)'
+  const hostLabel = (id: string): string => hosts.find((h) => h.id === id)?.label ?? t('host.deleted')
   const jumpCandidates = hosts.filter((h) => h.id !== host?.id && !jumpChain.includes(h.id))
   const isSsh = protocol === 'ssh'
   const isSerial = protocol === 'serial'
@@ -65,22 +78,22 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
 
   const submit = async (): Promise<void> => {
     setError(null)
-    if (!hostname.trim()) return setError(isSerial ? 'Chọn/nhập cổng COM' : 'Nhập hostname/IP')
+    if (!hostname.trim()) return setError(isSerial ? t('host.errCom') : t('host.errHostname'))
     const portNum = Number(port)
     if (isSerial) {
-      if (!Number.isInteger(portNum) || portNum < 50) return setError('Baud rate không hợp lệ')
+      if (!Number.isInteger(portNum) || portNum < 50) return setError(t('host.errBaud'))
     } else if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65_535) {
-      return setError('Port không hợp lệ')
+      return setError(t('host.errPort'))
     }
-    if (isSsh && authType === 'key' && !keyId) return setError('Chọn SSH key (hoặc tạo trong mục Keys)')
-    if (isSsh && authType === 'secret' && !secretRef.trim()) return setError('Nhập tham chiếu secret (op:// , bw:// , vault://)')
+    if (isSsh && authType === 'key' && !keyId) return setError(t('host.errKey'))
+    if (isSsh && authType === 'secret' && !secretRef.trim()) return setError(t('host.errSecret'))
 
     setBusy(true)
     let finalGroupId: string | null = groupId || null
     if (groupId === NEW_GROUP) {
       if (!newGroupName.trim()) {
         setBusy(false)
-        return setError('Nhập tên group mới')
+        return setError(t('host.errGroupName'))
       }
       const group = await saveGroup({ name: newGroupName.trim() })
       if (!group) return setBusy(false)
@@ -89,7 +102,7 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
 
     const sshOnly = isSsh
     const input: HostInput = {
-      id: host?.id,
+      id: isEdit ? host!.id : undefined,
       groupId: finalGroupId,
       protocol,
       label: label.trim() || `${username || 'host'}@${hostname}`,
@@ -114,7 +127,7 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
 
   return (
     // closeOnBackdrop=false: form dài — click hụt ra ngoài không được làm mất dữ liệu đang nhập
-    <Modal title={host ? 'Sửa host' : 'Thêm host'} onClose={onClose} closeOnBackdrop={false}>
+    <Modal title={isEdit ? t('host.titleEdit') : duplicate ? t('host.titleDuplicate') : t('host.titleAdd')} onClose={onClose} closeOnBackdrop={false}>
       <form
         className="max-h-[70vh] overflow-y-auto pr-1"
         onSubmit={(e) => {
@@ -122,25 +135,25 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
           void submit()
         }}
       >
-        <Field label="Tên hiển thị">
-          <TextInput value={label} onChange={(e) => setLabel(e.target.value)} placeholder="VD: Web server production" />
+        <Field label={t('host.displayName')}>
+          <TextInput value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t('host.displayNamePh')} />
         </Field>
 
-        <Field label="Giao thức">
+        <Field label={t('host.protocol')}>
           <Select value={protocol} onChange={(e) => changeProtocol(e.target.value as HostProtocol)}>
             <option value="ssh">SSH</option>
             <option value="telnet">Telnet</option>
-            <option value="serial">Serial (COM / USB)</option>
+            <option value="serial">{t('host.protoSerial')}</option>
           </Select>
         </Field>
 
         {isSerial ? (
           <div className="flex gap-2">
             <div className="flex-1">
-              <Field label="Cổng COM">
+              <Field label={t('host.comPort')}>
                 {serialPorts.length > 0 ? (
                   <Select value={hostname} onChange={(e) => setHostname(e.target.value)}>
-                    <option value="">— Chọn cổng —</option>
+                    <option value="">{t('host.chooseCom')}</option>
                     {serialPorts.map((p) => (
                       <option key={p.path} value={p.path}>
                         {p.path} {p.label !== p.path ? `— ${p.label}` : ''}
@@ -154,13 +167,13 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
                   <TextInput
                     value={hostname}
                     onChange={(e) => setHostname(e.target.value)}
-                    placeholder="COM3 / /dev/ttyUSB0 (cắm thiết bị rồi mở lại)"
+                    placeholder={t('host.comPh')}
                   />
                 )}
               </Field>
             </div>
             <div className="w-28">
-              <Field label="Baud">
+              <Field label={t('host.baud')}>
                 <Select value={port} onChange={(e) => setPort(e.target.value)}>
                   {BAUD_RATES.map((b) => (
                     <option key={b} value={b}>
@@ -174,7 +187,7 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
         ) : (
           <div className="flex gap-2">
             <div className="flex-1">
-              <Field label="Hostname / IP">
+              <Field label={t('host.hostname')}>
                 <TextInput
                   autoFocus
                   value={hostname}
@@ -184,7 +197,7 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
               </Field>
             </div>
             <div className="w-24">
-              <Field label="Port">
+              <Field label={t('host.port')}>
                 <TextInput value={port} onChange={(e) => setPort(e.target.value)} />
               </Field>
             </div>
@@ -192,30 +205,30 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
         )}
 
         {isSsh && (
-          <Field label="Username">
+          <Field label={t('host.username')}>
             <TextInput
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="(kế thừa từ group)"
+              placeholder={t('host.inheritGroup')}
             />
           </Field>
         )}
 
         {isSsh && (
-          <Field label="Xác thực">
+          <Field label={t('host.auth')}>
             <Select value={authType} onChange={(e) => setAuthType(e.target.value as '' | AuthType)}>
-              <option value="">(kế thừa từ group)</option>
-              <option value="password">Password</option>
-              <option value="key">SSH Key</option>
-              <option value="agent">SSH Agent (OS)</option>
-              <option value="secret">Secret manager (1Password / Bitwarden / Vault)</option>
-              <option value="none">Không cần xác thực (server cho vào thẳng)</option>
+              <option value="">{t('host.inheritGroup')}</option>
+              <option value="password">{t('host.authPassword')}</option>
+              <option value="key">{t('auth.key')}</option>
+              <option value="agent">{t('auth.agent')}</option>
+              <option value="secret">{t('host.authSecret')}</option>
+              <option value="none">{t('auth.none')}</option>
             </Select>
           </Field>
         )}
 
         {isSsh && authType === 'secret' && (
-          <Field label="Tham chiếu secret (lấy password lúc kết nối, không lưu trong app)">
+          <Field label={t('host.secretRef')}>
             <TextInput
               value={secretRef}
               onChange={(e) => setSecretRef(e.target.value)}
@@ -226,7 +239,7 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
 
         {isSsh && authType === 'password' && (
           <>
-            <Field label={host?.hasPassword ? 'Password (để trống = giữ nguyên)' : 'Password (để trống = hỏi khi kết nối)'}>
+            <Field label={isEdit && host?.hasPassword ? t('host.pwKeep') : t('host.pwAsk')}>
               <TextInput
                 type="password"
                 value={password}
@@ -234,26 +247,31 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
                   setPassword(e.target.value)
                   setClearPassword(false)
                 }}
-                placeholder={host?.hasPassword ? '••••••••' : ''}
+                placeholder={isEdit && host?.hasPassword ? '••••••••' : ''}
               />
             </Field>
-            {host?.hasPassword && (
-              <label className="mb-2.5 -mt-1 flex items-center gap-2 text-xs text-zinc-400 select-none">
+            {duplicate && host?.hasPassword && (
+              <p className="mb-2.5 -mt-1 text-[10px] leading-relaxed text-warning/80">
+                {t('host.pwDupNote')}
+              </p>
+            )}
+            {isEdit && host?.hasPassword && (
+              <label className="mb-2.5 -mt-1 flex items-center gap-2 text-xs text-muted select-none">
                 <input
                   type="checkbox"
                   checked={clearPassword}
                   onChange={(e) => setClearPassword(e.target.checked)}
                 />
-                Xoá password đã lưu (sẽ hỏi mỗi lần kết nối)
+                {t('host.pwClear')}
               </label>
             )}
           </>
         )}
 
         {isSsh && authType === 'key' && (
-          <Field label="SSH Key">
+          <Field label={t('host.sshKey')}>
             <Select value={keyId} onChange={(e) => setKeyId(e.target.value)}>
-              <option value="">— Chọn key —</option>
+              <option value="">{t('auth.chooseKey')}</option>
               {keys.map((k) => (
                 <option key={k.id} value={k.id}>
                   {k.label} ({k.keyType})
@@ -263,19 +281,19 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
           </Field>
         )}
 
-        <Field label="Group">
+        <Field label={t('host.group')}>
           <Select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-            <option value="">— Không nhóm —</option>
+            <option value="">{t('host.noGroup')}</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
               </option>
             ))}
-            <option value={NEW_GROUP}>+ Tạo group mới…</option>
+            <option value={NEW_GROUP}>{t('host.newGroupOpt')}</option>
           </Select>
         </Field>
         {groupId === NEW_GROUP && (
-          <Field label="Tên group mới">
+          <Field label={t('host.newGroupName')}>
             <TextInput value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} />
           </Field>
         )}
@@ -283,25 +301,25 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
         {isSsh && (
           <button
             type="button"
-            className="mb-2 text-xs text-blue-400 hover:text-blue-300"
+            className="mb-2 text-xs text-accent-fg hover:text-accent-fg"
             onClick={() => setShowAdvanced((v) => !v)}
           >
-            {showAdvanced ? '▾' : '▸'} Nâng cao (jump host, env, startup…)
+            {showAdvanced ? '▾' : '▸'} {t('host.advanced')}
           </button>
         )}
 
         {isSsh && showAdvanced && (
-          <div className="mb-2 rounded border border-zinc-800 bg-zinc-950/50 p-2.5">
-            <Field label="Jump hosts (kết nối xuyên qua, theo thứ tự)">
+          <div className="mb-2 rounded border border-edge bg-input/50 p-2.5">
+            <Field label={t('host.jumpHosts')}>
               <div>
                 {jumpChain.map((id, index) => (
-                  <div key={id} className="mb-1 flex items-center gap-1.5 text-xs text-zinc-300">
-                    <span className="text-zinc-600">{index + 1}.</span>
+                  <div key={id} className="mb-1 flex items-center gap-1.5 text-xs text-content">
+                    <span className="text-subtle">{index + 1}.</span>
                     <span className="flex-1 truncate">{hostLabel(id)}</span>
                     <button
                       type="button"
-                      className="rounded px-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-                      title="Xoá khỏi chain"
+                      className="rounded px-1 text-subtle hover:bg-hover hover:text-content"
+                      title={t('host.removeJump')}
                       onClick={() => setJumpChain((prev) => prev.filter((x) => x !== id))}
                     >
                       ✕
@@ -310,7 +328,7 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
                 ))}
                 <div className="flex gap-1.5">
                   <Select value={jumpToAdd} onChange={(e) => setJumpToAdd(e.target.value)} className="!text-xs">
-                    <option value="">+ Thêm jump host…</option>
+                    <option value="">{t('host.addJump')}</option>
                     {jumpCandidates.map((h) => (
                       <option key={h.id} value={h.id}>
                         {h.label}
@@ -328,19 +346,19 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
                       }
                     }}
                   >
-                    Thêm
+                    {t('host.add')}
                   </Button>
                 </div>
               </div>
             </Field>
 
-            <Field label="Biến môi trường (KEY=VALUE mỗi dòng)">
+            <Field label={t('host.env')}>
               <TextArea rows={2} value={envText} onChange={(e) => setEnvText(e.target.value)} />
             </Field>
 
-            <Field label="Startup snippet">
+            <Field label={t('host.startup')}>
               <Select value={startupSnippetId} onChange={(e) => setStartupSnippetId(e.target.value)}>
-                <option value="">(không có)</option>
+                <option value="">{t('common.none')}</option>
                 {snippets.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.label}
@@ -349,16 +367,16 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
               </Select>
             </Field>
 
-            <label className="mb-2.5 flex items-center gap-2 text-xs text-zinc-400 select-none">
+            <label className="mb-2.5 flex items-center gap-2 text-xs text-muted select-none">
               <input type="checkbox" checked={agentForward} onChange={(e) => setAgentForward(e.target.checked)} />
-              Agent forwarding (chuyển tiếp ssh-agent — tương đương ssh -A)
+              {t('host.agentFwd')}
             </label>
 
-            <Field label="Login script (tự gõ lệnh sau khi login — vd su rồi ssh tiếp)">
+            <Field label={t('host.loginScript')}>
               <div>
                 {loginSteps.map((step, index) => (
                   <div key={index} className="mb-1.5 flex items-center gap-1.5">
-                    <span className="w-4 shrink-0 text-right text-[10px] text-zinc-600">{index + 1}</span>
+                    <span className="w-4 shrink-0 text-right text-[10px] text-subtle">{index + 1}</span>
                     <input
                       value={step.expect ?? ''}
                       onChange={(e) =>
@@ -366,9 +384,9 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
                           prev.map((s, i) => (i === index ? { ...s, expect: e.target.value } : s))
                         )
                       }
-                      placeholder="chờ chuỗi…"
-                      title='Chờ chuỗi này xuất hiện trong output rồi mới gửi (vd "assword", "$"). Trống = gửi sau 0.8s'
-                      className="w-24 shrink-0 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-1 text-[11px] text-zinc-200 outline-none focus:border-blue-600"
+                      placeholder={t('host.expectPh')}
+                      title={t('host.expectTip')}
+                      className="w-24 shrink-0 rounded border border-edge-strong bg-input px-1.5 py-1 text-[11px] text-content outline-none focus:border-accent"
                     />
                     <input
                       type={step.secret ? 'password' : 'text'}
@@ -380,16 +398,16 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
                       }
                       placeholder={
                         step.secret
-                          ? host?.loginSteps?.[index]?.secret
-                            ? '•••• (để trống = giữ nguyên)'
-                            : 'mật khẩu (trống = hỏi khi kết nối)'
-                          : 'lệnh gửi đi…'
+                          ? isEdit && host?.loginSteps?.[index]?.secret
+                            ? t('host.stepPwKeep')
+                            : t('host.stepPwAsk')
+                          : t('host.stepSendPh')
                       }
-                      className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-1 font-mono text-[11px] text-zinc-200 outline-none focus:border-blue-600"
+                      className="min-w-0 flex-1 rounded border border-edge-strong bg-input px-1.5 py-1 font-mono text-[11px] text-content outline-none focus:border-accent"
                     />
                     <label
-                      className="flex shrink-0 items-center gap-1 text-[10px] text-zinc-500 select-none"
-                      title="Là mật khẩu: lưu mã hoá, không hiển thị lại"
+                      className="flex shrink-0 items-center gap-1 text-[10px] text-subtle select-none"
+                      title={t('host.secretTip')}
                     >
                       <input
                         type="checkbox"
@@ -404,8 +422,8 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
                     </label>
                     <button
                       type="button"
-                      className="shrink-0 rounded px-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-                      title="Xoá bước"
+                      className="shrink-0 rounded px-1 text-subtle hover:bg-hover hover:text-content"
+                      title={t('host.removeStep')}
                       onClick={() => setLoginSteps((prev) => prev.filter((_, i) => i !== index))}
                     >
                       ✕
@@ -418,23 +436,22 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
                     className="!px-2 !py-1 !text-xs"
                     onClick={() => setLoginSteps((prev) => [...prev, { expect: '', send: '', secret: false }])}
                   >
-                    + Bước
+                    {t('host.addStep')}
                   </Button>
                   {loginSteps.length === 0 && (
                     <Button
                       type="button"
                       className="!px-2 !py-1 !text-xs"
-                      title="Điền sẵn 3 bước: su → nhập mật khẩu → ssh sang server khác"
+                      title={t('host.suTemplateTip')}
                       onClick={() => setLoginSteps(SU_SSH_TEMPLATE.map((s) => ({ ...s })))}
                     >
-                      Mẫu: su → ssh
+                      {t('host.suTemplate')}
                     </Button>
                   )}
                 </div>
                 {loginSteps.length > 0 && (
-                  <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
-                    Chạy lần lượt sau khi login (cả khi auto-reconnect). Mật khẩu 🔒 được mã hoá trong vault;
-                    để trống sẽ hỏi mỗi lần kết nối.
+                  <p className="mt-1.5 text-[10px] leading-relaxed text-subtle">
+                    {t('host.loginNote')}
                   </p>
                 )}
               </div>
@@ -442,24 +459,20 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
           </div>
         )}
 
-        {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
+        {error && <p className="mb-3 text-xs text-danger">{error}</p>}
 
         <div className="flex items-center justify-between pt-1">
-          {host ? (
+          {isEdit ? (
             <Button type="button" variant="danger" onClick={() => setConfirmDelete(true)}>
-              Xoá host
+              {t('host.deleteHost')}
             </Button>
           ) : (
             <span />
           )}
-          {confirmDelete && host && (
+          {confirmDelete && isEdit && host && (
             <ConfirmModal
-              title="Xoá host"
-              message={
-                <>
-                  Xoá vĩnh viễn host <b>{host.label}</b>? Mật khẩu/login script lưu kèm sẽ mất theo.
-                </>
-              }
+              title={t('host.deleteHost')}
+              message={t('host.deleteConfirm', { label: host.label })}
               onConfirm={() => {
                 setConfirmDelete(false)
                 // chỉ đóng editor khi xoá thành công — thất bại thì giữ modal, lỗi đã có toast
@@ -472,10 +485,10 @@ export function HostEditorModal({ host, onClose }: { host: HostDto | null; onClo
           )}
           <div className="flex gap-2">
             <Button type="button" onClick={onClose}>
-              Huỷ
+              {t('common.cancel')}
             </Button>
             <Button type="submit" variant="primary" disabled={busy}>
-              {busy ? 'Đang lưu…' : 'Lưu'}
+              {busy ? t('common.saving') : t('common.save')}
             </Button>
           </div>
         </div>

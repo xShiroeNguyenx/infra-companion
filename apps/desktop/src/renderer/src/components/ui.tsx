@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { useT } from '../i18n'
 
 export function Modal({
   title,
@@ -32,14 +33,14 @@ export function Modal({
     >
       {/* w-fit + min/max: form thường giữ tối thiểu 420px, nội dung rộng hơn (560–700px) tự nới ra, trần 92vw */}
       <div
-        className={`flex max-h-[92vh] w-fit max-w-[92vw] min-w-[min(420px,92vw)] flex-col overflow-hidden rounded-lg border bg-zinc-900 shadow-2xl ${
-          danger ? 'border-red-700' : 'border-zinc-700'
+        className={`bg-elevated flex max-h-[92vh] w-fit max-w-[92vw] min-w-[min(420px,92vw)] flex-col overflow-hidden rounded-lg border shadow-2xl ${
+          danger ? 'border-danger' : 'border-edge-strong'
         }`}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div
           className={`shrink-0 border-b px-4 py-2.5 text-sm font-semibold ${
-            danger ? 'border-red-800 text-red-400' : 'border-zinc-800 text-zinc-200'
+            danger ? 'border-danger/60 text-danger' : 'border-edge text-content'
           }`}
         >
           {title}
@@ -54,7 +55,7 @@ export function Modal({
 export function ConfirmModal({
   title,
   message,
-  confirmLabel = 'Xoá',
+  confirmLabel,
   onConfirm,
   onCancel
 }: {
@@ -64,13 +65,14 @@ export function ConfirmModal({
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const t = useT()
   return (
     <Modal title={title} onClose={onCancel} danger>
-      <div className="mb-3 max-w-96 text-sm text-zinc-300">{message}</div>
+      <div className="text-content mb-3 max-w-96 text-sm">{message}</div>
       <div className="flex justify-end gap-2">
-        <Button onClick={onCancel}>Huỷ</Button>
+        <Button onClick={onCancel}>{t('common.cancel')}</Button>
         <Button variant="danger" onClick={onConfirm}>
-          {confirmLabel}
+          {confirmLabel ?? t('common.delete')}
         </Button>
       </div>
     </Modal>
@@ -80,7 +82,7 @@ export function ConfirmModal({
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="mb-2.5 block">
-      <span className="mb-1 block text-[11px] font-medium tracking-wide text-zinc-400 uppercase">{label}</span>
+      <span className="text-muted mb-1 block text-[11px] font-medium tracking-wide uppercase">{label}</span>
       {children}
     </label>
   )
@@ -90,7 +92,7 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`w-full rounded border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-blue-500 ${props.className ?? ''}`}
+      className={`border-edge-strong bg-input text-content placeholder-subtle focus:border-accent w-full rounded border px-2.5 py-1.5 text-sm outline-none ${props.className ?? ''}`}
     />
   )
 }
@@ -99,7 +101,7 @@ export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
   return (
     <textarea
       {...props}
-      className={`w-full rounded border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 font-mono text-xs text-zinc-100 placeholder-zinc-600 outline-none focus:border-blue-500 ${props.className ?? ''}`}
+      className={`border-edge-strong bg-input text-content placeholder-subtle focus:border-accent w-full rounded border px-2.5 py-1.5 font-mono text-xs outline-none ${props.className ?? ''}`}
     />
   )
 }
@@ -108,7 +110,7 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className={`w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-blue-500 ${props.className ?? ''}`}
+      className={`border-edge-strong bg-input text-content focus:border-accent w-full rounded border px-2 py-1.5 text-sm outline-none ${props.className ?? ''}`}
     />
   )
 }
@@ -118,9 +120,9 @@ export function Button({
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'default' | 'primary' | 'danger' }) {
   const styles = {
-    default: 'border border-zinc-700 text-zinc-300 hover:bg-zinc-800',
-    primary: 'bg-blue-600 text-white hover:bg-blue-500',
-    danger: 'bg-red-700 text-white hover:bg-red-600'
+    default: 'border border-edge-strong text-muted hover:bg-hover',
+    primary: 'bg-accent text-white hover:bg-accent-hover',
+    danger: 'bg-danger text-white hover:opacity-90'
   }[variant]
   return (
     <button

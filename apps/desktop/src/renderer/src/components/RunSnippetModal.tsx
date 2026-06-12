@@ -4,9 +4,11 @@ import { useTabsStore } from '../stores/tabs'
 import { useToastsStore } from '../stores/toasts'
 import { Button, Field, Modal, TextInput } from './ui'
 import { parseSnippetVars, substituteSnippet } from './SnippetsModal'
+import { useT } from '../i18n'
 
 /** Chạy snippet: điền biến {{x}} + chọn các pane đích (P42 — chạy đa session). */
 export function RunSnippetModal({ snippet, onClose }: { snippet: SnippetDto; onClose: () => void }) {
+  const t = useT()
   const { tabs, activeId } = useTabsStore()
   // Gom tất cả pane terminal đang kết nối (qua mọi tab) làm danh sách đích
   const panes = tabs
@@ -37,12 +39,12 @@ export function RunSnippetModal({ snippet, onClose }: { snippet: SnippetDto; onC
     for (const id of targets) {
       window.infra.terminal.write(id, script.endsWith('\n') ? script : script + '\n')
     }
-    useToastsStore.getState().push(`Đã chạy "${snippet.label}" trên ${targets.size} phiên`, 'info')
+    useToastsStore.getState().push(t('runSnippet.done', { label: snippet.label, n: targets.size }), 'info')
     onClose()
   }
 
   return (
-    <Modal title={`Chạy: ${snippet.label}`} onClose={onClose}>
+    <Modal title={t('runSnippet.title', { label: snippet.label })} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -50,7 +52,7 @@ export function RunSnippetModal({ snippet, onClose }: { snippet: SnippetDto; onC
         }}
       >
         {vars.map((name, index) => (
-          <Field key={name} label={`Biến {{${name}}}`}>
+          <Field key={name} label={t('runSnippet.varLabel', { name })}>
             <TextInput
               autoFocus={index === 0}
               value={values[name] ?? ''}
@@ -59,15 +61,15 @@ export function RunSnippetModal({ snippet, onClose }: { snippet: SnippetDto; onC
           </Field>
         ))}
 
-        <Field label={`Chạy trên pane (${targets.size} đã chọn)`}>
-          <div className="max-h-40 overflow-y-auto rounded border border-zinc-800 bg-zinc-950 p-1">
+        <Field label={t('runSnippet.targets', { n: targets.size })}>
+          <div className="border-edge bg-input max-h-40 overflow-y-auto rounded border p-1">
             {panes.length === 0 && (
-              <p className="px-2 py-3 text-center text-xs text-zinc-500">Không có phiên nào đang kết nối</p>
+              <p className="text-subtle px-2 py-3 text-center text-xs">{t('runSnippet.noSession')}</p>
             )}
             {panes.map((pane) => (
               <label
                 key={pane.sessionId}
-                className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs text-zinc-300 select-none hover:bg-zinc-800/60"
+                className="text-muted hover:bg-hover flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs select-none"
               >
                 <input
                   type="checkbox"
@@ -85,10 +87,10 @@ export function RunSnippetModal({ snippet, onClose }: { snippet: SnippetDto; onC
 
         <div className="flex justify-end gap-2">
           <Button type="button" onClick={onClose}>
-            Huỷ
+            {t('common.cancel')}
           </Button>
           <Button type="submit" variant="primary" disabled={targets.size === 0}>
-            ⚡ Chạy ({targets.size})
+            {t('runSnippet.run', { n: targets.size })}
           </Button>
         </div>
       </form>

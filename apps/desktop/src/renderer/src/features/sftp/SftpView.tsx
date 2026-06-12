@@ -4,9 +4,11 @@ import { formatSize } from '../../lib/paths'
 import { errorMessage, useToastsStore } from '../../stores/toasts'
 import type { AppTab } from '../../stores/tabs'
 import { FilePane, usePane, type PaneAdapter } from './FilePane'
+import { useT } from '../../i18n'
 
 /** Tab SFTP: dual-pane local ↔ remote + hàng đợi transfer ở đáy. */
 export function SftpView({ tab, active }: { tab: AppTab; active: boolean }) {
+  const t = useT()
   const [transfers, setTransfers] = useState<TransferEvent[]>([])
   const sid = tab.sftpSessionId ?? ''
 
@@ -86,16 +88,16 @@ export function SftpView({ tab, active }: { tab: AppTab; active: boolean }) {
         <FilePane title="Local" adapter={localAdapter} pane={local} />
         <div className="flex flex-col items-center justify-center gap-2 px-1.5">
           <button
-            className="rounded border border-zinc-700 px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
-            title="Upload file/thư mục đã chọn lên remote"
+            className="rounded border border-edge-strong px-2 py-1 text-sm text-content hover:bg-hover disabled:opacity-40"
+            title={t('sftp.uploadTip')}
             disabled={!local.selected}
             onClick={() => void upload()}
           >
             →
           </button>
           <button
-            className="rounded border border-zinc-700 px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
-            title="Download file/thư mục đã chọn về local"
+            className="rounded border border-edge-strong px-2 py-1 text-sm text-content hover:bg-hover disabled:opacity-40"
+            title={t('sftp.downloadTip')}
             disabled={!remote.selected}
             onClick={() => void download()}
           >
@@ -106,37 +108,37 @@ export function SftpView({ tab, active }: { tab: AppTab; active: boolean }) {
       </div>
 
       {transfers.length > 0 && (
-        <div className="max-h-28 shrink-0 overflow-y-auto border-t border-zinc-800 bg-[#0e121b] px-3 py-1.5">
-          <div className="mb-1 text-[10px] font-semibold tracking-wider text-zinc-600 uppercase">
-            Transfers {activeTransfers.length > 0 ? `(${activeTransfers.length} đang chạy)` : ''}
+        <div className="max-h-28 shrink-0 overflow-y-auto border-t border-edge bg-panel px-3 py-1.5">
+          <div className="mb-1 text-[10px] font-semibold tracking-wider text-subtle uppercase">
+            {t('sftp.transfers')} {activeTransfers.length > 0 ? t('sftp.running', { n: activeTransfers.length }) : ''}
           </div>
           {[...transfers].reverse().map((transfer) => (
             <div key={transfer.id} className="mb-1 flex items-center gap-2 text-[11px]">
               <span
                 className={
                   transfer.status === 'error'
-                    ? 'text-red-400'
+                    ? 'text-danger'
                     : transfer.status === 'done'
-                      ? 'text-emerald-500'
-                      : 'text-amber-400'
+                      ? 'text-success'
+                      : 'text-warning'
                 }
               >
                 {transfer.kind === 'download' ? '↓' : '↑'}
               </span>
-              <span className="min-w-0 flex-1 truncate text-zinc-400">{transfer.label}</span>
+              <span className="min-w-0 flex-1 truncate text-muted">{transfer.label}</span>
               {transfer.status === 'running' && transfer.total > 0 && (
-                <div className="h-1 w-32 overflow-hidden rounded bg-zinc-800">
+                <div className="h-1 w-32 overflow-hidden rounded bg-hover">
                   <div
-                    className="h-full bg-blue-500"
+                    className="h-full bg-accent-hover"
                     style={{ width: `${Math.min(100, (transfer.transferred / transfer.total) * 100)}%` }}
                   />
                 </div>
               )}
-              <span className="w-20 text-right text-zinc-600">
+              <span className="w-20 text-right text-subtle">
                 {transfer.status === 'done'
-                  ? 'xong'
+                  ? t('sftp.done')
                   : transfer.status === 'error'
-                    ? 'lỗi'
+                    ? t('sftp.error')
                     : `${formatSize(transfer.transferred)}/${formatSize(transfer.total)}`}
               </span>
             </div>

@@ -14,8 +14,10 @@ import { MonitorModal } from './components/MonitorModal'
 import { SyncModal } from './components/SyncModal'
 import { AiModal } from './components/AiModal'
 import { RecordingsModal } from './components/RecordingsModal'
+import { SettingsModal } from './components/SettingsModal'
 import { UpdateBanner } from './components/UpdateBanner'
 import { SftpView } from './features/sftp/SftpView'
+import { useT } from './i18n'
 import { TerminalTabView } from './features/terminal/TerminalTabView'
 import { useDataStore } from './stores/data'
 import { useTabsStore } from './stores/tabs'
@@ -24,6 +26,7 @@ import { useUiStore } from './stores/ui'
 import { useVaultStore } from './stores/vault'
 
 export default function App() {
+  const t = useT()
   const vaultState = useVaultStore((s) => s.state)
   const { tabs, activeId, openLocal } = useTabsStore()
   const toasts = useToastsStore((s) => s.toasts)
@@ -118,7 +121,7 @@ export default function App() {
   }, [])
 
   if (vaultState === 'loading') {
-    return <div className="h-screen bg-[#0b0e14]" />
+    return <div className="bg-app h-screen" />
   }
 
   // Khoá vault: phủ VaultGate dạng overlay, KHÔNG unmount cây tab —
@@ -126,20 +129,21 @@ export default function App() {
   const locked = vaultState !== 'unlocked'
 
   const paletteCommands: Command[] = [
-    { id: 'open-bulk', label: '⚡ Bulk Execution — chạy lệnh trên nhiều host', run: () => setModal('bulk') },
-    { id: 'open-monitor', label: '📊 Monitoring Dashboard', run: () => setModal('monitor') },
-    { id: 'open-net', label: '🛰 Network Toolbox (ping/DNS/port)', run: () => setModal('net') },
-    { id: 'open-ai', label: '🤖 Trợ lý AI (sinh lệnh / giải thích)', run: () => setModal('ai') },
-    { id: 'open-recordings', label: '⏯ Bản ghi phiên (replay)', run: () => setModal('recordings') },
-    { id: 'open-sync', label: '🔄 Sync (mã hoá đầu-cuối)', run: () => setModal('sync') },
-    { id: 'open-snippets', label: '⚡ Quản lý Snippets', run: () => setModal('snippets') },
-    { id: 'open-tunnels', label: '⇄ Tunnels (port forwarding)', run: () => setModal('tunnels') },
-    { id: 'open-keys', label: '🔑 SSH Keys', run: () => setModal('keys') },
-    { id: 'open-logs', label: '📂 Mở thư mục log phiên', run: () => window.infra.terminal.openLogFolder() }
+    { id: 'open-bulk', label: t('menu.bulk'), run: () => setModal('bulk') },
+    { id: 'open-monitor', label: t('menu.monitor'), run: () => setModal('monitor') },
+    { id: 'open-net', label: t('menu.net'), run: () => setModal('net') },
+    { id: 'open-ai', label: t('menu.ai'), run: () => setModal('ai') },
+    { id: 'open-recordings', label: t('menu.recordings'), run: () => setModal('recordings') },
+    { id: 'open-sync', label: t('menu.sync'), run: () => setModal('sync') },
+    { id: 'open-snippets', label: t('menu.snippets'), run: () => setModal('snippets') },
+    { id: 'open-tunnels', label: t('menu.tunnels'), run: () => setModal('tunnels') },
+    { id: 'open-keys', label: `🔑 ${t('sidebar.keys')}`, run: () => setModal('keys') },
+    { id: 'open-settings', label: t('menu.settings'), run: () => setModal('settings') },
+    { id: 'open-logs', label: t('menu.openLogs'), run: () => window.infra.terminal.openLogFolder() }
   ]
 
   return (
-    <div className="relative flex h-screen flex-col bg-[#0b0e14] text-zinc-200">
+    <div className="bg-app text-content relative flex h-screen flex-col">
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col">
@@ -156,10 +160,10 @@ export default function App() {
             {tabs.length === 0 && (
               <div className="flex h-full items-center justify-center">
                 <button
-                  className="rounded-lg border border-zinc-700 px-6 py-3 text-sm text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+                  className="border-edge-strong text-muted hover:border-subtle hover:text-content rounded-lg border px-6 py-3 text-sm"
                   onClick={() => void openLocal()}
                 >
-                  + Mở terminal mới (Ctrl+Shift+T) · Ctrl+Shift+P để mở Command Palette
+                  {t('app.newTerminalHint')}
                 </button>
               </div>
             )}
@@ -179,6 +183,7 @@ export default function App() {
       {modal === 'sync' && <SyncModal onClose={() => setModal(null)} />}
       {modal === 'ai' && <AiModal onClose={() => setModal(null)} />}
       {modal === 'recordings' && <RecordingsModal onClose={() => setModal(null)} />}
+      {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} />}
 
       {locked && (
         <div className="absolute inset-0 z-[100]">
@@ -193,8 +198,8 @@ export default function App() {
               key={toast.id}
               className={`max-w-96 rounded border px-3 py-2 text-left text-xs shadow-lg ${
                 toast.kind === 'error'
-                  ? 'border-red-800 bg-red-950/90 text-red-200'
-                  : 'border-zinc-700 bg-zinc-900/95 text-zinc-200'
+                  ? 'border-danger/60 bg-danger/15 text-danger'
+                  : 'border-edge-strong bg-elevated text-content'
               }`}
               onClick={() => dismiss(toast.id)}
             >

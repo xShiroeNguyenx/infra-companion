@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import type { SyncStatusDto } from '@infra/shared'
 import { useDataStore } from '../stores/data'
 import { Button, Field, Modal, TextInput } from './ui'
+import { useT } from '../i18n'
 
 /**
  * Sync E2EE (Phase 4): đồng bộ vault mã hoá qua thư mục (Syncthing/Drive/Dropbox/OneDrive…).
  * Backend chỉ thấy blob mã hoá; sync passphrase không bao giờ rời máy.
  */
 export function SyncModal({ onClose }: { onClose: () => void }) {
+  const t = useT()
   const [status, setStatus] = useState<SyncStatusDto | null>(null)
   const [folder, setFolder] = useState('')
   const [passphrase, setPassphrase] = useState('')
@@ -29,8 +31,8 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
   const configure = async (): Promise<void> => {
     setError(null)
     setMessage(null)
-    if (!folder.trim()) return setError('Chọn thư mục đồng bộ')
-    if (passphrase.length < 8) return setError('Sync passphrase cần ít nhất 8 ký tự')
+    if (!folder.trim()) return setError(t('sync.errFolder'))
+    if (passphrase.length < 8) return setError(t('sync.errPass'))
     setBusy(true)
     try {
       const result = await window.infra.sync.configure(folder.trim(), passphrase)
@@ -71,7 +73,7 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
   const disable = async (): Promise<void> => {
     try {
       setStatus(await window.infra.sync.disable())
-      setMessage('Đã tắt sync trên máy này (dữ liệu local giữ nguyên)')
+      setMessage(t('sync.disabled'))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }
@@ -80,54 +82,48 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
   const configured = status?.configured
 
   return (
-    <Modal title="Sync (mã hoá đầu-cuối)" onClose={onClose}>
+    <Modal title={t('sync.title')} onClose={onClose}>
       <div className="w-[460px] max-w-full">
         {!configured ? (
           <>
-            <p className="mb-3 text-xs leading-relaxed text-zinc-400">
-              Đồng bộ vault qua một <b>thư mục</b> được đồng bộ sẵn (Syncthing, Google Drive, Dropbox, OneDrive,
-              ổ mạng…). Mọi thứ được mã hoá bằng <b>sync passphrase</b> trước khi rời máy — dịch vụ lưu trữ
-              không đọc được. Dùng <b>cùng passphrase + cùng thư mục</b> trên các máy khác để chúng đồng bộ với nhau.
-            </p>
-            <Field label="Thư mục đồng bộ">
+            <p className="mb-3 text-xs leading-relaxed text-muted">{t('sync.desc')}</p>
+            <Field label={t('sync.folder')}>
               <div className="flex gap-2">
-                <TextInput value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="VD: D:\\Drive\\infra-sync" className="flex-1" />
-                <Button type="button" onClick={() => void pickFolder()}>Chọn…</Button>
+                <TextInput value={folder} onChange={(e) => setFolder(e.target.value)} placeholder={t('sync.folderPh')} className="flex-1" />
+                <Button type="button" onClick={() => void pickFolder()}>{t('sync.choose')}</Button>
               </div>
             </Field>
-            <Field label="Sync passphrase (giống nhau trên mọi máy)">
+            <Field label={t('sync.passphrase')}>
               <TextInput type="password" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} placeholder="••••••••" />
             </Field>
-            <p className="mb-3 text-[11px] text-amber-500/90">
-              ⚠ Quên sync passphrase = không khôi phục được dữ liệu trên thư mục đó. Có thể khác master password.
-            </p>
-            {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
-            {message && <p className="mb-2 text-xs text-emerald-400">{message}</p>}
+            <p className="mb-3 text-[11px] text-warning/90">{t('sync.warn')}</p>
+            {error && <p className="mb-2 text-xs text-danger">{error}</p>}
+            {message && <p className="mb-2 text-xs text-success">{message}</p>}
             <div className="flex justify-end">
               <Button variant="primary" disabled={busy} onClick={() => void configure()}>
-                {busy ? 'Đang thiết lập…' : 'Bật sync & đồng bộ ngay'}
+                {busy ? t('sync.setting') : t('sync.enable')}
               </Button>
             </div>
           </>
         ) : (
           <>
-            <div className="mb-3 rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs">
-              <div className="text-emerald-400">● Sync đang bật</div>
-              <div className="mt-1 truncate text-zinc-400">{status?.folder}</div>
+            <div className="mb-3 rounded border border-edge bg-input px-3 py-2 text-xs">
+              <div className="text-success">{t('sync.on')}</div>
+              <div className="mt-1 truncate text-muted">{status?.folder}</div>
               {status?.lastSyncAt && (
-                <div className="mt-1 text-zinc-500">
-                  Lần cuối: {new Date(status.lastSyncAt).toLocaleString('vi-VN')} — {status.lastMessage}
+                <div className="mt-1 text-subtle">
+                  {t('sync.last', { time: new Date(status.lastSyncAt).toLocaleString(), msg: status.lastMessage ?? '' })}
                 </div>
               )}
             </div>
-            {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
-            {message && <p className="mb-2 text-xs text-emerald-400">{message}</p>}
+            {error && <p className="mb-2 text-xs text-danger">{error}</p>}
+            {message && <p className="mb-2 text-xs text-success">{message}</p>}
             <div className="flex justify-between">
               <Button variant="danger" disabled={busy} onClick={() => void disable()}>
-                Tắt sync (máy này)
+                {t('sync.disable')}
               </Button>
               <Button variant="primary" disabled={busy} onClick={() => void syncNow()}>
-                {busy ? 'Đang đồng bộ…' : '↻ Đồng bộ ngay'}
+                {busy ? t('sync.syncing') : t('sync.now')}
               </Button>
             </div>
           </>

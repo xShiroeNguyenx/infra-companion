@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { useTabsStore, type AppTab } from '../../stores/tabs'
 import { useToastsStore } from '../../stores/toasts'
+import { useT } from '../../i18n'
 import { TerminalPane } from './TerminalPane'
 
 function statusDot(status: string): string {
-  if (status === 'connected') return 'bg-emerald-500'
-  if (status === 'exited') return 'bg-red-500'
-  return 'bg-amber-400 animate-pulse'
+  if (status === 'connected') return 'bg-success'
+  if (status === 'exited') return 'bg-danger'
+  return 'bg-warning animate-pulse'
 }
 
 /** Render các pane của 1 tab terminal dạng lưới + thanh công cụ pane (split, broadcast, log). */
 export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean }) {
+  const t = useT()
   const { setActivePane, closePane, toggleBroadcast, splitLocal } = useTabsStore()
   const [logging, setLogging] = useState<Set<string>>(new Set())
   const [recording, setRecording] = useState<Set<string>>(new Set())
@@ -52,55 +54,55 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
   return (
     <div className={`absolute inset-0 flex flex-col ${active ? '' : 'hidden'}`}>
       {/* Thanh công cụ chỉ hiện khi có nhiều pane hoặc để bật split/broadcast */}
-      <div className="flex h-7 shrink-0 items-center gap-2 border-b border-zinc-800/70 bg-[#0e121b] px-2 text-[11px]">
+      <div className="border-edge bg-panel flex h-7 shrink-0 items-center gap-2 border-b px-2 text-[11px]">
         <button
-          className="rounded border border-zinc-700 px-1.5 py-0.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-          title="Tách thêm 1 pane terminal local trong tab này"
+          className="border-edge-strong text-muted hover:bg-hover hover:text-content rounded border px-1.5 py-0.5"
+          title={t('tabs.splitTip')}
           onClick={() => void splitLocal()}
         >
-          ⊞ Split
+          {t('tabs.split')}
         </button>
         <button
           className={`rounded border px-1.5 py-0.5 ${
             tab.broadcast
-              ? 'border-amber-500 bg-amber-500/15 text-amber-300'
-              : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+              ? 'border-warning bg-warning/15 text-warning'
+              : 'border-edge-strong text-muted hover:bg-hover hover:text-content'
           }`}
-          title="Broadcast: gõ ở 1 pane sẽ gửi lệnh tới TẤT CẢ pane trong tab"
+          title={t('tabs.broadcastTip')}
           onClick={() => toggleBroadcast(tab.id)}
         >
-          📡 Broadcast {tab.broadcast ? 'ON' : 'OFF'}
+          {tab.broadcast ? t('tabs.broadcastOn') : t('tabs.broadcastOff')}
         </button>
         <button
           className={`rounded border px-1.5 py-0.5 ${
             activeLogging
-              ? 'border-red-500 bg-red-500/15 text-red-300'
-              : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+              ? 'border-danger bg-danger/15 text-danger'
+              : 'border-edge-strong text-muted hover:bg-hover hover:text-content'
           }`}
-          title="Ghi log output của pane đang chọn ra file text"
+          title={t('tabs.logTip')}
           onClick={() => void toggleLog()}
         >
-          {activeLogging ? '⏺ Đang ghi log' : '⏺ Ghi log'}
+          {activeLogging ? t('tabs.logging') : t('tabs.log')}
         </button>
         <button
           className={`rounded border px-1.5 py-0.5 ${
             activeRecording
-              ? 'border-rose-500 bg-rose-500/15 text-rose-300'
-              : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+              ? 'border-danger bg-danger/15 text-danger'
+              : 'border-edge-strong text-muted hover:bg-hover hover:text-content'
           }`}
-          title="Ghi hình phiên (asciicast) — xem lại replay trong mục Recordings"
+          title={t('tabs.recordTip')}
           onClick={() => void toggleRecord()}
         >
-          {activeRecording ? '⏯ Đang ghi hình' : '⏯ Ghi hình'}
+          {activeRecording ? t('tabs.recording') : t('tabs.record')}
         </button>
-        {multi && <span className="text-zinc-600">{count} panes</span>}
+        {multi && <span className="text-subtle">{t('tabs.panes', { n: count })}</span>}
         {tab.broadcast && multi && (
-          <span className="text-amber-400">— mọi phím gõ sẽ vào cả {count} pane</span>
+          <span className="text-warning">{t('tabs.broadcastHint', { n: count })}</span>
         )}
       </div>
 
       <div
-        className="grid min-h-0 flex-1 gap-px bg-zinc-800"
+        className="bg-edge grid min-h-0 flex-1 gap-px"
         style={{
           gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
           gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`
@@ -111,15 +113,15 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
           return (
             <div
               key={pane.id}
-              className={`relative flex min-h-0 min-w-0 flex-col bg-[#0b0e14] ${
-                multi && isActive ? 'ring-1 ring-inset ring-blue-500/70' : ''
+              className={`bg-app relative flex min-h-0 min-w-0 flex-col ${
+                multi && isActive ? 'ring-accent/70 ring-1 ring-inset' : ''
               }`}
               onMouseDownCapture={() => setActivePane(tab.id, pane.id)}
             >
               {multi && (
                 <div
                   className={`flex h-6 shrink-0 items-center gap-1.5 px-2 text-[10px] ${
-                    isActive ? 'bg-zinc-800 text-zinc-200' : 'bg-[#11151f] text-zinc-500'
+                    isActive ? 'bg-hover text-content' : 'bg-panel text-subtle'
                   }`}
                 >
                   <span className={`size-1.5 shrink-0 rounded-full ${statusDot(pane.status)}`} />
@@ -127,8 +129,8 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
                     {pane.title}
                   </span>
                   <button
-                    className="rounded px-1 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-200"
-                    title="Đóng pane"
+                    className="text-subtle hover:bg-edge-strong hover:text-content rounded px-1"
+                    title={t('tabs.closePane')}
                     onClick={(e) => {
                       e.stopPropagation()
                       closePane(tab.id, pane.id)

@@ -1,16 +1,141 @@
 @import 'tailwindcss';
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Semantic color tokens — đổi runtime theo [data-theme] trên <html>.
+   Dùng qua Tailwind: bg-app, bg-panel, bg-elevated, text-content, border-edge…
+   (Token theo VAI TRÒ, không theo màu cụ thể, để light/dark dùng chung class.)
+   ────────────────────────────────────────────────────────────────────────── */
+@theme inline {
+  --color-app: var(--c-app);
+  --color-panel: var(--c-panel);
+  --color-elevated: var(--c-elevated);
+  --color-input: var(--c-input);
+  --color-hover: var(--c-hover);
+  --color-edge: var(--c-edge);
+  --color-edge-strong: var(--c-edge-strong);
+  --color-content: var(--c-content);
+  --color-muted: var(--c-muted);
+  --color-subtle: var(--c-subtle);
+  --color-accent: var(--c-accent);
+  --color-accent-hover: var(--c-accent-hover);
+  --color-accent-fg: var(--c-accent-fg);
+  --color-accent-soft: var(--c-accent-soft);
+  --color-danger: var(--c-danger);
+  --color-warning: var(--c-warning);
+  --color-success: var(--c-success);
+}
+
+/* Dark (mặc định) */
+:root,
+:root[data-theme='dark'] {
+  --c-app: #0b0e14;
+  --c-panel: #0e121b;
+  --c-elevated: #18181b;
+  --c-input: #09090b;
+  --c-hover: #27272a;
+  --c-edge: #27272a;
+  --c-edge-strong: #3f3f46;
+  --c-content: #e4e4e7;
+  --c-muted: #a1a1aa;
+  --c-subtle: #71717a;
+  --c-accent: #2563eb;
+  --c-accent-hover: #1d4ed8;
+  --c-accent-fg: #60a5fa;
+  --c-accent-soft: #172554;
+  --c-danger: #ef4444;
+  --c-warning: #f59e0b;
+  --c-success: #10b981;
+  /* Nền terminal theo theme — khớp đúng nền xterm để dải dư quanh canvas không tạo "khung" */
+  --term-bg: #0b0e14;
+  color-scheme: dark;
+}
+
+/* Light — tông xám dịu (off-white), tránh trắng tinh gây chói; chữ xám đậm thay đen thuần */
+:root[data-theme='light'] {
+  --c-app: #e9ebef;
+  --c-panel: #f3f4f6;
+  --c-elevated: #fafbfc;
+  --c-input: #eceef2;
+  --c-hover: #e0e3e9;
+  --c-edge: #dde0e6;
+  --c-edge-strong: #c9cdd6;
+  --c-content: #22262d;
+  --c-muted: #596070;
+  --c-subtle: #8a909c;
+  --c-accent: #2f6fed;
+  --c-accent-hover: #2560d8;
+  --c-accent-fg: #2560d8;
+  --c-accent-soft: #dce8fd;
+  --c-danger: #d64545;
+  --c-warning: #c2790a;
+  --c-success: #2f9e5f;
+  --term-bg: #fafbfc;
+  color-scheme: light;
+}
+
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: #0b0e14;
+  background: var(--c-app);
 }
 
-/* Vùng terminal: xterm tự vẽ nền, thêm padding cho dễ đọc */
+/* Vùng terminal: nền khớp token để dải dư khi xterm fit không tạo "khung" khác màu;
+   padding đều cho cân đối (tránh cảm giác lệch viền). xterm tự vẽ nền theo theme JS. */
+.terminal-host {
+  background: var(--term-bg);
+}
 .terminal-host .xterm {
   height: 100%;
-  padding: 8px 4px 4px 10px;
+  padding: 6px 8px;
+}
+/* xterm.css đặt cứng .xterm-viewport { background-color: #000 } → lộ "khung đen" ở dải dư
+   khi dùng DOM renderer. Override khớp nền terminal theo theme (đổi theo light/dark). */
+.terminal-host .xterm,
+.terminal-host .xterm-viewport,
+.terminal-host .xterm-screen {
+  background-color: var(--term-bg) !important;
+}
+
+/* ── Scrollbar mảnh, tối — thay scrollbar trắng to mặc định của Chromium ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-edge-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--c-edge-strong);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--c-subtle);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.xterm-viewport {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-edge-strong) transparent;
+}
+.xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+}
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--c-edge-strong);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }

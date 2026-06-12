@@ -47,6 +47,14 @@
 
 ---
 
+## Tuỳ biến giao diện (sau)
+
+- **Background image cho terminal** — chọn ảnh nền + chỉnh độ mờ/độ tối cho vùng terminal; lưu theo settings. (Đã có sẵn hệ thống theme dark/light + semantic tokens + đa ngôn ngữ vi/en/ja.)
+- **Theme tuỳ chỉnh** — cho phép user tự định nghĩa bảng màu (accent, nền) ngoài 2 preset dark/light.
+- **Font & cỡ chữ terminal** — chọn font/cỡ chữ per-host hoặc toàn cục.
+
+---
+
 ## Ngoài phạm vi (chưa lên kế hoạch)
 
 - Mobile app (iOS / Android) — kiến trúc `packages/core` tách riêng để mở khả năng này sau.

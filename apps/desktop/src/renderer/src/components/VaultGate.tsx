@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useVaultStore } from '../stores/vault'
+import { useT } from '../i18n'
 import { Button, Field, TextInput } from './ui'
 
 /** Màn hình chặn toàn app khi vault chưa khởi tạo hoặc đang khoá. */
 export function VaultGate() {
+  const t = useT()
   const { state, busy, error, setup, unlock } = useVaultStore()
   const isSetup = state === 'uninitialized'
   const [password, setPassword] = useState('')
@@ -14,23 +16,21 @@ export function VaultGate() {
   const submit = (): void => {
     setLocalError(null)
     if (isSetup) {
-      if (password.length < 8) return setLocalError('Master password phải có ít nhất 8 ký tự')
-      if (password !== confirm) return setLocalError('Mật khẩu nhập lại không khớp')
+      if (password.length < 8) return setLocalError(t('vault.errMin'))
+      if (password !== confirm) return setLocalError(t('vault.errMismatch'))
       void setup(password, remember)
     } else {
-      if (!password) return setLocalError('Nhập master password')
+      if (!password) return setLocalError(t('vault.errEmpty'))
       void unlock(password, remember)
     }
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-[#0b0e14]">
-      <div className="w-[380px] rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 shadow-2xl">
-        <div className="mb-1 text-lg font-semibold text-zinc-100">Infra Companion</div>
-        <p className="mb-5 text-xs text-zinc-500">
-          {isSetup
-            ? 'Tạo master password để mã hoá vault (hosts, passwords, SSH keys). Mất mật khẩu này = mất dữ liệu — không có cách khôi phục.'
-            : 'Vault đang khoá. Nhập master password để mở.'}
+    <div className="bg-app flex h-screen items-center justify-center">
+      <div className="border-edge bg-elevated w-[380px] rounded-xl border p-6 shadow-2xl">
+        <div className="text-content mb-1 text-lg font-semibold">Infra Companion</div>
+        <p className="text-subtle mb-5 text-xs">
+          {isSetup ? t('vault.setupDesc') : t('vault.unlockDesc')}
         </p>
 
         <form
@@ -39,7 +39,7 @@ export function VaultGate() {
             submit()
           }}
         >
-          <Field label="Master password">
+          <Field label={t('vault.masterPassword')}>
             <TextInput
               type="password"
               autoFocus
@@ -49,7 +49,7 @@ export function VaultGate() {
             />
           </Field>
           {isSetup && (
-            <Field label="Nhập lại master password">
+            <Field label={t('vault.confirmPassword')}>
               <TextInput
                 type="password"
                 value={confirm}
@@ -59,15 +59,15 @@ export function VaultGate() {
             </Field>
           )}
 
-          <label className="mb-4 flex items-center gap-2 text-xs text-zinc-400 select-none">
+          <label className="text-muted mb-4 flex items-center gap-2 text-xs select-none">
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-            Ghi nhớ trên máy này (mở khoá tự động qua Windows DPAPI)
+            {t('vault.remember')}
           </label>
 
-          {(localError ?? error) && <p className="mb-3 text-xs text-red-400">{localError ?? error}</p>}
+          {(localError ?? error) && <p className="text-danger mb-3 text-xs">{localError ?? error}</p>}
 
           <Button type="submit" variant="primary" className="w-full" disabled={busy}>
-            {busy ? 'Đang xử lý…' : isSetup ? 'Tạo vault' : 'Mở khoá'}
+            {busy ? t('vault.processing') : isSetup ? t('vault.create') : t('vault.unlock')}
           </Button>
         </form>
       </div>

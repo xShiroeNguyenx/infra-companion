@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { HostKeyQuestion, PasswordQuestion } from '@infra/shared'
 import { Button, Field, Modal, TextInput } from './ui'
+import { useT } from '../i18n'
 
 type Question =
   | { type: 'hostkey'; q: HostKeyQuestion }
@@ -8,6 +9,7 @@ type Question =
 
 /** Hứng câu hỏi từ main (host key TOFU, password Quick Connect) và hiện modal lần lượt. */
 export function PromptsHost() {
+  const t = useT()
   const [queue, setQueue] = useState<Question[]>([])
   const [password, setPassword] = useState('')
 
@@ -37,14 +39,14 @@ export function PromptsHost() {
     const { q } = current
     return (
       // closeOnBackdrop=false: misclick không được tính là "Huỷ" với prompt bảo mật
-      <Modal title={`Mật khẩu cho ${q.target}`} onClose={() => finish(q.requestId, null)} closeOnBackdrop={false}>
+      <Modal title={t('prompts.passwordTitle', { target: q.target })} onClose={() => finish(q.requestId, null)} closeOnBackdrop={false}>
         <form
           onSubmit={(e) => {
             e.preventDefault()
             finish(q.requestId, password || null)
           }}
         >
-          <Field label="Password">
+          <Field label={t('prompts.password')}>
             <TextInput
               type="password"
               autoFocus
@@ -54,10 +56,10 @@ export function PromptsHost() {
           </Field>
           <div className="flex justify-end gap-2">
             <Button type="button" onClick={() => finish(q.requestId, null)}>
-              Huỷ
+              {t('common.cancel')}
             </Button>
             <Button type="submit" variant="primary">
-              Kết nối
+              {t('prompts.connect')}
             </Button>
           </div>
         </form>
@@ -69,38 +71,36 @@ export function PromptsHost() {
   const mismatch = q.kind === 'mismatch'
   return (
     <Modal
-      title={mismatch ? '⚠ HOST KEY ĐÃ THAY ĐỔI' : 'Host chưa từng kết nối'}
+      title={mismatch ? t('prompts.hostkeyMismatch') : t('prompts.hostkeyNew')}
       danger={mismatch}
       onClose={() => finish(q.requestId, false)}
       closeOnBackdrop={false}
     >
       {mismatch ? (
-        <p className="mb-3 text-xs leading-relaxed text-red-300">
-          Fingerprint của <b>{q.host}:{q.port}</b> KHÔNG khớp với lần kết nối trước. Có thể server vừa cài
-          lại — hoặc đang bị tấn công man-in-the-middle. Chỉ tiếp tục nếu bạn chắc chắn lý do.
+        <p className="text-danger mb-3 max-w-96 text-xs leading-relaxed">
+          {t('prompts.mismatchDesc', { host: q.host, port: q.port })}
         </p>
       ) : (
-        <p className="mb-3 text-xs leading-relaxed text-zinc-400">
-          Lần đầu kết nối tới <b className="text-zinc-200">{q.host}:{q.port}</b>. Hãy xác minh fingerprint
-          dưới đây trùng với fingerprint trên server trước khi tin tưởng.
+        <p className="text-muted mb-3 max-w-96 text-xs leading-relaxed">
+          {t('prompts.newDesc', { host: q.host, port: q.port })}
         </p>
       )}
 
-      <div className="mb-3 rounded border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-[11px]">
-        <div className="text-zinc-500">{q.keyType}</div>
-        <div className="break-all text-zinc-200">{q.fingerprint}</div>
+      <div className="border-edge-strong bg-input mb-3 rounded border px-3 py-2 font-mono text-[11px]">
+        <div className="text-subtle">{q.keyType}</div>
+        <div className="text-content break-all">{q.fingerprint}</div>
         {mismatch && q.knownFingerprint && (
-          <div className="mt-2 border-t border-zinc-800 pt-2">
-            <div className="text-zinc-500">Đã lưu trước đó:</div>
-            <div className="break-all text-red-400 line-through">{q.knownFingerprint}</div>
+          <div className="border-edge mt-2 border-t pt-2">
+            <div className="text-subtle">{t('prompts.savedBefore')}</div>
+            <div className="text-danger break-all line-through">{q.knownFingerprint}</div>
           </div>
         )}
       </div>
 
       <div className="flex justify-end gap-2">
-        <Button onClick={() => finish(q.requestId, false)}>Ngắt kết nối</Button>
+        <Button onClick={() => finish(q.requestId, false)}>{t('prompts.disconnect')}</Button>
         <Button variant={mismatch ? 'danger' : 'primary'} onClick={() => finish(q.requestId, true)}>
-          {mismatch ? 'Vẫn tin tưởng (thay fingerprint)' : 'Tin tưởng & tiếp tục'}
+          {mismatch ? t('prompts.trustMismatch') : t('prompts.trustNew')}
         </Button>
       </div>
     </Modal>

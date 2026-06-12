@@ -10,6 +10,7 @@ export type AppModal =
   | 'sync'
   | 'ai'
   | 'recordings'
+  | 'settings'
   | null
 
 interface UiState {

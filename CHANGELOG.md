@@ -1,0 +1,65 @@
+# Changelog
+
+All notable changes to Infra Companion are documented here.
+Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+---
+
+## [0.1.2] — 2026-06-12
+
+### Added
+
+- **Internationalization (i18n)** — full UI translation in Vietnamese 🇻🇳, English 🇬🇧, and Japanese 🇯🇵; missing keys fall back to Vietnamese automatically.
+- **Settings modal** — accessible via `⚙ Settings` in the sidebar menu; lets users switch theme and language without restarting.
+- **Dark / Light theme** — two built-in themes persisted to `localStorage`; applied immediately on change with no flash on reload.
+- **Themed terminal colors** — dark terminal uses Tokyo Night palette; light terminal uses GitHub Light palette, both matched to app background.
+- **Settings store** (`useSettingsStore`) — Zustand store that reads/writes `infra.theme` and `infra.lang` in `localStorage`; initial values applied before React mounts to avoid color flicker.
+
+### Changed
+
+- All UI components (30+) refactored to use the `useT()` i18n hook — every visible string now comes from the `vi/en/ja` dictionary.
+- Terminal theme now tracks the global theme setting in real time (hot-switch dark ↔ light without reconnecting).
+- `electron.vite.config.ts` minor cleanup.
+
+---
+
+## [0.1.1] — 2026-06-07
+
+### Added
+
+- Official Infra Companion logo as app icon (replaces Electron default).
+
+### Fixed
+
+- CI race condition: GitHub Actions now creates the release before parallel build jobs start, so all artifacts attach to the same release.
+- `executableName` added to `electron-builder` config — avoids `@` character in Linux/macOS output paths.
+- `pnpm/action-setup` no longer pins `pnpm` version in CI (conflicted with `packageManager` in `package.json`).
+- Added `contents: write` permission to the release workflow so artifacts can be uploaded.
+
+---
+
+## [0.1.0] — 2026-06-05
+
+### Added
+
+Initial public release of **Infra Companion** — a modern SSH client desktop app (Electron + React).
+
+**Core features:**
+- Encrypted vault (AES-256-GCM, master password, optional Windows DPAPI auto-unlock).
+- SSH connections with password, SSH key, SSH agent, or secret-manager references (1Password `op://`, Bitwarden `bw://`).
+- Serial / COM port connections.
+- Multi-tab terminal with split panes and broadcast mode (type once → all panes).
+- Jump host chains (multi-hop SSH).
+- Group inheritance (default username / auth / env per group).
+- SFTP file manager with upload, download, rename, chmod, inline editor (auto-upload on save).
+- Port-forwarding tunnels (Local, Remote, Dynamic/SOCKS5).
+- Bulk execution — run a command across N hosts in parallel, group results by diff.
+- Monitoring dashboard — CPU / memory / disk via SSH (no agent required, Linux only).
+- Network Toolbox — ping, DNS lookup, common-port scan.
+- Snippets with variable interpolation (`{{var}}`).
+- Session recording (asciicast) and log-to-file.
+- E2EE sync via shared folder (Syncthing, Google Drive, Dropbox, OneDrive…).
+- AI assistant (Anthropic Claude API, bring-your-own key).
+- Command palette (Ctrl+Shift+P).
+- Import from `~/.ssh/config`.
+- Auto-update (electron-updater).

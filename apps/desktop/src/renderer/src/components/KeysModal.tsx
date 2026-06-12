@@ -29,15 +29,15 @@ export function KeysModal({ onClose }: { onClose: () => void }) {
       {mode === 'list' && (
         <>
           <div className="mb-3 max-h-72 overflow-y-auto">
-            {keys.length === 0 && <p className="py-4 text-center text-xs text-zinc-500">Chưa có key nào</p>}
+            {keys.length === 0 && <p className="py-4 text-center text-xs text-subtle">Chưa có key nào</p>}
             {keys.map((key) => (
               <div
                 key={key.id}
-                className="mb-1.5 flex items-center gap-2 rounded border border-zinc-800 bg-zinc-950 px-3 py-2"
+                className="mb-1.5 flex items-center gap-2 rounded border border-edge bg-input px-3 py-2"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm text-zinc-200">{key.label}</div>
-                  <div className="truncate font-mono text-[10px] text-zinc-500">
+                  <div className="truncate text-sm text-content">{key.label}</div>
+                  <div className="truncate font-mono text-[10px] text-subtle">
                     {key.keyType} · {key.source === 'generated' ? 'đã sinh' : 'đã import'}
                     {key.hasPassphrase ? ' · có passphrase' : ''}
                   </div>
@@ -93,7 +93,7 @@ export function KeysModal({ onClose }: { onClose: () => void }) {
             })
           }}
         >
-          <p className="mb-3 text-xs text-zinc-400">
+          <p className="mb-3 text-xs text-muted">
             Sinh cặp khoá <b>ed25519</b> mới. Private key được mã hoá và lưu trong vault.
           </p>
           <Field label="Tên key">

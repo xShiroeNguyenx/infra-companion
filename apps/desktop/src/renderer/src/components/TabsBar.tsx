@@ -3,6 +3,7 @@ import type { ShellProfile, SnippetDto } from '@infra/shared'
 import { useDataStore } from '../stores/data'
 import { useTabsStore, type AppTab } from '../stores/tabs'
 import { RunSnippetModal } from './RunSnippetModal'
+import { useT } from '../i18n'
 
 /** Tiêu đề tab: SFTP → sftpTitle; terminal → pane active (hoặc "N panes"). */
 function tabTitle(tab: AppTab): string {
@@ -20,16 +21,17 @@ function tabSubtitle(tab: AppTab): string | undefined {
 
 /** Chấm trạng thái: terminal lấy theo pane active; sftp luôn xanh. */
 function statusDotClass(tab: AppTab): string {
-  if (tab.kind === 'sftp') return 'bg-emerald-500'
+  if (tab.kind === 'sftp') return 'bg-success'
   const active = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
   const status = active?.status ?? 'connecting'
-  if (status === 'connected') return 'bg-emerald-500'
-  if (status === 'exited') return 'bg-red-500'
-  return 'bg-amber-400 animate-pulse'
+  if (status === 'connected') return 'bg-success'
+  if (status === 'exited') return 'bg-danger'
+  return 'bg-warning animate-pulse'
 }
 
 /** Thanh tab trên cùng: danh sách tab + nút snippet ⚡ + nút mở tab local mới. */
 export function TabsBar() {
+  const t = useT()
   const { tabs, activeId, openLocal, closeTab, setActive } = useTabsStore()
   const snippets = useDataStore((s) => s.snippets)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -66,7 +68,7 @@ export function TabsBar() {
   }, [menuOpen])
 
   return (
-    <div className="flex h-9 shrink-0 items-stretch gap-px border-b border-zinc-800 bg-[#11151f] pl-1 select-none">
+    <div className="border-edge bg-panel flex h-9 shrink-0 items-stretch gap-px border-b pl-1 select-none">
       <div className="flex flex-1 items-stretch gap-px overflow-x-auto">
         {tabs.map((tab) => (
           <div
@@ -75,8 +77,8 @@ export function TabsBar() {
             aria-selected={tab.id === activeId}
             className={`group flex max-w-52 min-w-28 cursor-pointer items-center gap-2 rounded-t px-3 text-xs ${
               tab.id === activeId
-                ? 'bg-[#0b0e14] text-zinc-100'
-                : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
+                ? 'bg-app text-content'
+                : 'text-muted hover:bg-hover hover:text-content'
             }`}
             onClick={() => setActive(tab.id)}
             onAuxClick={(e) => {
@@ -85,12 +87,12 @@ export function TabsBar() {
             title={tabSubtitle(tab) ?? tabTitle(tab)}
           >
             <span className={`size-1.5 shrink-0 rounded-full ${statusDotClass(tab)}`} />
-            {tab.kind === 'sftp' && <span className="shrink-0 text-zinc-500">📁</span>}
-            {tab.broadcast && <span className="shrink-0 text-amber-400" title="Broadcast ON">📡</span>}
+            {tab.kind === 'sftp' && <span className="text-subtle shrink-0">📁</span>}
+            {tab.broadcast && <span className="text-warning shrink-0" title="Broadcast ON">📡</span>}
             <span className="truncate">{tabTitle(tab)}</span>
             <button
-              className="ml-auto rounded p-0.5 text-zinc-500 opacity-0 group-hover:opacity-100 hover:bg-zinc-700 hover:text-zinc-200"
-              title="Đóng tab (Ctrl+Shift+W)"
+              className="text-subtle hover:bg-edge-strong hover:text-content ml-auto rounded p-0.5 opacity-0 group-hover:opacity-100"
+              title={t('tabs.close')}
               onClick={(e) => {
                 e.stopPropagation()
                 closeTab(tab.id)
@@ -106,18 +108,18 @@ export function TabsBar() {
 
       <div className="relative flex items-center" ref={snippetMenuRef}>
         <button
-          className="flex h-7 items-center px-2 text-zinc-400 hover:bg-zinc-800 hover:text-amber-300"
-          title="Chạy snippet trên phiên đang mở"
+          className="text-muted hover:bg-hover hover:text-warning flex h-7 items-center px-2"
+          title={t('tabs.runSnippet')}
           onClick={() => setSnippetMenuOpen((v) => !v)}
         >
           ⚡
         </button>
         {snippetMenuOpen && (
-          <div className="absolute top-8 right-0 z-50 min-w-48 rounded-md border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+          <div className="border-edge-strong bg-elevated absolute top-8 right-0 z-50 min-w-48 rounded-md border py-1 shadow-xl">
             {snippets.map((snippet) => (
               <button
                 key={snippet.id}
-                className="block w-full px-3 py-1.5 text-left text-xs text-zinc-300 hover:bg-zinc-700/60 hover:text-zinc-100"
+                className="text-muted hover:bg-hover hover:text-content block w-full px-3 py-1.5 text-left text-xs"
                 onClick={() => {
                   setSnippetMenuOpen(false)
                   setRunSnippet(snippet)
@@ -127,7 +129,7 @@ export function TabsBar() {
               </button>
             ))}
             {snippets.length === 0 && (
-              <p className="px-3 py-1.5 text-xs text-zinc-500">Chưa có snippet (tạo trong menu ⋯ ở sidebar)</p>
+              <p className="text-subtle px-3 py-1.5 text-xs">{t('tabs.noSnippet')}</p>
             )}
           </div>
         )}
@@ -135,8 +137,8 @@ export function TabsBar() {
 
       <div className="relative flex items-center" ref={menuRef}>
         <button
-          className="flex h-7 items-center rounded-l px-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-          title="Tab terminal local mới (Ctrl+Shift+T)"
+          className="text-muted hover:bg-hover hover:text-content flex h-7 items-center rounded-l px-2"
+          title={t('tabs.newLocal')}
           onClick={() => void openLocal()}
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -144,8 +146,8 @@ export function TabsBar() {
           </svg>
         </button>
         <button
-          className="flex h-7 items-center rounded-r px-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-100"
-          title="Chọn shell"
+          className="text-subtle hover:bg-hover hover:text-content flex h-7 items-center rounded-r px-1"
+          title={t('tabs.chooseShell')}
           onClick={() => setMenuOpen((open) => !open)}
         >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -153,11 +155,11 @@ export function TabsBar() {
           </svg>
         </button>
         {menuOpen && (
-          <div className="absolute top-8 right-1 z-50 min-w-48 rounded-md border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+          <div className="border-edge-strong bg-elevated absolute top-8 right-1 z-50 min-w-48 rounded-md border py-1 shadow-xl">
             {shells.map((shell) => (
               <button
                 key={shell.id}
-                className="block w-full px-3 py-1.5 text-left text-xs text-zinc-300 hover:bg-zinc-700/60 hover:text-zinc-100"
+                className="text-muted hover:bg-hover hover:text-content block w-full px-3 py-1.5 text-left text-xs"
                 onClick={() => {
                   setMenuOpen(false)
                   void openLocal(shell.id)
@@ -167,7 +169,7 @@ export function TabsBar() {
               </button>
             ))}
             {shells.length === 0 && (
-              <p className="px-3 py-1.5 text-xs text-zinc-500">Không tìm thấy shell nào</p>
+              <p className="text-subtle px-3 py-1.5 text-xs">{t('tabs.noShell')}</p>
             )}
           </div>
         )}

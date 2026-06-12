@@ -76,11 +76,11 @@ export function AiModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Trợ lý AI" onClose={onClose}>
       <div className="w-[560px] max-w-full">
-        <div className="mb-2 flex items-center justify-between text-[11px] text-zinc-500">
+        <div className="mb-2 flex items-center justify-between text-[11px] text-subtle">
           <span>
             {config ? `${config.provider} · ${config.model}` : 'Chưa cấu hình'}
           </span>
-          <button className="hover:text-zinc-200" onClick={() => setShowSettings(true)}>
+          <button className="hover:text-content" onClick={() => setShowSettings(true)}>
             ⚙ Cấu hình
           </button>
         </div>
@@ -90,7 +90,7 @@ export function AiModal({ onClose }: { onClose: () => void }) {
             <button
               key={m}
               className={`rounded border px-2 py-1 text-xs ${
-                mode === m ? 'border-blue-500 bg-blue-500/15 text-blue-300' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'
+                mode === m ? 'border-accent bg-accent-hover/15 text-accent-fg' : 'border-edge-strong text-muted hover:bg-hover'
               }`}
               onClick={() => setMode(m)}
             >
@@ -121,11 +121,11 @@ export function AiModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {answer && (
-          <div className="mt-3 rounded border border-zinc-800 bg-zinc-950 p-3">
-            <pre className="max-h-64 overflow-auto text-[12px] whitespace-pre-wrap text-zinc-300">{answer.text}</pre>
+          <div className="mt-3 rounded border border-edge bg-input p-3">
+            <pre className="max-h-64 overflow-auto text-[12px] whitespace-pre-wrap text-content">{answer.text}</pre>
             {answer.command && (
-              <div className="mt-2 flex items-center justify-between gap-2 border-t border-zinc-800 pt-2">
-                <code className="min-w-0 flex-1 truncate text-[11px] text-emerald-400">{answer.command}</code>
+              <div className="mt-2 flex items-center justify-between gap-2 border-t border-edge pt-2">
+                <code className="min-w-0 flex-1 truncate text-[11px] text-success">{answer.command}</code>
                 <Button
                   variant="primary"
                   className="!px-2 !py-1 !text-xs"
@@ -215,7 +215,7 @@ function AiSettings({
             />
           </Field>
         )}
-        <p className="mb-3 text-[11px] text-zinc-500">
+        <p className="mb-3 text-[11px] text-subtle">
           API key được mã hoá trong vault. Ollama chạy local nên không cần key và không gửi dữ liệu ra ngoài.
         </p>
         <div className="flex justify-end gap-2">

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { MetricSampleDto } from '@infra/shared'
 import { useDataStore } from '../stores/data'
 import { Button, Modal } from './ui'
+import { useT } from '../i18n'
 
 const HISTORY = 30
 
@@ -14,6 +15,7 @@ interface HostMonitor {
 
 /** Monitoring dashboard (F04): theo dõi load/mem/disk/uptime realtime nhiều host qua SSH. */
 export function MonitorModal({ onClose }: { onClose: () => void }) {
+  const t = useT()
   const hosts = useDataStore((s) => s.hosts).filter((h) => h.protocol === 'ssh')
   const [monitoring, setMonitoring] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -62,39 +64,39 @@ export function MonitorModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="Monitoring Dashboard" onClose={onClose}>
+    <Modal title={t('monitor.title')} onClose={onClose}>
       <div className="w-[700px] max-w-full">
         {!monitoring ? (
           <>
-            <div className="mb-2 flex items-center justify-between text-[11px] text-zinc-500">
-              <span>Chọn host để theo dõi ({selected.size})</span>
-              <button className="hover:text-zinc-200" onClick={() => setSelected(new Set(hosts.map((h) => h.id)))}>
-                Chọn hết
+            <div className="mb-2 flex items-center justify-between text-[11px] text-subtle">
+              <span>{t('monitor.choose', { n: selected.size })}</span>
+              <button className="hover:text-content" onClick={() => setSelected(new Set(hosts.map((h) => h.id)))}>
+                {t('bulk.selectAll')}
               </button>
             </div>
-            <div className="mb-3 grid max-h-40 grid-cols-3 gap-x-3 gap-y-0.5 overflow-y-auto rounded border border-zinc-800 bg-zinc-950 p-2">
+            <div className="mb-3 grid max-h-40 grid-cols-3 gap-x-3 gap-y-0.5 overflow-y-auto rounded border border-edge bg-input p-2">
               {hosts.map((host) => (
-                <label key={host.id} className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-300 select-none">
+                <label key={host.id} className="flex cursor-pointer items-center gap-1.5 text-xs text-content select-none">
                   <input type="checkbox" checked={selected.has(host.id)} onChange={() => toggle(host.id)} />
                   <span className="truncate">{host.label}</span>
                 </label>
               ))}
-              {hosts.length === 0 && <span className="col-span-3 py-2 text-center text-xs text-zinc-500">Chưa có host SSH</span>}
+              {hosts.length === 0 && <span className="col-span-3 py-2 text-center text-xs text-subtle">{t('bulk.noSsh')}</span>}
             </div>
-            <p className="mb-3 text-[11px] text-zinc-600">
-              Thu thập qua SSH (đọc /proc + df) mỗi 3s — không cần cài agent trên server. Chỉ hỗ trợ Linux.
+            <p className="mb-3 text-[11px] text-subtle">
+              {t('monitor.note')}
             </p>
             <div className="flex justify-end">
               <Button variant="primary" disabled={selected.size === 0} onClick={() => void start()}>
-                ▶ Bắt đầu theo dõi ({selected.size})
+                {t('monitor.start', { n: selected.size })}
               </Button>
             </div>
           </>
         ) : (
           <>
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-[11px] text-zinc-500">Đang theo dõi {Object.keys(data).length} host · cập nhật mỗi 3s</span>
-              <Button onClick={stop}>■ Dừng</Button>
+              <span className="text-[11px] text-subtle">{t('monitor.watching', { n: Object.keys(data).length })}</span>
+              <Button onClick={stop}>{t('monitor.stop')}</Button>
             </div>
             <div className="grid max-h-96 grid-cols-2 gap-2 overflow-y-auto">
               {Object.values(data).map((m) => (
@@ -109,16 +111,17 @@ export function MonitorModal({ onClose }: { onClose: () => void }) {
 }
 
 function MonitorCard({ monitor }: { monitor: HostMonitor }) {
+  const t = useT()
   const s = monitor.sample
   return (
-    <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
+    <div className="rounded border border-edge bg-input p-3">
       <div className="mb-2 flex items-center gap-2">
-        <span className={`size-1.5 rounded-full ${!s ? 'bg-amber-400 animate-pulse' : s.ok ? 'bg-emerald-500' : 'bg-red-500'}`} />
-        <span className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-200">{monitor.label}</span>
-        {s?.uptimeSec != null && <span className="text-[10px] text-zinc-500">up {formatUptime(s.uptimeSec)}</span>}
+        <span className={`size-1.5 rounded-full ${!s ? 'bg-warning animate-pulse' : s.ok ? 'bg-success' : 'bg-danger'}`} />
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-content">{monitor.label}</span>
+        {s?.uptimeSec != null && <span className="text-[10px] text-subtle">up {formatUptime(s.uptimeSec)}</span>}
       </div>
-      {!s && <p className="text-[11px] text-zinc-500">đang kết nối…</p>}
-      {s && !s.ok && <p className="text-[11px] text-red-400">{s.error}</p>}
+      {!s && <p className="text-[11px] text-subtle">{t('monitor.connecting')}</p>}
+      {s && !s.ok && <p className="text-[11px] text-danger">{s.error}</p>}
       {s?.ok && (
         <div className="space-y-1.5">
           <Sparkline values={monitor.loadHistory} cpuCount={s.cpuCount} />
@@ -133,14 +136,14 @@ function MonitorCard({ monitor }: { monitor: HostMonitor }) {
 
 function Bar({ label, pct }: { label: string; pct: number | null }) {
   const value = pct ?? 0
-  const color = value > 90 ? 'bg-red-500' : value > 70 ? 'bg-amber-500' : 'bg-emerald-500'
+  const color = value > 90 ? 'bg-danger' : value > 70 ? 'bg-warning' : 'bg-success'
   return (
     <div className="flex items-center gap-2 text-[10px]">
-      <span className="w-24 shrink-0 truncate text-zinc-500">{label}</span>
-      <div className="h-1.5 flex-1 overflow-hidden rounded bg-zinc-800">
+      <span className="w-24 shrink-0 truncate text-subtle">{label}</span>
+      <div className="h-1.5 flex-1 overflow-hidden rounded bg-hover">
         <div className={`h-full ${color}`} style={{ width: `${Math.min(100, value)}%` }} />
       </div>
-      <span className="w-8 shrink-0 text-right text-zinc-400">{pct === null ? '—' : `${value}%`}</span>
+      <span className="w-8 shrink-0 text-right text-muted">{pct === null ? '—' : `${value}%`}</span>
     </div>
   )
 }

@@ -3,6 +3,7 @@ import type { FileEntryDto } from '@infra/shared'
 import { formatSize, formatTime, joinPath, parentPath } from '../../lib/paths'
 import { errorMessage, useToastsStore } from '../../stores/toasts'
 import { ConfirmModal } from '../../components/ui'
+import { useT } from '../../i18n'
 
 /** Adapter trừu tượng hoá local FS vs SFTP để FilePane dùng chung. */
 export interface PaneAdapter {
@@ -69,6 +70,7 @@ export function FilePane({
   adapter: PaneAdapter
   pane: PaneState
 }) {
+  const t = useT()
   const [pathInput, setPathInput] = useState(pane.path)
   const [prompt, setPrompt] = useState<PromptMode | null>(null)
   const [promptValue, setPromptValue] = useState('')
@@ -105,32 +107,32 @@ export function FilePane({
   const iconFor = (entry: FileEntryDto): string => (entry.kind === 'dir' ? '📁' : entry.kind === 'symlink' ? '🔗' : '📄')
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col border border-zinc-800 bg-[#0e121b]">
-      <div className="flex items-center gap-1 border-b border-zinc-800 px-2 py-1.5">
-        <span className="mr-1 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">{title}</span>
+    <div className="flex min-w-0 flex-1 flex-col border border-edge bg-panel">
+      <div className="flex items-center gap-1 border-b border-edge px-2 py-1.5">
+        <span className="mr-1 text-[10px] font-semibold tracking-wider text-subtle uppercase">{title}</span>
         <input
           value={pathInput}
           onChange={(e) => setPathInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void pane.navigate(pathInput.trim())
           }}
-          className="min-w-0 flex-1 rounded border border-zinc-800 bg-zinc-950 px-2 py-0.5 font-mono text-[11px] text-zinc-300 outline-none focus:border-blue-600"
+          className="min-w-0 flex-1 rounded border border-edge bg-input px-2 py-0.5 font-mono text-[11px] text-content outline-none focus:border-accent"
         />
-        <PaneButton title="Lên thư mục cha" onClick={() => void pane.navigate(parentPath(pane.path))}>
+        <PaneButton title={t('sftp.up')} onClick={() => void pane.navigate(parentPath(pane.path))}>
           ↑
         </PaneButton>
-        <PaneButton title="Refresh" onClick={() => void pane.refresh()}>
+        <PaneButton title={t('sftp.refresh')} onClick={() => void pane.refresh()}>
           ⟳
         </PaneButton>
-        <PaneButton title="Thư mục mới" onClick={() => { setPrompt({ kind: 'mkdir' }); setPromptValue('') }}>
+        <PaneButton title={t('sftp.mkdir')} onClick={() => { setPrompt({ kind: 'mkdir' }); setPromptValue('') }}>
           +📁
         </PaneButton>
       </div>
 
       {prompt && (
-        <div className="flex items-center gap-1.5 border-b border-zinc-800 bg-zinc-900/60 px-2 py-1.5">
-          <span className="text-[11px] text-zinc-400">
-            {prompt.kind === 'mkdir' ? 'Tên thư mục:' : prompt.kind === 'rename' ? 'Tên mới:' : 'Mode (octal):'}
+        <div className="flex items-center gap-1.5 border-b border-edge bg-elevated/60 px-2 py-1.5">
+          <span className="text-[11px] text-muted">
+            {prompt.kind === 'mkdir' ? t('sftp.mkdirLabel') : prompt.kind === 'rename' ? t('sftp.renameLabel') : t('sftp.chmodLabel')}
           </span>
           <input
             autoFocus
@@ -140,20 +142,20 @@ export function FilePane({
               if (e.key === 'Enter') void submitPrompt()
               if (e.key === 'Escape') setPrompt(null)
             }}
-            className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-[11px] text-zinc-200 outline-none focus:border-blue-600"
+            className="min-w-0 flex-1 rounded border border-edge-strong bg-input px-2 py-0.5 text-[11px] text-content outline-none focus:border-accent"
           />
-          <PaneButton title="OK" onClick={() => void submitPrompt()}>✓</PaneButton>
-          <PaneButton title="Huỷ" onClick={() => setPrompt(null)}>✕</PaneButton>
+          <PaneButton title={t('sftp.ok')} onClick={() => void submitPrompt()}>✓</PaneButton>
+          <PaneButton title={t('common.cancel')} onClick={() => setPrompt(null)}>✕</PaneButton>
         </div>
       )}
 
       <div className="flex-1 overflow-y-auto">
         <table className="w-full text-left text-[11px]">
-          <thead className="sticky top-0 bg-[#0e121b] text-zinc-600">
+          <thead className="sticky top-0 bg-panel text-subtle">
             <tr>
-              <th className="px-2 py-1 font-medium">Tên</th>
-              <th className="w-20 px-2 py-1 text-right font-medium">Kích thước</th>
-              <th className="w-28 px-2 py-1 font-medium">Sửa đổi</th>
+              <th className="px-2 py-1 font-medium">{t('sftp.colName')}</th>
+              <th className="w-20 px-2 py-1 text-right font-medium">{t('sftp.colSize')}</th>
+              <th className="w-28 px-2 py-1 font-medium">{t('sftp.colMtime')}</th>
             </tr>
           </thead>
           <tbody>
@@ -162,7 +164,7 @@ export function FilePane({
               return (
                 <tr
                   key={entry.name}
-                  className={`cursor-pointer select-none ${isSelected ? 'bg-blue-900/40 text-zinc-100' : 'text-zinc-300 hover:bg-zinc-800/50'}`}
+                  className={`cursor-pointer select-none ${isSelected ? 'bg-accent-soft/40 text-content' : 'text-content hover:bg-hover/50'}`}
                   onClick={() => pane.setSelected(entry)}
                   onDoubleClick={() => {
                     if (entry.kind === 'dir') void pane.navigate(joinPath(pane.path, entry.name))
@@ -171,17 +173,17 @@ export function FilePane({
                   <td className="truncate px-2 py-1">
                     {iconFor(entry)} {entry.name}
                   </td>
-                  <td className="px-2 py-1 text-right text-zinc-500">
+                  <td className="px-2 py-1 text-right text-subtle">
                     {entry.kind === 'file' ? formatSize(entry.size) : ''}
                   </td>
-                  <td className="px-2 py-1 text-zinc-500">{formatTime(entry.mtimeMs)}</td>
+                  <td className="px-2 py-1 text-subtle">{formatTime(entry.mtimeMs)}</td>
                 </tr>
               )
             })}
             {pane.entries.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-2 py-6 text-center text-zinc-600">
-                  (trống)
+                <td colSpan={3} className="px-2 py-6 text-center text-subtle">
+                  {t('sftp.empty')}
                 </td>
               </tr>
             )}
@@ -189,9 +191,9 @@ export function FilePane({
         </table>
       </div>
 
-      <div className="flex items-center gap-1 border-t border-zinc-800 px-2 py-1">
+      <div className="flex items-center gap-1 border-t border-edge px-2 py-1">
         <PaneButton
-          title="Đổi tên"
+          title={t('sftp.rename')}
           disabled={!pane.selected}
           onClick={() => {
             if (pane.selected) {
@@ -200,27 +202,25 @@ export function FilePane({
             }
           }}
         >
-          Đổi tên
+          {t('sftp.rename')}
         </PaneButton>
         <PaneButton
-          title="Xoá"
+          title={t('common.delete')}
           disabled={!pane.selected}
           onClick={() => {
             // PHẢI confirm: phía Local là rm đệ quy không qua Recycle Bin — một misclick = mất cả thư mục
             if (pane.selected) setConfirmDelete(pane.selected)
           }}
         >
-          Xoá
+          {t('common.delete')}
         </PaneButton>
         {confirmDelete && (
           <ConfirmModal
-            title={confirmDelete.kind === 'dir' ? 'Xoá thư mục' : 'Xoá file'}
+            title={confirmDelete.kind === 'dir' ? t('sftp.deleteDir') : t('sftp.deleteFile')}
             message={
-              <>
-                Xoá vĩnh viễn <b>{confirmDelete.name}</b>
-                {confirmDelete.kind === 'dir' ? ' và toàn bộ nội dung bên trong' : ''}? Không qua thùng rác, không
-                khôi phục được.
-              </>
+              confirmDelete.kind === 'dir'
+                ? t('sftp.deleteMsgDir', { name: confirmDelete.name })
+                : t('sftp.deleteMsgFile', { name: confirmDelete.name })
             }
             onConfirm={() => {
               doDelete(confirmDelete)
@@ -231,7 +231,7 @@ export function FilePane({
         )}
         {adapter.chmod && (
           <PaneButton
-            title="Đổi quyền (chmod)"
+            title={t('sftp.chmodTip')}
             disabled={!pane.selected}
             onClick={() => {
               if (pane.selected) {
@@ -245,7 +245,7 @@ export function FilePane({
         )}
         {adapter.edit && (
           <PaneButton
-            title="Sửa bằng editor local — tự upload khi save"
+            title={t('sftp.editTip')}
             disabled={!pane.selected || pane.selected.kind !== 'file'}
             onClick={() => {
               if (pane.selected) {
@@ -255,7 +255,7 @@ export function FilePane({
               }
             }}
           >
-            ✏ Sửa
+            {t('sftp.edit')}
           </PaneButton>
         )}
       </div>
@@ -267,7 +267,7 @@ function PaneButton(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       {...props}
-      className={`rounded border border-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40 ${props.className ?? ''}`}
+      className={`rounded border border-edge px-1.5 py-0.5 text-[11px] text-muted hover:bg-hover hover:text-content disabled:cursor-not-allowed disabled:opacity-40 ${props.className ?? ''}`}
     />
   )
 }

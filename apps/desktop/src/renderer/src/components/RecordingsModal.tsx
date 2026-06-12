@@ -58,23 +58,23 @@ export function RecordingsModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Bản ghi phiên (Session Recordings)" onClose={onClose}>
       <div className="w-[560px] max-w-full">
-        <div className="mb-2 flex items-center justify-between text-[11px] text-zinc-500">
+        <div className="mb-2 flex items-center justify-between text-[11px] text-subtle">
           <span>{list.length} bản ghi (.cast — chuẩn asciinema)</span>
-          <button className="hover:text-zinc-200" onClick={() => window.infra.recordings.openFolder()}>
+          <button className="hover:text-content" onClick={() => window.infra.recordings.openFolder()}>
             📂 Mở thư mục
           </button>
         </div>
         <div className="max-h-96 overflow-y-auto">
           {list.length === 0 && (
-            <p className="py-8 text-center text-xs text-zinc-500">
+            <p className="py-8 text-center text-xs text-subtle">
               Chưa có bản ghi. Bật <b>⏯ Ghi hình</b> trên thanh công cụ tab terminal để tạo.
             </p>
           )}
           {list.map((rec) => (
-            <div key={rec.name} className="mb-1.5 flex items-center gap-2 rounded border border-zinc-800 bg-zinc-950 px-3 py-2">
+            <div key={rec.name} className="mb-1.5 flex items-center gap-2 rounded border border-edge bg-input px-3 py-2">
               <div className="min-w-0 flex-1">
-                <div className="truncate text-xs text-zinc-200">{rec.name}</div>
-                <div className="text-[10px] text-zinc-500">
+                <div className="truncate text-xs text-content">{rec.name}</div>
+                <div className="text-[10px] text-subtle">
                   {formatSize(rec.sizeBytes)} · {formatTime(rec.mtimeMs)}
                 </div>
               </div>
@@ -208,10 +208,10 @@ function ReplayPlayer({
     <Modal title={`Replay — ${recording.name}`} onClose={onClose}>
       <div className="w-[760px] max-w-full">
         {/* overflow-auto: bản ghi từ terminal to hơn khung vẫn cuộn xem được (fit sẽ đổi cols làm vỡ layout cast) */}
-        <div ref={hostRef} className="mb-2 h-[420px] w-full overflow-auto rounded border border-zinc-800 bg-[#0b0e14] p-1" />
+        <div ref={hostRef} className="mb-2 h-[420px] w-full overflow-auto rounded border border-edge bg-[var(--term-bg)] p-1" />
 
         {/* Thanh điều khiển */}
-        <div className="flex items-center gap-2 text-xs text-zinc-300">
+        <div className="flex items-center gap-2 text-xs text-content">
           <Button className="!px-2 !py-1 !text-xs" onClick={() => setPlaying((p) => !p)}>
             {playing ? '⏸' : '▶'}
           </Button>
@@ -227,13 +227,13 @@ function ReplayPlayer({
             onChange={(e) => seek(Number(e.target.value))}
             className="flex-1 accent-blue-500"
           />
-          <span className="w-20 text-right font-mono text-[11px] text-zinc-500">
+          <span className="w-20 text-right font-mono text-[11px] text-subtle">
             {time.toFixed(1)}s / {duration.toFixed(1)}s
           </span>
           <select
             value={speed}
             onChange={(e) => setSpeed(Number(e.target.value))}
-            className="rounded border border-zinc-700 bg-zinc-950 px-1 py-0.5 text-[11px] text-zinc-200 outline-none"
+            className="rounded border border-edge-strong bg-input px-1 py-0.5 text-[11px] text-content outline-none"
           >
             {SPEEDS.map((s) => (
               <option key={s} value={s}>
