@@ -117,6 +117,8 @@ Head to the **[Releases page](https://github.com/xShiroeNguyenx/infra-companion/
 
 The app checks for updates automatically on startup and shows a banner when a new version is available.
 
+> **Windows SmartScreen warning:** The installer is not yet code-signed. If you see "Windows protected your PC", click **More info → Run anyway**. This is expected for new open-source apps without a paid certificate. See [this explanation](https://github.com/xShiroeNguyenx/infra-companion/wiki/Windows-SmartScreen) for details.
+
 ### Build from Source
 
 Requirements: **Node.js ≥ 20**, **pnpm 9**

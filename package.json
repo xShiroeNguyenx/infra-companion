@@ -12,6 +12,12 @@
     "build": "pnpm --filter @infra/desktop build",
     "dist": "pnpm --filter @infra/desktop dist",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter @infra/core test"
+    "test": "pnpm --filter @infra/core test",
+    "gen:icons": "node scripts/generate-icons.mjs"
+  },
+  "devDependencies": {
+    "png-to-ico": "^3.0.1",
+    "png2icons": "^2.0.1",
+    "sharp": "^0.35.1"
   }
 }

@@ -16,6 +16,7 @@ publish:
   provider: github
   owner: xShiroeNguyenx
   repo: infra-companion
+  releaseType: release
 
 win:
   target:
