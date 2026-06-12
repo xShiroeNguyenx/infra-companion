@@ -1,0 +1,292 @@
+# Infra Companion — Hướng dẫn sử dụng
+
+> SSH client desktop thế hệ mới: đầy đủ tính năng Termius + nhiều thứ vượt trội (local-first, sync E2EE tự host, bulk exec, monitoring, AI đa nhà cung cấp…).
+> File này hướng dẫn dùng + cách test tính năng của **phiên bản hiện tại (Phase 0–6)**. Tính năng sắp tới xem [../ROADMAP.md](../ROADMAP.md).
+
+---
+
+## 0. Chạy app
+
+Từ thư mục gốc `infra-companion`:
+
+```bash
+pnpm dev      # DEV — hot reload, sửa code tự cập nhật (khuyên dùng khi phát triển)
+pnpm start    # Chạy bản đã build (cần "pnpm build" trước nếu vừa sửa code)
+pnpm build    # Build production ra out/
+pnpm dist     # Đóng gói installer ra release/
+pnpm test     # Test core: crypto / sync merge / parser ssh_config (merge cần Node >= 22.5, Node 20 tự skip)
+```
+
+> ⚠️ Đừng chạy `npx electron .` ở thư mục gốc — app nằm trong `apps/desktop`. Dùng `pnpm dev`/`pnpm start`, hoặc `npx electron apps/desktop`.
+
+---
+
+## 1. Vault (kho mã hoá) — màn hình đầu tiên
+
+**Là gì**: mọi host/password/SSH key được mã hoá bằng **master password** (argon2id → AES‑256‑GCM). Không có master password = không đọc được dữ liệu. Local-first, không cần tài khoản cloud.
+
+**Dùng**:
+- Lần đầu: đặt master password (≥ 8 ký tự). Tick **"Ghi nhớ trên máy này"** để mở khoá tự động qua Windows DPAPI (không phải gõ lại).
+- Khoá ngay: nút **🔒 Khoá vault** ở thanh trạng thái dưới. Tự khoá sau 15 phút không thao tác (nếu không bật ghi nhớ).
+
+**Test**: tạo vault → thêm 1 host → tắt app → mở lại. Nếu **không** tick ghi nhớ, app sẽ đòi master password; nhập sai → từ chối.
+
+---
+
+## 2. Quản lý Host / Group / Key
+
+### Host
+- Sidebar trái → nút **+ Host**. Điền tên, hostname/IP, port, username, cách xác thực.
+- Click host để kết nối; hover để hiện nút **split** (⊟), **SFTP** (📁), **sửa** (✏).
+
+### Xác thực (Authentication) — 6 kiểu
+| Kiểu | Khi nào dùng |
+|------|--------------|
+| **Password** | Gõ mật khẩu; để trống = hỏi mỗi lần kết nối |
+| **SSH Key** | Chọn key đã import/sinh trong mục Keys |
+| **SSH Agent (OS)** | Dùng OpenSSH agent/Pageant của Windows (kể cả FIDO2 sk-key) |
+| **Secret manager** | Lấy password từ 1Password/Bitwarden/Vault lúc kết nối (xem mục 14B) |
+| **Không cần xác thực** | Server cho vào thẳng (auth none / password rỗng) |
+| **(kế thừa từ group)** | Lấy theo cấu hình mặc định của group |
+
+### Keys (nút **Keys**)
+- **Sinh key mới**: tạo cặp ed25519, private key mã hoá trong vault. Bấm **Copy pub** để dán vào `~/.ssh/authorized_keys` trên server.
+- **Import key**: dán private key (OpenSSH/PEM/PuTPK), nhập passphrase nếu có.
+
+### Group + kế thừa
+- Menu `⋯` → **Tạo group**. Đặt mặc định: username / kiểu auth / key / env / startup snippet.
+- Host trong group để trống các trường đó → **kế thừa** từ group.
+- **Test kế thừa**: tạo group "Sakura" username mặc định `vn_dev` → tạo host bỏ trống username → kết nối thấy dùng `vn_dev`.
+
+---
+
+## 3. Kết nối SSH nâng cao
+
+### Quick Connect
+Gõ thẳng `user@host` hoặc `user@host:port` vào ô tìm kiếm sidebar → Enter để kết nối ngay (không cần lưu host). Lịch sử 50 kết nối gần nhất hiện ở mục **Gần đây**.
+
+### Jump host (ProxyJump nhiều bậc)
+- Sửa host → **Nâng cao** → thêm jump host theo thứ tự. Tương đương `ssh -J hop1,hop2 target`.
+- Mỗi bậc xác minh host key + hỏi mật khẩu riêng nếu thiếu.
+- **Lưu ý**: jump kiểu này xác thực **từ máy bạn** xuyên qua tunnel. Nếu máy đích chỉ nhận key có sẵn **trên gate** (không nhận credential của bạn từ ngoài) → dùng **Login script** bên dưới thay thế.
+
+### Login script (su → ssh, hoặc ssh lồng nhau) — Termius không có
+- Sửa host → **Nâng cao** → **Login script** → nút **"Mẫu: su → ssh"** hoặc tự thêm bước.
+- Mỗi bước: **chờ chuỗi** (vd `assword`, `$`) → **gửi lệnh**. Tick 🔒 nếu là mật khẩu (mã hoá trong vault).
+- Ví dụ thực tế (jpapst04 qua gate):
+  - Host `jpapst04`: hostname = `133.242.68.60` (gate), auth = của gate.
+  - Login script 1 bước: chờ `$` → gửi `ssh vn_dev@jpapst04`.
+  - Kết nối → app tự ssh vào gate rồi tự gõ `ssh jpapst04` → vào thẳng. Chạy lại cả khi auto-reconnect.
+
+### Khác
+- **Agent forwarding** (`ssh -A`), **env vars** (gửi sau login), **startup snippet** (tự chạy sau login) — đều trong phần Nâng cao.
+- **known_hosts (TOFU)**: lần đầu kết nối hiện fingerprint để xác minh; nếu host key đổi → cảnh báo đỏ (chống MITM).
+- **Auto-reconnect**: rớt mạng tự kết nối lại 3 lần (báo vàng trong terminal).
+
+---
+
+## 4. SFTP (truyền file)
+
+**Mở**: hover host ở sidebar → bấm icon 📁.
+
+- 2 pane: **Local** ↔ **Remote**. Double-click thư mục để vào; nút `↑` lên cha, `⟳` refresh, `+📁` thư mục mới.
+- Nút **→** upload, **←** download (đệ quy cả thư mục). Hàng đợi transfer + progress ở đáy.
+- Đổi tên, xoá (đệ quy), **chmod** (octal), và **✏ Sửa** — mở file remote bằng editor mặc định trên máy, **lưu là tự upload lại**.
+
+### SFTP qua máy nội bộ (nested-ssh) — vượt trội
+Với host vào bằng login script `ssh vn_dev@jpapst04`, SFTP **tự vào jpapst04** (không dừng ở gate) bằng cách chạy `ssh vn_dev@jpapst04 -s sftp` trên gate. Không cần cấu hình thêm.
+
+**Test**: mở SFTP `jpapst04` → pane Remote phải là `/home/vn_dev` **của jpapst04**, không phải của gate.
+
+---
+
+## 5. Terminal & Multi-pane
+
+| Tính năng | Cách dùng |
+|-----------|-----------|
+| **Tab mới** (local) | `Ctrl+Shift+T`, hoặc nút `+` (chevron để chọn shell: PowerShell/cmd/Git Bash/WSL) |
+| **Split pane** | Nút **⊞ Split** trên thanh tab (thêm pane local), hoặc icon **⊟** trên host ở sidebar (mở host vào pane mới) — `Ctrl+Shift+D` |
+| **Broadcast** | Nút **📡 Broadcast** hoặc `Ctrl+Shift+B`: gõ ở 1 pane → gửi tới **TẤT CẢ pane** trong tab |
+| **Chuyển tab** | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
+| **Đóng tab/pane** | `Ctrl+Shift+W`, hoặc `✕` trên tab/pane, hoặc middle-click tab |
+| **Tìm trong terminal** | `Ctrl+F` |
+| **Copy / Paste** | `Ctrl+Shift+C` / `Ctrl+Shift+V` |
+
+### Test broadcast (tính năng "gõ 1 lần ra nhiều server")
+1. Mở SSH vào jpapst04. 2. Hover jpapst05 ở sidebar → bấm **⊟ split** → 2 pane cạnh nhau.
+3. Bấm **📡 Broadcast ON**. 4. Gõ `uptime` → cả 2 pane cùng chạy.
+
+---
+
+## 6. Telnet & Serial
+
+- Sửa/Thêm host → **Giao thức**: **Telnet** (host + port 23) hoặc **Serial (COM/USB)**.
+- Serial: dropdown **tự liệt kê cổng COM** đang cắm + chọn **baud** (9600…230400). Dùng cho console switch/router qua cáp USB-serial.
+- **Test Serial**: cắm cáp USB-serial → thêm host Serial → chọn cổng → kết nối → Enter để thấy prompt thiết bị.
+
+---
+
+## 7. Session logging (ghi log phiên)
+
+- Trên thanh công cụ tab: nút **⏺ Ghi log** → ghi toàn bộ output pane đang chọn ra file `…/logs/<thời gian>_<tên>.log` (đã lọc mã màu ANSI).
+- Command Palette → **📂 Mở thư mục log phiên** để xem file.
+- **Test**: bật ⏺ → gõ vài lệnh → mở thư mục log → kiểm tra nội dung.
+
+---
+
+## 7B. Session Recording & Replay (ghi hình phiên) — `⋯` → Bản ghi phiên
+
+**Là gì**: ghi lại phiên terminal dạng **asciicast v2** (chuẩn asciinema) — raw + thời gian — để **xem lại như video**. Khác với Ghi log (text thuần để grep).
+
+**Ghi**: thanh công cụ tab → nút **⏯ Ghi hình** (cạnh ⏺ Ghi log). Bật → ghi ra file `.cast`.
+**Xem lại**: `⋯` → **⏯ Bản ghi phiên** → chọn bản → **▶ Replay** → player có **play/pause (⏸/▶)**, **restart (↺)**, **thanh tua**, **tốc độ 1x/2x/4x/8x**.
+**Export**: 📂 Mở thư mục → file `.cast` mở được bằng `asciinema play` hoặc asciinema-player trên web.
+
+**Test**: mở terminal → ⏯ Ghi hình → gõ `ls`, `top` rồi `q` → tắt ghi → Bản ghi phiên → Replay → thử tua + 4x.
+
+---
+
+## 8. Snippets (lệnh lưu sẵn)
+
+- Menu `⋯` → **Snippets**. Tạo snippet có biến `{{ten_bien}}`.
+- Chạy: nút **⚡** trên thanh tab → chọn snippet → điền biến → tick các pane đích → **Chạy** (chạy đa session).
+- **Test**: snippet `sudo systemctl restart {{service}}` → chạy với `service=nginx` trên nhiều phiên.
+
+---
+
+## 9. Tunnels (port forwarding) — `⋯` → Tunnels
+
+| Loại | Ý nghĩa |
+|------|---------|
+| **L (Local)** | Cổng trên máy bạn → qua SSH → đích (vd vào DB remote như local) |
+| **R (Remote)** | Cổng trên server → về máy bạn |
+| **D (Dynamic)** | SOCKS5 proxy local — duyệt web qua server |
+
+**Test SOCKS5**: + Tunnel → host `Sakurai1-gate1`, loại **Dynamic**, bind `1080` → **Chạy** (chấm xanh) → đặt SOCKS5 `127.0.0.1:1080` trong trình duyệt → duyệt web đi qua gate.
+**Test Local**: loại L, bind `13306`, dest `127.0.0.1:3306` → kết nối MySQL vào `127.0.0.1:13306`.
+
+---
+
+## 10. Bulk Execution (chạy lệnh đa host) — `⋯` → Bulk Execution
+
+**Là gì**: chạy 1 lệnh trên N host **song song** (tối đa 8 cùng lúc), gom nhóm output để phát hiện máy lệch.
+
+**Dùng**: tick host → gõ lệnh (`uptime`, `df -h /`…) → **⚡ Chạy**. Kết quả dạng lưới; bật "Gom theo output" để gom các máy trả kết quả giống nhau, máy lệch gắn nhãn vàng **"(lệch?)"**. Đang chạy có nút **Hủy** (đóng kết nối, dừng host còn xếp hàng); đóng modal giữa chừng cũng tự hủy.
+
+**Chạy xuyên login script**: host vào bằng `ssh vn_dev@jpapst04` → lệnh chạy **đúng trên jpapst04** (app tự `ssh vn_dev@jpapst04 '<lệnh>'`), không phải gate.
+
+**Test**: tick cả 3 host → gõ `hostname; uptime` → mỗi máy trả hostname **riêng** của nó (jpapst04/05 khác gate).
+
+> Giới hạn: chỉ xuyên được login script kiểu `ssh …` thuần; nếu có `su` trước thì host đó chạy ở gate.
+
+---
+
+## 11. Monitoring Dashboard — `⋯` → Monitoring
+
+**Là gì**: theo dõi **CPU load / RAM / disk / uptime** realtime, **không cần cài agent** (đọc `/proc` + `df` qua SSH mỗi 3s). Chỉ Linux.
+
+**Dùng**: chọn host → **Bắt đầu theo dõi** → mỗi host 1 card: sparkline load + thanh Load/RAM/Disk (đỏ >90%, vàng >70%) + uptime. Tự kết nối lại nếu rớt; tự dừng khi đóng dashboard.
+
+**Chạy xuyên login script**: giống Bulk — jpapst04/05 đo đúng máy trong, không phải gate.
+
+**Test**: chọn jpapst04 + jpapst05 → Bắt đầu → xem số liệu của đúng từng máy.
+
+---
+
+## 12. Network Toolbox — `⋯` → Network Toolbox
+
+Thuần local, không cần SSH. Nhập host/IP rồi:
+- **Ping** (độ trễ), **DNS lookup** (A/AAAA/PTR), **Quét port phổ biến** (16 cổng: SSH/HTTP/MySQL/RDP/Redis…).
+- **Test**: ping `1.1.1.1`; quét port `133.242.68.60` xem cổng 22 có mở.
+
+---
+
+## 13. Sync E2EE (đồng bộ đa máy) — `⋯` → Sync
+
+**Là gì**: mã hoá toàn bộ vault thành 1 blob, đẩy vào **thư mục đồng bộ sẵn** (Google Drive / Dropbox / OneDrive / Syncthing / ổ mạng). Backend **chỉ thấy blob mã hoá** (zero-knowledge). Termius bắt dùng cloud của họ — cái này tự host.
+
+**Dùng**:
+1. Chọn thư mục đồng bộ → đặt **sync passphrase** (≥8 ký tự, **giống nhau trên mọi máy**, có thể khác master password) → Bật sync.
+2. Máy khác: cùng thư mục + cùng passphrase → dữ liệu hội tụ (merge Last-Write-Wins + tombstone cho xoá).
+
+**Test nhanh 1 máy**: trỏ vào `D:\sync-test` → bật sync → mở file `infra-companion-vault.blob` trong đó: toàn ký tự mã hoá, không đọc được host/password = đúng zero-knowledge.
+
+> ⚠️ Quên sync passphrase = mất dữ liệu trên thư mục đó (không khôi phục được).
+
+---
+
+## 14. Trợ lý AI — `Ctrl+I` hoặc `⋯` → Trợ lý AI
+
+**Là gì**: sinh lệnh từ ngôn ngữ tự nhiên, giải thích lệnh/lỗi. **4 nhà cung cấp**: Claude / OpenAI / Gemini / **Ollama (local — riêng tư 100%)**.
+
+**Cấu hình** (⚙): chọn provider → model → API key (mã hoá trong vault; Ollama không cần key).
+| Provider | Model mặc định | Ghi chú |
+|----------|----------------|---------|
+| Claude | `claude-opus-4-8` | key `sk-ant-…` |
+| OpenAI | `gpt-4o-mini` | key `sk-…` |
+| Gemini | `gemini-2.0-flash` | key `AIza…` |
+| Ollama | `llama3.1` | local, cần `ollama serve` |
+
+**3 chế độ**:
+1. **Sinh lệnh** — gõ tiếng Việt ("tìm 5 file lớn nhất trong /var/log") → AI trả lệnh + giải thích → nút **↵ Chèn vào terminal** (ghi vào pane đang mở, **KHÔNG tự chạy**, bạn duyệt rồi bấm Enter).
+2. **Giải thích lệnh** — dán lệnh → giải thích từng phần + rủi ro.
+3. **Giải thích lỗi** — dán output/lỗi → chẩn đoán + cách sửa.
+
+**Test**: cấu hình Gemini → Sinh lệnh "kill process đang chiếm cổng 8080" → mở 1 tab terminal → Chèn vào terminal.
+
+---
+
+## 14B. Secrets Manager (lấy password từ 1Password/Bitwarden/Vault)
+
+**Là gì**: không lưu password trong app — chỉ lưu **tham chiếu**, app gọi CLI của secret manager lấy password **đúng lúc kết nối**.
+
+**Dùng**: Sửa host → Xác thực = **Secret manager** → nhập tham chiếu:
+| Cú pháp | Secret manager | CLI gọi |
+|---------|----------------|---------|
+| `op://Vault/jpapst04/password` | 1Password | `op read "op://…"` |
+| `bw://<item-id-hoặc-tên>` | Bitwarden | `bw get password <item>` (cần `BW_SESSION`) |
+| `vault://secret/jpapst04#password` | HashiCorp Vault | `vault kv get -field=password secret/jpapst04` |
+
+**Yêu cầu**: CLI tương ứng (`op`/`bw`/`vault`) đã **cài + đăng nhập** trên máy, có trong PATH. Bitwarden cần unlock và `BW_SESSION` trong môi trường; Vault cần `VAULT_ADDR`/token.
+
+**Test**: cài + đăng nhập `op` → tạo host auth = Secret manager, ref `op://Personal/test/password` → kết nối → app tự lấy password. Nếu CLI chưa cài/đăng nhập → báo lỗi rõ ràng (không treo).
+
+---
+
+## 15. Import từ ssh_config — `⋯` → Import
+
+Chọn file `~/.ssh/config` → tự tạo host, **giữ nguyên ProxyJump nhiều bậc**, import IdentityFile (dedupe key), báo cảnh báo nếu có. Group đặt tên `ssh_config (ngày)`.
+
+---
+
+## 16. Command Palette — `Ctrl+Shift+P`
+
+Gõ là ra mọi hành động (keyboard-first): SSH/SFTP/Split tới host bất kỳ, mở local, toggle broadcast, mở Bulk/Monitor/AI/Sync/Tunnels/Snippets/Keys, mở thư mục log, khoá vault. ↑↓ chọn, Enter chạy.
+
+---
+
+## 17. Bảng phím tắt
+
+| Phím | Hành động |
+|------|-----------|
+| `Ctrl+Shift+P` | Command Palette |
+| `Ctrl+I` | Trợ lý AI |
+| `Ctrl+Shift+T` | Tab terminal local mới |
+| `Ctrl+Shift+W` | Đóng tab hiện tại |
+| `Ctrl+Shift+D` | Split thêm pane local |
+| `Ctrl+Shift+B` | Bật/tắt Broadcast |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Chuyển tab |
+| `Ctrl+F` | Tìm trong terminal |
+| `Ctrl+Shift+C` / `Ctrl+Shift+V` | Copy / Paste |
+| `Esc` | Đóng modal đang mở |
+
+> Mọi hành động xoá (host/key/snippet/tunnel/bản ghi/file trong SFTP) đều hỏi xác nhận trước khi xoá vĩnh viễn.
+
+---
+
+## 18. Giới hạn đã biết của phiên bản hiện tại
+
+- **Bulk/Monitor/SFTP xuyên login script** chỉ áp dụng login script kiểu `ssh …` thuần; nếu có `su` ở trước thì lệnh/monitor vẫn chạy trên gate.
+- **Sync** hiện chỉ có backend **thư mục** (Google Drive/Dropbox/Syncthing/ổ mạng); WebDAV, S3, Git sẽ có sau.
+- **Secrets manager** hỗ trợ 1Password, Bitwarden, HashiCorp Vault qua CLI; KeePassXC sẽ có sau.
+- Chưa có: **plugin system**, **RDP/VNC**, **team server** (self-host), **cloud import** (AWS/GCP…), **Docker/K8s browser** — xem [../ROADMAP.md](../ROADMAP.md).

@@ -1,0 +1,37 @@
+appId: com.nguyenkhanh.infracompanion
+productName: Infra Companion
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+asarUnpack:
+  - "**/node_modules/node-pty/**"
+  - "**/node_modules/@serialport/**"
+  - "**/node_modules/serialport/**"
+npmRebuild: false
+
+publish:
+  provider: github
+  owner: xShiroeNguyenx
+  repo: infra-companion
+
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  artifactName: InfraCompanion-Setup-${version}.${ext}
+
+mac:
+  target:
+    - dmg
+  category: public.app-category.developer-tools
+  artifactName: InfraCompanion-${version}.${ext}
+
+linux:
+  target:
+    - AppImage
+  category: Development
+  artifactName: InfraCompanion-${version}.${ext}

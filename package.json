@@ -1,0 +1,17 @@
+{
+  "name": "infra-companion",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @infra/desktop dev",
+    "start": "pnpm --filter @infra/desktop start",
+    "build": "pnpm --filter @infra/desktop build",
+    "dist": "pnpm --filter @infra/desktop dist",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @infra/core test"
+  }
+}
