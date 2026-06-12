@@ -105,15 +105,17 @@ Pull credentials at connect time — nothing stored in the app:
 
 ## Installation
 
-### Download (Windows)
+### Download
 
-Grab the latest installer from [`apps/desktop/release/`](apps/desktop/release/):
+Head to the **[Releases page](https://github.com/xShiroeNguyenx/infra-companion/releases)** and grab the installer for your platform:
 
-```
-InfraCompanion-Setup-0.1.0.exe
-```
+| Platform | File |
+|----------|------|
+| Windows | `InfraCompanion-Setup-x.x.x.exe` (NSIS, choose install directory) |
+| macOS | `InfraCompanion-x.x.x.dmg` |
+| Linux | `InfraCompanion-x.x.x.AppImage` |
 
-NSIS installer — choose your installation directory, no admin rights required for per-user install.
+The app checks for updates automatically on startup and shows a banner when a new version is available.
 
 ### Build from Source
 
