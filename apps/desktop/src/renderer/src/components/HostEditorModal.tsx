@@ -43,16 +43,23 @@ export function HostEditorModal({
   const [secretRef, setSecretRef] = useState(host?.secretRef ?? '')
   const [groupId, setGroupId] = useState(host?.groupId ?? '')
   const [newGroupName, setNewGroupName] = useState('')
+  const [notes, setNotes] = useState(host?.notes ?? '')
   const [jumpChain, setJumpChain] = useState<string[]>(host?.jumpChain ?? [])
   const [jumpToAdd, setJumpToAdd] = useState('')
   const [envText, setEnvText] = useState(envToText(host?.env ?? null))
   const [startupSnippetId, setStartupSnippetId] = useState(host?.startupSnippetId ?? '')
   const [agentForward, setAgentForward] = useState(host?.agentForward ?? false)
+  const [tmux, setTmux] = useState(host?.tmux ?? false)
   const [loginSteps, setLoginSteps] = useState<LoginStep[]>(host?.loginSteps ?? [])
   const [showAdvanced, setShowAdvanced] = useState(
     Boolean(
       host &&
-        (host.jumpChain?.length || host.env || host.startupSnippetId || host.agentForward || host.loginSteps?.length)
+        (host.jumpChain?.length ||
+          host.env ||
+          host.startupSnippetId ||
+          host.agentForward ||
+          host.tmux ||
+          host.loginSteps?.length)
     )
   )
   const [busy, setBusy] = useState(false)
@@ -118,6 +125,8 @@ export function HostEditorModal({
       env: sshOnly ? textToEnv(envText) : null,
       startupSnippetId: sshOnly ? startupSnippetId || null : null,
       agentForward: sshOnly ? agentForward : false,
+      tmux: sshOnly ? tmux : false,
+      notes: notes.trim() || null,
       loginSteps: sshOnly && loginSteps.filter((s) => s.send || s.secret).length > 0 ? loginSteps : null
     }
     const ok = await saveHost(input)
@@ -298,6 +307,10 @@ export function HostEditorModal({
           </Field>
         )}
 
+        <Field label={t('host.notes')}>
+          <TextArea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('host.notesPh')} />
+        </Field>
+
         {isSsh && (
           <button
             type="button"
@@ -371,6 +384,12 @@ export function HostEditorModal({
               <input type="checkbox" checked={agentForward} onChange={(e) => setAgentForward(e.target.checked)} />
               {t('host.agentFwd')}
             </label>
+
+            <label className="mb-1 flex items-center gap-2 text-xs text-muted select-none" title={t('host.tmuxTip')}>
+              <input type="checkbox" checked={tmux} onChange={(e) => setTmux(e.target.checked)} />
+              {t('host.tmux')}
+            </label>
+            <p className="mb-2.5 -mt-0.5 ml-6 text-[10px] leading-relaxed text-subtle">{t('host.tmuxHint')}</p>
 
             <Field label={t('host.loginScript')}>
               <div>

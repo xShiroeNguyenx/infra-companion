@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, AI assistance with local LLM support, and more.
 
-**Current release: v0.1.3 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.1.4 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 ---
 
@@ -28,6 +28,7 @@
 - **Jump host chain** — multi-hop ProxyJump (equivalent to `ssh -J hop1,hop2 target`)
 - **Login script (expect/send)** — automate `su → ssh` or nested SSH sequences with per-step encrypted secrets; runs on auto-reconnect too
 - **Auto-reconnect** (3 retries, status shown in terminal)
+- **tmux session resume** — opt-in per host: wraps the session in tmux (`new-session -A`) so it survives disconnects and reattaches on reconnect/reopen (server must have tmux)
 - **TOFU known-hosts** — fingerprint shown on first connect, red alert on host-key change
 - **Quick Connect** — type `user@host:port` in the sidebar; 50-entry history
 - **Telnet** and **Serial / COM port** (auto-lists connected ports, configurable baud)
@@ -39,8 +40,11 @@
 - **Split panes** — side-by-side sessions, Ctrl+Shift+D
 - **Merge tabs ⇄ split panes** — the Split button combines all open tabs into one tab's panes (so Broadcast spans them) and toggles back; scrollback is preserved across merge/split
 - **Open a group as split panes** — one click on a group header opens every host in it side by side, ready to broadcast
+- **Workspaces** — save a layout (tabs + split panes + broadcast) and restore it in one click (⋯ → Workspaces)
 - **Broadcast input** — type once, send to all open panes simultaneously (Ctrl+Shift+B)
 - **Background image** — full-window wallpaper with adjustable opacity, blur, fit (cover/contain), and position (Settings → Background image)
+- **Terminal appearance** — configurable font family, size, line height, and cursor style (Settings → Terminal); applies live
+- **Custom accent color** — pick your own accent over the dark/light theme (Settings → Appearance)
 - **Find in terminal** — Ctrl+F with highlight
 - **Command Palette** — Ctrl+Shift+P, keyboard-first access to every action
 - **Session logging** — capture raw output (ANSI-stripped) to file
@@ -53,6 +57,7 @@
 - **Groups with inheritance** — set default username / auth / key / env / startup snippet at group level; individual hosts can override
 - **SSH Keys** — generate ed25519, import OpenSSH/PEM/PuTTY; private keys never leave main process in plaintext
 - **Snippets** — parameterized commands (`{{variable}}`), run across multiple sessions at once
+- **Notes per host** — encrypted Markdown note per host (purpose, handoff info, app passwords); quick-view from the sidebar, synced with the host
 - **Import** — `~/.ssh/config` (preserves multi-hop ProxyJump, deduplicates IdentityFile)
 
 ### SFTP
@@ -231,7 +236,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.1.3)
+## Known Limitations (v0.1.4)
 
 - Bulk / Monitor / SFTP through login scripts only works when the login script uses a plain `ssh …` command (a preceding `su` will stop at the gate host)
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))

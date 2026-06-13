@@ -133,6 +133,14 @@ const MIGRATIONS: string[] = [
     updated_at     INTEGER NOT NULL
   );
   ALTER TABLE hosts ADD COLUMN vpn_profile_id TEXT REFERENCES vpn_profiles(id) ON DELETE SET NULL;
+  `,
+  // v8 — ghi chú per-host (Markdown), mã hoá vì có thể chứa thông tin nhạy cảm (mật khẩu app…).
+  `
+  ALTER TABLE hosts ADD COLUMN notes_enc TEXT;
+  `,
+  // v9 — tmux: bật thì sau login tự "tmux new-session -A" để phiên sống sót khi rớt mạng (resume).
+  `
+  ALTER TABLE hosts ADD COLUMN tmux INTEGER NOT NULL DEFAULT 0;
   `
 ]
 

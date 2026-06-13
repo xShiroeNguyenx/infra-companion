@@ -80,6 +80,10 @@ export interface HostDto {
   env: Record<string, string> | null
   startupSnippetId: string | null
   agentForward: boolean
+  /** Bật: sau login tự chạy `tmux new-session -A` để phiên sống sót/khôi phục khi rớt mạng. */
+  tmux: boolean
+  /** Ghi chú Markdown (đã giải mã khi vault mở) — null nếu trống. */
+  notes: string | null
   /** Bước secret có send='' (giá trị thật không rời main process). */
   loginSteps: LoginStep[] | null
 }
@@ -102,6 +106,9 @@ export interface HostInput {
   env?: Record<string, string> | null
   startupSnippetId?: string | null
   agentForward?: boolean
+  tmux?: boolean
+  /** Ghi chú: undefined = giữ nguyên, null/'' = xoá, string = đặt mới. */
+  notes?: string | null
   /** Bước secret với send='' = giữ nguyên giá trị cũ (merge theo vị trí). */
   loginSteps?: LoginStep[] | null
 }

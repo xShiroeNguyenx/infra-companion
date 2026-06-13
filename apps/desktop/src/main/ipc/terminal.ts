@@ -128,6 +128,7 @@ export function registerTerminalIpc(): () => void {
             env: prepared.env,
             startupScript: prepared.startupScript,
             agentForward: prepared.agentForward,
+            tmux: prepared.tmux,
             loginSteps: prepared.loginSteps,
             verifyHostKey
           },

@@ -4,6 +4,15 @@ import { clearTermSession } from '../lib/termBus'
 import { errorMessage, useToastsStore } from './toasts'
 import { useDataStore } from './data'
 
+/**
+ * Cách mở lại 1 pane — lưu vào workspace để dựng lại layout. Chỉ tham chiếu hostId
+ * (không denormalize) nên host đồng bộ tới máy nào là mở được tới đó.
+ */
+export type PaneOrigin =
+  | { kind: 'local'; profileId?: string }
+  | { kind: 'host'; hostId: string }
+  | { kind: 'quick'; target: string }
+
 /** Một pane terminal trong tab (mỗi pane = 1 phiên local/ssh riêng). */
 export interface Pane {
   id: string
@@ -15,6 +24,8 @@ export interface Pane {
   statusDetail?: string
   exitCode?: number | null
   exitReason?: string
+  /** Cách tạo pane này — để lưu/dựng lại workspace. */
+  origin?: PaneOrigin
 }
 
 export type TabKind = 'terminal' | 'sftp'
@@ -30,7 +41,14 @@ export interface AppTab {
   sftpSessionId?: string
   sftpTitle?: string
   sftpHome?: string
+  /** sftp: host đã mở — để lưu/dựng lại workspace. */
+  sftpHostId?: string
 }
+
+/** Một tab trong workspace đã lưu (chỉ spec để mở lại, không có session sống). */
+export type WorkspaceTab =
+  | { kind: 'terminal'; broadcast: boolean; panes: PaneOrigin[] }
+  | { kind: 'sftp'; hostId: string }
 
 let tabSeq = 1
 let paneSeq = 1
@@ -64,9 +82,28 @@ interface TabsState {
   applyExit: (sessionId: string, exitCode: number | null, reason?: string) => void
   cycleTab: (direction: 1 | -1) => void
   activeTab: () => AppTab | undefined
+  /** Chụp layout hiện tại thành spec để lưu workspace (bỏ pane/tab không mở lại được). */
+  snapshotWorkspace: () => WorkspaceTab[]
+  /** Dựng lại layout từ workspace — CỘNG THÊM tab (không đóng tab đang mở). */
+  restoreWorkspace: (tabs: WorkspaceTab[]) => Promise<void>
 }
 
-/** Tạo 1 phiên terminal qua IPC và trả về Pane. */
+/** Suy ra cách mở lại pane từ request tạo phiên. Nguồn DUY NHẤT gán origin. */
+function originOf(req: TerminalCreateRequest): PaneOrigin {
+  if (req.kind === 'local') return { kind: 'local', profileId: req.profileId }
+  if (req.quickTarget) return { kind: 'quick', target: req.quickTarget }
+  if (req.hostId) return { kind: 'host', hostId: req.hostId }
+  return { kind: 'local' }
+}
+
+/** Chuyển origin → request để mở lại. */
+function reqOf(origin: PaneOrigin): TerminalCreateRequest {
+  if (origin.kind === 'local') return { kind: 'local', profileId: origin.profileId, cols: 80, rows: 24 }
+  if (origin.kind === 'quick') return { kind: 'ssh', quickTarget: origin.target, cols: 80, rows: 24 }
+  return { kind: 'ssh', hostId: origin.hostId, cols: 80, rows: 24 }
+}
+
+/** Tạo 1 phiên terminal qua IPC và trả về Pane (kèm origin để lưu workspace). */
 async function createPane(req: TerminalCreateRequest): Promise<Pane> {
   const res = await window.infra.terminal.create(req)
   return {
@@ -75,7 +112,8 @@ async function createPane(req: TerminalCreateRequest): Promise<Pane> {
     kind: res.kind,
     title: res.title,
     subtitle: res.subtitle,
-    status: res.kind === 'local' ? 'connected' : 'connecting'
+    status: res.kind === 'local' ? 'connected' : 'connecting',
+    origin: originOf(req)
   }
 }
 
@@ -168,7 +206,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         broadcast: false,
         sftpSessionId: res.sessionId,
         sftpTitle: res.title,
-        sftpHome: res.home
+        sftpHome: res.home,
+        sftpHostId: hostId
       }
       set((s) => ({ tabs: [...s.tabs, tab], activeId: tab.id }))
     } catch (error) {
@@ -266,6 +305,44 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     const index = tabs.findIndex((t) => t.id === activeId)
     const next = tabs[(index + direction + tabs.length) % tabs.length]
     if (next) set({ activeId: next.id })
+  },
+
+  snapshotWorkspace: () => {
+    const result: WorkspaceTab[] = []
+    for (const tab of get().tabs) {
+      if (tab.kind === 'sftp') {
+        if (tab.sftpHostId) result.push({ kind: 'sftp', hostId: tab.sftpHostId })
+        continue
+      }
+      // Bỏ pane không có origin (không mở lại được); tab rỗng thì bỏ luôn
+      const panes = tab.panes.map((p) => p.origin).filter((o): o is PaneOrigin => o !== undefined)
+      if (panes.length > 0) result.push({ kind: 'terminal', broadcast: tab.broadcast, panes })
+    }
+    return result
+  },
+
+  restoreWorkspace: async (wtabs) => {
+    for (const wt of wtabs) {
+      if (wt.kind === 'sftp') {
+        await get().openSftp(wt.hostId) // openSftp tự toast nếu host lỗi/đã xoá
+        continue
+      }
+      let tabId: string | null = null
+      for (const origin of wt.panes) {
+        try {
+          const pane = await createPane(reqOf(origin))
+          // 1 pane lỗi (host đã xoá…) không chặn các pane khác trong tab
+          if (tabId === null) tabId = addTab(set, pane)
+          else addPane(set, tabId, pane)
+        } catch (error) {
+          toastError(error)
+        }
+      }
+      if (tabId !== null && wt.broadcast) {
+        const id = tabId
+        set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, broadcast: true } : t)) }))
+      }
+    }
   }
 }))
 

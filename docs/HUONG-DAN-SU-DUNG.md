@@ -38,6 +38,7 @@ pnpm test     # Test core: crypto / sync merge / parser ssh_config (merge cần 
 ### Host
 - Sidebar trái → nút **+ Host**. Điền tên, hostname/IP, port, username, cách xác thực.
 - Click host để kết nối; hover để hiện nút **split** (⊟), **SFTP** (📁), **sửa** (✏).
+- **Ghi chú (Notes)**: trong form sửa host có ô **Ghi chú** (Markdown, **mã hoá** trong vault) — ghi mục đích server, info bàn giao, mật khẩu app… Host có ghi chú sẽ hiện nút **📝** ở sidebar để xem nhanh (read-only); đồng bộ cùng host qua Sync.
 
 ### Xác thực (Authentication) — 6 kiểu
 | Kiểu | Khi nào dùng |
@@ -77,6 +78,11 @@ Gõ thẳng `user@host` hoặc `user@host:port` vào ô tìm kiếm sidebar → 
   - Host `jpapst04`: hostname = `133.242.68.60` (gate), auth = của gate.
   - Login script 1 bước: chờ `$` → gửi `ssh vn_dev@jpapst04`.
   - Kết nối → app tự ssh vào gate rồi tự gõ `ssh jpapst04` → vào thẳng. Chạy lại cả khi auto-reconnect.
+
+### tmux — tự khôi phục phiên khi rớt mạng (per-host)
+- Sửa host → **Nâng cao** → tick **"Tmux — tự khôi phục phiên khi rớt mạng"**. Sau login app tự chạy `tmux new-session -A -s ic-main`.
+- Rớt mạng → app kết nối lại → **re-attach** đúng phiên tmux còn sống trên server (lệnh đang chạy/scrollback phía server còn nguyên). Kể cả khi app đã bỏ cuộc sau 3 lần thử, **mở lại host** vẫn attach lại được.
+- **Yêu cầu**: server có cài `tmux`. Lưu ý: startup snippet chạy ở shell **ngoài** tmux; mở cùng host ở 2 tab sẽ "soi gương" (cùng 1 phiên tmux).
 
 ### Khác
 - **Agent forwarding** (`ssh -A`), **env vars** (gửi sau login), **startup snippet** (tự chạy sau login) — đều trong phần Nâng cao.
@@ -131,6 +137,25 @@ Với host vào bằng login script `ssh vn_dev@jpapst04`, SFTP **tự vào jpap
   - **Độ hiện** (5–100%) và **Độ mờ** (0–24px) — giảm độ hiện hoặc tăng độ mờ nếu chữ khó đọc trên ảnh sáng.
   - **Xoá** để bỏ ảnh nền.
 - Ảnh được nén tự động và lưu **trên máy này** (không đồng bộ) — mỗi người tự chọn ảnh riêng.
+- **Màu accent**: bảng chọn màu (color picker) đặt màu nhấn riêng (nút bấm chính, viền chọn…) đè lên theme dark/light; nút Khôi phục về mặc định.
+- **Terminal**: chỉnh **cỡ chữ**, **giãn dòng**, **kiểu con trỏ** (khối/gạch đứng/gạch dưới) và **font chữ** (tên font CSS, dùng font đã cài; có nút ↺ khôi phục mặc định). Áp dụng ngay cho mọi pane.
+
+---
+
+## 5C. Workspaces (lưu & mở lại bố cục) — `⋯` → Workspaces
+
+**Là gì**: lưu nguyên bố cục đang mở (tất cả tab + split pane + trạng thái Broadcast) thành 1 workspace có tên, mở lại bằng 1 click. Hợp với việc lặp lại layout quen thuộc (vd "Monitor cluster" = jpapst04+05 split sẵn + Broadcast).
+
+**Dùng**:
+- Mở các tab/split như mong muốn → `⋯` → **Workspaces** → đặt tên → **Lưu**.
+- Mở lại: chọn workspace → **Mở** (mở thêm vào tab đang có). **✏** đổi tên, **✕** xoá.
+
+**Lưu ý**:
+- Mở workspace tạo **phiên SSH mới** (đăng nhập lại, không có nội dung scrollback cũ).
+- Mở là **cộng thêm** tab (không đóng tab đang mở) — mở 2 lần thì nhân đôi tab.
+- Lưu **trên máy này** (chưa đồng bộ); chỉ tham chiếu host theo ID nên host nào đã sync sang máy khác thì workspace mở được tới đó. Host đã xoá thì pane đó bỏ qua (báo lỗi nhẹ), không chặn các pane khác.
+
+**Test**: mở jpapst04, split thêm jpapst05, bật Broadcast → Lưu tên "ST monitor" → đóng hết tab → Workspaces → Mở "ST monitor" → 2 pane mở lại cạnh nhau, Broadcast bật sẵn.
 
 ---
 

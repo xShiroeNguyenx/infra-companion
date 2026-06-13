@@ -6,6 +6,7 @@ import { useToastsStore } from '../stores/toasts'
 import { useUiStore, type AppModal } from '../stores/ui'
 import { GroupEditorModal } from './GroupEditorModal'
 import { HostEditorModal } from './HostEditorModal'
+import { NotesModal } from './NotesModal'
 import { Button } from './ui'
 import { useT } from '../i18n'
 
@@ -16,6 +17,7 @@ const QUICK_PATTERN = /^[^@\s]+@[^@\s]+$/
 type OpenModal =
   | { kind: 'host'; host: HostDto | null; duplicate?: boolean }
   | { kind: 'group'; group: GroupDto | null }
+  | { kind: 'notes'; host: HostDto }
   | null
 
 /** Cột trái: Quick Connect / tìm kiếm, hosts theo group, lịch sử, menu công cụ. */
@@ -152,6 +154,18 @@ export function Sidebar() {
                     {host.hostname}
                   </div>
                 </div>
+                {host.notes && (
+                  <button
+                    className="text-muted hover:bg-edge-strong hover:text-content shrink-0 rounded p-1"
+                    title={t('sidebar.viewNotes')}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setModal({ kind: 'notes', host })
+                    }}
+                  >
+                    <NoteIcon />
+                  </button>
+                )}
                 <button
                   className="text-subtle hover:bg-edge-strong hover:text-warning rounded p-1 opacity-0 group-hover:opacity-100"
                   title={t('sidebar.splitHost')}
@@ -237,6 +251,7 @@ export function Sidebar() {
           </Button>
           {menuOpen && (
             <div className="border-edge-strong bg-elevated absolute right-0 bottom-9 z-50 min-w-44 rounded-md border py-1 shadow-xl">
+              <MenuItem label={t('menu.workspaces')} onClick={() => { setMenuOpen(false); openAppModal('workspaces') }} />
               <MenuItem label={t('menu.bulk')} onClick={() => { setMenuOpen(false); openAppModal('bulk') }} />
               <MenuItem label={t('menu.monitor')} onClick={() => { setMenuOpen(false); openAppModal('monitor') }} />
               <MenuItem label={t('menu.ai')} onClick={() => { setMenuOpen(false); openAppModal('ai') }} />
@@ -258,6 +273,13 @@ export function Sidebar() {
         <HostEditorModal host={modal.host} duplicate={modal.duplicate} onClose={() => setModal(null)} />
       )}
       {modal?.kind === 'group' && <GroupEditorModal group={modal.group} onClose={() => setModal(null)} />}
+      {modal?.kind === 'notes' && (
+        <NotesModal
+          host={modal.host}
+          onEdit={() => setModal({ kind: 'host', host: modal.host })}
+          onClose={() => setModal(null)}
+        />
+      )}
     </div>
   )
 }
@@ -298,6 +320,15 @@ function CopyIcon() {
     <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
       <rect x="5" y="5" width="9" height="9" rx="1.5" />
       <path d="M11 5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2" />
+    </svg>
+  )
+}
+
+function NoteIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
+      <rect x="2.5" y="1.5" width="11" height="13" rx="1.5" />
+      <path d="M5 5h6M5 8h6M5 11h4" strokeLinecap="round" />
     </svg>
   )
 }

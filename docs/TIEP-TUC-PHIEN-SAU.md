@@ -1,10 +1,12 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
-> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật: chuẩn bị release **v0.1.3** (UX terminal + ảnh nền), sau phiên rà soát chất lượng và Phase 0–6.
+> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật: chuẩn bị release **v0.1.4** (workspaces/notes/tuỳ biến terminal/accent/tmux), sau khi v0.1.3 đã phát hành.
 
 ## Đang ở đâu
 
-Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3** (gộp tab/mở nhóm/ảnh nền). App build + typecheck + 27 test đều sạch. Bản release gần nhất đã phát hành: v0.1.2; **v0.1.3 đã sẵn sàng nhưng CHƯA commit/tag** (xem mục cuối).
+Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 (đã tag/phát hành)**: gộp tab / mở nhóm / ảnh nền. App build + typecheck + 27 test đều sạch.
+
+**v0.1.4 đã sẵn sàng nhưng CHƯA commit/tag** (xem mục cuối) — 5 tính năng: Workspaces, Notes per host, tuỳ biến terminal (font/cỡ chữ/con trỏ), màu accent tuỳ chỉnh, tmux-resume. Schema DB lên **v9** (`hosts.notes_enc`, `hosts.tmux`). ⚠️ **tmux-resume chưa test runtime** — cần server có tmux + rớt mạng thật để kiểm chứng trước khi tin tưởng.
 
 | Phase | Trạng thái |
 |-------|-----------|
@@ -55,9 +57,16 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 
 **Chưa sửa (chấp nhận được / để sau):** cảnh báo style SonarLint (window vs globalThis, nested-ternary…) — theo convention codebase; `sandbox: false` (preload cần); Bulk/Monitor/SFTP xuyên login-script vẫn chỉ hỗ trợ `ssh …` thuần.
 
-## Phiên v0.1.3 đã làm gì (UX terminal + ảnh nền) — chưa commit
+## Chi tiết kỹ thuật các tính năng
 
-Hầu hết ở renderer + 1 thay đổi nhỏ ở core (vault). Build + typecheck + 27 test sạch.
+**v0.1.4 (CHƯA commit)** — 5 mục dưới đây. Hầu hết ở renderer + thay đổi nhỏ ở core (vault). Build + typecheck + 27 test sạch.
+
+- **tmux-aware resume (F14)** per-host: schema **v9** (`hosts.tmux` INTEGER, mirror `agent_forward` qua resolveConnection→prepared→`SshSessionOptions`). `SshSession.sendBootstrap` thêm dòng cuối `tmux new-session -A -s ic-main` **CHỈ khi** `options.tmux` (gate chặt → host không bật bootstrap y hệt cũ). Resume nhờ sendBootstrap chạy lại mỗi (re)connect. importSnapshot: thêm `'tmux'` vào col list + default `?? 0` (cột NOT NULL, snapshot cũ thiếu). UI: checkbox trong HostEditor (Nâng cao). **CHƯA test runtime được** (cần server có tmux + rớt mạng thật) — user phải tự kiểm trước khi tag.
+- **Theme accent tuỳ chỉnh**: `accentColor` trong settings (localStorage `infra.accent`), `applyAccent()` set CSS var inline `--c-accent/-hover/-fg/-soft` (hover = darken 14%); áp sớm trong main.tsx. Color picker trong Settings → Giao diện.
+- **Tuỳ biến terminal**: font/cỡ chữ/giãn dòng/kiểu con trỏ trong Settings → Terminal. Settings store (localStorage, key `infra.term.*`); [TerminalPane.tsx](../apps/desktop/src/renderer/src/features/terminal/TerminalPane.tsx) đọc settings cho options + effect áp live (set `term.options.*` rồi `fit()` để PTY nhận cols/rows mới). Default font giữ stack cũ (`TERM_FONT_DEFAULT`) nên không đổi hiển thị user hiện tại. Thuần renderer, không đụng core.
+- **Notes per host (F18)**: ghi chú Markdown mã hoá per-host. Schema **v8** (`ALTER TABLE hosts ADD COLUMN notes_enc`); `notes` trong HostDto (giải mã khi vault mở, như env)/HostInput (undefined=giữ, null/''=xoá); xử lý ở `saveHost`/`toHostDto` + sync export/import (`notes_plain`/`notes_enc`) trong [VaultService.ts](../packages/core/src/vault/VaultService.ts). UI: ô Notes trong [HostEditorModal.tsx](../apps/desktop/src/renderer/src/components/HostEditorModal.tsx); nút 📝 trên host row (khi có notes) mở [NotesModal.tsx](../apps/desktop/src/renderer/src/components/NotesModal.tsx) (read-only). 27 test vẫn pass (gồm sync-merge với cột mới).
+- **Workspaces (P38)**: lưu/mở lại bố cục tab+split+broadcast. Mỗi `Pane` có thêm `origin` (gán DUY NHẤT trong `createPane`); tab SFTP có `sftpHostId`. `snapshotWorkspace()`/`restoreWorkspace()` trong [stores/tabs.ts](../apps/desktop/src/renderer/src/stores/tabs.ts); CRUD localStorage trong [stores/workspaces.ts](../apps/desktop/src/renderer/src/stores/workspaces.ts) (key `infra.workspaces`); UI [WorkspacesModal.tsx](../apps/desktop/src/renderer/src/components/WorkspacesModal.tsx) (vào từ ⋯ + palette). Lưu **hostId** (không denormalize) → swap sang vault-sync sau này dễ; restore chịu được host đã xoá (try/catch từng pane). Mở = cộng thêm tab, phiên mới (không scrollback). **TODO sau**: đồng bộ workspace qua vault cho cả team.
+**v0.1.3 (ĐÃ phát hành/tag)** — 3 mục dưới đây + ghi chú VPN:
 
 - **Nút Split đổi nghĩa** ([stores/tabs.ts](../apps/desktop/src/renderer/src/stores/tabs.ts)): bỏ `splitView` (xếp các tab cạnh nhau dạng lưới — Broadcast không xuyên tab). Giờ Split = `mergeTabs` gộp mọi tab terminal thành pane trong 1 tab (Broadcast dùng chung), bấm lại = `unmergeTab` tách ra. Giữ scrollback khi pane bị remount bằng `@xterm/addon-serialize` + snapshot trong [lib/termBus.ts](../apps/desktop/src/renderer/src/lib/termBus.ts) (chỉ chụp khi pane còn trong store → không rò bộ nhớ). **Dep mới**: `@xterm/addon-serialize`.
 - **Mở cả nhóm 1 click**: `openSshGroup(hostIds)` trong tabs store — nút lưới trên header group ở Sidebar + lệnh palette "Mở nhóm" → mở mọi host trong group thành pane chia sẵn trong 1 tab.
@@ -73,19 +82,21 @@ Hầu hết ở renderer + 1 thay đổi nhỏ ở core (vault). Build + typeche
 - Mở lại file này để nhớ ngữ cảnh.
 - Nói số **1 / 2** → bắt đầu luôn.
 
-## Git + Release v0.1.3 (anh tự chạy; tôi không tự commit)
+## Git + Release v0.1.4 (anh tự chạy; tôi không tự commit)
 
-Version đã bump sẵn `0.1.2 → 0.1.3` ở `package.json` (gốc + `apps/desktop`); CHANGELOG/README/docs đã cập nhật. Release tự kích hoạt khi **push tag `v*.*.*`** (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux).
+> v0.1.3 ĐÃ tag/phát hành (3 tính năng: gộp tab/mở nhóm/ảnh nền). Phần đang chờ là **v0.1.4** (workspaces/notes/terminal/accent/tmux).
+
+Version đã bump sẵn `0.1.3 → 0.1.4` ở `package.json` (gốc + `apps/desktop`); CHANGELOG tách [0.1.4]/[0.1.3], README/ROADMAP/docs đã cập nhật. Release tự kích hoạt khi **push tag `v*.*.*`** (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux).
 
 ```powershell
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
 git add -A
 git status            # xem lại trước khi commit
-git commit -m "feat: merge-tabs split + open group as panes + full-window background image (v0.1.3)"
+git commit -m "feat: workspaces + notes per host + terminal font/cursor + custom accent + tmux resume (v0.1.4)"
 git push origin main
 # Phát hành: tạo tag để CI build + tạo release
-git tag v0.1.3
-git push origin v0.1.3
+git tag v0.1.4
+git push origin v0.1.4
 ```
 
 > Môi trường dev: Node 20, pnpm 9, Electron 42 (Node 24 runtime — dùng `node:sqlite`), ssh2/node-pty/serialport là native nhưng đã externalize + prebuilt nên không cần build C++. Khi chạy electron từ terminal đã dính biến `ELECTRON_RUN_AS_NODE` thì thêm `$env:ELECTRON_RUN_AS_NODE=$null` cùng lệnh (chỉ là gotcha của terminal, không phải lỗi app).

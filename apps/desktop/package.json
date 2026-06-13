@@ -1,6 +1,6 @@
 {
   "name": "@infra/desktop",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Infra Companion — modern SSH client desktop app",
   "author": "NguyenKhanh",

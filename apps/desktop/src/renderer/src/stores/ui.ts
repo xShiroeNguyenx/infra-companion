@@ -11,6 +11,7 @@ export type AppModal =
   | 'ai'
   | 'recordings'
   | 'settings'
+  | 'workspaces'
   | null
 
 interface UiState {

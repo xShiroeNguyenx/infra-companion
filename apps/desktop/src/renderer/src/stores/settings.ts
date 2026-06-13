@@ -6,18 +6,30 @@ export type Language = 'vi' | 'en' | 'ja'
 export type BgPosition = 'center' | 'left' | 'right' | 'top' | 'bottom'
 /** Kiểu lấp khung: cover = phủ kín (cắt bớt), contain = vừa khung (không cắt). */
 export type BgFit = 'cover' | 'contain'
+/** Kiểu con trỏ terminal (xterm cursorStyle). */
+export type TermCursor = 'block' | 'bar' | 'underline'
 
 const THEME_KEY = 'infra.theme'
 const LANG_KEY = 'infra.lang'
+const ACCENT_KEY = 'infra.accent'
 const BG_IMAGE_KEY = 'infra.bg.image'
 const BG_OPACITY_KEY = 'infra.bg.opacity'
 const BG_BLUR_KEY = 'infra.bg.blur'
 const BG_POSITION_KEY = 'infra.bg.position'
 const BG_FIT_KEY = 'infra.bg.fit'
+const TERM_FONT_KEY = 'infra.term.font'
+const TERM_SIZE_KEY = 'infra.term.size'
+const TERM_LH_KEY = 'infra.term.lineHeight'
+const TERM_CURSOR_KEY = 'infra.term.cursor'
 
 const BG_OPACITY_DEFAULT = 0.25
 const BG_BLUR_DEFAULT = 0
 const BG_POSITIONS: BgPosition[] = ['center', 'left', 'right', 'top', 'bottom']
+
+/** Font terminal mặc định (khớp giá trị cũ hardcode để không đổi hiển thị của user hiện tại). */
+export const TERM_FONT_DEFAULT = '"Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace'
+const TERM_SIZE_DEFAULT = 14
+const TERM_LH_DEFAULT = 1.2
 
 function readTheme(): ThemeMode {
   const v = localStorage.getItem(THEME_KEY)
@@ -27,6 +39,12 @@ function readTheme(): ThemeMode {
 function readLang(): Language {
   const v = localStorage.getItem(LANG_KEY)
   return v === 'en' || v === 'ja' ? v : 'vi'
+}
+
+/** Hex màu accent tùy chỉnh (#rrggbb) hoặc null = dùng accent mặc định của theme. */
+function readAccent(): string | null {
+  const v = localStorage.getItem(ACCENT_KEY)
+  return v && /^#[0-9a-fA-F]{6}$/.test(v) ? v : null
 }
 
 function readBgImage(): string | null {
@@ -52,6 +70,25 @@ function readBgFit(): BgFit {
   return localStorage.getItem(BG_FIT_KEY) === 'contain' ? 'contain' : 'cover'
 }
 
+function readTermFont(): string {
+  return localStorage.getItem(TERM_FONT_KEY) || TERM_FONT_DEFAULT
+}
+
+function readTermSize(): number {
+  const v = Number(localStorage.getItem(TERM_SIZE_KEY))
+  return Number.isFinite(v) && v >= 8 && v <= 28 ? v : TERM_SIZE_DEFAULT
+}
+
+function readTermLineHeight(): number {
+  const v = Number(localStorage.getItem(TERM_LH_KEY))
+  return Number.isFinite(v) && v >= 1 && v <= 2 ? v : TERM_LH_DEFAULT
+}
+
+function readTermCursor(): TermCursor {
+  const v = localStorage.getItem(TERM_CURSOR_KEY)
+  return v === 'bar' || v === 'underline' ? v : 'block'
+}
+
 /** Áp theme + lang lên <html>. Gọi sớm (main.tsx) để tránh nháy màu khi load. */
 export function applyTheme(theme: ThemeMode): void {
   document.documentElement.dataset.theme = theme
@@ -64,9 +101,39 @@ export function applyBackground(image: string | null): void {
   document.documentElement.dataset.bg = image ? 'on' : 'off'
 }
 
+/** Làm tối 1 màu hex theo tỉ lệ (0–1) — dùng cho accent-hover. */
+function darkenHex(hex: string, amount: number): string {
+  const n = Number.parseInt(hex.slice(1), 16)
+  const f = 1 - amount
+  const r = Math.round(((n >> 16) & 0xff) * f)
+  const g = Math.round(((n >> 8) & 0xff) * f)
+  const b = Math.round((n & 0xff) * f)
+  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`
+}
+
+/**
+ * Ghi đè màu accent qua CSS var inline trên <html> (thắng stylesheet theme).
+ * Một màu picked → accent + hover (tối hơn); accent-fg/soft = chính màu đó
+ * (soft chỉ dùng kèm alpha modifier nên thành tint nhạt). null = gỡ override.
+ */
+export function applyAccent(color: string | null): void {
+  const root = document.documentElement
+  const vars = ['--c-accent', '--c-accent-hover', '--c-accent-fg', '--c-accent-soft']
+  if (!color) {
+    for (const v of vars) root.style.removeProperty(v)
+    return
+  }
+  root.style.setProperty('--c-accent', color)
+  root.style.setProperty('--c-accent-hover', darkenHex(color, 0.14))
+  root.style.setProperty('--c-accent-fg', color)
+  root.style.setProperty('--c-accent-soft', color)
+}
+
 interface SettingsState {
   theme: ThemeMode
   language: Language
+  /** Màu accent tùy chỉnh (#rrggbb) — null = mặc định theo theme. */
+  accentColor: string | null
   /** Ảnh nền dạng data URL (đã downscale) — null = không dùng. */
   backgroundImage: string | null
   /** Độ hiện của ảnh nền (0–1). */
@@ -77,24 +144,42 @@ interface SettingsState {
   backgroundPosition: BgPosition
   /** Phủ kín (cover) hay vừa khung (contain). */
   backgroundFit: BgFit
+  /** Font terminal (CSS font-family). */
+  termFontFamily: string
+  /** Cỡ chữ terminal (px). */
+  termFontSize: number
+  /** Giãn dòng terminal. */
+  termLineHeight: number
+  /** Kiểu con trỏ terminal. */
+  termCursor: TermCursor
   setTheme: (t: ThemeMode) => void
   setLanguage: (l: Language) => void
+  setAccentColor: (c: string | null) => void
   /** Lưu/xoá ảnh nền. Trả về false nếu localStorage đầy (ảnh quá lớn). */
   setBackgroundImage: (image: string | null) => boolean
   setBackgroundOpacity: (v: number) => void
   setBackgroundBlur: (v: number) => void
   setBackgroundPosition: (p: BgPosition) => void
   setBackgroundFit: (f: BgFit) => void
+  setTermFontFamily: (f: string) => void
+  setTermFontSize: (n: number) => void
+  setTermLineHeight: (n: number) => void
+  setTermCursor: (c: TermCursor) => void
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   theme: readTheme(),
   language: readLang(),
+  accentColor: readAccent(),
   backgroundImage: readBgImage(),
   backgroundOpacity: readBgOpacity(),
   backgroundBlur: readBgBlur(),
   backgroundPosition: readBgPosition(),
   backgroundFit: readBgFit(),
+  termFontFamily: readTermFont(),
+  termFontSize: readTermSize(),
+  termLineHeight: readTermLineHeight(),
+  termCursor: readTermCursor(),
   setTheme: (theme) => {
     localStorage.setItem(THEME_KEY, theme)
     applyTheme(theme)
@@ -104,6 +189,12 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     localStorage.setItem(LANG_KEY, language)
     applyLang(language)
     set({ language })
+  },
+  setAccentColor: (color) => {
+    if (color) localStorage.setItem(ACCENT_KEY, color)
+    else localStorage.removeItem(ACCENT_KEY)
+    applyAccent(color)
+    set({ accentColor: color })
   },
   setBackgroundImage: (image) => {
     try {
@@ -133,8 +224,32 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setBackgroundFit: (fit) => {
     localStorage.setItem(BG_FIT_KEY, fit)
     set({ backgroundFit: fit })
+  },
+  setTermFontFamily: (family) => {
+    const value = family.trim() || TERM_FONT_DEFAULT
+    localStorage.setItem(TERM_FONT_KEY, value)
+    set({ termFontFamily: value })
+  },
+  setTermFontSize: (n) => {
+    const size = Math.min(Math.max(Math.round(n), 8), 28)
+    localStorage.setItem(TERM_SIZE_KEY, String(size))
+    set({ termFontSize: size })
+  },
+  setTermLineHeight: (n) => {
+    const lh = Math.min(Math.max(n, 1), 2)
+    localStorage.setItem(TERM_LH_KEY, String(lh))
+    set({ termLineHeight: lh })
+  },
+  setTermCursor: (cursor) => {
+    localStorage.setItem(TERM_CURSOR_KEY, cursor)
+    set({ termCursor: cursor })
   }
 }))
 
 /** Đọc giá trị ban đầu mà không cần mount React (cho main.tsx). */
-export const initialSettings = { theme: readTheme(), language: readLang(), backgroundImage: readBgImage() }
+export const initialSettings = {
+  theme: readTheme(),
+  language: readLang(),
+  backgroundImage: readBgImage(),
+  accentColor: readAccent()
+}

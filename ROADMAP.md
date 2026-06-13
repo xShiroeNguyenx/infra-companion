@@ -8,7 +8,7 @@
 ## Còn sót từ Phase 3–6 (ưu tiên cao)
 
 ### Terminal nâng cao (Phase 3)
-- **Workspaces** (P38) — lưu và mở lại bộ tab + split + kết nối; chuyển workspace bằng 1 click.
+- ~~**Workspaces** (P38)~~ — ✅ Đã làm (v0.1.4): lưu/mở lại bộ tab + split + broadcast bằng 1 click (⋯ → Workspaces). *Còn lại (sau): đồng bộ workspace qua vault để dùng chung cả team.*
 - **SSH Certificates** (P15) — hỗ trợ user cert ký bởi CA; import cert kèm key.
 - **FIDO2 / hardware key** (P16) — sk-ed25519, sk-ecdsa qua OS ssh-agent.
 
@@ -24,9 +24,9 @@
 ### Vượt trội Wave 2 — còn lại (Phase 6)
 - **Plugin system** (F16) — plugin JS sandbox hook vào command palette, panel UI, protocol mới, format output; kèm tài liệu Plugin API.
 - **KeePassXC** (F11 mở rộng) — tích hợp Secrets Manager thêm KeePassXC qua KeePassXC-proxy.
-- **tmux-aware resume** (F14) — tự attach lại tmux session sau rớt mạng; tuỳ chọn auto-wrap mọi phiên trong tmux.
+- ~~**tmux-aware resume** (F14)~~ — ✅ Đã làm (v0.1.4): bật per-host → sau login `tmux new-session -A -s ic-main`, tự re-attach khi reconnect/mở lại (resume). *Còn lại (sau): auto-wrap toàn cục mọi phiên.*
 - **ssh_config 2 chiều** (F12) — ghi ngược thay đổi vào `~/.ssh/config` (tuỳ chọn), dùng song song CLI ssh.
-- **Notes per host** (F18) — ghi chú Markdown mã hoá đính kèm host (thông tin bàn giao, sơ đồ, mật khẩu ứng dụng…).
+- ~~**Notes per host** (F18)~~ — ✅ Đã làm (v0.1.4): ghi chú Markdown mã hoá đính kèm host, xem nhanh từ sidebar, đồng bộ cùng host.
 
 ---
 
@@ -51,8 +51,8 @@
 ## Tuỳ biến giao diện (sau)
 
 - ~~**Background image**~~ — ✅ Đã làm (v0.1.3): ảnh nền phủ full khung + opacity/blur/vị trí/lấp khung. Xem [CHANGELOG.md](CHANGELOG.md).
-- **Theme tuỳ chỉnh** — cho phép user tự định nghĩa bảng màu (accent, nền) ngoài 2 preset dark/light.
-- **Font & cỡ chữ terminal** — chọn font/cỡ chữ per-host hoặc toàn cục.
+- **Theme tuỳ chỉnh** — ✅ Một phần (v0.1.4): chọn **màu accent** tuỳ ý (Settings → Giao diện). *Còn lại (sau): tuỳ biến cả bảng màu (nền/panel…), import/export theme.*
+- ~~**Font & cỡ chữ terminal**~~ — ✅ Đã làm (v0.1.4): font/cỡ chữ/giãn dòng/kiểu con trỏ toàn cục (Settings → Terminal). *Còn lại (sau): per-host override.*
 
 ---
 

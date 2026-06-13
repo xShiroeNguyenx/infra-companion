@@ -35,6 +35,8 @@ export interface PreparedConnection {
   env: Record<string, string>
   startupScript?: string
   agentForward: boolean
+  /** Bật tmux auto-attach-or-create sau login (resume khi rớt mạng). */
+  tmux: boolean
   /** Login script với secret đầy đủ (đã hỏi user nếu chưa lưu). */
   loginSteps: LoginStep[]
   title: string
@@ -94,6 +96,7 @@ export async function prepareConnection(sender: WebContents, hostId: string): Pr
     env: resolved.env,
     startupScript: resolved.startupScript,
     agentForward: resolved.agentForward,
+    tmux: resolved.tmux,
     loginSteps,
     title: target.label,
     subtitle: `${target.username}@${target.host}:${target.port}`,

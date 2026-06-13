@@ -40,20 +40,23 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
   const closePane = useTabsStore((s) => s.closePane)
   const themeMode = useSettingsStore((s) => s.theme)
   const hasBackground = useSettingsStore((s) => s.backgroundImage !== null)
+  const fontFamily = useSettingsStore((s) => s.termFontFamily)
+  const fontSize = useSettingsStore((s) => s.termFontSize)
+  const lineHeight = useSettingsStore((s) => s.termLineHeight)
+  const cursorStyle = useSettingsStore((s) => s.termCursor)
   const t = useT()
 
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
 
+    const s0 = useSettingsStore.getState()
     const term = new Terminal({
-      theme: terminalTheme(
-        useSettingsStore.getState().theme,
-        useSettingsStore.getState().backgroundImage !== null
-      ),
-      fontFamily: '"Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace',
-      fontSize: 14,
-      lineHeight: 1.2,
+      theme: terminalTheme(s0.theme, s0.backgroundImage !== null),
+      fontFamily: s0.termFontFamily,
+      fontSize: s0.termFontSize,
+      lineHeight: s0.termLineHeight,
+      cursorStyle: s0.termCursor,
       cursorBlink: true,
       scrollback: 10_000,
       allowProposedApi: true,
@@ -167,6 +170,21 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     if (!term) return
     term.options.theme = terminalTheme(themeMode, hasBackground)
   }, [themeMode, hasBackground])
+
+  // Áp font/cỡ chữ/giãn dòng/con trỏ ngay khi đổi trong Settings; fit lại để PTY nhận cols/rows mới
+  useEffect(() => {
+    const term = termRef.current
+    if (!term) return
+    term.options.fontFamily = fontFamily
+    term.options.fontSize = fontSize
+    term.options.lineHeight = lineHeight
+    term.options.cursorStyle = cursorStyle
+    const frame = requestAnimationFrame(() => {
+      const fit = fitRef.current
+      if (fit && hostRef.current?.offsetParent !== null) fit.fit()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [fontFamily, fontSize, lineHeight, cursorStyle])
 
   const findNext = (backward: boolean): void => {
     if (!findText) return

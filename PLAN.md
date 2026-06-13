@@ -2,7 +2,7 @@
 
 > Desktop SSH client thế hệ mới: **đầy đủ 100% tính năng Termius** + các tính năng vượt trội mà Termius không có.
 > Ngày lập: 2026-06-10.
-> Tiến độ: ✅ **Phase 0–6 hoàn thành** (hơn 23 tính năng + phiên rà soát chất lượng ~30 bug fix + 27 test) + **v0.1.3** (gộp tab/mở nhóm/ảnh nền). Chi tiết tính năng: [docs/HUONG-DAN-SU-DUNG.md](docs/HUONG-DAN-SU-DUNG.md). Roadmap tiếp theo: [ROADMAP.md](ROADMAP.md).
+> Tiến độ: ✅ **Phase 0–6 hoàn thành** (hơn 23 tính năng + phiên rà soát chất lượng ~30 bug fix + 27 test) + **v0.1.3** (gộp tab/mở nhóm/ảnh nền) + **v0.1.4** (workspaces/notes/tuỳ biến terminal/accent/tmux). Chi tiết tính năng: [docs/HUONG-DAN-SU-DUNG.md](docs/HUONG-DAN-SU-DUNG.md). Roadmap tiếp theo: [ROADMAP.md](ROADMAP.md).
 
 ---
 

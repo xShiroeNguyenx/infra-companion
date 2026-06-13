@@ -5,6 +5,22 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.4] — 2026-06-13
+
+### Added
+
+- **Workspaces** — save the current layout (all tabs, split panes, and broadcast state) under a name and restore it in one click. In **⋯ → Workspaces** (or the Command Palette): *Save current layout*, then *Open* / *Rename* / *Delete* saved ones. Opening adds the layout's tabs as fresh sessions. Stored per-machine (referencing host IDs, so synced hosts resolve on any machine).
+- **Notes per host** — attach an encrypted Markdown note to any host (server purpose, handoff info, app passwords…). Edit it in the host editor; hosts with a note show a 📝 button in the sidebar for a quick read-only view. Encrypted at rest in the vault and synced with the host.
+- **Terminal appearance** — customize the terminal font family, font size, line height, and cursor style (block / bar / underline) in **Settings → Terminal**. Applies live to all panes and persists per-machine.
+- **Custom accent color** — pick your own accent (color picker in **Settings → Appearance**); applied app-wide over the dark/light theme, with a one-click reset to the theme default.
+- **tmux session resume (per-host)** — opt-in toggle in the host editor: after login the app runs `tmux new-session -A -s ic-main`, so the session lives on the server. If the network drops (or you reopen the host later), it re-attaches the still-running session and you resume where you left off. Requires tmux on the server.
+
+### Notes
+
+- Vault schema migrated to **v9** (`hosts.notes_enc` for notes, `hosts.tmux` flag); both fields participate in E2EE sync.
+
+---
+
 ## [0.1.3] — 2026-06-13
 
 ### Added

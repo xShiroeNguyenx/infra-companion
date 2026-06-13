@@ -1,8 +1,16 @@
 import { useRef } from 'react'
 import { useT } from '../i18n'
-import { useSettingsStore, type BgFit, type BgPosition, type Language, type ThemeMode } from '../stores/settings'
+import {
+  TERM_FONT_DEFAULT,
+  useSettingsStore,
+  type BgFit,
+  type BgPosition,
+  type Language,
+  type TermCursor,
+  type ThemeMode
+} from '../stores/settings'
 import { useToastsStore } from '../stores/toasts'
-import { Field, Modal } from './ui'
+import { Field, Modal, TextInput } from './ui'
 
 /** Cạnh tối đa khi nén ảnh nền — đủ nét cho màn 4K, đủ nhỏ để vừa localStorage. */
 const MAX_DIM = 2560
@@ -42,21 +50,37 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const {
     theme,
     language,
+    accentColor,
     backgroundImage,
     backgroundOpacity,
     backgroundBlur,
     backgroundPosition,
     backgroundFit,
+    termFontFamily,
+    termFontSize,
+    termLineHeight,
+    termCursor,
     setTheme,
     setLanguage,
+    setAccentColor,
     setBackgroundImage,
     setBackgroundOpacity,
     setBackgroundBlur,
     setBackgroundPosition,
-    setBackgroundFit
+    setBackgroundFit,
+    setTermFontFamily,
+    setTermFontSize,
+    setTermLineHeight,
+    setTermCursor
   } = useSettingsStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const push = useToastsStore((s) => s.push)
+
+  const cursorOptions: Array<{ value: TermCursor; label: string }> = [
+    { value: 'block', label: t('settings.termCursorBlock') },
+    { value: 'bar', label: t('settings.termCursorBar') },
+    { value: 'underline', label: t('settings.termCursorUnderline') }
+  ]
 
   const positionOptions: Array<{ value: BgPosition; label: string }> = [
     { value: 'center', label: t('settings.bgPosCenter') },
@@ -136,6 +160,27 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 {opt.label}
               </button>
             ))}
+          </div>
+        </Field>
+
+        <Field label={t('settings.accent')}>
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={accentColor ?? '#2563eb'}
+              onChange={(e) => setAccentColor(e.target.value)}
+              className="border-edge-strong h-8 w-12 shrink-0 cursor-pointer rounded border bg-transparent"
+              title={t('settings.accent')}
+            />
+            <span className="text-muted flex-1 font-mono text-xs">{accentColor ?? t('settings.accentDefault')}</span>
+            {accentColor && (
+              <button
+                onClick={() => setAccentColor(null)}
+                className="border-edge text-muted hover:bg-hover rounded border px-3 py-1.5 text-sm"
+              >
+                {t('settings.accentReset')}
+              </button>
+            )}
           </div>
         </Field>
 
@@ -237,6 +282,71 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             </Field>
           </>
         )}
+
+        <div className="text-subtle mt-4 mb-2 text-[10px] font-semibold tracking-wider uppercase">
+          {t('settings.terminal')}
+        </div>
+
+        <Field label={`${t('settings.termFontSize')} — ${termFontSize}px`}>
+          <input
+            type="range"
+            min={8}
+            max={28}
+            step={1}
+            value={termFontSize}
+            onChange={(e) => setTermFontSize(Number(e.target.value))}
+            className="accent-accent w-full"
+          />
+        </Field>
+
+        <Field label={`${t('settings.termLineHeight')} — ${termLineHeight.toFixed(2)}`}>
+          <input
+            type="range"
+            min={1}
+            max={2}
+            step={0.05}
+            value={termLineHeight}
+            onChange={(e) => setTermLineHeight(Number(e.target.value))}
+            className="accent-accent w-full"
+          />
+        </Field>
+
+        <Field label={t('settings.termCursor')}>
+          <div className="grid grid-cols-3 gap-2">
+            {cursorOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setTermCursor(opt.value)}
+                className={`rounded border px-2 py-2 text-sm ${
+                  termCursor === opt.value
+                    ? 'border-accent text-content bg-accent-soft/40'
+                    : 'border-edge text-muted hover:bg-hover'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <Field label={t('settings.termFont')}>
+          <div className="flex gap-2">
+            <TextInput
+              value={termFontFamily}
+              onChange={(e) => setTermFontFamily(e.target.value)}
+              placeholder={TERM_FONT_DEFAULT}
+              className="!font-mono !text-xs"
+            />
+            <button
+              onClick={() => setTermFontFamily(TERM_FONT_DEFAULT)}
+              className="border-edge text-muted hover:bg-hover shrink-0 rounded border px-3 text-sm"
+              title={t('settings.termFontReset')}
+            >
+              ↺
+            </button>
+          </div>
+          <p className="text-subtle mt-1 text-[10px] leading-relaxed">{t('settings.termFontHint')}</p>
+        </Field>
       </div>
     </Modal>
   )

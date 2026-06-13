@@ -15,6 +15,7 @@ import { SyncModal } from './components/SyncModal'
 import { AiModal } from './components/AiModal'
 import { RecordingsModal } from './components/RecordingsModal'
 import { SettingsModal } from './components/SettingsModal'
+import { WorkspacesModal } from './components/WorkspacesModal'
 import { UpdateBanner } from './components/UpdateBanner'
 import { SftpView } from './features/sftp/SftpView'
 import { useT } from './i18n'
@@ -135,6 +136,7 @@ export default function App() {
   const locked = vaultState !== 'unlocked'
 
   const paletteCommands: Command[] = [
+    { id: 'open-workspaces', label: t('menu.workspaces'), run: () => setModal('workspaces') },
     { id: 'open-bulk', label: t('menu.bulk'), run: () => setModal('bulk') },
     { id: 'open-monitor', label: t('menu.monitor'), run: () => setModal('monitor') },
     { id: 'open-net', label: t('menu.net'), run: () => setModal('net') },
@@ -211,6 +213,7 @@ export default function App() {
       {modal === 'ai' && <AiModal onClose={() => setModal(null)} />}
       {modal === 'recordings' && <RecordingsModal onClose={() => setModal(null)} />}
       {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} />}
+      {modal === 'workspaces' && <WorkspacesModal onClose={() => setModal(null)} />}
 
       {locked && (
         <div className="absolute inset-0 z-[100]">

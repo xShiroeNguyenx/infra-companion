@@ -93,6 +93,8 @@ export interface ResolvedConnection {
   env: Record<string, string>
   startupScript?: string
   agentForward: boolean
+  /** Bật tmux auto-attach-or-create sau login (resume khi rớt mạng). */
+  tmux: boolean
   /** Login script với giá trị secret THẬT — chỉ dùng trong main process. */
   loginSteps: LoginStep[]
 }
@@ -268,8 +270,10 @@ export class VaultService {
 
     if (input.id) {
       const existing = db
-        .prepare('SELECT password_enc, login_script_enc FROM hosts WHERE id = ?')
-        .get(input.id) as { password_enc: string | null; login_script_enc: string | null } | undefined
+        .prepare('SELECT password_enc, login_script_enc, notes_enc FROM hosts WHERE id = ?')
+        .get(input.id) as
+        | { password_enc: string | null; login_script_enc: string | null; notes_enc: string | null }
+        | undefined
       if (!existing) throw new Error('Host không tồn tại')
       let passwordEnc = existing.password_enc
       if (input.password === null) passwordEnc = null
@@ -279,10 +283,13 @@ export class VaultService {
         input.loginSteps === undefined
           ? existing.login_script_enc
           : this.encodeLoginSteps(dek, input.loginSteps, existing.login_script_enc)
+      // notes: undefined = giữ nguyên; null/'' = xoá; string = đặt mới
+      const notesEnc =
+        input.notes === undefined ? existing.notes_enc : input.notes ? encryptField(dek, input.notes) : null
       db.prepare(
         `UPDATE hosts SET group_id=?, label=?, protocol=?, hostname=?, port=?, username=?, auth_type=?,
          password_enc=?, key_id=?, secret_ref=?, favorite=?, jump_chain=?, env_enc=?, startup_snippet_id=?,
-         agent_forward=?, login_script_enc=?, updated_at=? WHERE id=?`
+         agent_forward=?, tmux=?, login_script_enc=?, notes_enc=?, updated_at=? WHERE id=?`
       ).run(
         input.groupId ?? null,
         input.label,
@@ -299,7 +306,9 @@ export class VaultService {
         envEnc,
         input.startupSnippetId ?? null,
         input.agentForward ? 1 : 0,
+        input.tmux ? 1 : 0,
         loginScriptEnc,
+        notesEnc,
         now,
         input.id
       )
@@ -309,9 +318,9 @@ export class VaultService {
     const id = randomUUID()
     db.prepare(
       `INSERT INTO hosts (id, group_id, label, protocol, hostname, port, username, auth_type, password_enc,
-       key_id, secret_ref, favorite, jump_chain, env_enc, startup_snippet_id, agent_forward,
-       login_script_enc, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+       key_id, secret_ref, favorite, jump_chain, env_enc, startup_snippet_id, agent_forward, tmux,
+       login_script_enc, notes_enc, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).run(
       id,
       input.groupId ?? null,
@@ -329,7 +338,9 @@ export class VaultService {
       envEnc,
       input.startupSnippetId ?? null,
       input.agentForward ? 1 : 0,
+      input.tmux ? 1 : 0,
       this.encodeLoginSteps(dek, input.loginSteps ?? null, null),
+      input.notes ? encryptField(dek, input.notes) : null,
       now,
       now
     )
@@ -408,6 +419,7 @@ export class VaultService {
       env,
       startupScript,
       agentForward: row.agent_forward === 1,
+      tmux: row.tmux === 1,
       loginSteps: this.decodeLoginSteps(dek, row.login_script_enc)
     }
   }
@@ -787,9 +799,11 @@ export class VaultService {
         password_plain: dec(r.password_enc),
         env_plain: dec(r.env_enc),
         login_script_plain: dec(r.login_script_enc),
+        notes_plain: dec(r.notes_enc),
         password_enc: undefined,
         env_enc: undefined,
-        login_script_enc: undefined
+        login_script_enc: undefined,
+        notes_enc: undefined
       })),
       snippets: all('SELECT * FROM snippets'),
       tunnels: all('SELECT * FROM tunnels'),
@@ -867,11 +881,14 @@ export class VaultService {
             ...h,
             password_enc: enc(h.password_plain as string),
             env_enc: enc(h.env_plain as string),
-            login_script_enc: enc(h.login_script_plain as string)
+            login_script_enc: enc(h.login_script_plain as string),
+            notes_enc: enc(h.notes_plain as string),
+            // Snapshot từ máy cũ (trước v9) không có 'tmux' → mặc định 0 (cột NOT NULL)
+            tmux: h.tmux ?? 0
           },
           ['id', 'group_id', 'label', 'protocol', 'hostname', 'port', 'username', 'auth_type', 'password_enc',
            'key_id', 'secret_ref', 'favorite', 'jump_chain', 'env_enc', 'startup_snippet_id', 'agent_forward',
-           'login_script_enc', 'last_connected_at', 'created_at', 'updated_at']
+           'tmux', 'login_script_enc', 'notes_enc', 'last_connected_at', 'created_at', 'updated_at']
         )
       }
       for (const s of remote.snippets) {
@@ -980,6 +997,8 @@ export class VaultService {
       env: this.dek ? nullIfEmpty(this.decryptEnv(this.dek, row.env_enc)) : null,
       startupSnippetId: row.startup_snippet_id,
       agentForward: row.agent_forward === 1,
+      tmux: row.tmux === 1,
+      notes: this.dek && row.notes_enc ? (decryptField(this.dek, row.notes_enc) ?? null) : null,
       loginSteps: this.dek ? maskLoginSteps(this.decodeLoginSteps(this.dek, row.login_script_enc)) : null
     }
   }
@@ -1034,7 +1053,9 @@ interface HostRow {
   env_enc: string | null
   startup_snippet_id: string | null
   agent_forward: number
+  tmux: number
   login_script_enc: string | null
+  notes_enc: string | null
 }
 
 interface KeyRow {

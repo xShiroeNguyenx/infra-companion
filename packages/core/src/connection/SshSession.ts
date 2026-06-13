@@ -14,8 +14,13 @@ export interface SshSessionOptions {
   startupScript?: string
   /** Login script expect/send (vd su → ssh lồng nhau). Secret đã được resolve thành giá trị thật. */
   loginSteps?: LoginStep[]
+  /** Bật: sau login tự `tmux new-session -A` để phiên sống sót/khôi phục khi rớt mạng. */
+  tmux?: boolean
   verifyHostKey: HostKeyVerifier
 }
+
+/** Tên tmux session dùng để attach-or-create (đặt riêng, tránh chiếm session có sẵn của user). */
+const TMUX_SESSION = 'ic-main'
 
 /** Thời gian chờ tối đa cho mỗi bước expect. */
 const LOGIN_STEP_TIMEOUT_MS = 20_000
@@ -208,6 +213,9 @@ export class SshSession implements TerminalSession {
       lines.push(`export ${key}=${shellQuote(value)}`)
     }
     if (this.options.startupScript) lines.push(this.options.startupScript)
+    // tmux LẦN CUỐI: attach-or-create. Chạy lại ở mỗi lần (re)connect → re-attach session
+    // còn sống trên server (resume). CHỈ thêm khi bật — host không bật bootstrap y hệt như cũ.
+    if (this.options.tmux) lines.push(`tmux new-session -A -s ${TMUX_SESSION}`)
     if (lines.length > 0) stream.write(lines.join('\n') + '\n')
   }
 
