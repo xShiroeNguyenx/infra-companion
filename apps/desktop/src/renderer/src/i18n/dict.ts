@@ -27,6 +27,8 @@ export const vi = {
   'sidebar.moreTools': 'Công cụ khác',
   'sidebar.editGroup': 'Sửa group',
   'sidebar.splitHost': 'Mở trong pane mới của tab hiện tại (split — để broadcast nhiều server)',
+  'sidebar.openGroup': 'Mở cả nhóm: {n} host, mỗi host 1 pane trong cùng 1 tab (Broadcast dùng chung)',
+
   'sidebar.openSftp': 'Mở SFTP',
   'sidebar.duplicateHost': 'Nhân bản host (tạo bản sao rồi sửa)',
   'sidebar.editHost': 'Sửa host',
@@ -47,7 +49,8 @@ export const vi = {
 
   // Tabs / terminal
   'tabs.split': '⊞ Split',
-  'tabs.splitTip': 'Tách thêm 1 pane terminal local trong tab này',
+  'tabs.splitOn': '⊞ Split ON',
+  'tabs.splitTip': 'Gộp tất cả tab đang mở thành các pane trong 1 tab (Broadcast dùng chung) — bấm lần nữa để tách về tab riêng',
   'tabs.broadcastOn': '📡 Broadcast ON',
   'tabs.broadcastOff': '📡 Broadcast OFF',
   'tabs.broadcastTip': 'Broadcast: gõ ở 1 pane sẽ gửi lệnh tới TẤT CẢ pane trong tab',
@@ -101,6 +104,8 @@ export const vi = {
   'palette.sftp': 'SFTP: {label}',
   'palette.splitSsh': 'Split SSH: {label}',
   'palette.splitSshHint': 'mở trong pane mới (broadcast)',
+  'palette.openGroup': 'Mở nhóm: {label} ({n} host, chia màn hình)',
+  'palette.openGroupHint': 'mỗi host 1 pane trong cùng tab',
   'palette.placeholder': 'Gõ lệnh hoặc tên host… (↑↓ chọn, Enter chạy)',
   'palette.noMatch': 'Không có lệnh khớp',
 
@@ -350,7 +355,25 @@ export const vi = {
   'settings.language': 'Ngôn ngữ',
   'settings.langVi': 'Tiếng Việt',
   'settings.langEn': 'English',
-  'settings.langJa': '日本語'
+  'settings.langJa': '日本語',
+  'settings.background': 'Ảnh nền',
+  'settings.bgChoose': 'Chọn ảnh…',
+  'settings.bgChange': 'Đổi ảnh…',
+  'settings.bgRemove': 'Xoá',
+  'settings.bgOpacity': 'Độ hiện',
+  'settings.bgBlur': 'Độ mờ',
+  'settings.bgHint': 'Ảnh hiện mờ phía sau terminal. Giảm độ hiện hoặc tăng độ mờ để chữ dễ đọc hơn.',
+  'settings.bgTooLarge': 'Ảnh quá lớn để lưu — hãy chọn ảnh nhỏ hơn.',
+  'settings.bgError': 'Không đọc được ảnh.',
+  'settings.bgFit': 'Lấp khung',
+  'settings.bgFitCover': 'Phủ kín',
+  'settings.bgFitContain': 'Vừa khung',
+  'settings.bgPosition': 'Vị trí ảnh',
+  'settings.bgPosCenter': 'Giữa',
+  'settings.bgPosLeft': 'Trái',
+  'settings.bgPosRight': 'Phải',
+  'settings.bgPosTop': 'Trên',
+  'settings.bgPosBottom': 'Dưới'
 }
 
 export type I18nKey = keyof typeof vi
@@ -375,6 +398,8 @@ export const en: Partial<Record<I18nKey, string>> = {
   'sidebar.moreTools': 'More tools',
   'sidebar.editGroup': 'Edit group',
   'sidebar.splitHost': 'Open in a new pane of the current tab (split — to broadcast to many servers)',
+  'sidebar.openGroup': 'Open whole group: {n} hosts as panes in one tab (shared Broadcast)',
+
   'sidebar.openSftp': 'Open SFTP',
   'sidebar.duplicateHost': 'Duplicate host (clone then edit)',
   'sidebar.editHost': 'Edit host',
@@ -393,7 +418,8 @@ export const en: Partial<Record<I18nKey, string>> = {
   'menu.openLogs': '📂 Open session log folder',
 
   'tabs.split': '⊞ Split',
-  'tabs.splitTip': 'Split off another local terminal pane in this tab',
+  'tabs.splitOn': '⊞ Split ON',
+  'tabs.splitTip': 'Merge all open tabs into panes in one tab (shared Broadcast) — click again to split back into tabs',
   'tabs.broadcastOn': '📡 Broadcast ON',
   'tabs.broadcastOff': '📡 Broadcast OFF',
   'tabs.broadcastTip': 'Broadcast: typing in one pane sends to ALL panes in the tab',
@@ -444,6 +470,8 @@ export const en: Partial<Record<I18nKey, string>> = {
   'palette.sftp': 'SFTP: {label}',
   'palette.splitSsh': 'Split SSH: {label}',
   'palette.splitSshHint': 'open in a new pane (broadcast)',
+  'palette.openGroup': 'Open group: {label} ({n} hosts, split)',
+  'palette.openGroupHint': 'each host as a pane in one tab',
   'palette.placeholder': 'Type a command or host name… (↑↓ to select, Enter to run)',
   'palette.noMatch': 'No matching command',
 
@@ -679,7 +707,25 @@ export const en: Partial<Record<I18nKey, string>> = {
   'settings.language': 'Language',
   'settings.langVi': 'Tiếng Việt',
   'settings.langEn': 'English',
-  'settings.langJa': '日本語'
+  'settings.langJa': '日本語',
+  'settings.background': 'Background image',
+  'settings.bgChoose': 'Choose image…',
+  'settings.bgChange': 'Change image…',
+  'settings.bgRemove': 'Remove',
+  'settings.bgOpacity': 'Opacity',
+  'settings.bgBlur': 'Blur',
+  'settings.bgHint': 'Shows faintly behind the terminal. Lower the opacity or raise the blur to keep text readable.',
+  'settings.bgTooLarge': 'Image too large to store — please pick a smaller one.',
+  'settings.bgError': 'Could not read the image.',
+  'settings.bgFit': 'Fit',
+  'settings.bgFitCover': 'Cover',
+  'settings.bgFitContain': 'Contain',
+  'settings.bgPosition': 'Position',
+  'settings.bgPosCenter': 'Center',
+  'settings.bgPosLeft': 'Left',
+  'settings.bgPosRight': 'Right',
+  'settings.bgPosTop': 'Top',
+  'settings.bgPosBottom': 'Bottom'
 }
 
 export const ja: Partial<Record<I18nKey, string>> = {
@@ -702,6 +748,8 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'sidebar.moreTools': 'その他のツール',
   'sidebar.editGroup': 'グループを編集',
   'sidebar.splitHost': '現在のタブの新しいペインで開く（分割 — 複数サーバーへブロードキャスト）',
+  'sidebar.openGroup': 'グループを一括で開く：{n} ホストを1つのタブのペインとして開く（ブロードキャスト共用）',
+
   'sidebar.openSftp': 'SFTP を開く',
   'sidebar.duplicateHost': 'ホストを複製（複製してから編集）',
   'sidebar.editHost': 'ホストを編集',
@@ -720,7 +768,8 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'menu.openLogs': '📂 セッションログフォルダを開く',
 
   'tabs.split': '⊞ 分割',
-  'tabs.splitTip': 'このタブにローカルターミナルペインを追加',
+  'tabs.splitOn': '⊞ 分割 ON',
+  'tabs.splitTip': '開いている全タブを1つのタブのペインとして統合（ブロードキャスト共用）— もう一度押すとタブに戻す',
   'tabs.broadcastOn': '📡 ブロードキャスト ON',
   'tabs.broadcastOff': '📡 ブロードキャスト OFF',
   'tabs.broadcastTip': 'ブロードキャスト：1つのペインで入力するとタブ内の全ペインへ送信',
@@ -771,6 +820,8 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'palette.sftp': 'SFTP: {label}',
   'palette.splitSsh': '分割 SSH: {label}',
   'palette.splitSshHint': '新しいペインで開く（ブロードキャスト）',
+  'palette.openGroup': 'グループを開く: {label}（{n} ホスト・分割）',
+  'palette.openGroupHint': '各ホストを同じタブのペインで開く',
   'palette.placeholder': 'コマンドまたはホスト名を入力…（↑↓ 選択、Enter 実行）',
   'palette.noMatch': '一致するコマンドがありません',
 
@@ -1006,7 +1057,25 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'settings.language': '言語',
   'settings.langVi': 'Tiếng Việt',
   'settings.langEn': 'English',
-  'settings.langJa': '日本語'
+  'settings.langJa': '日本語',
+  'settings.background': '背景画像',
+  'settings.bgChoose': '画像を選択…',
+  'settings.bgChange': '画像を変更…',
+  'settings.bgRemove': '削除',
+  'settings.bgOpacity': '不透明度',
+  'settings.bgBlur': 'ぼかし',
+  'settings.bgHint': 'ターミナルの背後にうっすら表示されます。文字を読みやすくするには不透明度を下げるかぼかしを上げてください。',
+  'settings.bgTooLarge': '画像が大きすぎて保存できません。小さい画像を選んでください。',
+  'settings.bgError': '画像を読み込めませんでした。',
+  'settings.bgFit': 'フィット',
+  'settings.bgFitCover': 'カバー',
+  'settings.bgFitContain': '全体表示',
+  'settings.bgPosition': '位置',
+  'settings.bgPosCenter': '中央',
+  'settings.bgPosLeft': '左',
+  'settings.bgPosRight': '右',
+  'settings.bgPosTop': '上',
+  'settings.bgPosBottom': '下'
 }
 
 export const dictionaries = { vi, en, ja }

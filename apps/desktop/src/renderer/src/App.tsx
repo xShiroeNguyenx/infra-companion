@@ -21,6 +21,7 @@ import { useT } from './i18n'
 import { TerminalTabView } from './features/terminal/TerminalTabView'
 import { useDataStore } from './stores/data'
 import { useTabsStore } from './stores/tabs'
+import { useSettingsStore } from './stores/settings'
 import { useToastsStore } from './stores/toasts'
 import { useUiStore } from './stores/ui'
 import { useVaultStore } from './stores/vault'
@@ -31,6 +32,11 @@ export default function App() {
   const { tabs, activeId, openLocal } = useTabsStore()
   const toasts = useToastsStore((s) => s.toasts)
   const dismiss = useToastsStore((s) => s.dismiss)
+  const bgImage = useSettingsStore((s) => s.backgroundImage)
+  const bgOpacity = useSettingsStore((s) => s.backgroundOpacity)
+  const bgBlur = useSettingsStore((s) => s.backgroundBlur)
+  const bgPosition = useSettingsStore((s) => s.backgroundPosition)
+  const bgFit = useSettingsStore((s) => s.backgroundFit)
   const [paletteOpen, setPaletteOpen] = useState(false)
   // store chung để Sidebar/palette cùng mở — tránh 2 instance modal dẫm chân nhau
   const modal = useUiStore((s) => s.modal)
@@ -143,20 +149,41 @@ export default function App() {
   ]
 
   return (
-    <div className="bg-app text-content relative flex h-screen flex-col">
+    // isolate: App root là stacking context riêng → ảnh nền ở z âm nằm trên nền bg-app
+    // nhưng dưới MỌI nội dung & overlay (modal/prompt/palette) mà không cần nâng z nội dung
+    <div className="bg-app text-content relative isolate flex h-screen flex-col">
+      {bgImage && (
+        <div
+          aria-hidden
+          // -inset-8 để mép blur tràn ra ngoài viewport (body overflow:hidden cắt), tránh viền nhạt
+          className="pointer-events-none absolute -inset-8"
+          style={{
+            zIndex: -10,
+            backgroundImage: `url(${bgImage})`,
+            backgroundSize: bgFit,
+            backgroundPosition: bgPosition,
+            backgroundRepeat: 'no-repeat',
+            opacity: bgOpacity,
+            filter: bgBlur > 0 ? `blur(${bgBlur}px)` : undefined
+          }}
+        />
+      )}
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <UpdateBanner />
           <TabsBar />
           <div className="relative flex-1 overflow-hidden">
-            {tabs.map((tab) =>
-              tab.kind === 'sftp' ? (
-                <SftpView key={tab.id} tab={tab} active={tab.id === activeId} />
-              ) : (
-                <TerminalTabView key={tab.id} tab={tab} active={tab.id === activeId} />
-              )
-            )}
+            {/* Tab ẩn được giấu bằng CSS (active=false), KHÔNG unmount — unmount xterm → mất scrollback */}
+            <div className="relative h-full">
+              {tabs.map((tab) =>
+                tab.kind === 'sftp' ? (
+                  <SftpView key={tab.id} tab={tab} active={tab.id === activeId} />
+                ) : (
+                  <TerminalTabView key={tab.id} tab={tab} active={tab.id === activeId} />
+                )
+              )}
+            </div>
             {tabs.length === 0 && (
               <div className="flex h-full items-center justify-center">
                 <button

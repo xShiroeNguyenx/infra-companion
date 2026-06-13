@@ -5,6 +5,23 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.3] — 2026-06-13
+
+### Added
+
+- **Background image** — set a wallpaper that fills the whole window behind the UI. In **Settings → Background image**: pick an image (auto-downscaled and stored locally), then tune **opacity**, **blur**, **fit** (cover / contain), and **position** (center / left / right / top / bottom). Chrome panels (sidebar, tab bar, status bar, toolbar) become translucent so the image shows full-frame, while modals and menus stay opaque for readability. Per-machine preference — not synced.
+- **Open a whole group at once** — a grid button on each group header (and an *Open group* entry in the Command Palette) opens every host in that group as split panes in a single tab, ready for Broadcast. Ideal for monitoring a cluster side by side.
+
+### Changed
+
+- **Split button redefined** — it now **merges** all open terminal tabs into panes within one tab (so Broadcast spans them), and toggles back to separate tabs on a second click. Terminal scrollback is preserved across merge/split. *(Previously it tiled separate tabs side by side, where Broadcast couldn't reach across tabs.)*
+
+### Dependencies
+
+- Added `@xterm/addon-serialize` — snapshots the terminal buffer so scrollback survives when panes are re-parented during merge/split.
+
+---
+
 ## [0.1.2] — 2026-06-12
 
 ### Added

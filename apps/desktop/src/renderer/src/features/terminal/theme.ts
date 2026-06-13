@@ -51,8 +51,10 @@ export const lightTerminalTheme: ITheme = {
   brightWhite: '#8c959f'
 }
 
-export function terminalTheme(mode: ThemeMode): ITheme {
-  return mode === 'light' ? lightTerminalTheme : darkTerminalTheme
+export function terminalTheme(mode: ThemeMode, transparent = false): ITheme {
+  const base = mode === 'light' ? lightTerminalTheme : darkTerminalTheme
+  // Nền trong suốt khi có ảnh nền — cần allowTransparency=true ở Terminal
+  return transparent ? { ...base, background: 'rgba(0,0,0,0)' } : base
 }
 
 /** @deprecated dùng terminalTheme(mode) — giữ lại để không vỡ import cũ. */

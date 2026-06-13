@@ -22,7 +22,7 @@ type OpenModal =
 export function Sidebar() {
   const t = useT()
   const { hosts, groups, history, refreshAll } = useDataStore()
-  const { openSsh, openQuick, openSftp, splitSsh } = useTabsStore()
+  const { openSsh, openQuick, openSftp, openSshGroup, splitSsh } = useTabsStore()
   const [query, setQuery] = useState('')
   const [modal, setModal] = useState<OpenModal>(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -115,6 +115,15 @@ export function Sidebar() {
               <span className="text-subtle flex-1 text-[10px] font-semibold tracking-wider uppercase">
                 {section.group?.name ?? (groups.length > 0 ? t('sidebar.other') : t('sidebar.global'))}
               </span>
+              {section.hosts.length > 1 && (
+                <button
+                  className="text-subtle hover:bg-hover hover:text-warning rounded p-0.5 opacity-0 group-hover/header:opacity-100"
+                  title={t('sidebar.openGroup', { n: section.hosts.length })}
+                  onClick={() => void openSshGroup(section.hosts.map((h) => h.id))}
+                >
+                  <GridIcon />
+                </button>
+              )}
               {section.group && (
                 <button
                   className="text-subtle hover:bg-hover hover:text-content rounded p-0.5 opacity-0 group-hover/header:opacity-100"
@@ -289,6 +298,15 @@ function CopyIcon() {
     <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
       <rect x="5" y="5" width="9" height="9" rx="1.5" />
       <path d="M11 5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2" />
+    </svg>
+  )
+}
+
+function GridIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="1.5" y="2" width="13" height="12" rx="1" />
+      <path d="M8 2v12M1.5 8h13" />
     </svg>
   )
 }

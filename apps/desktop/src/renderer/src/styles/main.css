@@ -82,6 +82,17 @@ body,
   background: var(--c-app);
 }
 
+/* Có ảnh nền: terminal trong suốt + chrome (sidebar/tab/status/toolbar = bg-panel)
+   bán trong suốt để ảnh nền phủ FULL khung. Overlay (modal/menu/palette = bg-elevated)
+   vẫn ĐỤC để giữ dễ đọc. Bản light có biến thể riêng (specificity cao hơn). */
+:root[data-bg='on'] {
+  --term-bg: transparent;
+  --c-panel: rgba(14, 18, 27, 0.62);
+}
+:root[data-bg='on'][data-theme='light'] {
+  --c-panel: rgba(243, 244, 246, 0.62);
+}
+
 /* Vùng terminal: nền khớp token để dải dư khi xterm fit không tạo "khung" khác màu;
    padding đều cho cân đối (tránh cảm giác lệch viền). xterm tự vẽ nền theo theme JS. */
 .terminal-host {

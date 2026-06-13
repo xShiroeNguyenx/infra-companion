@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, AI assistance with local LLM support, and more.
 
-**Current release: v0.1.0 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.1.3 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 ---
 
@@ -37,7 +37,10 @@
 - **xterm.js** with WebGL renderer — smooth even at high throughput (`yes`, large `cat`)
 - **Multi-tab** with Ctrl+Shift+T / middle-click close
 - **Split panes** — side-by-side sessions, Ctrl+Shift+D
+- **Merge tabs ⇄ split panes** — the Split button combines all open tabs into one tab's panes (so Broadcast spans them) and toggles back; scrollback is preserved across merge/split
+- **Open a group as split panes** — one click on a group header opens every host in it side by side, ready to broadcast
 - **Broadcast input** — type once, send to all open panes simultaneously (Ctrl+Shift+B)
+- **Background image** — full-window wallpaper with adjustable opacity, blur, fit (cover/contain), and position (Settings → Background image)
 - **Find in terminal** — Ctrl+F with highlight
 - **Command Palette** — Ctrl+Shift+P, keyboard-first access to every action
 - **Session logging** — capture raw output (ANSI-stripped) to file
@@ -228,7 +231,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.1.0)
+## Known Limitations (v0.1.3)
 
 - Bulk / Monitor / SFTP through login scripts only works when the login script uses a plain `ssh …` command (a preceding `su` will stop at the gate host)
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))

@@ -1,10 +1,75 @@
+import { useRef } from 'react'
 import { useT } from '../i18n'
-import { useSettingsStore, type Language, type ThemeMode } from '../stores/settings'
+import { useSettingsStore, type BgFit, type BgPosition, type Language, type ThemeMode } from '../stores/settings'
+import { useToastsStore } from '../stores/toasts'
 import { Field, Modal } from './ui'
+
+/** Cạnh tối đa khi nén ảnh nền — đủ nét cho màn 4K, đủ nhỏ để vừa localStorage. */
+const MAX_DIM = 2560
+const JPEG_QUALITY = 0.82
+
+/** Đọc + downscale ảnh về data URL JPEG (giữ localStorage gọn, ~<1.5MB). */
+function downscaleToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('read failed'))
+    reader.onload = () => {
+      const img = new Image()
+      img.onerror = () => reject(new Error('decode failed'))
+      img.onload = () => {
+        const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height))
+        const w = Math.max(1, Math.round(img.width * scale))
+        const h = Math.max(1, Math.round(img.height * scale))
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          reject(new Error('no 2d context'))
+          return
+        }
+        ctx.drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', JPEG_QUALITY))
+      }
+      img.src = reader.result as string
+    }
+    reader.readAsDataURL(file)
+  })
+}
 
 export function SettingsModal({ onClose }: { onClose: () => void }) {
   const t = useT()
-  const { theme, language, setTheme, setLanguage } = useSettingsStore()
+  const {
+    theme,
+    language,
+    backgroundImage,
+    backgroundOpacity,
+    backgroundBlur,
+    backgroundPosition,
+    backgroundFit,
+    setTheme,
+    setLanguage,
+    setBackgroundImage,
+    setBackgroundOpacity,
+    setBackgroundBlur,
+    setBackgroundPosition,
+    setBackgroundFit
+  } = useSettingsStore()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const push = useToastsStore((s) => s.push)
+
+  const positionOptions: Array<{ value: BgPosition; label: string }> = [
+    { value: 'center', label: t('settings.bgPosCenter') },
+    { value: 'left', label: t('settings.bgPosLeft') },
+    { value: 'right', label: t('settings.bgPosRight') },
+    { value: 'top', label: t('settings.bgPosTop') },
+    { value: 'bottom', label: t('settings.bgPosBottom') }
+  ]
+
+  const fitOptions: Array<{ value: BgFit; label: string }> = [
+    { value: 'cover', label: t('settings.bgFitCover') },
+    { value: 'contain', label: t('settings.bgFitContain') }
+  ]
 
   const themeOptions: Array<{ value: ThemeMode; label: string; swatch: string }> = [
     { value: 'dark', label: t('settings.themeDark'), swatch: '#0b0e14' },
@@ -16,6 +81,16 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     { value: 'en', label: t('settings.langEn') },
     { value: 'ja', label: t('settings.langJa') }
   ]
+
+  const onPickFile = async (file: File | undefined): Promise<void> => {
+    if (!file) return
+    try {
+      const dataUrl = await downscaleToDataUrl(file)
+      if (!setBackgroundImage(dataUrl)) push(t('settings.bgTooLarge'))
+    } catch {
+      push(t('settings.bgError'))
+    }
+  }
 
   return (
     <Modal title={t('settings.title')} onClose={onClose}>
@@ -63,6 +138,105 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         </Field>
+
+        <Field label={t('settings.background')}>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              void onPickFile(e.target.files?.[0])
+              e.target.value = '' // cho chọn lại cùng file
+            }}
+          />
+          <div className="flex items-center gap-2">
+            {backgroundImage && (
+              <div
+                className="border-edge-strong size-12 shrink-0 rounded border bg-cover bg-center"
+                style={{ backgroundImage: `url(${backgroundImage})` }}
+              />
+            )}
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="border-edge text-muted hover:bg-hover flex-1 rounded border px-3 py-2 text-sm"
+            >
+              {backgroundImage ? t('settings.bgChange') : t('settings.bgChoose')}
+            </button>
+            {backgroundImage && (
+              <button
+                onClick={() => setBackgroundImage(null)}
+                className="border-edge text-muted hover:bg-hover hover:text-danger rounded border px-3 py-2 text-sm"
+              >
+                {t('settings.bgRemove')}
+              </button>
+            )}
+          </div>
+          {!backgroundImage && <p className="text-subtle mt-1 text-[10px] leading-relaxed">{t('settings.bgHint')}</p>}
+        </Field>
+
+        {backgroundImage && (
+          <>
+            <Field label={t('settings.bgFit')}>
+              <div className="grid grid-cols-2 gap-2">
+                {fitOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setBackgroundFit(opt.value)}
+                    className={`rounded border px-3 py-2 text-sm ${
+                      backgroundFit === opt.value
+                        ? 'border-accent text-content bg-accent-soft/40'
+                        : 'border-edge text-muted hover:bg-hover'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </Field>
+
+            <Field label={t('settings.bgPosition')}>
+              <div className="grid grid-cols-5 gap-1.5">
+                {positionOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setBackgroundPosition(opt.value)}
+                    className={`rounded border px-1 py-2 text-xs ${
+                      backgroundPosition === opt.value
+                        ? 'border-accent text-content bg-accent-soft/40'
+                        : 'border-edge text-muted hover:bg-hover'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </Field>
+
+            <Field label={`${t('settings.bgOpacity')} — ${Math.round(backgroundOpacity * 100)}%`}>
+              <input
+                type="range"
+                min={5}
+                max={100}
+                step={5}
+                value={Math.round(backgroundOpacity * 100)}
+                onChange={(e) => setBackgroundOpacity(Number(e.target.value) / 100)}
+                className="accent-accent w-full"
+              />
+            </Field>
+            <Field label={`${t('settings.bgBlur')} — ${backgroundBlur}px`}>
+              <input
+                type="range"
+                min={0}
+                max={24}
+                step={1}
+                value={backgroundBlur}
+                onChange={(e) => setBackgroundBlur(Number(e.target.value))}
+                className="accent-accent w-full"
+              />
+            </Field>
+          </>
+        )}
       </div>
     </Modal>
   )

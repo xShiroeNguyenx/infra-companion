@@ -40,4 +40,22 @@ export function subscribeTermData(sessionId: string, handler: DataHandler): () =
 export function clearTermSession(sessionId: string): void {
   handlers.delete(sessionId)
   pending.delete(sessionId)
+  snapshots.delete(sessionId)
+}
+
+/**
+ * Ảnh chụp buffer xterm (chuỗi serialize) — khôi phục scrollback khi pane bị
+ * remount lúc gộp/tách tab (React không reparent được cây con giữa 2 tab).
+ */
+const snapshots = new Map<string, string>()
+
+export function saveTermSnapshot(sessionId: string, data: string): void {
+  snapshots.set(sessionId, data)
+}
+
+/** Lấy và xoá snapshot (chỉ dùng 1 lần cho lần mount kế tiếp). */
+export function takeTermSnapshot(sessionId: string): string | undefined {
+  const snapshot = snapshots.get(sessionId)
+  snapshots.delete(sessionId)
+  return snapshot
 }

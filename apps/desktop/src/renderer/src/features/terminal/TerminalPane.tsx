@@ -2,13 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { SearchAddon } from '@xterm/addon-search'
+import { SerializeAddon } from '@xterm/addon-serialize'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { WebLinksAddon } from '@xterm/addon-web-links'
-import { subscribeTermData } from '../../lib/termBus'
+import { saveTermSnapshot, subscribeTermData, takeTermSnapshot } from '../../lib/termBus'
 import { useTabsStore, type Pane } from '../../stores/tabs'
 import { useSettingsStore } from '../../stores/settings'
 import { useT } from '../../i18n'
 import { terminalTheme } from './theme'
+
+/** Pane còn tồn tại trong store không (phân biệt remount do gộp/tách tab với đóng hẳn). */
+function paneStillOpen(sessionId: string): boolean {
+  return useTabsStore.getState().tabs.some((t) => t.panes.some((p) => p.sessionId === sessionId))
+}
 
 interface TerminalPaneProps {
   tabId: string
@@ -33,6 +39,7 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
   const findInputRef = useRef<HTMLInputElement>(null)
   const closePane = useTabsStore((s) => s.closePane)
   const themeMode = useSettingsStore((s) => s.theme)
+  const hasBackground = useSettingsStore((s) => s.backgroundImage !== null)
   const t = useT()
 
   useEffect(() => {
@@ -40,19 +47,26 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     if (!host) return
 
     const term = new Terminal({
-      theme: terminalTheme(useSettingsStore.getState().theme),
+      theme: terminalTheme(
+        useSettingsStore.getState().theme,
+        useSettingsStore.getState().backgroundImage !== null
+      ),
       fontFamily: '"Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace',
       fontSize: 14,
       lineHeight: 1.2,
       cursorBlink: true,
       scrollback: 10_000,
-      allowProposedApi: true
+      allowProposedApi: true,
+      // Luôn bật để có thể đổi nền trong suốt khi bật/tắt ảnh nền mà không phải tạo lại terminal
+      allowTransparency: true
     })
 
     const fit = new FitAddon()
     const search = new SearchAddon()
+    const serialize = new SerializeAddon()
     term.loadAddon(fit)
     term.loadAddon(search)
+    term.loadAddon(serialize)
     term.loadAddon(new Unicode11Addon())
     term.loadAddon(
       new WebLinksAddon((event, uri) => {
@@ -90,6 +104,11 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     fit.fit()
     window.infra.terminal.resize(pane.sessionId, term.cols, term.rows)
 
+    // Pane bị remount khi gộp/tách tab → ghi lại buffer đã chụp TRƯỚC khi subscribe
+    // (data mới đến trong lúc unmount nằm ở hàng đợi pending, flush sau snapshot là đúng thứ tự)
+    const snapshot = takeTermSnapshot(pane.sessionId)
+    if (snapshot) term.write(snapshot)
+
     const unsubscribeData = subscribeTermData(pane.sessionId, (data) => term.write(data))
     const dataDisposable = term.onData(handleInput)
     const resizeDisposable = term.onResize(({ cols, rows }) =>
@@ -110,6 +129,9 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
       dataDisposable.dispose()
       resizeDisposable.dispose()
       resizeObserver.disconnect()
+      // Chỉ chụp buffer khi pane còn sống trong store (đang gộp/tách tab);
+      // pane đã đóng thì clearTermSession dọn rồi — chụp lại sẽ rò bộ nhớ
+      if (paneStillOpen(pane.sessionId)) saveTermSnapshot(pane.sessionId, serialize.serialize())
       term.dispose()
       termRef.current = null
       fitRef.current = null
@@ -139,12 +161,12 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     return () => cancelAnimationFrame(frame)
   }, [tabVisible, paneActive])
 
-  // Đổi theme khi user chuyển light/dark — DOM renderer repaint nền ngay khi set options.theme
+  // Đổi theme khi user chuyển light/dark hoặc bật/tắt ảnh nền — DOM renderer repaint nền ngay
   useEffect(() => {
     const term = termRef.current
     if (!term) return
-    term.options.theme = terminalTheme(themeMode)
-  }, [themeMode])
+    term.options.theme = terminalTheme(themeMode, hasBackground)
+  }, [themeMode, hasBackground])
 
   const findNext = (backward: boolean): void => {
     if (!findText) return

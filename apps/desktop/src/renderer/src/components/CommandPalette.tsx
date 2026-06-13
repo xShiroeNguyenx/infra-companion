@@ -25,6 +25,7 @@ export function CommandPalette({
 }) {
   const t = useT()
   const hosts = useDataStore((s) => s.hosts)
+  const groups = useDataStore((s) => s.groups)
   const [query, setQuery] = useState('')
   const [index, setIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -71,10 +72,22 @@ export function CommandPalette({
         label: t('palette.splitSsh', { label: host.label }),
         hint: t('palette.splitSshHint'),
         run: () => void tabs.splitSsh(host.id)
-      }))
+      })),
+      ...groups.flatMap((group) => {
+        const memberIds = hosts.filter((h) => h.groupId === group.id).map((h) => h.id)
+        if (memberIds.length < 2) return []
+        return [
+          {
+            id: `open-group-${group.id}`,
+            label: t('palette.openGroup', { label: group.name, n: memberIds.length }),
+            hint: t('palette.openGroupHint'),
+            run: () => void tabs.openSshGroup(memberIds)
+          }
+        ]
+      })
     ]
     return list
-  }, [hosts, extraCommands, t])
+  }, [hosts, groups, extraCommands, t])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()

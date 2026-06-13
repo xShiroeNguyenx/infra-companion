@@ -309,8 +309,8 @@ export class VaultService {
     const id = randomUUID()
     db.prepare(
       `INSERT INTO hosts (id, group_id, label, protocol, hostname, port, username, auth_type, password_enc,
-       key_id, secret_ref, favorite, jump_chain, env_enc, startup_snippet_id, agent_forward, login_script_enc,
-       created_at, updated_at)
+       key_id, secret_ref, favorite, jump_chain, env_enc, startup_snippet_id, agent_forward,
+       login_script_enc, created_at, updated_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).run(
       id,

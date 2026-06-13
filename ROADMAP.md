@@ -44,12 +44,13 @@
 ### Bảo mật mở rộng
 - **Zero-trust transports** (F19) — hỗ trợ Tailscale SSH, Teleport, Cloudflare Access làm transport thay SSH trực tiếp.
 - **Mosh** (P04) — bundle mosh-client; Windows chạy qua WSL.
+- **VPN nhúng** — *đã đánh giá & hoãn* (2026-06-13): mục tiêu gỡ được app VPN ngoài (vd OpenVPN Connect). Cần bundle OpenVPN community + driver Wintun + Interactive Service (cài 1 lần cần admin) vì VPN bắt buộc có card mạng ảo + thao tác đặc quyền. Hạng mục riêng cỡ vài ngày, Windows trước. Hiện vẫn dùng client VPN ngoài.
 
 ---
 
 ## Tuỳ biến giao diện (sau)
 
-- **Background image cho terminal** — chọn ảnh nền + chỉnh độ mờ/độ tối cho vùng terminal; lưu theo settings. (Đã có sẵn hệ thống theme dark/light + semantic tokens + đa ngôn ngữ vi/en/ja.)
+- ~~**Background image**~~ — ✅ Đã làm (v0.1.3): ảnh nền phủ full khung + opacity/blur/vị trí/lấp khung. Xem [CHANGELOG.md](CHANGELOG.md).
 - **Theme tuỳ chỉnh** — cho phép user tự định nghĩa bảng màu (accent, nền) ngoài 2 preset dark/light.
 - **Font & cỡ chữ terminal** — chọn font/cỡ chữ per-host hoặc toàn cục.
 

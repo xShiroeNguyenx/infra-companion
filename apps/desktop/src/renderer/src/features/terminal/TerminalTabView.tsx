@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTabsStore, type AppTab } from '../../stores/tabs'
 import { useToastsStore } from '../../stores/toasts'
+import { useSettingsStore } from '../../stores/settings'
 import { useT } from '../../i18n'
 import { TerminalPane } from './TerminalPane'
 
@@ -13,13 +14,17 @@ function statusDot(status: string): string {
 /** Render các pane của 1 tab terminal dạng lưới + thanh công cụ pane (split, broadcast, log). */
 export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean }) {
   const t = useT()
-  const { setActivePane, closePane, toggleBroadcast, splitLocal } = useTabsStore()
+  const { tabs, setActivePane, closePane, toggleBroadcast, mergeTabs, unmergeTab } = useTabsStore()
+  // Có ảnh nền: nền pane/grid trong suốt để lộ ảnh phía sau terminal
+  const hasBackground = useSettingsStore((s) => s.backgroundImage !== null)
   const [logging, setLogging] = useState<Set<string>>(new Set())
   const [recording, setRecording] = useState<Set<string>>(new Set())
   const count = tab.panes.length
   const cols = Math.ceil(Math.sqrt(count))
   const rows = Math.ceil(count / cols)
   const multi = count > 1
+  // Còn tab terminal khác để gộp vào tab này không (Split = gộp tab thành pane)
+  const canMerge = tabs.filter((t) => t.kind === 'terminal').length > 1
   const activePane = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
   const activeLogging = activePane ? logging.has(activePane.sessionId) : false
   const activeRecording = activePane ? recording.has(activePane.sessionId) : false
@@ -56,11 +61,16 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
       {/* Thanh công cụ chỉ hiện khi có nhiều pane hoặc để bật split/broadcast */}
       <div className="border-edge bg-panel flex h-7 shrink-0 items-center gap-2 border-b px-2 text-[11px]">
         <button
-          className="border-edge-strong text-muted hover:bg-hover hover:text-content rounded border px-1.5 py-0.5"
+          className={`rounded border px-1.5 py-0.5 disabled:opacity-40 ${
+            multi
+              ? 'border-accent bg-accent/15 text-accent'
+              : 'border-edge-strong text-muted hover:bg-hover hover:text-content'
+          }`}
           title={t('tabs.splitTip')}
-          onClick={() => void splitLocal()}
+          disabled={!multi && !canMerge}
+          onClick={() => (multi ? unmergeTab(tab.id) : mergeTabs(tab.id))}
         >
-          {t('tabs.split')}
+          {multi ? t('tabs.splitOn') : t('tabs.split')}
         </button>
         <button
           className={`rounded border px-1.5 py-0.5 ${
@@ -102,7 +112,7 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
       </div>
 
       <div
-        className="bg-edge grid min-h-0 flex-1 gap-px"
+        className={`grid min-h-0 flex-1 gap-px ${hasBackground ? '' : 'bg-edge'}`}
         style={{
           gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
           gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`
@@ -113,7 +123,7 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
           return (
             <div
               key={pane.id}
-              className={`bg-app relative flex min-h-0 min-w-0 flex-col ${
+              className={`relative flex min-h-0 min-w-0 flex-col ${hasBackground ? '' : 'bg-app'} ${
                 multi && isActive ? 'ring-accent/70 ring-1 ring-inset' : ''
               }`}
               onMouseDownCapture={() => setActivePane(tab.id, pane.id)}

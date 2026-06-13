@@ -117,6 +117,22 @@ const MIGRATIONS: string[] = [
   // v6 — secret_ref: tham chiếu tới secret manager (op://, bw://, vault://) thay vì lưu password.
   `
   ALTER TABLE hosts ADD COLUMN secret_ref TEXT;
+  `,
+  // v7 — (ĐÃ BỎ tính năng VPN) Bảng/cột giữ lại để bảo toàn tính tuần tự của migration:
+  // DB đã chạy v7 không được phép "tái dùng" index này cho migration khác. Không code nào dùng.
+  `
+  CREATE TABLE vpn_profiles (
+    id             TEXT PRIMARY KEY,
+    name           TEXT NOT NULL,
+    connect_cmd    TEXT NOT NULL,
+    disconnect_cmd TEXT,
+    check_host     TEXT NOT NULL,
+    check_port     INTEGER NOT NULL DEFAULT 22,
+    timeout_sec    INTEGER NOT NULL DEFAULT 45,
+    created_at     INTEGER NOT NULL,
+    updated_at     INTEGER NOT NULL
+  );
+  ALTER TABLE hosts ADD COLUMN vpn_profile_id TEXT REFERENCES vpn_profiles(id) ON DELETE SET NULL;
   `
 ]
 

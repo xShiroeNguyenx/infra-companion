@@ -1,10 +1,10 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
-> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật: cuối phiên **rà soát chất lượng** (sau Phase 0–6).
+> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật: chuẩn bị release **v0.1.3** (UX terminal + ảnh nền), sau phiên rà soát chất lượng và Phase 0–6.
 
 ## Đang ở đâu
 
-Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng toàn diện**. App build + typecheck + 27 test đều sạch.
+Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3** (gộp tab/mở nhóm/ảnh nền). App build + typecheck + 27 test đều sạch. Bản release gần nhất đã phát hành: v0.1.2; **v0.1.3 đã sẵn sàng nhưng CHƯA commit/tag** (xem mục cuối).
 
 | Phase | Trạng thái |
 |-------|-----------|
@@ -55,6 +55,15 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 
 **Chưa sửa (chấp nhận được / để sau):** cảnh báo style SonarLint (window vs globalThis, nested-ternary…) — theo convention codebase; `sandbox: false` (preload cần); Bulk/Monitor/SFTP xuyên login-script vẫn chỉ hỗ trợ `ssh …` thuần.
 
+## Phiên v0.1.3 đã làm gì (UX terminal + ảnh nền) — chưa commit
+
+Hầu hết ở renderer + 1 thay đổi nhỏ ở core (vault). Build + typecheck + 27 test sạch.
+
+- **Nút Split đổi nghĩa** ([stores/tabs.ts](../apps/desktop/src/renderer/src/stores/tabs.ts)): bỏ `splitView` (xếp các tab cạnh nhau dạng lưới — Broadcast không xuyên tab). Giờ Split = `mergeTabs` gộp mọi tab terminal thành pane trong 1 tab (Broadcast dùng chung), bấm lại = `unmergeTab` tách ra. Giữ scrollback khi pane bị remount bằng `@xterm/addon-serialize` + snapshot trong [lib/termBus.ts](../apps/desktop/src/renderer/src/lib/termBus.ts) (chỉ chụp khi pane còn trong store → không rò bộ nhớ). **Dep mới**: `@xterm/addon-serialize`.
+- **Mở cả nhóm 1 click**: `openSshGroup(hostIds)` trong tabs store — nút lưới trên header group ở Sidebar + lệnh palette "Mở nhóm" → mở mọi host trong group thành pane chia sẵn trong 1 tab.
+- **Ảnh nền (background image)**: Settings → Ảnh nền. Lưu data URL đã downscale (canvas, cap 2560px JPEG) trong `localStorage` (per-user, **không sync**). Phủ **full khung**: chrome (`bg-panel`) bán trong suốt qua override `--c-panel` khi `data-bg='on'`; terminal trong suốt (`--term-bg: transparent` + xterm `allowTransparency` + theme nền trong suốt + nền pane/grid bỏ); lớp ảnh ở **z âm** trong stacking context `isolate` của App root → nằm dưới mọi overlay nên **không che ô nhập mật khẩu**. Chỉnh opacity/blur/vị trí (giữa/trái/phải/trên/dưới)/lấp khung (cover/contain).
+- **VPN: đã thử rồi BỎ HẲN.** User muốn VPN nhúng thật (gỡ OpenVPN Connect vẫn chạy, dùng cho team) — không khả thi nhẹ nhàng: cần card mạng ảo (driver Wintun) + service đặc quyền, và OpenVPN Connect v3 **không có CLI để connect**. Đã gỡ sạch code VPN, **chỉ còn migration DB v7** (`vpn_profiles` + cột `hosts.vpn_profile_id`) — GIỮ CHỦ ĐÍCH để bảo toàn thứ tự migration (DB của user đã chạy tới v7; xoá đi sẽ làm migration tương lai bị skip). Bảng/cột "chết", không code nào dùng. **ĐỪNG tái dùng index 7** cho migration khác — migration mới thêm vào cuối là v8. Nếu sau này team thực sự cần: hướng đúng là bundle OpenVPN community + Wintun + Interactive Service (cài 1 lần cần admin) — hạng mục riêng cỡ vài ngày, Windows trước.
+
 ## 2 LỰA CHỌN cho phiên sau (chọn 1 số là bắt đầu)
 
 1. **Plugin system (F16)** — thuần JS, vừa sức. Plugin JS sandbox hook vào command palette / panel / format output. Rủi ro thấp.
@@ -64,15 +73,19 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 - Mở lại file này để nhớ ngữ cảnh.
 - Nói số **1 / 2** → bắt đầu luôn.
 
-## Git — commit toàn bộ phần đã làm (anh tự chạy; tôi không tự commit)
+## Git + Release v0.1.3 (anh tự chạy; tôi không tự commit)
+
+Version đã bump sẵn `0.1.2 → 0.1.3` ở `package.json` (gốc + `apps/desktop`); CHANGELOG/README/docs đã cập nhật. Release tự kích hoạt khi **push tag `v*.*.*`** (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux).
 
 ```powershell
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
-# Nếu chưa từng init git ở đây:
-#   git init -b main
 git add -A
 git status            # xem lại trước khi commit
-git commit -m "Infra Companion: ra soat chat luong — sua ~30 bug (leak reconnect/tunnel/monitor, UTF-8 chunk, path traversal SFTP, secret_ref sync, race Bulk runId, vault-lock overlay, confirm xoa, Esc modal) + 27 test crypto/merge/parser"
+git commit -m "feat: merge-tabs split + open group as panes + full-window background image (v0.1.3)"
+git push origin main
+# Phát hành: tạo tag để CI build + tạo release
+git tag v0.1.3
+git push origin v0.1.3
 ```
 
 > Môi trường dev: Node 20, pnpm 9, Electron 42 (Node 24 runtime — dùng `node:sqlite`), ssh2/node-pty/serialport là native nhưng đã externalize + prebuilt nên không cần build C++. Khi chạy electron từ terminal đã dính biến `ELECTRON_RUN_AS_NODE` thì thêm `$env:ELECTRON_RUN_AS_NODE=$null` cùng lệnh (chỉ là gotcha của terminal, không phải lỗi app).

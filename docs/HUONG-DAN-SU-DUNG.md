@@ -105,7 +105,9 @@ Với host vào bằng login script `ssh vn_dev@jpapst04`, SFTP **tự vào jpap
 | Tính năng | Cách dùng |
 |-----------|-----------|
 | **Tab mới** (local) | `Ctrl+Shift+T`, hoặc nút `+` (chevron để chọn shell: PowerShell/cmd/Git Bash/WSL) |
-| **Split pane** | Nút **⊞ Split** trên thanh tab (thêm pane local), hoặc icon **⊟** trên host ở sidebar (mở host vào pane mới) — `Ctrl+Shift+D` |
+| **Thêm pane vào tab** | `Ctrl+Shift+D` thêm 1 pane local; icon **⊟** trên host ở sidebar = mở host đó vào pane mới của tab hiện tại |
+| **Gộp tab ⇄ tách** (nút **⊞ Split**) | Bấm **⊞ Split** trên thanh công cụ: gộp **TẤT CẢ tab terminal** đang mở thành các pane trong 1 tab (để Broadcast xuyên suốt); bấm lại để tách về tab riêng. Nội dung màn hình (scrollback) được giữ nguyên khi gộp/tách |
+| **Mở cả nhóm** | Nút **lưới** trên header group ở sidebar (hoặc lệnh **Mở nhóm** trong Command Palette): mở mọi host trong nhóm thành các pane chia sẵn trong 1 tab — sẵn sàng Broadcast |
 | **Broadcast** | Nút **📡 Broadcast** hoặc `Ctrl+Shift+B`: gõ ở 1 pane → gửi tới **TẤT CẢ pane** trong tab |
 | **Chuyển tab** | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
 | **Đóng tab/pane** | `Ctrl+Shift+W`, hoặc `✕` trên tab/pane, hoặc middle-click tab |
@@ -115,6 +117,20 @@ Với host vào bằng login script `ssh vn_dev@jpapst04`, SFTP **tự vào jpap
 ### Test broadcast (tính năng "gõ 1 lần ra nhiều server")
 1. Mở SSH vào jpapst04. 2. Hover jpapst05 ở sidebar → bấm **⊟ split** → 2 pane cạnh nhau.
 3. Bấm **📡 Broadcast ON**. 4. Gõ `uptime` → cả 2 pane cùng chạy.
+
+> Nhanh hơn: cho jpapst04 + jpapst05 vào cùng 1 group → bấm nút **lưới** trên header group → cả 2 mở sẵn dạng pane → bật **Broadcast ON**. Hoặc đang có nhiều tab rời thì bấm **⊞ Split** để gộp hết thành pane trong 1 tab.
+
+---
+
+## 5B. Giao diện & ảnh nền — `⋯` → Cài đặt (Settings)
+
+- **Chủ đề**: Tối / Sáng. **Ngôn ngữ**: Tiếng Việt / English / 日本語. Đổi là áp dụng ngay, nhớ qua các lần mở app.
+- **Ảnh nền**: bấm **Chọn ảnh…** → ảnh hiện mờ phủ **toàn bộ cửa sổ** (sau cả sidebar lẫn terminal); chrome (thanh bên/tab/status) tự mờ đi để lộ ảnh, còn modal/menu vẫn đục để dễ đọc. Chỉnh:
+  - **Lấp khung**: *Phủ kín* (cover — lấp đầy, có thể cắt bớt) / *Vừa khung* (contain — thấy trọn ảnh, không cắt).
+  - **Vị trí ảnh**: Giữa / Trái / Phải / Trên / Dưới.
+  - **Độ hiện** (5–100%) và **Độ mờ** (0–24px) — giảm độ hiện hoặc tăng độ mờ nếu chữ khó đọc trên ảnh sáng.
+  - **Xoá** để bỏ ảnh nền.
+- Ảnh được nén tự động và lưu **trên máy này** (không đồng bộ) — mỗi người tự chọn ảnh riêng.
 
 ---
 

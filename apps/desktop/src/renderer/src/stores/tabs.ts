@@ -42,8 +42,14 @@ const toastError = (error: unknown): void => useToastsStore.getState().push(erro
 interface TabsState {
   tabs: AppTab[]
   activeId: string | null
+  /** Gộp mọi tab terminal thành pane trong tab này (1 toolbar, broadcast dùng chung). */
+  mergeTabs: (tabId: string) => void
+  /** Tách mỗi pane của tab thành 1 tab riêng (đảo của mergeTabs). */
+  unmergeTab: (tabId: string) => void
   openLocal: (profileId?: string) => Promise<void>
   openSsh: (hostId: string) => Promise<void>
+  /** Mở nhiều host cùng lúc: mỗi host 1 pane trong CÙNG 1 tab mới (chia màn hình sẵn). */
+  openSshGroup: (hostIds: string[]) => Promise<void>
   openQuick: (target: string) => Promise<void>
   openSftp: (hostId: string) => Promise<void>
   /** Mở thêm pane trong tab đang active (split). opener tạo phiên. */
@@ -77,6 +83,37 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   tabs: [],
   activeId: null,
 
+  mergeTabs: (tabId) =>
+    set((state) => {
+      const target = state.tabs.find((t) => t.id === tabId)
+      if (target?.kind !== 'terminal') return {}
+      const terminals = state.tabs.filter((t) => t.kind === 'terminal')
+      if (terminals.length < 2) return {}
+      // Gom pane theo thứ tự tab trên thanh tab; tab đích giữ vị trí, các tab terminal khác đóng lại
+      const panes = terminals.flatMap((t) => t.panes)
+      const tabs = state.tabs
+        .filter((t) => t.kind !== 'terminal' || t.id === tabId)
+        .map((t) => (t.id === tabId ? { ...t, panes } : t))
+      return { tabs, activeId: tabId }
+    }),
+
+  unmergeTab: (tabId) =>
+    set((state) => {
+      const index = state.tabs.findIndex((t) => t.id === tabId)
+      const tab = state.tabs[index]
+      if (tab?.kind !== 'terminal' || tab.panes.length < 2) return {}
+      const split = tab.panes.map<AppTab>((pane) => ({
+        id: newTabId(),
+        kind: 'terminal',
+        panes: [pane],
+        activePaneId: pane.id,
+        broadcast: false
+      }))
+      const tabs = [...state.tabs.slice(0, index), ...split, ...state.tabs.slice(index + 1)]
+      const activeId = split.find((t) => t.panes[0]?.id === tab.activePaneId)?.id ?? split[0].id
+      return { tabs, activeId }
+    }),
+
   activeTab: () => get().tabs.find((t) => t.id === get().activeId),
 
   openLocal: async (profileId) => {
@@ -94,6 +131,20 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       addTab(set, pane)
     } catch (error) {
       toastError(error)
+    }
+  },
+
+  openSshGroup: async (hostIds) => {
+    let tabId: string | null = null
+    for (const hostId of hostIds) {
+      try {
+        const pane = await createPane({ kind: 'ssh', hostId, cols: 80, rows: 24 })
+        // Host đầu tiên tạo tab mới, các host sau thêm pane vào đó; 1 host lỗi không chặn host khác
+        if (tabId === null) tabId = addTab(set, pane)
+        else addPane(set, tabId, pane)
+      } catch (error) {
+        toastError(error)
+      }
     }
   },
 
@@ -218,7 +269,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   }
 }))
 
-function addTab(set: (fn: (s: TabsState) => Partial<TabsState>) => void, pane: Pane): void {
+function addTab(set: (fn: (s: TabsState) => Partial<TabsState>) => void, pane: Pane): string {
   const tab: AppTab = {
     id: newTabId(),
     kind: 'terminal',
@@ -227,6 +278,7 @@ function addTab(set: (fn: (s: TabsState) => Partial<TabsState>) => void, pane: P
     broadcast: false
   }
   set((s) => ({ tabs: [...s.tabs, tab], activeId: tab.id }))
+  return tab.id
 }
 
 function addPane(set: (fn: (s: TabsState) => Partial<TabsState>) => void, tabId: string, pane: Pane): void {
