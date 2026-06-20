@@ -89,6 +89,7 @@ export const vi = {
   'tabs.chooseShell': 'Chọn shell',
   'tabs.noShell': 'Không tìm thấy shell nào',
   'terminal.findPlaceholder': 'Tìm…',
+  'terminal.copied': 'Đã sao chép',
 
   // Status bar
   'status.lockVault': 'Khoá vault',
@@ -498,6 +499,7 @@ export const en: Partial<Record<I18nKey, string>> = {
   'tabs.chooseShell': 'Choose shell',
   'tabs.noShell': 'No shells found',
   'terminal.findPlaceholder': 'Find…',
+  'terminal.copied': 'Copied',
 
   'status.lockVault': 'Lock vault',
   'status.connected': 'connected',
@@ -888,6 +890,7 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'tabs.chooseShell': 'シェルを選択',
   'tabs.noShell': 'シェルが見つかりません',
   'terminal.findPlaceholder': '検索…',
+  'terminal.copied': 'コピーしました',
 
   'status.lockVault': 'Vault をロック',
   'status.connected': '接続済み',

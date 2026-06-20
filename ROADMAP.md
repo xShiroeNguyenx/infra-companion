@@ -53,6 +53,7 @@
 - ~~**Background image**~~ — ✅ Đã làm (v0.1.3): ảnh nền phủ full khung + opacity/blur/vị trí/lấp khung. Xem [CHANGELOG.md](CHANGELOG.md).
 - **Theme tuỳ chỉnh** — ✅ Một phần (v0.1.4): chọn **màu accent** tuỳ ý (Settings → Giao diện). *Còn lại (sau): tuỳ biến cả bảng màu (nền/panel…), import/export theme.*
 - ~~**Font & cỡ chữ terminal**~~ — ✅ Đã làm (v0.1.4): font/cỡ chữ/giãn dòng/kiểu con trỏ toàn cục (Settings → Terminal). *Còn lại (sau): per-host override.*
+- ~~**Copy/dán bằng chuột**~~ — ✅ Đã làm (v0.1.5): tô khối → click trái vào vùng đã tô = copy; click phải = dán (kèm Ctrl+Shift+C/V cũ). Xem [CHANGELOG.md](CHANGELOG.md).
 
 ---
 

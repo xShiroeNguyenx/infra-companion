@@ -36,6 +36,8 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
   const searchRef = useRef<SearchAddon | null>(null)
   const [findOpen, setFindOpen] = useState(false)
   const [findText, setFindText] = useState('')
+  const [copied, setCopied] = useState(false)
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const findInputRef = useRef<HTMLInputElement>(null)
   const closePane = useTabsStore((s) => s.closePane)
   const themeMode = useSettingsStore((s) => s.theme)
@@ -123,6 +125,81 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     })
     resizeObserver.observe(host)
 
+    // ── Copy bằng click trái vào vùng đã tô khối; dán bằng click phải ──────────
+    // Mọi handler chuột đặt ở pha capture: mousedown chạy TRƯỚC khi xterm xoá
+    // selection (đọc được đoạn đang bôi đen), và không bị xterm stopPropagation.
+    const mouseEl = term.element
+    let downSel = ''
+    let downX = 0
+    let downY = 0
+    let downInSel = false
+
+    /** Quy toạ độ pixel của con trỏ về ô (col, row tuyệt đối trong buffer). */
+    const cellFromEvent = (ev: MouseEvent): { col: number; row: number } | null => {
+      const screen = mouseEl?.querySelector('.xterm-screen') as HTMLElement | null
+      if (!screen || term.cols < 1 || term.rows < 1) return null
+      const rect = screen.getBoundingClientRect()
+      if (rect.width < 1 || rect.height < 1) return null
+      const col = Math.floor((ev.clientX - rect.left) / (rect.width / term.cols))
+      const vrow = Math.floor((ev.clientY - rect.top) / (rect.height / term.rows))
+      if (col < 0 || col >= term.cols || vrow < 0 || vrow >= term.rows) return null
+      return { col, row: vrow + term.buffer.active.viewportY }
+    }
+
+    /** Con trỏ có rơi trong vùng đang được tô khối không. */
+    const pointInSelection = (ev: MouseEvent): boolean => {
+      const pos = term.getSelectionPosition()
+      if (!pos) return false
+      const cell = cellFromEvent(ev)
+      if (!cell) return true // không tính được toạ độ → cứ coi như nằm trong vùng
+      // Toạ độ trả về là 0-based, tuyệt đối trong buffer, end.x exclusive;
+      // start/end có thể đảo chiều nếu bôi từ dưới lên → chuẩn hoá trước.
+      let [sX, sY, eX, eY] = [pos.start.x, pos.start.y, pos.end.x, pos.end.y]
+      if (sY > eY || (sY === eY && sX > eX)) [sX, sY, eX, eY] = [eX, eY, sX, sY]
+      const { col: c, row: r } = cell
+      if (r < sY || r > eY) return false
+      if (sY === eY) return c >= sX && c < eX
+      if (r === sY) return c >= sX
+      if (r === eY) return c < eX
+      return true
+    }
+
+    const flashCopied = (): void => {
+      setCopied(true)
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 900)
+    }
+
+    const onMouseDown = (ev: MouseEvent): void => {
+      if (ev.button !== 0) return
+      downSel = term.getSelection()
+      downX = ev.clientX
+      downY = ev.clientY
+      downInSel = downSel.length > 0 && pointInSelection(ev)
+    }
+
+    const onMouseUp = (ev: MouseEvent): void => {
+      if (ev.button !== 0) return
+      const moved = Math.abs(ev.clientX - downX) > 3 || Math.abs(ev.clientY - downY) > 3
+      if (!moved && downInSel && downSel) {
+        void navigator.clipboard.writeText(downSel)
+        flashCopied()
+      }
+      downSel = ''
+      downInSel = false
+    }
+
+    const onContextMenu = (ev: MouseEvent): void => {
+      ev.preventDefault()
+      void navigator.clipboard.readText().then((text) => {
+        if (text) handleInput(text)
+      })
+    }
+
+    mouseEl?.addEventListener('mousedown', onMouseDown, true)
+    mouseEl?.addEventListener('mouseup', onMouseUp, true)
+    mouseEl?.addEventListener('contextmenu', onContextMenu, true)
+
     termRef.current = term
     fitRef.current = fit
     searchRef.current = search
@@ -132,6 +209,10 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
       dataDisposable.dispose()
       resizeDisposable.dispose()
       resizeObserver.disconnect()
+      mouseEl?.removeEventListener('mousedown', onMouseDown, true)
+      mouseEl?.removeEventListener('mouseup', onMouseUp, true)
+      mouseEl?.removeEventListener('contextmenu', onContextMenu, true)
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
       // Chỉ chụp buffer khi pane còn sống trong store (đang gộp/tách tab);
       // pane đã đóng thì clearTermSession dọn rồi — chụp lại sẽ rò bộ nhớ
       if (paneStillOpen(pane.sessionId)) saveTermSnapshot(pane.sessionId, serialize.serialize())
@@ -202,6 +283,12 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
   return (
     <div className="relative h-full w-full overflow-hidden">
       <div ref={hostRef} className="terminal-host h-full w-full" />
+
+      {copied && (
+        <div className="pointer-events-none absolute bottom-3 right-3 z-30 rounded border border-edge-strong bg-elevated/95 px-2.5 py-1 text-xs text-content shadow-lg">
+          {t('terminal.copied')}
+        </div>
+      )}
 
       {findOpen && (
         <div className="absolute top-2 right-3 z-30 flex items-center gap-1 rounded border border-edge-strong bg-elevated px-2 py-1 shadow-lg">

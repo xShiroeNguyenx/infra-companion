@@ -119,6 +119,8 @@ Với host vào bằng login script `ssh vn_dev@jpapst04`, SFTP **tự vào jpap
 | **Đóng tab/pane** | `Ctrl+Shift+W`, hoặc `✕` trên tab/pane, hoặc middle-click tab |
 | **Tìm trong terminal** | `Ctrl+F` |
 | **Copy / Paste** | `Ctrl+Shift+C` / `Ctrl+Shift+V` |
+| **Copy bằng chuột** | Tô khối 1 đoạn → **click chuột trái vào vùng vừa tô** = sao chép (hiện toast *"Đã sao chép"*) |
+| **Paste bằng chuột** | **Click chuột phải** ở bất kỳ đâu trong terminal = dán nội dung clipboard vào con trỏ (theo cả Broadcast) |
 
 ### Test broadcast (tính năng "gõ 1 lần ra nhiều server")
 1. Mở SSH vào jpapst04. 2. Hover jpapst05 ở sidebar → bấm **⊟ split** → 2 pane cạnh nhau.
@@ -319,6 +321,8 @@ Gõ là ra mọi hành động (keyboard-first): SSH/SFTP/Split tới host bất
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Chuyển tab |
 | `Ctrl+F` | Tìm trong terminal |
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | Copy / Paste |
+| Chuột trái vào vùng đã tô | Copy đoạn đang bôi đen |
+| Chuột phải trong terminal | Paste clipboard vào con trỏ |
 | `Esc` | Đóng modal đang mở |
 
 > Mọi hành động xoá (host/key/snippet/tunnel/bản ghi/file trong SFTP) đều hỏi xác nhận trước khi xoá vĩnh viễn.

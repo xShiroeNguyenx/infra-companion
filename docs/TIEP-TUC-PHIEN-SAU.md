@@ -1,12 +1,14 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
-> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật: chuẩn bị release **v0.1.4** (workspaces/notes/tuỳ biến terminal/accent/tmux), sau khi v0.1.3 đã phát hành.
+> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật: chuẩn bị release **v0.1.5** (copy/dán bằng chuột trong terminal), sau khi v0.1.4 đã phát hành.
 
 ## Đang ở đâu
 
-Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 (đã tag/phát hành)**: gộp tab / mở nhóm / ảnh nền. App build + typecheck + 27 test đều sạch.
+Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3, v0.1.4 (đã tag/phát hành)**. App build + typecheck + 27 test đều sạch.
 
-**v0.1.4 đã sẵn sàng nhưng CHƯA commit/tag** (xem mục cuối) — 5 tính năng: Workspaces, Notes per host, tuỳ biến terminal (font/cỡ chữ/con trỏ), màu accent tuỳ chỉnh, tmux-resume. Schema DB lên **v9** (`hosts.notes_enc`, `hosts.tmux`). ⚠️ **tmux-resume chưa test runtime** — cần server có tmux + rớt mạng thật để kiểm chứng trước khi tin tưởng.
+**v0.1.5 đã sẵn sàng nhưng CHƯA commit/tag** (xem mục cuối) — 1 tính năng: **copy/dán bằng chuột trong terminal** (tô khối → click trái vào vùng đã tô = copy; click phải = dán). Thuần renderer, chỉ đụng 2 file (`TerminalPane.tsx`, `i18n/dict.ts`); không đổi schema DB (vẫn **v9**). ⚠️ **Chưa test runtime** — cần `pnpm dev` thử click copy/dán + bôi từ dưới lên + khi đã cuộn scrollback trước khi tag.
+
+**v0.1.4 (đã phát hành)** — 5 tính năng: Workspaces, Notes per host, tuỳ biến terminal (font/cỡ chữ/con trỏ), màu accent tuỳ chỉnh, tmux-resume. Schema DB ở **v9** (`hosts.notes_enc`, `hosts.tmux`). ⚠️ **tmux-resume vẫn chưa được kiểm runtime** — cần server có tmux + rớt mạng thật để kiểm chứng.
 
 | Phase | Trạng thái |
 |-------|-----------|
@@ -59,7 +61,12 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 
 ## Chi tiết kỹ thuật các tính năng
 
-**v0.1.4 (CHƯA commit)** — 5 mục dưới đây. Hầu hết ở renderer + thay đổi nhỏ ở core (vault). Build + typecheck + 27 test sạch.
+**v0.1.5 (CHƯA commit)** — copy/dán bằng chuột trong terminal. Thuần renderer, chỉ 2 file. Typecheck sạch.
+
+- **Copy bằng click trái vào vùng đã tô, dán bằng click phải** trong [TerminalPane.tsx](../apps/desktop/src/renderer/src/features/terminal/TerminalPane.tsx). Gắn listener chuột ở **pha capture** trên `term.element`: `mousedown` chạy TRƯỚC khi xterm xoá selection nên đọc được đoạn đang bôi đen + tính `pointInSelection`; `mouseup` mà là click đơn (di chuyển < 3px) và rơi trong vùng → `navigator.clipboard.writeText` + toast "Đã sao chép" (key i18n `terminal.copied` cho vi/en/ja). `contextmenu` → `preventDefault` + `readText` rồi gửi qua `handleInput` (tôn trọng Broadcast). Phím tắt cũ Ctrl+Shift+C/V giữ nguyên.
+  - ⚠️ **Gotcha đã xử lý**: bản build xterm 6.0 trả `getSelectionPosition()` theo **0-based tuyệt đối trong buffer** (typings ghi "1-based" là SAI), và start/end **đảo chiều** khi bôi từ dưới lên → code đã chuẩn hoá. `cellFromEvent` quy pixel→ô bằng `.xterm-screen` rect / cols-rows (không đụng private API). Nếu không tính được toạ độ thì fallback coi như trong vùng (vẫn copy khi có selection). Listener gỡ sạch + clear timer toast trong cleanup.
+
+**v0.1.4 (đã phát hành)** — 5 mục dưới đây. Hầu hết ở renderer + thay đổi nhỏ ở core (vault). Build + typecheck + 27 test sạch.
 
 - **tmux-aware resume (F14)** per-host: schema **v9** (`hosts.tmux` INTEGER, mirror `agent_forward` qua resolveConnection→prepared→`SshSessionOptions`). `SshSession.sendBootstrap` thêm dòng cuối `tmux new-session -A -s ic-main` **CHỈ khi** `options.tmux` (gate chặt → host không bật bootstrap y hệt cũ). Resume nhờ sendBootstrap chạy lại mỗi (re)connect. importSnapshot: thêm `'tmux'` vào col list + default `?? 0` (cột NOT NULL, snapshot cũ thiếu). UI: checkbox trong HostEditor (Nâng cao). **CHƯA test runtime được** (cần server có tmux + rớt mạng thật) — user phải tự kiểm trước khi tag.
 - **Theme accent tuỳ chỉnh**: `accentColor` trong settings (localStorage `infra.accent`), `applyAccent()` set CSS var inline `--c-accent/-hover/-fg/-soft` (hover = darken 14%); áp sớm trong main.tsx. Color picker trong Settings → Giao diện.
@@ -82,21 +89,21 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 - Mở lại file này để nhớ ngữ cảnh.
 - Nói số **1 / 2** → bắt đầu luôn.
 
-## Git + Release v0.1.4 (anh tự chạy; tôi không tự commit)
+## Git + Release v0.1.5 (anh tự chạy; tôi không tự commit)
 
-> v0.1.3 ĐÃ tag/phát hành (3 tính năng: gộp tab/mở nhóm/ảnh nền). Phần đang chờ là **v0.1.4** (workspaces/notes/terminal/accent/tmux).
+> v0.1.4 ĐÃ tag/phát hành (workspaces/notes/terminal/accent/tmux). Phần đang chờ là **v0.1.5** (copy/dán bằng chuột trong terminal).
 
-Version đã bump sẵn `0.1.3 → 0.1.4` ở `package.json` (gốc + `apps/desktop`); CHANGELOG tách [0.1.4]/[0.1.3], README/ROADMAP/docs đã cập nhật. Release tự kích hoạt khi **push tag `v*.*.*`** (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux).
+Version đã bump sẵn `0.1.4 → 0.1.5` ở `package.json` (gốc + `apps/desktop`); CHANGELOG thêm [0.1.5], README + hướng dẫn sử dụng đã cập nhật. Release tự kích hoạt khi **push tag `v*.*.*`** (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux).
 
 ```powershell
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
 git add -A
 git status            # xem lại trước khi commit
-git commit -m "feat: workspaces + notes per host + terminal font/cursor + custom accent + tmux resume (v0.1.4)"
+git commit -m "feat: copy bằng click trái vào vùng tô khối + dán bằng click phải trong terminal (v0.1.5)"
 git push origin main
 # Phát hành: tạo tag để CI build + tạo release
-git tag v0.1.4
-git push origin v0.1.4
+git tag v0.1.5
+git push origin v0.1.5
 ```
 
 > Môi trường dev: Node 20, pnpm 9, Electron 42 (Node 24 runtime — dùng `node:sqlite`), ssh2/node-pty/serialport là native nhưng đã externalize + prebuilt nên không cần build C++. Khi chạy electron từ terminal đã dính biến `ELECTRON_RUN_AS_NODE` thì thêm `$env:ELECTRON_RUN_AS_NODE=$null` cùng lệnh (chỉ là gotcha của terminal, không phải lỗi app).

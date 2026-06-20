@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, AI assistance with local LLM support, and more.
 
-**Current release: v0.1.4 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.1.5 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 ---
 
@@ -46,6 +46,7 @@
 - **Terminal appearance** — configurable font family, size, line height, and cursor style (Settings → Terminal); applies live
 - **Custom accent color** — pick your own accent over the dark/light theme (Settings → Appearance)
 - **Find in terminal** — Ctrl+F with highlight
+- **Mouse copy & paste** — select then left-click the highlight to copy, right-click to paste (alongside Ctrl+Shift+C / Ctrl+Shift+V)
 - **Command Palette** — Ctrl+Shift+P, keyboard-first access to every action
 - **Session logging** — capture raw output (ANSI-stripped) to file
 - **Session recording & replay** — asciinema v2 format; player with play/pause, seek bar, 1×/2×/4×/8× speed; export `.cast` for `asciinema play`
@@ -236,7 +237,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.1.4)
+## Known Limitations (v0.1.5)
 
 - Bulk / Monitor / SFTP through login scripts only works when the login script uses a plain `ssh …` command (a preceding `su` will stop at the gate host)
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))

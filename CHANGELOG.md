@@ -5,6 +5,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.5] — 2026-06-20
+
+### Added
+
+- **Mouse copy & paste in the terminal** — select text by dragging, then **left-click inside the highlighted block to copy it** (a brief *"Copied"* toast confirms). **Right-click anywhere to paste** the clipboard at the prompt. Works in every pane and respects Broadcast mode (paste reaches all panes when broadcasting), just like the existing `Ctrl+Shift+C` / `Ctrl+Shift+V` shortcuts, which still work.
+
+---
+
 ## [0.1.4] — 2026-06-13
 
 ### Added
