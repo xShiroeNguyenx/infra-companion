@@ -21,6 +21,27 @@ const TERM_FONT_KEY = 'infra.term.font'
 const TERM_SIZE_KEY = 'infra.term.size'
 const TERM_LH_KEY = 'infra.term.lineHeight'
 const TERM_CURSOR_KEY = 'infra.term.cursor'
+const CUSTOM_COLORS_KEY = 'infra.theme.custom'
+
+/** Các biến màu UI cho phép tuỳ biến (accent có control riêng nên không nằm ở đây). */
+export const CUSTOM_PALETTE_VARS = [
+  '--c-app',
+  '--c-panel',
+  '--c-elevated',
+  '--c-input',
+  '--c-hover',
+  '--c-edge-strong',
+  '--c-content',
+  '--c-muted',
+  '--c-danger',
+  '--c-success',
+  '--c-warning'
+] as const
+export type PaletteVar = (typeof CUSTOM_PALETTE_VARS)[number]
+/** Override màu theo từng base theme (màu dark khác light nên lưu tách). */
+export type CustomColors = Record<ThemeMode, Partial<Record<PaletteVar, string>>>
+
+const HEX_RE = /^#[0-9a-fA-F]{6}$/
 
 const BG_OPACITY_DEFAULT = 0.25
 const BG_BLUR_DEFAULT = 0
@@ -89,6 +110,25 @@ function readTermCursor(): TermCursor {
   return v === 'bar' || v === 'underline' ? v : 'block'
 }
 
+function readCustomColors(): CustomColors {
+  const out: CustomColors = { dark: {}, light: {} }
+  try {
+    const raw = JSON.parse(localStorage.getItem(CUSTOM_COLORS_KEY) || '{}') as Record<string, unknown>
+    for (const theme of ['dark', 'light'] as const) {
+      const m = raw[theme]
+      if (m && typeof m === 'object') {
+        for (const v of CUSTOM_PALETTE_VARS) {
+          const hex = (m as Record<string, unknown>)[v]
+          if (typeof hex === 'string' && HEX_RE.test(hex)) out[theme][v] = hex
+        }
+      }
+    }
+  } catch {
+    /* JSON hỏng → mặc định rỗng */
+  }
+  return out
+}
+
 /** Áp theme + lang lên <html>. Gọi sớm (main.tsx) để tránh nháy màu khi load. */
 export function applyTheme(theme: ThemeMode): void {
   document.documentElement.dataset.theme = theme
@@ -129,6 +169,20 @@ export function applyAccent(color: string | null): void {
   root.style.setProperty('--c-accent-soft', color)
 }
 
+/**
+ * Áp bảng màu tuỳ chỉnh (override CSS var inline trên <html>) cho base theme hiện tại.
+ * Gọi lại khi đổi theme dark↔light vì override lưu tách theo theme.
+ */
+export function applyCustomTheme(theme: ThemeMode, all: CustomColors): void {
+  const root = document.documentElement
+  const map = all[theme] ?? {}
+  for (const v of CUSTOM_PALETTE_VARS) {
+    const hex = map[v]
+    if (hex) root.style.setProperty(v, hex)
+    else root.style.removeProperty(v)
+  }
+}
+
 interface SettingsState {
   theme: ThemeMode
   language: Language
@@ -165,12 +219,23 @@ interface SettingsState {
   setTermFontSize: (n: number) => void
   setTermLineHeight: (n: number) => void
   setTermCursor: (c: TermCursor) => void
+  /** Override màu UI theo base theme hiện tại. */
+  customColors: CustomColors
+  /** Đặt/gỡ 1 màu cho theme đang chọn (null = gỡ override). */
+  setCustomColor: (varName: PaletteVar, hex: string | null) => void
+  /** Gỡ mọi override màu của theme đang chọn. */
+  resetCustomColors: () => void
+  /** Xuất theme hiện tại (accent + palette override) ra JSON. */
+  exportThemeJson: () => string
+  /** Nhập theme từ JSON (áp accent + palette cho theme đang chọn). Trả về false nếu JSON sai. */
+  importThemeJson: (text: string) => boolean
 }
 
-export const useSettingsStore = create<SettingsState>((set) => ({
+export const useSettingsStore = create<SettingsState>((set, get) => ({
   theme: readTheme(),
   language: readLang(),
   accentColor: readAccent(),
+  customColors: readCustomColors(),
   backgroundImage: readBgImage(),
   backgroundOpacity: readBgOpacity(),
   backgroundBlur: readBgBlur(),
@@ -183,6 +248,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setTheme: (theme) => {
     localStorage.setItem(THEME_KEY, theme)
     applyTheme(theme)
+    // Override màu lưu tách theo theme → áp lại bộ của theme mới
+    applyCustomTheme(theme, get().customColors)
     set({ theme })
   },
   setLanguage: (language) => {
@@ -243,6 +310,68 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setTermCursor: (cursor) => {
     localStorage.setItem(TERM_CURSOR_KEY, cursor)
     set({ termCursor: cursor })
+  },
+  setCustomColor: (varName, hex) => {
+    const { theme, customColors } = get()
+    const next: CustomColors = {
+      dark: { ...customColors.dark },
+      light: { ...customColors.light }
+    }
+    if (hex && HEX_RE.test(hex)) next[theme][varName] = hex
+    else delete next[theme][varName]
+    localStorage.setItem(CUSTOM_COLORS_KEY, JSON.stringify(next))
+    applyCustomTheme(theme, next)
+    set({ customColors: next })
+  },
+  resetCustomColors: () => {
+    const { theme, customColors } = get()
+    const next: CustomColors = { dark: { ...customColors.dark }, light: { ...customColors.light } }
+    next[theme] = {}
+    localStorage.setItem(CUSTOM_COLORS_KEY, JSON.stringify(next))
+    applyCustomTheme(theme, next)
+    set({ customColors: next })
+  },
+  exportThemeJson: () => {
+    const { theme, accentColor, customColors } = get()
+    return JSON.stringify(
+      { version: 1, theme, accent: accentColor, colors: customColors[theme] },
+      null,
+      2
+    )
+  },
+  importThemeJson: (text) => {
+    let raw: Record<string, unknown>
+    try {
+      raw = JSON.parse(text) as Record<string, unknown>
+    } catch {
+      return false
+    }
+    if (!raw || typeof raw !== 'object') return false
+    // Màu palette
+    const colors: Partial<Record<PaletteVar, string>> = {}
+    const rawColors = raw.colors
+    if (rawColors && typeof rawColors === 'object') {
+      for (const v of CUSTOM_PALETTE_VARS) {
+        const hex = (rawColors as Record<string, unknown>)[v]
+        if (typeof hex === 'string' && HEX_RE.test(hex)) colors[v] = hex
+      }
+    }
+    // Accent (tuỳ chọn)
+    const accent = raw.accent
+    const accentColor = typeof accent === 'string' && /^#[0-9a-fA-F]{6}$/.test(accent) ? accent : null
+
+    const { theme, customColors } = get()
+    const next: CustomColors = { dark: { ...customColors.dark }, light: { ...customColors.light } }
+    next[theme] = colors
+    localStorage.setItem(CUSTOM_COLORS_KEY, JSON.stringify(next))
+    applyCustomTheme(theme, next)
+
+    if (accentColor) localStorage.setItem(ACCENT_KEY, accentColor)
+    else localStorage.removeItem(ACCENT_KEY)
+    applyAccent(accentColor)
+
+    set({ customColors: next, accentColor })
+    return true
   }
 }))
 
@@ -251,5 +380,6 @@ export const initialSettings = {
   theme: readTheme(),
   language: readLang(),
   backgroundImage: readBgImage(),
-  accentColor: readAccent()
+  accentColor: readAccent(),
+  customColors: readCustomColors()
 }

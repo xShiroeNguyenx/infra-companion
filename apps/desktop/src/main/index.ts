@@ -12,6 +12,7 @@ import { registerPromptIpc } from './ipc/prompts'
 import { registerSftpIpc } from './ipc/sftp'
 import { registerTerminalIpc } from './ipc/terminal'
 import { registerTunnelsIpc } from './ipc/tunnels'
+import { registerPluginsIpc } from './ipc/plugins'
 import { getVault, registerVaultIpc } from './ipc/vault'
 
 const isDev = !app.isPackaged
@@ -86,13 +87,16 @@ registerAiIpc()
 registerNetToolsIpc()
 registerSyncIpc()
 const disposeMonitor = registerMonitorIpc()
-const disposeTerminals = registerTerminalIpc()
+const terminal = registerTerminalIpc()
 const disposeSftp = registerSftpIpc()
 const disposeTunnels = registerTunnelsIpc()
+let disposePlugins: (() => void) | null = null
 
 void app.whenReady().then(() => {
   const win = createWindow()
   registerUpdaterIpc(win)
+  // Plugin host: cần cửa sổ để gửi event panel/notify; bridge để observe/gửi output terminal
+  disposePlugins = registerPluginsIpc(() => BrowserWindow.getAllWindows()[0] ?? null, terminal.bridge)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -104,7 +108,8 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
-  disposeTerminals()
+  disposePlugins?.()
+  terminal.dispose()
   disposeSftp()
   disposeTunnels()
   disposeMonitor()

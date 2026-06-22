@@ -1,6 +1,8 @@
 import { useSettingsStore } from '../stores/settings'
 import { dictionaries, vi, type I18nKey } from './dict'
 
+export type { I18nKey } from './dict'
+
 type Params = Record<string, string | number>
 
 function interpolate(template: string, params?: Params): string {

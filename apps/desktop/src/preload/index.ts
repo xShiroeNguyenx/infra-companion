@@ -7,8 +7,11 @@ import {
   type HostKeyQuestion,
   type InfraApi,
   type KeyImportInput,
+  type ContributedCommandDto,
   type MetricSampleDto,
   type PasswordQuestion,
+  type PluginNotifyDto,
+  type PluginPanelDto,
   type SnippetInput,
   type TerminalCreateRequest,
   type TerminalDataEvent,
@@ -71,7 +74,8 @@ const api: InfraApi = {
     onStatus: (cb) => subscribe<TerminalStatusEvent>(IPC.TERM_STATUS, cb),
     toggleLog: (sessionId, title) => ipcRenderer.invoke(IPC.TERM_LOG_TOGGLE, sessionId, title),
     openLogFolder: () => ipcRenderer.send(IPC.TERM_LOG_OPEN_FOLDER),
-    toggleRecord: (sessionId, title) => ipcRenderer.invoke(IPC.TERM_RECORD_TOGGLE, sessionId, title)
+    toggleRecord: (sessionId, title) => ipcRenderer.invoke(IPC.TERM_RECORD_TOGGLE, sessionId, title),
+    setActive: (sessionId) => ipcRenderer.send(IPC.TERM_SET_ACTIVE, sessionId)
   },
   recordings: {
     list: () => ipcRenderer.invoke(IPC.REC_LIST),
@@ -154,6 +158,19 @@ const api: InfraApi = {
     onAvailable: (cb: (version: string) => void) => subscribe<string>(IPC.UPDATE_AVAILABLE, cb),
     onProgress: (cb: (percent: number) => void) => subscribe<number>(IPC.UPDATE_PROGRESS, cb),
     onDownloaded: (cb: (version: string) => void) => subscribe<string>(IPC.UPDATE_DOWNLOADED, cb)
+  },
+  plugins: {
+    list: () => ipcRenderer.invoke(IPC.PLUGINS_LIST),
+    setEnabled: (id, enabled) => ipcRenderer.invoke(IPC.PLUGINS_SET_ENABLED, id, enabled),
+    reload: (id) => ipcRenderer.invoke(IPC.PLUGINS_RELOAD, id),
+    rescan: () => ipcRenderer.invoke(IPC.PLUGINS_RESCAN),
+    openFolder: (id) => ipcRenderer.send(IPC.PLUGINS_OPEN_FOLDER, id),
+    invokeCommand: (pluginId, commandId, activeSessionId) =>
+      ipcRenderer.invoke(IPC.PLUGINS_INVOKE_COMMAND, pluginId, commandId, activeSessionId),
+    contributions: () => ipcRenderer.invoke(IPC.PLUGINS_CONTRIBUTIONS),
+    onContributionsChanged: (cb) => subscribe<ContributedCommandDto[]>(IPC.PLUGINS_CONTRIBUTIONS_CHANGED, cb),
+    onPanel: (cb) => subscribe<PluginPanelDto>(IPC.PLUGINS_PANEL_SHOW, cb),
+    onNotify: (cb) => subscribe<PluginNotifyDto>(IPC.PLUGINS_NOTIFY, cb)
   }
 }
 

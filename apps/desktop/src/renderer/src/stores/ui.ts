@@ -12,6 +12,7 @@ export type AppModal =
   | 'recordings'
   | 'settings'
   | 'workspaces'
+  | 'plugins'
   | null
 
 interface UiState {

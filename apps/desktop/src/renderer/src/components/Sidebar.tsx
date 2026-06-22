@@ -3,6 +3,7 @@ import type { GroupDto, HostDto } from '@infra/shared'
 import { useDataStore } from '../stores/data'
 import { useTabsStore } from '../stores/tabs'
 import { useToastsStore } from '../stores/toasts'
+import { useFavoritesStore } from '../stores/favorites'
 import { useUiStore, type AppModal } from '../stores/ui'
 import { GroupEditorModal } from './GroupEditorModal'
 import { HostEditorModal } from './HostEditorModal'
@@ -24,7 +25,8 @@ type OpenModal =
 export function Sidebar() {
   const t = useT()
   const { hosts, groups, history, refreshAll } = useDataStore()
-  const { openSsh, openQuick, openSftp, openSshGroup, splitSsh } = useTabsStore()
+  const { openSsh, openQuick, openSshGroup } = useTabsStore()
+  const favIds = useFavoritesStore((s) => s.ids)
   const [query, setQuery] = useState('')
   const [modal, setModal] = useState<OpenModal>(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -69,6 +71,12 @@ export function Sidebar() {
     return result
   }, [filtered, groups])
 
+  // Host đã ghim (tôn trọng cả ô tìm kiếm); hiện ở mục "Yêu thích" đầu danh sách.
+  const favHosts = useMemo(() => filtered.filter((h) => favIds.includes(h.id)), [filtered, favIds])
+
+  const openHostEditor = (host: HostDto, duplicate = false): void => setModal({ kind: 'host', host, duplicate })
+  const openNotes = (host: HostDto): void => setModal({ kind: 'notes', host })
+
   const connectQuick = (): void => {
     if (!isQuick) return
     void openQuick(query.trim())
@@ -111,6 +119,19 @@ export function Sidebar() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-2">
+        {favHosts.length > 0 && (
+          <div className="mb-2">
+            <div className="px-1 py-1">
+              <span className="text-warning/80 text-[10px] font-semibold tracking-wider uppercase">
+                ★ {t('sidebar.favorites')}
+              </span>
+            </div>
+            {favHosts.map((host) => (
+              <HostRow key={`fav-${host.id}`} host={host} onEdit={openHostEditor} onNotes={openNotes} />
+            ))}
+          </div>
+        )}
+
         {sections.map((section) => (
           <div key={section.group?.id ?? '__ungrouped__'} className="mb-2">
             <div className="group/header flex items-center px-1 py-1">
@@ -137,76 +158,7 @@ export function Sidebar() {
               )}
             </div>
             {section.hosts.map((host) => (
-              <div
-                key={host.id}
-                className="group hover:bg-hover flex cursor-pointer items-center gap-2 rounded px-2 py-1.5"
-                onClick={() => void openSsh(host.id)}
-                title={`${host.username ?? '(group)'}@${host.hostname}:${host.port}${host.jumpChain?.length ? ` (qua ${host.jumpChain.length} jump)` : ''}`}
-              >
-                <span className="bg-subtle size-1.5 shrink-0 rounded-full group-hover:bg-success" />
-                <div className="min-w-0 flex-1">
-                  <div className="text-content truncate text-xs">
-                    {host.label}
-                    {host.jumpChain?.length ? <span className="text-warning/80 ml-1 text-[9px]">⛓{host.jumpChain.length}</span> : null}
-                  </div>
-                  <div className="text-subtle truncate text-[10px]">
-                    {host.username ? `${host.username}@` : ''}
-                    {host.hostname}
-                  </div>
-                </div>
-                {host.notes && (
-                  <button
-                    className="text-muted hover:bg-edge-strong hover:text-content shrink-0 rounded p-1"
-                    title={t('sidebar.viewNotes')}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setModal({ kind: 'notes', host })
-                    }}
-                  >
-                    <NoteIcon />
-                  </button>
-                )}
-                <button
-                  className="text-subtle hover:bg-edge-strong hover:text-warning rounded p-1 opacity-0 group-hover:opacity-100"
-                  title={t('sidebar.splitHost')}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void splitSsh(host.id)
-                  }}
-                >
-                  <SplitIcon />
-                </button>
-                <button
-                  className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
-                  title={t('sidebar.openSftp')}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void openSftp(host.id)
-                  }}
-                >
-                  <FolderIcon />
-                </button>
-                <button
-                  className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
-                  title={t('sidebar.duplicateHost')}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setModal({ kind: 'host', host, duplicate: true })
-                  }}
-                >
-                  <CopyIcon />
-                </button>
-                <button
-                  className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
-                  title={t('sidebar.editHost')}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setModal({ kind: 'host', host })
-                  }}
-                >
-                  <PencilIcon />
-                </button>
-              </div>
+              <HostRow key={host.id} host={host} onEdit={openHostEditor} onNotes={openNotes} />
             ))}
           </div>
         ))}
@@ -260,6 +212,7 @@ export function Sidebar() {
               <MenuItem label={t('menu.sync')} onClick={() => { setMenuOpen(false); openAppModal('sync') }} />
               <MenuItem label={t('menu.snippets')} onClick={() => { setMenuOpen(false); openAppModal('snippets') }} />
               <MenuItem label={t('menu.tunnels')} onClick={() => { setMenuOpen(false); openAppModal('tunnels') }} />
+              <MenuItem label={t('menu.plugins')} onClick={() => { setMenuOpen(false); openAppModal('plugins') }} />
               <MenuItem label={t('menu.createGroup')} onClick={() => { setMenuOpen(false); setModal({ kind: 'group', group: null }) }} />
               <MenuItem label={t('menu.import')} onClick={() => void runImport()} />
               <div className="border-edge my-1 border-t" />
@@ -296,6 +249,122 @@ function MenuItem({ label, onClick }: { label: string; onClick: () => void }) {
     >
       {label}
     </button>
+  )
+}
+
+/** Một dòng host trong sidebar (dùng chung cho mục Yêu thích lẫn các group). */
+function HostRow({
+  host,
+  onEdit,
+  onNotes
+}: {
+  host: HostDto
+  onEdit: (host: HostDto, duplicate?: boolean) => void
+  onNotes: (host: HostDto) => void
+}) {
+  const t = useT()
+  const openSsh = useTabsStore((s) => s.openSsh)
+  const splitSsh = useTabsStore((s) => s.splitSsh)
+  const openSftp = useTabsStore((s) => s.openSftp)
+  const favorite = useFavoritesStore((s) => s.ids.includes(host.id))
+  const toggleFav = useFavoritesStore((s) => s.toggle)
+  return (
+    <div
+      className="group hover:bg-hover flex cursor-pointer items-center gap-2 rounded px-2 py-1.5"
+      onClick={() => void openSsh(host.id)}
+      title={`${host.username ?? '(group)'}@${host.hostname}:${host.port}${host.jumpChain?.length ? ` (qua ${host.jumpChain.length} jump)` : ''}`}
+    >
+      <span className="bg-subtle size-1.5 shrink-0 rounded-full group-hover:bg-success" />
+      <div className="min-w-0 flex-1">
+        <div className="text-content truncate text-xs">
+          {host.label}
+          {host.jumpChain?.length ? <span className="text-warning/80 ml-1 text-[9px]">⛓{host.jumpChain.length}</span> : null}
+        </div>
+        <div className="text-subtle truncate text-[10px]">
+          {host.username ? `${host.username}@` : ''}
+          {host.hostname}
+        </div>
+      </div>
+      <button
+        className={`shrink-0 rounded p-1 hover:bg-edge-strong hover:text-warning ${
+          favorite ? 'text-warning opacity-100' : 'text-subtle opacity-0 group-hover:opacity-100'
+        }`}
+        title={favorite ? t('sidebar.unfavorite') : t('sidebar.favorite')}
+        onClick={(e) => {
+          e.stopPropagation()
+          toggleFav(host.id)
+        }}
+      >
+        <StarIcon filled={favorite} />
+      </button>
+      {host.notes && (
+        <button
+          className="text-muted hover:bg-edge-strong hover:text-content shrink-0 rounded p-1"
+          title={t('sidebar.viewNotes')}
+          onClick={(e) => {
+            e.stopPropagation()
+            onNotes(host)
+          }}
+        >
+          <NoteIcon />
+        </button>
+      )}
+      <button
+        className="text-subtle hover:bg-edge-strong hover:text-warning rounded p-1 opacity-0 group-hover:opacity-100"
+        title={t('sidebar.splitHost')}
+        onClick={(e) => {
+          e.stopPropagation()
+          void splitSsh(host.id)
+        }}
+      >
+        <SplitIcon />
+      </button>
+      <button
+        className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
+        title={t('sidebar.openSftp')}
+        onClick={(e) => {
+          e.stopPropagation()
+          void openSftp(host.id)
+        }}
+      >
+        <FolderIcon />
+      </button>
+      <button
+        className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
+        title={t('sidebar.duplicateHost')}
+        onClick={(e) => {
+          e.stopPropagation()
+          onEdit(host, true)
+        }}
+      >
+        <CopyIcon />
+      </button>
+      <button
+        className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
+        title={t('sidebar.editHost')}
+        onClick={(e) => {
+          e.stopPropagation()
+          onEdit(host)
+        }}
+      >
+        <PencilIcon />
+      </button>
+    </div>
+  )
+}
+
+function StarIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width="11"
+      height="11"
+      viewBox="0 0 16 16"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="1.3"
+    >
+      <path d="M8 1.7l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.9 4.2 13.5l.7-4.3-3.1-3 4.3-.6z" strokeLinejoin="round" />
+    </svg>
   )
 }
 

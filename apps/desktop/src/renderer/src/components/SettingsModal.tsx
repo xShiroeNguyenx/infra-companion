@@ -10,6 +10,7 @@ import {
   type ThemeMode
 } from '../stores/settings'
 import { useToastsStore } from '../stores/toasts'
+import { CustomPaletteSection } from './CustomPaletteSection'
 import { Field, Modal, TextInput } from './ui'
 
 /** Cạnh tối đa khi nén ảnh nền — đủ nét cho màn 4K, đủ nhỏ để vừa localStorage. */
@@ -183,6 +184,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             )}
           </div>
         </Field>
+
+        <CustomPaletteSection />
 
         <Field label={t('settings.background')}>
           <input

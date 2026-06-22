@@ -45,6 +45,7 @@ export const IPC = {
   TERM_LOG_TOGGLE: 'terminal:log-toggle',
   TERM_LOG_OPEN_FOLDER: 'terminal:log-open-folder',
   TERM_RECORD_TOGGLE: 'terminal:record-toggle',
+  TERM_SET_ACTIVE: 'terminal:set-active',
 
   REC_LIST: 'rec:list',
   REC_READ: 'rec:read',
@@ -108,7 +109,18 @@ export const IPC = {
   UPDATE_INSTALL: 'update:install',
   UPDATE_AVAILABLE: 'update:available',
   UPDATE_PROGRESS: 'update:progress',
-  UPDATE_DOWNLOADED: 'update:downloaded'
+  UPDATE_DOWNLOADED: 'update:downloaded',
+
+  PLUGINS_LIST: 'plugins:list',
+  PLUGINS_SET_ENABLED: 'plugins:set-enabled',
+  PLUGINS_RELOAD: 'plugins:reload',
+  PLUGINS_RESCAN: 'plugins:rescan',
+  PLUGINS_OPEN_FOLDER: 'plugins:open-folder',
+  PLUGINS_INVOKE_COMMAND: 'plugins:invoke-command',
+  PLUGINS_CONTRIBUTIONS: 'plugins:contributions',
+  PLUGINS_CONTRIBUTIONS_CHANGED: 'plugins:contributions-changed',
+  PLUGINS_PANEL_SHOW: 'plugins:panel-show',
+  PLUGINS_NOTIFY: 'plugins:notify'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

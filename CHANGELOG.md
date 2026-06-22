@@ -5,6 +5,21 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.6] — 2026-06-21
+
+### Added
+
+- **Plugin system (v1)** — extend the app with trusted JavaScript plugins, no core changes needed. Plugins live in `<userData>/plugins/<id>/` (a `manifest.json` + a CommonJS `index.js`) and run in an isolated Node `worker_thread` (a buggy plugin can't crash the app), reaching the app only through a controlled `api` — they never touch the vault or secrets. A plugin can: **add commands** (shown in the Command Palette and the Plugins menu), **observe terminal output and write to a session**, **show a markdown/text panel**, **store its own JSON data**, and **notify**. Manage them in **⋯ → 🧩 Plugins**: enable/disable, reload after editing, open the folder, view per-plugin logs/errors, and **Rescan** to pick up newly added plugins without restarting. Ships with API docs and two example plugins.
+- **Theme studio** — customize the full UI palette (background, panels, modals, inputs, hover, borders, text, danger/success/warning) per base theme in **Settings → Appearance → 🎨 Custom palette**, applied live with one-click reset. **Export / import a theme as JSON** to share or back up your look.
+- **Favorite hosts** — pin hosts with the ⭐ button; pinned hosts appear in a **Favorites** section at the top of the sidebar for quick access (respects the search filter). Stored per-machine.
+
+### Notes
+
+- Plugin usage & API are documented in the **Plugins** section of [docs/HUONG-DAN-SU-DUNG.md](docs/HUONG-DAN-SU-DUNG.md); example plugins under [docs/examples/](docs/examples/).
+- Plugin code, theme palette overrides, and favorites are stored per-machine (not part of E2EE vault sync in v1).
+
+---
+
 ## [0.1.5] — 2026-06-20
 
 ### Added

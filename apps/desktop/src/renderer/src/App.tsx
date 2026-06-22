@@ -16,6 +16,8 @@ import { AiModal } from './components/AiModal'
 import { RecordingsModal } from './components/RecordingsModal'
 import { SettingsModal } from './components/SettingsModal'
 import { WorkspacesModal } from './components/WorkspacesModal'
+import { PluginsModal } from './components/PluginsModal'
+import { PluginPanelModal } from './components/PluginPanelModal'
 import { UpdateBanner } from './components/UpdateBanner'
 import { SftpView } from './features/sftp/SftpView'
 import { useT } from './i18n'
@@ -25,6 +27,7 @@ import { useTabsStore } from './stores/tabs'
 import { useSettingsStore } from './stores/settings'
 import { useToastsStore } from './stores/toasts'
 import { useUiStore } from './stores/ui'
+import { usePluginStore } from './stores/plugins'
 import { useVaultStore } from './stores/vault'
 
 export default function App() {
@@ -42,6 +45,8 @@ export default function App() {
   // store chung để Sidebar/palette cùng mở — tránh 2 instance modal dẫm chân nhau
   const modal = useUiStore((s) => s.modal)
   const setModal = useUiStore((s) => s.setModal)
+  const pluginPanel = usePluginStore((s) => s.panel)
+  const pluginCommands = usePluginStore((s) => s.contributions)
   const booted = useRef(false)
   const openedInitialTab = useRef(false)
 
@@ -62,22 +67,42 @@ export default function App() {
     const offTunnel = window.infra.tunnels.onState((e) =>
       useDataStore.getState().applyTunnelState(e.ruleId, e.status, e.detail)
     )
+    const offContrib = window.infra.plugins.onContributionsChanged((list) =>
+      usePluginStore.getState().applyContributions(list)
+    )
+    const offPanel = window.infra.plugins.onPanel((p) => usePluginStore.getState().setPanel(p))
+    const offNotify = window.infra.plugins.onNotify((n) => useToastsStore.getState().push(n.message))
     return () => {
       offLocked()
       offExit()
       offStatus()
       offTunnel()
+      offContrib()
+      offPanel()
+      offNotify()
     }
   }, [])
 
   useEffect(() => {
     if (vaultState !== 'unlocked') return
     void useDataStore.getState().refreshAll()
+    void usePluginStore.getState().refresh()
     if (!openedInitialTab.current) {
       openedInitialTab.current = true
       if (useTabsStore.getState().tabs.length === 0) void openLocal()
     }
   }, [vaultState, openLocal])
+
+  // Báo main phiên terminal đang active (cho plugin api.terminal.getActiveSessionId)
+  useEffect(() => {
+    const tab = tabs.find((tb) => tb.id === activeId)
+    let sid: string | null = null
+    if (tab && tab.kind === 'terminal') {
+      const pane = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
+      sid = pane?.sessionId ?? null
+    }
+    window.infra.terminal.setActive(sid)
+  }, [tabs, activeId])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -147,7 +172,21 @@ export default function App() {
     { id: 'open-tunnels', label: t('menu.tunnels'), run: () => setModal('tunnels') },
     { id: 'open-keys', label: `🔑 ${t('sidebar.keys')}`, run: () => setModal('keys') },
     { id: 'open-settings', label: t('menu.settings'), run: () => setModal('settings') },
-    { id: 'open-logs', label: t('menu.openLogs'), run: () => window.infra.terminal.openLogFolder() }
+    { id: 'open-plugins', label: t('menu.plugins'), run: () => setModal('plugins') },
+    { id: 'open-logs', label: t('menu.openLogs'), run: () => window.infra.terminal.openLogFolder() },
+    ...pluginCommands.map((c) => ({
+      id: `plugin-${c.pluginId}-${c.commandId}`,
+      label: c.title,
+      hint: 'plugin',
+      run: () => {
+        const tab = tabs.find((tb) => tb.id === activeId)
+        const sid =
+          tab && tab.kind === 'terminal'
+            ? ((tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0])?.sessionId ?? null)
+            : null
+        void window.infra.plugins.invokeCommand(c.pluginId, c.commandId, sid)
+      }
+    }))
   ]
 
   return (
@@ -214,6 +253,10 @@ export default function App() {
       {modal === 'recordings' && <RecordingsModal onClose={() => setModal(null)} />}
       {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} />}
       {modal === 'workspaces' && <WorkspacesModal onClose={() => setModal(null)} />}
+      {modal === 'plugins' && <PluginsModal onClose={() => setModal(null)} />}
+      {pluginPanel && (
+        <PluginPanelModal panel={pluginPanel} onClose={() => usePluginStore.getState().setPanel(null)} />
+      )}
 
       {locked && (
         <div className="absolute inset-0 z-[100]">

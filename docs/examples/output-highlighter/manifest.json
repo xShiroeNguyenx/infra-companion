@@ -1,0 +1,10 @@
+{
+  "id": "output-highlighter",
+  "name": "Output Highlighter",
+  "version": "1.0.0",
+  "description": "Theo dõi output terminal, báo khi thấy 'error/fail'; có lệnh chèn echo vào phiên đang mở.",
+  "permissions": ["terminal.observe", "terminal.write", "ui.notify"],
+  "contributes": {
+    "commands": [{ "id": "highlight.echo", "title": "Highlighter: Gửi echo test vào phiên active" }]
+  }
+}

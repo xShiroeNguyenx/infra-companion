@@ -449,6 +449,46 @@ export interface PasswordQuestion {
 // API preload expose cho renderer qua `window.infra`
 // ---------------------------------------------------------------------------
 
+// ── Plugins (F16) ────────────────────────────────────────────────────────────
+export type PluginStatusDto = 'active' | 'disabled' | 'failed' | 'crashed' | 'loading'
+
+export interface PluginCommandDto {
+  id: string
+  title: string
+}
+
+export interface PluginInfoDto {
+  id: string
+  name: string
+  version: string
+  description: string | null
+  enabled: boolean
+  status: PluginStatusDto
+  error: string | null
+  commands: PluginCommandDto[]
+  permissions: string[]
+  logTail: string[]
+}
+
+/** Lệnh plugin đóng góp vào Command Palette. */
+export interface ContributedCommandDto {
+  pluginId: string
+  commandId: string
+  title: string
+}
+
+export interface PluginPanelDto {
+  pluginId: string
+  title: string
+  markdown?: string
+  text?: string
+}
+
+export interface PluginNotifyDto {
+  pluginId: string
+  message: string
+}
+
 export interface InfraApi {
   vault: {
     status(): Promise<VaultStatus>
@@ -498,6 +538,8 @@ export interface InfraApi {
     openLogFolder(): void
     /** Bật/tắt ghi hình phiên (asciicast v2 — replay được). */
     toggleRecord(sessionId: string, title: string): Promise<SessionRecordState>
+    /** Báo main phiên terminal đang active (cho plugin api.terminal.getActiveSessionId). */
+    setActive(sessionId: string | null): void
   }
   recordings: {
     list(): Promise<RecordingInfoDto[]>
@@ -597,5 +639,20 @@ export interface InfraApi {
     onProgress(cb: (percent: number) => void): () => void
     /** Tải xong, sẵn sàng cài. */
     onDownloaded(cb: (version: string) => void): () => void
+  }
+  plugins: {
+    list(): Promise<PluginInfoDto[]>
+    setEnabled(id: string, enabled: boolean): Promise<PluginInfoDto[]>
+    reload(id: string): Promise<PluginInfoDto[]>
+    /** Quét lại thư mục plugins (phát hiện plugin mới) — không cần khởi động lại. */
+    rescan(): Promise<PluginInfoDto[]>
+    /** Mở thư mục plugins (hoặc thư mục 1 plugin) bằng file explorer. */
+    openFolder(id?: string): void
+    /** Chạy 1 lệnh do plugin đóng góp; activeSessionId lấy từ tab đang mở. */
+    invokeCommand(pluginId: string, commandId: string, activeSessionId: string | null): Promise<void>
+    contributions(): Promise<ContributedCommandDto[]>
+    onContributionsChanged(cb: (list: ContributedCommandDto[]) => void): () => void
+    onPanel(cb: (p: PluginPanelDto) => void): () => void
+    onNotify(cb: (n: PluginNotifyDto) => void): () => void
   }
 }

@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, AI assistance with local LLM support, and more.
 
-**Current release: v0.1.5 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.1.6 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 ---
 
@@ -31,6 +31,7 @@
 - **tmux session resume** — opt-in per host: wraps the session in tmux (`new-session -A`) so it survives disconnects and reattaches on reconnect/reopen (server must have tmux)
 - **TOFU known-hosts** — fingerprint shown on first connect, red alert on host-key change
 - **Quick Connect** — type `user@host:port` in the sidebar; 50-entry history
+- **Favorite hosts** — pin hosts with ⭐ to a Favorites section at the top of the sidebar (respects search)
 - **Telnet** and **Serial / COM port** (auto-lists connected ports, configurable baud)
 - **Local terminal** — PowerShell, cmd, Git Bash, WSL shells via node-pty
 
@@ -44,12 +45,18 @@
 - **Broadcast input** — type once, send to all open panes simultaneously (Ctrl+Shift+B)
 - **Background image** — full-window wallpaper with adjustable opacity, blur, fit (cover/contain), and position (Settings → Background image)
 - **Terminal appearance** — configurable font family, size, line height, and cursor style (Settings → Terminal); applies live
-- **Custom accent color** — pick your own accent over the dark/light theme (Settings → Appearance)
+- **Theme studio** — pick a custom accent and recolor the full UI palette per theme (Settings → Appearance → Custom palette); export / import a theme as JSON
 - **Find in terminal** — Ctrl+F with highlight
 - **Mouse copy & paste** — select then left-click the highlight to copy, right-click to paste (alongside Ctrl+Shift+C / Ctrl+Shift+V)
 - **Command Palette** — Ctrl+Shift+P, keyboard-first access to every action
 - **Session logging** — capture raw output (ANSI-stripped) to file
 - **Session recording & replay** — asciinema v2 format; player with play/pause, seek bar, 1×/2×/4×/8× speed; export `.cast` for `asciinema play`
+
+### Plugins (v1)
+- **Trusted JS plugins** — drop a plugin folder (`manifest.json` + `index.js`) into `<userData>/plugins/`; runs in an isolated Node worker so a crash can't take down the app
+- **Capabilities** — add Command Palette commands, observe terminal output & write to a session, show a markdown/text panel, store per-plugin data, notify — all via a controlled API that never exposes the vault
+- **Manager** — ⋯ → 🧩 Plugins: enable/disable, reload after editing, Rescan for new plugins (no restart), view per-plugin logs/errors
+- See the **Plugins** section in [docs/HUONG-DAN-SU-DUNG.md](docs/HUONG-DAN-SU-DUNG.md) and examples in [docs/examples/](docs/examples/)
 
 ### Host & Vault Management
 - **Encrypted vault** — master password → argon2id → AES-256-GCM field-level encryption; all secrets (passwords, private keys, env vars) are encrypted at rest
@@ -237,7 +244,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.1.5)
+## Known Limitations (v0.1.6)
 
 - Bulk / Monitor / SFTP through login scripts only works when the login script uses a plain `ssh …` command (a preceding `su` will stop at the gate host)
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))

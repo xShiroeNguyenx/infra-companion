@@ -15,13 +15,27 @@ import { makeHostKeyVerifier, prepareConnection } from './connection'
 import { sessionLogger } from './sessionLog'
 import { recorder } from './recording'
 
+/** Cầu nối cho Plugin host: nghe output, gửi input, biết phiên đang active. */
+export interface TerminalBridge {
+  /** Plugin host gắn sink để nhận mọi output (host tự gate theo subscriber). */
+  setOutputSink(fn: ((sessionId: string, data: string) => void) | null): void
+  /** Gửi text vào 1 phiên (như khi user gõ). */
+  write(sessionId: string, data: string): void
+  /** Phiên terminal đang active (renderer báo qua TERM_SET_ACTIVE). */
+  getActiveSessionId(): string | null
+}
+
 /**
  * Nối SessionManager với IPC. Output stream về đúng WebContents đã tạo phiên.
- * Trả về hàm dispose gọi khi app quit.
+ * Trả về hàm dispose + bridge cho Plugin host.
  */
-export function registerTerminalIpc(): () => void {
+export function registerTerminalIpc(): { dispose: () => void; bridge: TerminalBridge } {
   const manager = new SessionManager()
   const owners = new Map<string, WebContents>()
+  /** Sink cho Plugin host (null khi chưa có plugin system). */
+  let outputSink: ((sessionId: string, data: string) => void) | null = null
+  /** Phiên terminal đang được focus ở renderer (cho plugin api.terminal.getActiveSessionId). */
+  let activeSessionId: string | null = null
   /** sessionId → thông tin để ghi history khi kết nối thành công lần đầu */
   const pendingHistory = new Map<string, { target: string; hostId: string | null }>()
   /** sessionId → kích thước terminal hiện tại (cho header asciicast khi ghi hình) */
@@ -36,6 +50,7 @@ export function registerTerminalIpc(): () => void {
       manager.kill(sessionId)
       owners.delete(sessionId)
       pendingHistory.delete(sessionId)
+      if (activeSessionId === sessionId) activeSessionId = null
     }
   }
 
@@ -52,6 +67,7 @@ export function registerTerminalIpc(): () => void {
   manager.on('data', (sessionId, data) => {
     sessionLogger.append(sessionId, data) // tee ra file log (text thuần) nếu đang bật
     recorder.append(sessionId, data) // tee ra .cast (raw + thời gian) nếu đang ghi hình
+    if (outputSink) outputSink(sessionId, data) // tee cho plugin (host tự gate theo subscriber)
     const owner = owners.get(sessionId)
     if (owner && !owner.isDestroyed()) owner.send(IPC.TERM_DATA, { sessionId, data })
   })
@@ -63,6 +79,7 @@ export function registerTerminalIpc(): () => void {
     const owner = owners.get(sessionId)
     owners.delete(sessionId)
     pendingHistory.delete(sessionId)
+    if (activeSessionId === sessionId) activeSessionId = null
     if (owner && !owner.isDestroyed()) owner.send(IPC.TERM_EXIT, { sessionId, exitCode, reason })
   })
 
@@ -183,6 +200,11 @@ export function registerTerminalIpc(): () => void {
     dims.delete(sessionId)
     manager.kill(sessionId)
     owners.delete(sessionId)
+    if (activeSessionId === sessionId) activeSessionId = null
+  })
+
+  ipcMain.on(IPC.TERM_SET_ACTIVE, (_event, sessionId: string | null) => {
+    activeSessionId = sessionId
   })
 
   ipcMain.handle(IPC.TERM_LOG_TOGGLE, (_event, sessionId: string, title: string): SessionLogState => {
@@ -207,12 +229,22 @@ export function registerTerminalIpc(): () => void {
 
   ipcMain.handle(IPC.SERIAL_LIST, () => listSerialPorts())
 
-  return () => {
+  const bridge: TerminalBridge = {
+    setOutputSink: (fn) => {
+      outputSink = fn
+    },
+    write: (sessionId, data) => manager.write(sessionId, data),
+    getActiveSessionId: () => activeSessionId
+  }
+
+  const dispose = (): void => {
     sessionLogger.stopAll()
     recorder.stopAll()
     manager.disposeAll()
     owners.clear()
   }
+
+  return { dispose, bridge }
 }
 
 export function parseQuickTarget(

@@ -1,12 +1,15 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
-> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật: chuẩn bị release **v0.1.5** (copy/dán bằng chuột trong terminal), sau khi v0.1.4 đã phát hành.
+> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật: chuẩn bị release **v0.1.6** (Plugin system + Theme studio + Favorites), sau khi v0.1.5 đã phát hành.
 
 ## Đang ở đâu
 
-Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3, v0.1.4 (đã tag/phát hành)**. App build + typecheck + 27 test đều sạch.
+Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 → v0.1.5 (đã tag/phát hành)**. App build + typecheck + test đều sạch (54 core test).
 
-**v0.1.5 đã sẵn sàng nhưng CHƯA commit/tag** (xem mục cuối) — 1 tính năng: **copy/dán bằng chuột trong terminal** (tô khối → click trái vào vùng đã tô = copy; click phải = dán). Thuần renderer, chỉ đụng 2 file (`TerminalPane.tsx`, `i18n/dict.ts`); không đổi schema DB (vẫn **v9**). ⚠️ **Chưa test runtime** — cần `pnpm dev` thử click copy/dán + bôi từ dưới lên + khi đã cuộn scrollback trước khi tag.
+**v0.1.6 đã sẵn sàng nhưng CHƯA commit/tag** (xem mục cuối) — 3 tính năng, đã test GUI OK, không đổi schema DB (vẫn **v9**):
+1. **Plugin system v1 (F16)** — plugin JS tin cậy ở `userData/plugins/<id>/` (manifest.json + index.js CJS), chạy trong **worker_thread chung** cô lập lỗi, API có kiểm soát (không đụng vault). Hook: command palette + panel markdown + observe/write output + storage + notify; có **Quét lại** (rescan, mở modal tự quét). Tài liệu dùng + viết plugin gộp trong mục **Plugins** của `docs/HUONG-DAN-SU-DUNG.md`; mẫu `docs/examples/`.
+2. **Theme studio** — tuỳ biến 11 màu UI per base-theme (Settings → Giao diện → 🎨) + xuất/nhập theme JSON.
+3. **Favorites** — nút ⭐ ghim host lên mục Yêu thích đầu sidebar (localStorage, per-máy).
 
 **v0.1.4 (đã phát hành)** — 5 tính năng: Workspaces, Notes per host, tuỳ biến terminal (font/cỡ chữ/con trỏ), màu accent tuỳ chỉnh, tmux-resume. Schema DB ở **v9** (`hosts.notes_enc`, `hosts.tmux`). ⚠️ **tmux-resume vẫn chưa được kiểm runtime** — cần server có tmux + rớt mạng thật để kiểm chứng.
 
@@ -61,7 +64,13 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 
 ## Chi tiết kỹ thuật các tính năng
 
-**v0.1.5 (CHƯA commit)** — copy/dán bằng chuột trong terminal. Thuần renderer, chỉ 2 file. Typecheck sạch.
+**v0.1.6 (CHƯA commit)** — Plugin system + Theme studio + Favorites. Typecheck + build + 54 core test sạch.
+
+- **Plugin system v1 (F16)**: logic thuần ở `packages/core/src/plugins/` (`manifest.ts` validate, `discover.ts` quét, `protocol.ts` message union, `paths.ts` confine, `PluginHost.ts` EventEmitter quản lý vòng đời + registry + responder api-call + ref-count observe). Bootstrap worker ở [worker.ts](../apps/desktop/src/main/plugins/worker.ts) (CJS qua `createRequire`); IPC ở [ipc/plugins.ts](../apps/desktop/src/main/ipc/plugins.ts). **Pitfall đã xử lý**: electron-vite emit CJS phẳng → thêm **input thứ 2** trong `electron.vite.config.ts` để emit `out/main/plugin-worker.js`; nạp bằng `new Worker(join(__dirname,'plugin-worker.js'))`. Terminal tee qua `TerminalBridge` ([terminal.ts](../apps/desktop/src/main/ipc/terminal.ts), gate theo subscriber + `TERM_SET_ACTIVE`). Renderer: `stores/plugins.ts`, `lib/miniMarkdown.tsx` (render markdown an toàn, KHÔNG dangerouslySetInnerHTML), `PluginsModal`/`PluginPanelModal`. **Rescan**: `PluginHost.rescan()` + mở modal tự quét → thấy plugin mới không cần restart. 3 test file (33 test). Bảo mật: không truyền DEK/secret vào worker; storage confine trong thư mục plugin; crash worker → respawn 1 lần.
+- **Theme studio**: `CUSTOM_PALETTE_VARS` (11 biến `--c-*`) + `CustomColors` per base-theme + `applyCustomTheme()` (override CSS var inline như accent) trong [stores/settings.ts](../apps/desktop/src/renderer/src/stores/settings.ts); key `infra.theme.custom`; áp boot trong main.tsx; UI [CustomPaletteSection.tsx](../apps/desktop/src/renderer/src/components/CustomPaletteSection.tsx) (color pickers + reset + xuất/nhập JSON qua textarea). setTheme reapply đúng bộ khi đổi dark↔light.
+- **Favorites**: [stores/favorites.ts](../apps/desktop/src/renderer/src/stores/favorites.ts) (localStorage `infra.favorites`); tách `HostRow` dùng chung trong [Sidebar.tsx](../apps/desktop/src/renderer/src/components/Sidebar.tsx) + nút ⭐ + mục "★ Yêu thích" đầu list (tôn trọng search). Host ghim hiện cả ở Yêu thích lẫn group (chủ ý).
+
+**v0.1.5 (đã phát hành)** — copy/dán bằng chuột trong terminal. Thuần renderer, chỉ 2 file.
 
 - **Copy bằng click trái vào vùng đã tô, dán bằng click phải** trong [TerminalPane.tsx](../apps/desktop/src/renderer/src/features/terminal/TerminalPane.tsx). Gắn listener chuột ở **pha capture** trên `term.element`: `mousedown` chạy TRƯỚC khi xterm xoá selection nên đọc được đoạn đang bôi đen + tính `pointInSelection`; `mouseup` mà là click đơn (di chuyển < 3px) và rơi trong vùng → `navigator.clipboard.writeText` + toast "Đã sao chép" (key i18n `terminal.copied` cho vi/en/ja). `contextmenu` → `preventDefault` + `readText` rồi gửi qua `handleInput` (tôn trọng Broadcast). Phím tắt cũ Ctrl+Shift+C/V giữ nguyên.
   - ⚠️ **Gotcha đã xử lý**: bản build xterm 6.0 trả `getSelectionPosition()` theo **0-based tuyệt đối trong buffer** (typings ghi "1-based" là SAI), và start/end **đảo chiều** khi bôi từ dưới lên → code đã chuẩn hoá. `cellFromEvent` quy pixel→ô bằng `.xterm-screen` rect / cols-rows (không đụng private API). Nếu không tính được toạ độ thì fallback coi như trong vùng (vẫn copy khi có selection). Listener gỡ sạch + clear timer toast trong cleanup.
@@ -80,30 +89,31 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 - **Ảnh nền (background image)**: Settings → Ảnh nền. Lưu data URL đã downscale (canvas, cap 2560px JPEG) trong `localStorage` (per-user, **không sync**). Phủ **full khung**: chrome (`bg-panel`) bán trong suốt qua override `--c-panel` khi `data-bg='on'`; terminal trong suốt (`--term-bg: transparent` + xterm `allowTransparency` + theme nền trong suốt + nền pane/grid bỏ); lớp ảnh ở **z âm** trong stacking context `isolate` của App root → nằm dưới mọi overlay nên **không che ô nhập mật khẩu**. Chỉnh opacity/blur/vị trí (giữa/trái/phải/trên/dưới)/lấp khung (cover/contain).
 - **VPN: đã thử rồi BỎ HẲN.** User muốn VPN nhúng thật (gỡ OpenVPN Connect vẫn chạy, dùng cho team) — không khả thi nhẹ nhàng: cần card mạng ảo (driver Wintun) + service đặc quyền, và OpenVPN Connect v3 **không có CLI để connect**. Đã gỡ sạch code VPN, **chỉ còn migration DB v7** (`vpn_profiles` + cột `hosts.vpn_profile_id`) — GIỮ CHỦ ĐÍCH để bảo toàn thứ tự migration (DB của user đã chạy tới v7; xoá đi sẽ làm migration tương lai bị skip). Bảng/cột "chết", không code nào dùng. **ĐỪNG tái dùng index 7** cho migration khác — migration mới thêm vào cuối là v8. Nếu sau này team thực sự cần: hướng đúng là bundle OpenVPN community + Wintun + Interactive Service (cài 1 lần cần admin) — hạng mục riêng cỡ vài ngày, Windows trước.
 
-## 2 LỰA CHỌN cho phiên sau (chọn 1 số là bắt đầu)
+## Gợi ý cho phiên sau (Plugin system F16 v1 đã xong ở v0.1.6)
 
-1. **Plugin system (F16)** — thuần JS, vừa sức. Plugin JS sandbox hook vào command palette / panel / format output. Rủi ro thấp.
-2. **VNC (noVNC)** — xem màn hình remote trong tab. Thuần JS khả thi hơn RDP (RDP cần FreeRDP native, nặng). Rủi ro trung bình.
+1. **VNC (noVNC)** — xem màn hình remote trong tab. Thuần JS khả thi hơn RDP (RDP cần FreeRDP native, nặng). Rủi ro trung bình.
+2. **Plugin v2** — protocol mới (SessionKind) + permission enforcement + transform output (mở rộng nền v1).
+3. **SSH Certificates / FIDO2**, hoặc **Sync backend WebDAV/S3/Git**, hoặc **ssh_config 2 chiều** — xem ROADMAP.
 
 ## Việc cần làm khi mở phiên mới
 - Mở lại file này để nhớ ngữ cảnh.
-- Nói số **1 / 2** → bắt đầu luôn.
+- Chọn 1 hạng mục ở trên → bắt đầu luôn.
 
-## Git + Release v0.1.5 (anh tự chạy; tôi không tự commit)
+## Git + Release v0.1.6 (anh tự chạy; tôi không tự commit)
 
-> v0.1.4 ĐÃ tag/phát hành (workspaces/notes/terminal/accent/tmux). Phần đang chờ là **v0.1.5** (copy/dán bằng chuột trong terminal).
+> v0.1.5 ĐÃ tag/phát hành (copy/dán bằng chuột). Phần đang chờ là **v0.1.6** (Plugin system + Theme studio + Favorites).
 
-Version đã bump sẵn `0.1.4 → 0.1.5` ở `package.json` (gốc + `apps/desktop`); CHANGELOG thêm [0.1.5], README + hướng dẫn sử dụng đã cập nhật. Release tự kích hoạt khi **push tag `v*.*.*`** (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux).
+Version đã bump sẵn `0.1.5 → 0.1.6` ở `package.json` (gốc + `apps/desktop`); CHANGELOG thêm [0.1.6], README/ROADMAP/handoff đã cập nhật. Release tự kích hoạt khi **push tag `v*.*.*`** (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux).
 
 ```powershell
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
 git add -A
 git status            # xem lại trước khi commit
-git commit -m "feat: copy bằng click trái vào vùng tô khối + dán bằng click phải trong terminal (v0.1.5)"
+git commit -m "feat: plugin system (F16) + theme studio + favorite hosts (v0.1.6)"
 git push origin main
 # Phát hành: tạo tag để CI build + tạo release
-git tag v0.1.5
-git push origin v0.1.5
+git tag v0.1.6
+git push origin v0.1.6
 ```
 
 > Môi trường dev: Node 20, pnpm 9, Electron 42 (Node 24 runtime — dùng `node:sqlite`), ssh2/node-pty/serialport là native nhưng đã externalize + prebuilt nên không cần build C++. Khi chạy electron từ terminal đã dính biến `ELECTRON_RUN_AS_NODE` thì thêm `$env:ELECTRON_RUN_AS_NODE=$null` cùng lệnh (chỉ là gotcha của terminal, không phải lỗi app).

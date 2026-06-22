@@ -25,3 +25,25 @@ export type { KnownHostRecord, ResolvedConnection, ResolvedEndpoint, SyncSnapsho
 export { deriveSyncKey, newSyncSalt } from './vault/crypto'
 export { SyncService, createBackend } from './sync/SyncService'
 export type { SyncBackend, SyncResult } from './sync/SyncService'
+export { validateManifest, parseManifest } from './plugins/manifest'
+export type { PluginManifest, PluginCommandManifest, ManifestResult } from './plugins/manifest'
+export { discoverPlugins } from './plugins/discover'
+export type { DiscoveredPlugin, InvalidPlugin, DiscoverResult } from './plugins/discover'
+export { pluginScopedPath } from './plugins/paths'
+export { PluginHost } from './plugins/PluginHost'
+export type {
+  PluginHostAdapters,
+  PluginWorkerLike,
+  PluginInfo,
+  PluginStatus,
+  ContributedCommand,
+  PluginPanelPayload,
+  PluginNotifyPayload
+} from './plugins/PluginHost'
+export type {
+  HostToWorker,
+  WorkerToHost,
+  ApiMethod,
+  CommandCtx,
+  WorkerContributions
+} from './plugins/protocol'

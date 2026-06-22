@@ -22,7 +22,7 @@
 - **Docker & Kubernetes** (F06) — liệt kê container/pod, exec vào shell, xem log, port-forward kubectl; nguồn: Docker local/remote qua SSH, kubeconfig contexts.
 
 ### Vượt trội Wave 2 — còn lại (Phase 6)
-- **Plugin system** (F16) — plugin JS sandbox hook vào command palette, panel UI, protocol mới, format output; kèm tài liệu Plugin API.
+- ~~**Plugin system** (F16)~~ — ✅ **v1 đã làm (v0.1.6)**: plugin JS tin cậy chạy trong worker_thread cô lập, hook vào command palette + panel markdown + quan sát/gửi output terminal + storage; kèm tài liệu (mục Plugins trong [docs/HUONG-DAN-SU-DUNG.md](docs/HUONG-DAN-SU-DUNG.md)) + plugin mẫu. *Còn lại (v2): protocol mới (SessionKind), permission enforcement + dialog, transform output, marketplace.*
 - **KeePassXC** (F11 mở rộng) — tích hợp Secrets Manager thêm KeePassXC qua KeePassXC-proxy.
 - ~~**tmux-aware resume** (F14)~~ — ✅ Đã làm (v0.1.4): bật per-host → sau login `tmux new-session -A -s ic-main`, tự re-attach khi reconnect/mở lại (resume). *Còn lại (sau): auto-wrap toàn cục mọi phiên.*
 - **ssh_config 2 chiều** (F12) — ghi ngược thay đổi vào `~/.ssh/config` (tuỳ chọn), dùng song song CLI ssh.
@@ -51,9 +51,10 @@
 ## Tuỳ biến giao diện (sau)
 
 - ~~**Background image**~~ — ✅ Đã làm (v0.1.3): ảnh nền phủ full khung + opacity/blur/vị trí/lấp khung. Xem [CHANGELOG.md](CHANGELOG.md).
-- **Theme tuỳ chỉnh** — ✅ Một phần (v0.1.4): chọn **màu accent** tuỳ ý (Settings → Giao diện). *Còn lại (sau): tuỳ biến cả bảng màu (nền/panel…), import/export theme.*
+- ~~**Theme tuỳ chỉnh**~~ — ✅ Đã làm (accent v0.1.4 + **bảng màu đầy đủ & import/export v0.1.6**): tuỳ biến 11 màu UI per theme (Settings → Giao diện → 🎨 Bảng màu tuỳ chỉnh) + xuất/nhập theme JSON. *Còn lại (sau): tuỳ biến cả màu terminal.*
 - ~~**Font & cỡ chữ terminal**~~ — ✅ Đã làm (v0.1.4): font/cỡ chữ/giãn dòng/kiểu con trỏ toàn cục (Settings → Terminal). *Còn lại (sau): per-host override.*
 - ~~**Copy/dán bằng chuột**~~ — ✅ Đã làm (v0.1.5): tô khối → click trái vào vùng đã tô = copy; click phải = dán (kèm Ctrl+Shift+C/V cũ). Xem [CHANGELOG.md](CHANGELOG.md).
+- ~~**Ghim host (Favorites)**~~ — ✅ Đã làm (v0.1.6): nút ⭐ ghim host lên mục Yêu thích đầu sidebar (per-máy). *Còn lại (sau): đồng bộ qua vault.*
 
 ---
 
