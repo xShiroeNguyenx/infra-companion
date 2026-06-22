@@ -35,6 +35,10 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          # Tự bật GitHub Pages (build type = GitHub Actions) nếu repo chưa bật —
+          # khỏi phải vào Settings → Pages thủ công.
+          enablement: true
 
       - name: Upload landing page artifact
         uses: actions/upload-pages-artifact@v3
