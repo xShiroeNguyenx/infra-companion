@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useT } from '../i18n'
 import {
   TERM_FONT_DEFAULT,
@@ -17,31 +17,36 @@ import { Field, Modal, TextInput } from './ui'
 const MAX_DIM = 2560
 const JPEG_QUALITY = 0.82
 
-/** Đọc + downscale ảnh về data URL JPEG (giữ localStorage gọn, ~<1.5MB). */
+/** Downscale 1 ảnh (cho qua src data/blob URL) về data URL JPEG gọn nhẹ. */
+function downscaleSrc(src: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onerror = () => reject(new Error('decode failed'))
+    img.onload = () => {
+      const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height))
+      const w = Math.max(1, Math.round(img.width * scale))
+      const h = Math.max(1, Math.round(img.height * scale))
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('no 2d context'))
+        return
+      }
+      ctx.drawImage(img, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/jpeg', JPEG_QUALITY))
+    }
+    img.src = src
+  })
+}
+
+/** Đọc + downscale ảnh từ file local về data URL JPEG (giữ localStorage gọn, ~<1.5MB). */
 function downscaleToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onerror = () => reject(new Error('read failed'))
-    reader.onload = () => {
-      const img = new Image()
-      img.onerror = () => reject(new Error('decode failed'))
-      img.onload = () => {
-        const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height))
-        const w = Math.max(1, Math.round(img.width * scale))
-        const h = Math.max(1, Math.round(img.height * scale))
-        const canvas = document.createElement('canvas')
-        canvas.width = w
-        canvas.height = h
-        const ctx = canvas.getContext('2d')
-        if (!ctx) {
-          reject(new Error('no 2d context'))
-          return
-        }
-        ctx.drawImage(img, 0, 0, w, h)
-        resolve(canvas.toDataURL('image/jpeg', JPEG_QUALITY))
-      }
-      img.src = reader.result as string
-    }
+    reader.onload = () => downscaleSrc(reader.result as string).then(resolve, reject)
     reader.readAsDataURL(file)
   })
 }
@@ -76,6 +81,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   } = useSettingsStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const push = useToastsStore((s) => s.push)
+  const [bgUrl, setBgUrl] = useState('')
+  const [fetchingUrl, setFetchingUrl] = useState(false)
 
   const cursorOptions: Array<{ value: TermCursor; label: string }> = [
     { value: 'block', label: t('settings.termCursorBlock') },
@@ -114,6 +121,22 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
       if (!setBackgroundImage(dataUrl)) push(t('settings.bgTooLarge'))
     } catch {
       push(t('settings.bgError'))
+    }
+  }
+
+  const onAddUrl = async (): Promise<void> => {
+    const url = bgUrl.trim()
+    if (!url || fetchingUrl) return
+    setFetchingUrl(true)
+    try {
+      const raw = await window.infra.net.fetchImage(url) // tải ở main → tránh CORS
+      const dataUrl = await downscaleSrc(raw) // nén lại như ảnh local
+      if (setBackgroundImage(dataUrl)) setBgUrl('')
+      else push(t('settings.bgTooLarge'))
+    } catch {
+      push(t('settings.bgUrlError'))
+    } finally {
+      setFetchingUrl(false)
     }
   }
 
@@ -219,6 +242,28 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 {t('settings.bgRemove')}
               </button>
             )}
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <TextInput
+              type="url"
+              value={bgUrl}
+              placeholder={t('settings.bgUrlPlaceholder')}
+              disabled={fetchingUrl}
+              onChange={(e) => setBgUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  void onAddUrl()
+                }
+              }}
+            />
+            <button
+              onClick={() => void onAddUrl()}
+              disabled={fetchingUrl || !bgUrl.trim()}
+              className="border-edge text-muted hover:bg-hover shrink-0 rounded border px-3 py-2 text-sm disabled:opacity-50"
+            >
+              {fetchingUrl ? t('settings.bgUrlLoading') : t('settings.bgUrlAdd')}
+            </button>
           </div>
           {!backgroundImage && <p className="text-subtle mt-1 text-[10px] leading-relaxed">{t('settings.bgHint')}</p>}
         </Field>

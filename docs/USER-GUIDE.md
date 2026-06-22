@@ -134,12 +134,16 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 ## 5B. Appearance & background — `⋯` → Settings
 
 - **Theme**: Dark / Light. **Language**: Tiếng Việt / English / 日本語. Changes apply instantly and persist across launches.
-- **Background image**: click **Choose image…** → the image shows faintly behind the **whole window** (behind both the sidebar and the terminal); chrome (sidebar/tabs/status) becomes translucent to reveal it, while modals/menus stay opaque for readability. Adjust:
+- **Background image**: set a wallpaper that shows faintly behind the **whole window** (behind both the sidebar and the terminal); chrome (sidebar/tabs/status) becomes translucent to reveal it, while modals/menus stay opaque for readability. Two ways to set it:
+  - **Choose image…** — pick a local file.
+  - **Paste an image link** in the box and click **Add** — works with direct image URLs (e.g. ending in `.jpg`/`.png`) and with **Google Drive** / **Dropbox** share links (the app rewrites those to a direct-download form for you). For Google Drive, set the file's sharing to **"Anyone with the link"** first — a private link returns a login page and is rejected. The link is fetched once in the background; only a local compressed copy is kept (so the wallpaper still works offline).
+
+  Then adjust:
   - **Fit**: *Cover* (fills, may crop) / *Contain* (shows the whole image, no crop).
   - **Position**: Center / Left / Right / Top / Bottom.
   - **Opacity** (5–100%) and **Blur** (0–24px) — lower opacity or raise blur if text is hard to read over a bright image.
   - **Remove** to clear the background.
-- The image is auto-compressed and stored **on this machine** (not synced) — everyone picks their own.
+- The image is auto-compressed and stored **on this machine** (not synced) — everyone picks their own. Switching to a different image or link replaces the previous one (nothing accumulates).
 - **Accent color**: a color picker sets your own accent (primary buttons, selection borders…) on top of the dark/light theme; a Reset button restores the default.
 - **🎨 Custom palette (Theme studio)**: a collapsible section in Settings → Appearance to customize **11 UI colors** (Background, Sidebar/bars, Modals, Inputs, Hover, Borders, Text, Muted text, Danger, Success, Warning). Click a swatch to change it → **applied live**. Overrides are stored **separately per theme** (dark and light), so toggling Dark↔Light stays correct. The **✕** next to a color clears that override; **Reset to default** clears them all.
   - **Export / Import theme**: click **Export / Import theme** → a JSON box shows the current theme (accent + palette). **Copy** to share/back up; paste another JSON and **Apply** to load it. (Stored on this machine, not synced.)

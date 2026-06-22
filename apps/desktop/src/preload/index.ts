@@ -121,7 +121,8 @@ const api: InfraApi = {
     ping: (host) => ipcRenderer.invoke(IPC.NET_PING, host),
     dns: (host) => ipcRenderer.invoke(IPC.NET_DNS, host),
     portCheck: (host, port) => ipcRenderer.invoke(IPC.NET_PORT, host, port),
-    scan: (host) => ipcRenderer.invoke(IPC.NET_SCAN, host)
+    scan: (host) => ipcRenderer.invoke(IPC.NET_SCAN, host),
+    fetchImage: (url) => ipcRenderer.invoke(IPC.NET_FETCH_IMAGE, url)
   },
   monitor: {
     start: (hostIds) => ipcRenderer.invoke(IPC.MONITOR_START, hostIds),

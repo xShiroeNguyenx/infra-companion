@@ -84,6 +84,7 @@ export const IPC = {
   NET_DNS: 'net:dns',
   NET_PORT: 'net:port',
   NET_SCAN: 'net:scan',
+  NET_FETCH_IMAGE: 'net:fetchImage',
 
   MONITOR_START: 'monitor:start',
   MONITOR_STOP: 'monitor:stop',

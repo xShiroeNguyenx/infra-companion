@@ -594,6 +594,8 @@ export interface InfraApi {
     dns(host: string): Promise<DnsResultDto>
     portCheck(host: string, port: number): Promise<{ open: boolean; ms: number }>
     scan(host: string): Promise<PortScanEntryDto[]>
+    /** Tải ảnh từ URL ở main process (tránh CORS) → trả về data URL gốc để renderer nén/lưu. */
+    fetchImage(url: string): Promise<string>
   }
   monitor: {
     /** Bắt đầu theo dõi các host (mở kết nối + poll). */

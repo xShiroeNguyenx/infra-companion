@@ -5,6 +5,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.7] — 2026-06-22
+
+### Added
+
+- **Background image from a URL** — besides picking a local file, you can now paste an **image link** in **Settings → Background image** and click **Add**. Works with direct image URLs and with **Google Drive** and **Dropbox** share links (the app rewrites them to a direct-download form automatically). The image is fetched in the main process (so it isn't blocked by browser CORS), then downscaled and stored locally as before — pasting a new link or picking a new file simply replaces the old one, so nothing piles up. Per-machine preference, not synced.
+
+### Notes
+
+- The link is only used to fetch the bytes once; the app never keeps the remote URL — it stores a re-compressed local copy, so the wallpaper keeps working offline. Fetches are limited to http/https, time out after 20s, cap at 25 MB, and the content is validated as a real image (by magic bytes) before use. A non-public Drive link returns an HTML page and is rejected with a clear message.
+
+---
+
 ## [0.1.6] — 2026-06-21
 
 ### Added
