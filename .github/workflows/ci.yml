@@ -3,7 +3,14 @@ name: CI
 on:
   push:
     branches: [main]
+    # Thay đổi chỉ-docs (landing page, hướng dẫn…) không cần build/test lại app
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
 
 jobs:
   ci:

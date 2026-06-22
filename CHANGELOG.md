@@ -15,7 +15,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Notes
 
-- Plugin usage & API are documented in the **Plugins** section of [docs/HUONG-DAN-SU-DUNG.md](docs/HUONG-DAN-SU-DUNG.md); example plugins under [docs/examples/](docs/examples/).
+- Plugin usage & API are documented in the **Plugins** section of [docs/USER-GUIDE.md](docs/USER-GUIDE.md); example plugins under [docs/examples/](docs/examples/).
 - Plugin code, theme palette overrides, and favorites are stored per-machine (not part of E2EE vault sync in v1).
 
 ---

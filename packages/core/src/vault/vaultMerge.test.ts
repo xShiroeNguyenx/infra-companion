@@ -116,14 +116,14 @@ describe.skipIf(VaultService === null)('Sync merge (LWW + tombstone)', () => {
   test('snippet/tunnel/group cùng đi qua merge', () => {
     const a = newVault('a6')
     const b = newVault('b6')
-    const group = a.saveGroup({ name: 'Sakura', username: 'vn_dev' })
+    const group = a.saveGroup({ name: 'Production', username: 'deploy' })
     a.saveSnippet({ label: 'uptime', script: 'uptime' })
     const host = a.saveHost({ label: 'h', hostname: '1.1.1.1', port: 22, username: 'u', authType: 'password', groupId: group.id })
     a.saveTunnel({ hostId: host.id, type: 'D', bindPort: 1080, label: 'SOCKS5 :1080' })
 
     b.importSnapshot(a.exportSnapshot())
     const snapB = b.exportSnapshot()
-    expect(snapB.groups.map((g) => g.name)).toContain('Sakura')
+    expect(snapB.groups.map((g) => g.name)).toContain('Production')
     expect(snapB.snippets).toHaveLength(1)
     expect(snapB.tunnels).toHaveLength(1)
   })

@@ -241,7 +241,7 @@ export function HostEditorModal({
             <TextInput
               value={secretRef}
               onChange={(e) => setSecretRef(e.target.value)}
-              placeholder="op://Vault/jpapst04/password  ·  bw://<item>  ·  vault://secret/jpapst04#password"
+              placeholder="op://Vault/web-01/password  ·  bw://<item>  ·  vault://secret/web-01#password"
             />
           </Field>
         )}

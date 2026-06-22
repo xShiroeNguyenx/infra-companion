@@ -1,0 +1,47 @@
+name: Deploy landing page
+
+# Flow ĐỘC LẬP với build app: chỉ deploy trang landing (docs/landing) lên GitHub Pages.
+# KHÔNG gắn tag/release nên cập nhật trang KHÔNG kích hoạt build lại app.
+#  - tự chạy khi push lên main có thay đổi trong docs/landing/ (hoặc chính workflow này)
+#  - hoặc chạy tay (workflow_dispatch) bất cứ lúc nào
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/landing/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+# Quyền tối thiểu để deploy lên Pages qua OIDC
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Mỗi lúc chỉ 1 lần deploy; không hủy bản đang chạy giữa chừng
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload landing page artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Gốc site = thư mục landing (index.html + favicon.svg nằm cùng cấp)
+          path: docs/landing
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

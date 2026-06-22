@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0b0e14" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<title>Infra Companion — a modern SSH client that does more</title>
+<meta name="description" content="Infra Companion is a local-first desktop SSH client: jump hosts, login scripts, multi-pane broadcast, bulk exec, monitoring, E2EE sync, AI, and a plugin system." />
+<style>
+  :root {
+    --app: #0b0e14; --panel: #0e121b; --elevated: #161b27; --card: #11151f;
+    --edge: #232a39; --edge-strong: #323b4f;
+    --text: #e6e8ee; --muted: #a1a7b6; --subtle: #6b7385;
+    --accent: #3b82f6; --accent-2: #6366f1; --accent-soft: rgba(59,130,246,.14);
+    --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --magenta: #c084fc;
+    --mono: ui-monospace, "Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, system-ui, sans-serif;
+    --maxw: 1120px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--app); color: var(--text);
+    font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+  .accent { color: var(--accent); }
+
+  /* background glow */
+  body::before {
+    content: ""; position: fixed; inset: -20% -20% auto -20%; height: 70vh; z-index: 0;
+    background: radial-gradient(60% 60% at 50% 0%, rgba(59,130,246,.18), transparent 70%),
+                radial-gradient(40% 40% at 80% 10%, rgba(99,102,241,.12), transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ── nav ── */
+  nav {
+    position: sticky; top: 0; z-index: 50; backdrop-filter: blur(10px);
+    background: rgba(11,14,20,.7); border-bottom: 1px solid var(--edge);
+  }
+  nav .wrap { display: flex; align-items: center; gap: 16px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -.01em; }
+  .brand .logo {
+    width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; font-size: 16px;
+    box-shadow: 0 4px 14px rgba(59,130,246,.45);
+  }
+  nav .links { margin-left: auto; display: flex; align-items: center; gap: 22px; }
+  nav .links a { color: var(--muted); font-size: 14px; }
+  nav .links a:hover { color: var(--text); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; border-radius: 9px; padding: 10px 16px;
+    font-size: 14px; font-weight: 600; border: 1px solid var(--edge-strong); color: var(--text);
+    transition: .18s; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; color: #fff; box-shadow: 0 6px 20px rgba(59,130,246,.4); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  @media (max-width: 720px){ nav .links a.hide-sm { display:none; } }
+
+  /* ── hero ── */
+  header.hero { position: relative; z-index: 1; padding: 84px 0 40px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12.5px;
+    color: var(--accent); background: var(--accent-soft); border: 1px solid rgba(59,130,246,.3);
+    padding: 5px 12px; border-radius: 999px; margin-bottom: 22px;
+  }
+  .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px var(--success); }
+  h1 { font-size: clamp(34px, 6vw, 60px); line-height: 1.05; letter-spacing: -.025em; margin: 0 0 18px; font-weight: 800; }
+  h1 .grad { background: linear-gradient(120deg, #fff 10%, var(--accent) 60%, var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { font-size: clamp(16px, 2.2vw, 20px); color: var(--muted); max-width: 660px; margin: 0 0 28px; }
+  .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+  .hero-note { font-size: 13px; color: var(--subtle); }
+  .hero-note code { font-family: var(--mono); color: var(--muted); background: var(--card); padding: 2px 7px; border-radius: 6px; border: 1px solid var(--edge); }
+
+  /* ── terminal mock ── */
+  .term {
+    margin-top: 46px; border: 1px solid var(--edge-strong); border-radius: 14px; overflow: hidden;
+    background: var(--panel); box-shadow: 0 30px 80px -30px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.02);
+  }
+  .term-bar { display: flex; align-items: center; gap: 8px; padding: 11px 14px; background: var(--elevated); border-bottom: 1px solid var(--edge); }
+  .term-bar .tdot { width: 12px; height: 12px; border-radius: 50%; }
+  .term-bar .r{background:#ff5f57}.term-bar .y{background:#febc2e}.term-bar .g{background:#28c840}
+  .term-bar .title { margin-left: 8px; font-family: var(--mono); font-size: 12.5px; color: var(--subtle); }
+  .term-bar .badge { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--accent); border: 1px solid rgba(59,130,246,.35); border-radius: 6px; padding: 3px 8px; background: var(--accent-soft); }
+  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--edge); }
+  @media (max-width: 640px){ .panes { grid-template-columns: 1fr; } }
+  .pane { background: #0a0d13; padding: 16px 16px 20px; font-family: var(--mono); font-size: 13px; min-height: 188px; }
+  .pane .host { color: var(--magenta); font-size: 11.5px; margin-bottom: 10px; letter-spacing: .02em; }
+  .pane .line { white-space: pre-wrap; word-break: break-word; }
+  .prompt .u { color: var(--success); } .prompt .p { color: var(--accent); } .prompt .s { color: var(--subtle); }
+  .out { color: var(--muted); } .ok { color: var(--success); } .warn { color: var(--warning); }
+  .cursor { display:inline-block; width:8px; height:15px; background:var(--accent); vertical-align:-2px; animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── sections ── */
+  section { position: relative; z-index: 1; padding: 64px 0; }
+  .section-head { text-align: center; max-width: 680px; margin: 0 auto 44px; }
+  .kicker { font-family: var(--mono); font-size: 12.5px; color: var(--accent); text-transform: uppercase; letter-spacing: .14em; }
+  h2 { font-size: clamp(26px, 4vw, 38px); letter-spacing: -.02em; margin: 10px 0 12px; font-weight: 800; }
+  .section-head p { color: var(--muted); margin: 0; font-size: 16px; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 900px){ .grid { grid-template-columns: repeat(2,1fr);} }
+  @media (max-width: 560px){ .grid { grid-template-columns: 1fr;} }
+  .card {
+    background: linear-gradient(180deg, var(--card), var(--panel)); border: 1px solid var(--edge);
+    border-radius: 14px; padding: 22px; transition: .2s; position: relative;
+  }
+  .card:hover { transform: translateY(-4px); border-color: var(--edge-strong); box-shadow: 0 18px 40px -22px rgba(0,0,0,.9); }
+  .card .ic { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; font-size: 20px; background: var(--accent-soft); border: 1px solid rgba(59,130,246,.22); margin-bottom: 14px; }
+  .card h3 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -.01em; }
+  .card p { margin: 0; color: var(--muted); font-size: 14px; }
+  .card .tag { position: absolute; top: 16px; right: 16px; font-family: var(--mono); font-size: 10px; color: var(--magenta); border: 1px solid rgba(192,132,252,.4); border-radius: 5px; padding: 2px 6px; background: rgba(192,132,252,.1); }
+
+  /* spotlight rows */
+  .spot { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: center; }
+  .spot + .spot { margin-top: 64px; }
+  @media (max-width: 820px){ .spot { grid-template-columns: 1fr; gap: 24px; } .spot.rev .spot-art{ order: -1; } }
+  .spot h3 { font-size: clamp(22px, 3vw, 28px); margin: 12px 0 12px; letter-spacing: -.02em; }
+  .spot p { color: var(--muted); margin: 0 0 14px; }
+  .spot ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .spot li { margin: 6px 0; }
+  .spot li b { color: var(--text); font-weight: 600; }
+  .spot-art {
+    background: var(--panel); border: 1px solid var(--edge-strong); border-radius: 14px; padding: 18px;
+    font-family: var(--mono); font-size: 13px; box-shadow: 0 20px 50px -30px rgba(0,0,0,.8);
+  }
+  .codeline { white-space: pre; overflow-x: auto; color: var(--muted); }
+  .codeline .k { color: var(--accent); } .codeline .str { color: var(--success); } .codeline .c { color: var(--subtle); } .codeline .fn { color: var(--magenta); }
+
+  .pillrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .pill { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--edge); border-radius: 999px; padding: 6px 12px; background: var(--card); }
+  .pill .accent { color: var(--accent); }
+
+  /* security band */
+  .band { background: linear-gradient(180deg, rgba(16,185,129,.05), transparent); border-top: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
+
+  /* cta */
+  .cta-box { text-align: center; background: linear-gradient(135deg, rgba(59,130,246,.12), rgba(99,102,241,.1)); border: 1px solid var(--edge-strong); border-radius: 20px; padding: 54px 24px; }
+
+  footer { border-top: 1px solid var(--edge); padding: 36px 0; color: var(--subtle); font-size: 14px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; }
+  footer a { color: var(--muted); } footer a:hover { color: var(--text); }
+  footer .fl { display: flex; gap: 20px; flex-wrap: wrap; }
+
+  /* ── feature mocks ("in action") ── */
+  .mockgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 820px){ .mockgrid { grid-template-columns: 1fr; } }
+  .mw { border: 1px solid var(--edge-strong); border-radius: 12px; overflow: hidden; background: var(--panel); box-shadow: 0 20px 50px -34px rgba(0,0,0,.85); }
+  .mw-bar { display:flex; align-items:center; gap:8px; padding: 9px 12px; background: var(--elevated); border-bottom: 1px solid var(--edge); font-family: var(--mono); font-size: 12px; }
+  .mw-bar .label { color: var(--muted); } .mw-bar .right { margin-left:auto; color: var(--accent); }
+  .mw-body { padding: 14px; font-family: var(--mono); font-size: 12.5px; background: #0a0d13; }
+  /* bulk */
+  .bgroup { margin-bottom: 12px; } .bgroup:last-child { margin-bottom: 0; }
+  .bglabel { font-size: 11px; color: var(--subtle); margin-bottom: 6px; }
+  .brow { display:flex; align-items:center; gap:8px; padding: 3px 0; }
+  .brow .name { color: var(--magenta); width: 70px; } .brow .res { color: var(--muted); }
+  .flag { margin-left:auto; font-size:10px; color: var(--warning); border:1px solid rgba(245,158,11,.4); border-radius:5px; padding:1px 6px; }
+  /* monitoring */
+  .mcard { padding: 9px 0; border-bottom: 1px dashed var(--edge); } .mcard:last-child { border-bottom: 0; }
+  .mcard .mh { display:flex; justify-content:space-between; font-size: 12px; margin-bottom:7px; }
+  .mcard .mh .up { color: var(--subtle); font-size: 11px; }
+  .metric { display:flex; align-items:center; gap:8px; margin: 4px 0; }
+  .metric .ml { width: 34px; color: var(--subtle); font-size: 11px; }
+  .bar { flex:1; height: 7px; border-radius: 999px; background: var(--edge); overflow: hidden; }
+  .bar > span { display:block; height:100%; border-radius:999px; }
+  .fill-g { background: var(--success); } .fill-y { background: var(--warning); } .fill-r { background: var(--danger); }
+  .metric .mv { width: 36px; text-align:right; color: var(--muted); font-size: 11px; }
+  /* sftp */
+  .sftp { display:grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--edge); }
+  .sftp .col { background:#0a0d13; padding: 6px 0 8px; }
+  .sftp .ch { padding: 2px 12px 6px; color: var(--subtle); font-size: 11px; }
+  .frow { display:flex; align-items:center; gap:7px; padding: 3px 12px; color: var(--muted); }
+  .frow .fi { color: var(--accent); }
+  /* tunnels */
+  .trow { display:flex; align-items:center; gap:10px; padding: 7px 0; border-bottom:1px dashed var(--edge); }
+  .trow:last-child { border-bottom: 0; }
+  .trow .ty { width: 76px; color: var(--accent); }
+  .trow .desc { color: var(--muted); flex:1; }
+  .trow .st { display:flex; align-items:center; gap:6px; color: var(--success); font-size: 11px; }
+  .trow .st .d { width:7px; height:7px; border-radius:50%; background: var(--success); box-shadow: 0 0 7px var(--success); }
+  .trow.off .st { color: var(--subtle); } .trow.off .st .d { background: var(--subtle); box-shadow: none; }
+  /* wide mock spanning both columns */
+  .mw.wide { grid-column: 1 / -1; }
+  /* background-image demo */
+  .bg-demo { position: relative; padding: 18px; overflow: hidden; }
+  .bg-demo .wall { position:absolute; inset:0; z-index:0;
+    background:
+      radial-gradient(40% 50% at 18% 22%, rgba(192,132,252,.45), transparent 70%),
+      radial-gradient(45% 55% at 82% 28%, rgba(59,130,246,.42), transparent 70%),
+      radial-gradient(55% 60% at 60% 95%, rgba(236,72,153,.34), transparent 70%),
+      linear-gradient(160deg, #1a1430, #0a0d13);
+    opacity:.9; }
+  .bg-demo .glass { position: relative; z-index:1; max-width: 460px; border:1px solid var(--edge-strong); border-radius:10px;
+    background: rgba(11,14,20,.55); backdrop-filter: blur(3px); padding: 12px 14px; }
+  .bg-demo .glass .host { color: var(--magenta); font-size:11.5px; margin-bottom:8px; }
+  .bg-ctrls { position: relative; z-index:1; display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+  /* plugins manager */
+  .prow { display:flex; align-items:center; gap:10px; padding: 9px 0; border-bottom:1px dashed var(--edge); }
+  .prow:last-child { border-bottom: 0; }
+  .prow .pn { flex:1; color: var(--text); }
+  .prow .pv { color: var(--subtle); font-size:11px; }
+  .pbtn { font-size:11px; color: var(--muted); border:1px solid var(--edge-strong); border-radius:6px; padding:3px 9px; }
+  .sbadge { font-size:10px; border-radius:5px; padding:2px 7px; color: var(--success); background: rgba(16,185,129,.14); border:1px solid rgba(16,185,129,.3); }
+
+  /* reveal */
+  .reveal { opacity: 0; transform: translateY(16px); transition: opacity .6s, transform .6s; }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce){ .reveal { opacity:1; transform:none; } .cursor{ animation:none; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="logo">⌘</span> Infra Companion</a>
+    <div class="links">
+      <a class="hide-sm" href="#features">Features</a>
+      <a class="hide-sm" href="#broadcast">Broadcast</a>
+      <a class="hide-sm" href="#plugins">Plugins</a>
+      <a class="hide-sm" href="#security">Security</a>
+      <a class="hide-sm" href="https://github.com/xShiroeNguyenx/infra-companion/blob/main/docs/USER-GUIDE.md">User guide</a>
+      <a class="btn" href="https://github.com/xShiroeNguyenx/infra-companion" target="_blank" rel="noreferrer">★ GitHub</a>
+      <a class="btn primary" href="https://github.com/xShiroeNguyenx/infra-companion/releases/latest" target="_blank" rel="noreferrer">↓ Download</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <span class="eyebrow"><span class="dot"></span> Open-source · Local-first · Windows · macOS · Linux</span>
+    <h1>The SSH client that<br><span class="grad">does a whole lot more.</span></h1>
+    <p class="lead">Infra Companion is a modern, local-first desktop SSH client — everything you love about Termius, plus <b>broadcast</b>, <b>bulk execution</b>, <b>agentless monitoring</b>, <b>zero-knowledge sync</b>, an <b>AI assistant</b>, and a <b>plugin system</b>.</p>
+    <div class="hero-cta">
+      <a class="btn primary" href="https://github.com/xShiroeNguyenx/infra-companion/releases/latest" target="_blank" rel="noreferrer">↓ Download for Windows · macOS · Linux</a>
+      <a class="btn" href="#features">Explore features</a>
+    </div>
+    <p class="hero-note">Free &amp; open-source · <code>v0.1.6</code> · Grab an installer from <a href="https://github.com/xShiroeNguyenx/infra-companion/releases/latest" target="_blank" rel="noreferrer" style="color:var(--accent)">Releases</a> — or build from source: <code>git clone https://github.com/xShiroeNguyenx/infra-companion &amp;&amp; pnpm install &amp;&amp; pnpm dev</code></p>
+
+    <!-- terminal mock: broadcast across two panes -->
+    <div class="term reveal" id="hero-term">
+      <div class="term-bar">
+        <span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span>
+        <span class="title">web cluster — 2 panes</span>
+        <span class="badge">📡 BROADCAST ON</span>
+      </div>
+      <div class="panes">
+        <div class="pane">
+          <div class="host">● deploy@web-01</div>
+          <div class="line prompt"><span class="u">deploy@web-01</span><span class="s">:~$</span> <span id="typed"></span><span class="cursor"></span></div>
+          <div class="line out" id="out1"></div>
+        </div>
+        <div class="pane">
+          <div class="host">● deploy@web-02</div>
+          <div class="line prompt"><span class="u">deploy@web-02</span><span class="s">:~$</span> <span class="mirror"></span></div>
+          <div class="line out" id="out2"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">Everything in one window</div>
+      <h2>Powerful by default</h2>
+      <p>From a single SSH session to broadcasting commands across a whole cluster — without leaving the app.</p>
+    </div>
+    <div class="grid">
+      <div class="card reveal"><div class="ic">🔑</div><h3>SSH, your way</h3><p>Password, SSH key (ed25519/RSA/ECDSA), OS agent (incl. FIDO2), or a secrets-manager reference.</p></div>
+      <div class="card reveal"><div class="ic">🪜</div><h3>Jump host chains</h3><p>Multi-hop ProxyJump (<span class="accent">ssh -J</span>), each hop verified and prompted independently.</p></div>
+      <div class="card reveal"><div class="ic">🎬</div><h3>Login scripts</h3><p>Automate <span class="accent">su → ssh</span> or nested SSH with encrypted expect/send steps — re-runs on reconnect.</p></div>
+      <div class="card reveal"><div class="ic">♻️</div><h3>tmux resume</h3><p>Wrap a session in tmux so it survives drops and reattaches automatically when you reconnect.</p></div>
+      <div class="card reveal"><div class="ic">📡</div><h3>Multi-pane + Broadcast</h3><p>Split into panes and type once to run on every pane at the same time.</p></div>
+      <div class="card reveal"><div class="ic">📁</div><h3>SFTP</h3><p>Dual-pane file manager, edit remote files locally (auto-upload on save), even over nested SSH.</p></div>
+      <div class="card reveal"><div class="ic">🔀</div><h3>Tunnels</h3><p>Local, Remote, and Dynamic (SOCKS5) port forwarding with a managed dashboard.</p></div>
+      <div class="card reveal"><div class="ic">⚡</div><h3>Bulk execution</h3><p>Run one command across N hosts in parallel and group by output to spot the odd one out.</p></div>
+      <div class="card reveal"><div class="ic">📊</div><h3>Monitoring</h3><p>Agentless CPU / RAM / disk / uptime over SSH, refreshed every 3 seconds.</p></div>
+      <div class="card reveal"><div class="ic">🛠️</div><h3>Network toolbox</h3><p>Ping, DNS lookup, and common-port scan — runs locally, no SSH required.</p></div>
+      <div class="card reveal"><div class="ic">🔒</div><h3>E2EE sync</h3><p>Zero-knowledge sync of your vault through any shared folder — the backend never sees plaintext.</p></div>
+      <div class="card reveal"><div class="ic">🤖</div><h3>AI assistant</h3><p>Claude, OpenAI, Gemini, or local Ollama: generate commands, explain output, diagnose errors.</p></div>
+      <div class="card reveal"><div class="ic">🗝️</div><h3>Secrets manager</h3><p>Store a reference, not a password — fetched from 1Password / Bitwarden / Vault at connect time.</p></div>
+      <div class="card reveal"><div class="ic">⏯️</div><h3>Session recording</h3><p>Record sessions as asciicast v2 and replay with seek bar and 1×–8× speed.</p></div>
+      <div class="card reveal"><div class="ic">🧩</div><h3>Plugin system<span class="tag">NEW</span></h3><p>Extend the app with trusted JavaScript plugins running in an isolated worker.</p></div>
+      <div class="card reveal"><div class="ic">🎨</div><h3>Theme studio<span class="tag">NEW</span></h3><p>Recolor the full UI palette per theme and export / import themes as JSON.</p></div>
+      <div class="card reveal"><div class="ic">⭐</div><h3>Favorite hosts<span class="tag">NEW</span></h3><p>Pin the hosts you use most to a Favorites section at the top of the sidebar.</p></div>
+      <div class="card reveal"><div class="ic">🖱️</div><h3>Mouse copy / paste</h3><p>Select then left-click the highlight to copy; right-click to paste — alongside the usual shortcuts.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="inaction">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">See it in action</div>
+      <h2>One window, many superpowers</h2>
+      <p>A peek at a few of the built-in tools — no extra apps, no context switching.</p>
+    </div>
+    <div class="mockgrid">
+
+      <!-- Bulk execution -->
+      <div class="mw reveal">
+        <div class="mw-bar"><span>⚡</span><span class="label">Bulk Execution</span><span class="right">df -h / · 5 hosts</span></div>
+        <div class="mw-body">
+          <div class="bgroup">
+            <div class="bglabel">4 hosts · same output</div>
+            <div class="brow"><span class="name">web-01</span><span class="res">/dev/sda1&nbsp; 41% used</span></div>
+            <div class="brow"><span class="name">web-02</span><span class="res">/dev/sda1&nbsp; 41% used</span></div>
+            <div class="brow"><span class="name">web-03</span><span class="res">/dev/sda1&nbsp; 43% used</span></div>
+            <div class="brow"><span class="name">web-04</span><span class="res">/dev/sda1&nbsp; 40% used</span></div>
+          </div>
+          <div class="bgroup">
+            <div class="bglabel">1 host · differs</div>
+            <div class="brow"><span class="name">db-01</span><span class="res">/dev/sda1&nbsp; <span class="warn">92% used</span></span><span class="flag">differs?</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Monitoring -->
+      <div class="mw reveal">
+        <div class="mw-bar"><span>📊</span><span class="label">Monitoring</span><span class="right">live · every 3s</span></div>
+        <div class="mw-body">
+          <div class="mcard">
+            <div class="mh"><span style="color:var(--magenta)">web-01</span><span class="up">up 27d</span></div>
+            <div class="metric"><span class="ml">CPU</span><span class="bar"><span class="fill-g" style="width:32%"></span></span><span class="mv">0.32</span></div>
+            <div class="metric"><span class="ml">RAM</span><span class="bar"><span class="fill-y" style="width:74%"></span></span><span class="mv">74%</span></div>
+            <div class="metric"><span class="ml">Disk</span><span class="bar"><span class="fill-g" style="width:41%"></span></span><span class="mv">41%</span></div>
+          </div>
+          <div class="mcard">
+            <div class="mh"><span style="color:var(--magenta)">db-01</span><span class="up">up 5d</span></div>
+            <div class="metric"><span class="ml">CPU</span><span class="bar"><span class="fill-y" style="width:68%"></span></span><span class="mv">1.40</span></div>
+            <div class="metric"><span class="ml">RAM</span><span class="bar"><span class="fill-r" style="width:91%"></span></span><span class="mv">91%</span></div>
+            <div class="metric"><span class="ml">Disk</span><span class="bar"><span class="fill-r" style="width:92%"></span></span><span class="mv">92%</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SFTP -->
+      <div class="mw reveal">
+        <div class="mw-bar"><span>📁</span><span class="label">SFTP</span><span class="right">web-01</span></div>
+        <div class="sftp">
+          <div class="col">
+            <div class="ch">Local · ~/project</div>
+            <div class="frow"><span class="fi">📁</span> dist</div>
+            <div class="frow"><span class="fi">📁</span> src</div>
+            <div class="frow"><span>📄</span> deploy.sh</div>
+            <div class="frow"><span>📄</span> .env</div>
+          </div>
+          <div class="col">
+            <div class="ch">Remote · /var/www</div>
+            <div class="frow"><span class="fi">📁</span> releases</div>
+            <div class="frow"><span class="fi">📁</span> shared</div>
+            <div class="frow"><span>📄</span> nginx.conf</div>
+            <div class="frow"><span>📄</span> index.html</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tunnels -->
+      <div class="mw reveal">
+        <div class="mw-bar"><span>🔀</span><span class="label">Tunnels</span><span class="right">3 active</span></div>
+        <div class="mw-body">
+          <div class="trow"><span class="ty">L 13306</span><span class="desc">→ 127.0.0.1:3306 (MySQL)</span><span class="st"><span class="d"></span>Running</span></div>
+          <div class="trow"><span class="ty">D 1080</span><span class="desc">SOCKS5 proxy via gate-01</span><span class="st"><span class="d"></span>Running</span></div>
+          <div class="trow"><span class="ty">L 18080</span><span class="desc">→ 10.0.0.5:8080 (admin UI)</span><span class="st"><span class="d"></span>Running</span></div>
+          <div class="trow off"><span class="ty">R 9000</span><span class="desc">→ localhost:9000</span><span class="st"><span class="d"></span>Stopped</span></div>
+        </div>
+      </div>
+
+      <!-- Background image -->
+      <div class="mw wide reveal">
+        <div class="mw-bar"><span>🖼️</span><span class="label">Background image</span><span class="right">full-window wallpaper</span></div>
+        <div class="bg-demo">
+          <div class="wall"></div>
+          <div class="glass">
+            <div class="host">● deploy@web-01</div>
+            <div class="line prompt"><span class="u">deploy@web-01</span><span class="s">:~$</span> <span class="out">uptime</span></div>
+            <div class="line out">14:02:51 up 27 days,  load average: 0.18, 0.22, 0.20</div>
+          </div>
+          <div class="bg-ctrls">
+            <span class="pill">Opacity <span class="accent">25%</span></span>
+            <span class="pill">Blur <span class="accent">4px</span></span>
+            <span class="pill">Fit <span class="accent">Cover</span></span>
+            <span class="pill">Position <span class="accent">Center</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Plugins -->
+      <div class="mw wide reveal">
+        <div class="mw-bar"><span>🧩</span><span class="label">Plugins</span><span class="right">↻ Rescan · 📂 Open folder</span></div>
+        <div class="mw-body">
+          <div class="prow"><span>🧩</span><span class="pn">Hello World <span class="pv">v1.0.0</span></span><span class="sbadge">Active</span><span class="pbtn">Reload</span><span class="pbtn">Disable</span></div>
+          <div class="prow"><span>🧩</span><span class="pn">Output Highlighter <span class="pv">v1.0.0</span></span><span class="sbadge">Active</span><span class="pbtn">Reload</span><span class="pbtn">Disable</span></div>
+          <div class="prow"><span>🧩</span><span class="pn">Deploy Notifier <span class="pv">v0.2.0</span></span><span class="sbadge">Active</span><span class="pbtn">Reload</span><span class="pbtn">Disable</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section id="broadcast">
+  <div class="wrap">
+    <div class="spot reveal">
+      <div>
+        <div class="kicker">Operate at scale</div>
+        <h3>Broadcast once, run everywhere</h3>
+        <p>Merge every open tab into split panes with one click, flip on Broadcast, and your keystrokes go to all of them. Perfect for cluster maintenance and side-by-side debugging.</p>
+        <ul>
+          <li><b>Open a group as panes</b> — one click opens every host in a group, ready to broadcast.</li>
+          <li><b>Merge ⇄ split</b> — combine tabs into one toolbar; scrollback is preserved.</li>
+          <li><b>Works through login scripts</b> — commands land on the inner host, not the gate.</li>
+        </ul>
+      </div>
+      <div class="spot-art">
+        <div class="codeline"><span class="c"># broadcast to web-01 + web-02</span>
+$ <span class="k">sudo</span> systemctl restart nginx
+<span class="ok">✓ web-01  active (running)</span>
+<span class="ok">✓ web-02  active (running)</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="plugins" class="band">
+  <div class="wrap">
+    <div class="spot rev reveal">
+      <div class="spot-art">
+        <div class="codeline"><span class="c">// my-plugin/index.js</span>
+<span class="k">module</span>.exports.<span class="fn">activate</span> = (api) => {
+  api.commands.<span class="fn">register</span>(<span class="str">'hi.say'</span>, <span class="str">'Say hi'</span>, <span class="k">async</span> () => {
+    <span class="k">await</span> api.ui.<span class="fn">showPanel</span>({
+      title: <span class="str">'Hello'</span>,
+      markdown: <span class="str">'# Hi 👋\nIt **works**.'</span>
+    })
+  })
+}</div>
+      </div>
+      <div>
+        <div class="kicker">Make it yours</div>
+        <h3>Extend with plugins</h3>
+        <p>Drop a trusted JavaScript plugin into a folder and it runs in an isolated Node worker — a crash can't take down the app, and it only reaches the app through a controlled API (never the vault).</p>
+        <ul>
+          <li>Add <b>Command Palette</b> commands &amp; markdown <b>panels</b></li>
+          <li><b>Observe terminal output</b> and write to a session for light automation</li>
+          <li><b>Rescan</b> picks up new plugins with no restart; per-plugin logs &amp; errors</li>
+        </ul>
+        <p style="margin-top:14px"><a class="btn" href="https://github.com/xShiroeNguyenx/infra-companion/blob/main/docs/USER-GUIDE.md">Read the Plugin docs →</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="ai">
+  <div class="wrap">
+    <div class="spot reveal">
+      <div>
+        <div class="kicker">Less typing, fewer mistakes</div>
+        <h3>An AI that speaks your shell</h3>
+        <p>Describe what you want in plain language and get a ready-to-review command — it's <b>inserted, never auto-run</b>. Paste a confusing command or error and get a clear explanation. Bring your own key, or keep it 100% local with Ollama.</p>
+        <div class="pillrow">
+          <span class="pill"><span class="accent">●</span> Claude</span>
+          <span class="pill"><span class="accent">●</span> OpenAI</span>
+          <span class="pill"><span class="accent">●</span> Gemini</span>
+          <span class="pill"><span class="accent">●</span> Ollama (local)</span>
+        </div>
+      </div>
+      <div class="spot-art">
+        <div class="codeline"><span class="c"># "find the 5 biggest files in /var/log"</span>
+$ du -ah /var/log | sort -rh | head -5
+<span class="c"># ↵ Insert into terminal — you press Enter</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="security" class="band">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">Local-first &amp; private</div>
+      <h2>Your secrets stay yours</h2>
+      <p>No account, no telemetry, no cloud lock-in. Everything is encrypted on your machine.</p>
+    </div>
+    <div class="grid">
+      <div class="card reveal"><div class="ic">🛡️</div><h3>Encrypted vault</h3><p>Master password → argon2id → AES-256-GCM field-level encryption. Auto-lock after idle; unlock with Windows Hello / Touch ID.</p></div>
+      <div class="card reveal"><div class="ic">🕵️</div><h3>Zero-knowledge sync</h3><p>Only an encrypted blob ever leaves your machine. The shared folder/backend never sees a single plaintext secret.</p></div>
+      <div class="card reveal"><div class="ic">🧱</div><h3>Isolated plugins</h3><p>Plugins run in a separate worker and can't read the vault or secrets — a misbehaving plugin can't crash the app.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="cta-box reveal">
+      <div class="kicker">Ready when you are</div>
+      <h2 style="margin-top:8px">Bring your whole fleet into one terminal</h2>
+      <p style="color:var(--muted); max-width:560px; margin:0 auto 24px">Free and open-source. Download an installer for your OS, or clone the repo and run it from source — connect your first host in seconds.</p>
+      <div class="hero-cta" style="justify-content:center">
+        <a class="btn primary" href="https://github.com/xShiroeNguyenx/infra-companion/releases/latest" target="_blank" rel="noreferrer">↓ Download</a>
+        <a class="btn" href="https://github.com/xShiroeNguyenx/infra-companion" target="_blank" rel="noreferrer">★ Star on GitHub</a>
+        <a class="btn" href="https://github.com/xShiroeNguyenx/infra-companion/blob/main/docs/USER-GUIDE.md">Read the user guide</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="brand"><span class="logo">⌘</span> Infra Companion</div>
+    <div class="fl">
+      <a href="https://github.com/xShiroeNguyenx/infra-companion/releases/latest" target="_blank" rel="noreferrer">Download</a>
+      <a href="https://github.com/xShiroeNguyenx/infra-companion/blob/main/docs/USER-GUIDE.md">User guide</a>
+      <a href="https://github.com/xShiroeNguyenx/infra-companion/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/xShiroeNguyenx/infra-companion/blob/main/ROADMAP.md">Roadmap</a>
+      <a href="https://github.com/xShiroeNguyenx/infra-companion" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+    <div>Electron · React · xterm.js · node-pty</div>
+  </div>
+</footer>
+
+<script>
+  // Reveal on scroll (progressive enhancement)
+  (function () {
+    var els = document.querySelectorAll('.reveal');
+    if (!('IntersectionObserver' in window)) { els.forEach(function (e){ e.classList.add('in'); }); return; }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
+    }, { threshold: .12 });
+    els.forEach(function (e) { io.observe(e); });
+  })();
+
+  // Hero terminal: type a command, mirror to second pane (broadcast), show output
+  (function () {
+    var cmd = "sudo systemctl restart nginx";
+    var typed = document.getElementById('typed');
+    var mirror = document.querySelector('.mirror');
+    var out1 = document.getElementById('out1');
+    var out2 = document.getElementById('out2');
+    if (!typed) return;
+    var i = 0;
+    function step() {
+      if (i <= cmd.length) {
+        var s = cmd.slice(0, i);
+        typed.textContent = s;
+        if (mirror) mirror.textContent = s;
+        i++;
+        setTimeout(step, 55 + Math.random() * 40);
+      } else {
+        setTimeout(function () {
+          out1.innerHTML = '<span class="ok">✓ active (running)</span>';
+          out2.innerHTML = '<span class="ok">✓ active (running)</span>';
+        }, 420);
+      }
+    }
+    setTimeout(step, 900);
+  })();
+</script>
+</body>
+</html>

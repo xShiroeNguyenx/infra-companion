@@ -252,13 +252,13 @@ function buildSshHopCmd(target: string, password: string | null, innerCmd: strin
  * Xây dựng lệnh exec đầy đủ từ login script để truyền vào openSftpOverExec.
  *
  * Xử lý các tình huống theo đúng thứ tự lồng nhau. Ví dụ:
- *   steps = [ssh jpapst05, su vn_root+pass, ssh jpap06+pass]
+ *   steps = [ssh web-02, su admin+pass, ssh web-03+pass]
  *   → exec trên gate:
- *     ssh OPTS jpapst05 '{ echo PASS_SU; cat; } | su vn_root -c
- *       '\''env LC_ALL=C sshpass -p PASS_JP6 ssh OPTS_PASSWORD jpap06 -s sftp'\'''
+ *     ssh OPTS web-02 '{ echo PASS_SU; cat; } | su admin -c
+ *       '\''env LC_ALL=C sshpass -p PASS_WEB3 ssh OPTS_PASSWORD web-03 -s sftp'\'''
  *   su nuốt PASS_SU ở đầu stdin, cat đẩy tiếp dữ liệu SFTP cho ssh trong cùng;
  *   ssh dùng sshpass (pty riêng) để trả password, stdin/stdout giữ sạch cho dữ liệu.
- *   Yêu cầu: máy chạy ssh-có-password (vd jpapst05) phải cài sẵn sshpass.
+ *   Yêu cầu: máy chạy ssh-có-password (vd web-02) phải cài sẵn sshpass.
  *
  * Trả về null nếu không có hop ssh nào (mở SFTP trực tiếp trên endpoint cuối chain).
  */

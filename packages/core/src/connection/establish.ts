@@ -139,7 +139,7 @@ export function parseHostKey(key: Buffer, host: string, port: number) {
 /**
  * Bọc một lệnh để chạy XUYÊN qua login-script kiểu nested-ssh:
  * trên máy gate, chạy `ssh <sshArgs> '<command>'` → lệnh thực thi trên máy đích bên trong.
- * Dùng cho Bulk exec / Monitoring với host vào bằng `ssh ...` (vd jpapst04 qua gate).
+ * Dùng cho Bulk exec / Monitoring với host vào bằng `ssh ...` (vd web-01 qua gate).
  */
 export function wrapSshCommand(sshArgs: string, command: string): string {
   const quoted = `'${command.replaceAll("'", `'\\''`)}'`

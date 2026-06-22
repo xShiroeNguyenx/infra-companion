@@ -4,6 +4,10 @@
 
 **Current release: v0.1.6 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
+🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
+
+> The landing page deploys to GitHub Pages on its own — pushing changes under `docs/landing/` to `main` (or running the workflow manually) publishes it **without rebuilding the app** (see `.github/workflows/pages.yml`). One-time setup: **Settings → Pages → Build and deployment → Source = GitHub Actions**.
+
 ---
 
 ## Why Infra Companion?
@@ -56,7 +60,7 @@
 - **Trusted JS plugins** — drop a plugin folder (`manifest.json` + `index.js`) into `<userData>/plugins/`; runs in an isolated Node worker so a crash can't take down the app
 - **Capabilities** — add Command Palette commands, observe terminal output & write to a session, show a markdown/text panel, store per-plugin data, notify — all via a controlled API that never exposes the vault
 - **Manager** — ⋯ → 🧩 Plugins: enable/disable, reload after editing, Rescan for new plugins (no restart), view per-plugin logs/errors
-- See the **Plugins** section in [docs/HUONG-DAN-SU-DUNG.md](docs/HUONG-DAN-SU-DUNG.md) and examples in [docs/examples/](docs/examples/)
+- See the **Plugins** section in [docs/USER-GUIDE.md](docs/USER-GUIDE.md) and examples in [docs/examples/](docs/examples/)
 
 ### Host & Vault Management
 - **Encrypted vault** — master password → argon2id → AES-256-GCM field-level encryption; all secrets (passwords, private keys, env vars) are encrypted at rest
@@ -202,8 +206,9 @@ infra-companion/
 │   ├── shared/                   # TypeScript types + typed IPC contracts
 │   └── ui/                       # Design system (Radix UI + Tailwind)
 ├── docs/
-│   ├── HUONG-DAN-SU-DUNG.md      # Feature guide & test instructions (Vietnamese)
-│   └── TIEP-TUC-PHIEN-SAU.md    # Dev handoff notes
+│   ├── USER-GUIDE.md             # Full feature guide & usage instructions
+│   ├── landing/index.html        # Marketing landing page (demo)
+│   └── TIEP-TUC-PHIEN-SAU.md     # Dev handoff notes
 ├── PLAN.md                       # Architecture & detailed design decisions
 ├── ROADMAP.md                    # Planned features not yet implemented
 └── README.md                     # This file

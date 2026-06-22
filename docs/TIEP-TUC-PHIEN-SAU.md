@@ -7,7 +7,7 @@
 Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 → v0.1.5 (đã tag/phát hành)**. App build + typecheck + test đều sạch (54 core test).
 
 **v0.1.6 đã sẵn sàng nhưng CHƯA commit/tag** (xem mục cuối) — 3 tính năng, đã test GUI OK, không đổi schema DB (vẫn **v9**):
-1. **Plugin system v1 (F16)** — plugin JS tin cậy ở `userData/plugins/<id>/` (manifest.json + index.js CJS), chạy trong **worker_thread chung** cô lập lỗi, API có kiểm soát (không đụng vault). Hook: command palette + panel markdown + observe/write output + storage + notify; có **Quét lại** (rescan, mở modal tự quét). Tài liệu dùng + viết plugin gộp trong mục **Plugins** của `docs/HUONG-DAN-SU-DUNG.md`; mẫu `docs/examples/`.
+1. **Plugin system v1 (F16)** — plugin JS tin cậy ở `userData/plugins/<id>/` (manifest.json + index.js CJS), chạy trong **worker_thread chung** cô lập lỗi, API có kiểm soát (không đụng vault). Hook: command palette + panel markdown + observe/write output + storage + notify; có **Quét lại** (rescan, mở modal tự quét). Tài liệu dùng + viết plugin gộp trong mục **Plugins** của `docs/USER-GUIDE.md`; mẫu `docs/examples/`.
 2. **Theme studio** — tuỳ biến 11 màu UI per base-theme (Settings → Giao diện → 🎨) + xuất/nhập theme JSON.
 3. **Favorites** — nút ⭐ ghim host lên mục Yêu thích đầu sidebar (localStorage, per-máy).
 
@@ -24,7 +24,7 @@
 | 6 — **AI assistant** (Claude/OpenAI/Gemini/Ollama), **Session recording** (asciicast), **Secrets manager** (op/bw/vault) | ✅ (còn: plugin F16) |
 | 7 — Team server, RDP/VNC, Mosh, zero-trust | ⬜ chưa làm |
 
-Chi tiết tính năng + cách test: [HUONG-DAN-SU-DUNG.md](./HUONG-DAN-SU-DUNG.md). Roadmap các tính năng tiếp theo: [../ROADMAP.md](../ROADMAP.md).
+Chi tiết tính năng + cách test: [USER-GUIDE.md](./USER-GUIDE.md). Roadmap các tính năng tiếp theo: [../ROADMAP.md](../ROADMAP.md).
 
 ## Chạy lại app (từ thư mục gốc `infra-companion`)
 
@@ -104,6 +104,8 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 > v0.1.5 ĐÃ tag/phát hành (copy/dán bằng chuột). Phần đang chờ là **v0.1.6** (Plugin system + Theme studio + Favorites).
 
 Version đã bump sẵn `0.1.5 → 0.1.6` ở `package.json` (gốc + `apps/desktop`); CHANGELOG thêm [0.1.6], README/ROADMAP/handoff đã cập nhật. Release tự kích hoạt khi **push tag `v*.*.*`** (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux).
+
+**Landing page = flow ĐỘC LẬP** (`.github/workflows/pages.yml`, deploy `docs/landing/`): tự chạy khi **push thay đổi `docs/landing/**` lên `main`** (hoặc chạy tay workflow_dispatch) — **KHÔNG gắn tag/release → không build lại app**. `ci.yml` đã thêm `paths-ignore: docs/** + **/*.md` để push chỉ-docs không kích hoạt build 3-OS. **Setting 1 lần**: repo → Settings → Pages → Source = **GitHub Actions**. URL: `https://xshiroenguyenx.github.io/infra-companion/`. Link User guide/Changelog/Roadmap trong landing trỏ GitHub blob/main (không tương đối) để hoạt động khi publish.
 
 ```powershell
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
