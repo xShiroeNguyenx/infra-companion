@@ -5,6 +5,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.8] — 2026-07-02
+
+### Fixed
+
+- **Monitoring & Bulk exec were broken for hosts reached through a login script** (e.g. `ssh inner-host` typed on a gate). Since v0.1.3 the internal command builder returned a full SFTP command (`ssh … -s sftp`), which Monitoring/Bulk then wrapped in *another* `ssh` — producing a garbage command whose output was empty. The dashboard showed *"Không parse được metrics (không phải Linux?)"* even for perfectly normal Linux hosts (e.g. AlmaLinux behind a gate). Both features now build the correct nested command.
+- **Login-script coverage for Bulk / Monitoring now matches SFTP** — `su` / `sudo` steps and password-protected `ssh` hops (via `sshpass` on the gate) are traversed correctly instead of silently stopping at the gate host.
+- **Monitoring reports the real error** — when metrics can't be parsed, the host card now shows the remote stderr (e.g. `Permission denied`, `sshpass: command not found`) instead of guessing "not Linux?".
+
+### Internal
+
+- Login-script → exec-command building extracted into a shared module ([packages/core/src/connection/loginScript.ts](packages/core/src/connection/loginScript.ts)) used by SFTP, Bulk and Monitoring — one code path, no more drift between the three. +10 unit tests (71 total).
+
+---
+
 ## [0.1.7] — 2026-06-22
 
 ### Added

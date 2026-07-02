@@ -1,5 +1,5 @@
 import { ipcMain, type WebContents } from 'electron'
-import { MonitorService, deriveSshArgsFromLoginSteps } from '@infra/core'
+import { MonitorService } from '@infra/core'
 import { IPC } from '@infra/shared'
 import { touchActivity } from './vault'
 import { makeHostKeyVerifier, prepareConnection } from './connection'
@@ -27,8 +27,7 @@ export function registerMonitorIpc(): () => void {
     for (const hostId of hostIds) {
       try {
         const prepared = await prepareConnection(event.sender, hostId)
-        const sshArgs = deriveSshArgsFromLoginSteps(prepared.loginSteps) ?? undefined
-        await service.start({ hostId, chain: prepared.chain, sshArgs }, verify)
+        await service.start({ hostId, chain: prepared.chain, loginSteps: prepared.loginSteps }, verify)
       } catch (error) {
         event.sender.send(IPC.MONITOR_SAMPLE, {
           hostId,

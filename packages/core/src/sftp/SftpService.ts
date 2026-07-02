@@ -26,19 +26,20 @@ export class SftpService extends EventEmitter<SftpServiceEvents> {
   private readonly sessions = new Map<string, SftpSession>()
 
   /**
-   * @param viaSshArgs nếu có: mở SFTP của máy nội bộ bằng cách chạy `ssh <args> -s sftp`
-   *   trên máy cuối của chain (gate) — dùng cho host chỉ vào được khi đứng trên gate.
+   * @param viaExecCommand nếu có: mở SFTP của máy nội bộ bằng cách exec lệnh này (build bởi
+   *   deriveSftpExecFromLoginSteps, vd `ssh <opts> <đích> -s sftp`) trên máy cuối của chain
+   *   (gate) — dùng cho host chỉ vào được khi đứng trên gate.
    */
   async open(
     chain: ChainEndpoint[],
     verifyHostKey: HostKeyVerifier,
-    viaSshArgs?: string
+    viaExecCommand?: string
   ): Promise<{ sessionId: string; home: string }> {
     const { client, closeAll } = await establishChain(chain, verifyHostKey)
     const id = randomUUID()
     try {
-      const sftp = viaSshArgs
-        ? await openSftpOverExec(client, viaSshArgs)
+      const sftp = viaExecCommand
+        ? await openSftpOverExec(client, viaExecCommand)
         : await new Promise<SFTPWrapper>((resolve, reject) => {
             client.sftp((error, wrapper) => (error ? reject(error) : resolve(wrapper)))
           })
@@ -48,7 +49,7 @@ export class SftpService extends EventEmitter<SftpServiceEvents> {
         if (this.sessions.delete(id)) this.emit('closed', id)
       }
       client.on('close', cleanup)
-      // kênh SFTP chết riêng (viaSshArgs: ssh nội bộ đứt nhưng gate còn sống) → vẫn phải dọn session
+      // kênh SFTP chết riêng (viaExecCommand: ssh nội bộ đứt nhưng gate còn sống) → vẫn phải dọn session
       sftp.on('close', cleanup)
       const home = await this.realpath(id, '.')
       return { sessionId: id, home }

@@ -136,16 +136,6 @@ export function parseHostKey(key: Buffer, host: string, port: number) {
   return { host, port, keyType, fingerprint }
 }
 
-/**
- * Bọc một lệnh để chạy XUYÊN qua login-script kiểu nested-ssh:
- * trên máy gate, chạy `ssh <sshArgs> '<command>'` → lệnh thực thi trên máy đích bên trong.
- * Dùng cho Bulk exec / Monitoring với host vào bằng `ssh ...` (vd web-01 qua gate).
- */
-export function wrapSshCommand(sshArgs: string, command: string): string {
-  const quoted = `'${command.replaceAll("'", `'\\''`)}'`
-  return `ssh -o StrictHostKeyChecking=no -o BatchMode=yes ${sshArgs} ${quoted}`
-}
-
 export function friendlySshError(error: Error & { level?: string }, label?: string): string {
   const message = error.message || String(error)
   const prefix = label ? `[${label}] ` : ''

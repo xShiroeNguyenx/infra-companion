@@ -1,12 +1,18 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
-> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật: chuẩn bị release **v0.1.6** (Plugin system + Theme studio + Favorites), sau khi v0.1.5 đã phát hành.
+> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật: chuẩn bị release **v0.1.8** (fix Monitoring/Bulk xuyên login-script), sau khi v0.1.6/v0.1.7 đã phát hành.
 
 ## Đang ở đâu
 
-Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 → v0.1.5 (đã tag/phát hành)**. App build + typecheck + test đều sạch (54 core test).
+Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 → v0.1.7 (đã tag/phát hành)**. App build + typecheck + test đều sạch (71 core test).
 
-**v0.1.6 đã sẵn sàng nhưng CHƯA commit/tag** (xem mục cuối) — 3 tính năng, đã test GUI OK, không đổi schema DB (vẫn **v9**):
+**v0.1.8 đã sẵn sàng nhưng CHƯA commit/tag** (xem mục cuối) — bugfix, không đổi schema DB (vẫn **v9**):
+1. **Fix Monitoring/Bulk xuyên login-script** — từ v0.1.3, `deriveSshArgsFromLoginSteps` bị đổi ngữ nghĩa để trả về nguyên lệnh SFTP (`ssh … -s sftp`), nhưng Monitor/Bulk vẫn bọc thêm một lớp `ssh` bên ngoài → lệnh rác, stdout rỗng, dashboard báo "Không parse được metrics (không phải Linux?)" với host Linux bình thường sau gate (phát hiện trên một host AlmaLinux vào qua login script). Đã tách builder chung [loginScript.ts](../packages/core/src/connection/loginScript.ts): `deriveSftpExecFromLoginSteps` (SFTP, giữ nguyên hành vi) + `deriveExecFromLoginSteps(steps, command)` (Bulk/Monitor). Nhờ đó Bulk/Monitor giờ xuyên được cả **su/sudo + ssh-có-password** (sshpass trên gate) như SFTP. ⚠️ Biến thể exec nạp password su/sudo bằng `echo PASS |` chứ KHÔNG `{ echo; cat; } |` như SFTP — caller không bao giờ đóng stdin kênh exec nên `cat` sẽ chờ EOF vô hạn, kênh không bao giờ close.
+2. **Monitor thu stderr** — parse fail thì card hiện lỗi thật từ remote (Permission denied, sshpass thiếu…) thay vì đoán "không phải Linux?". Đã xoá `wrapSshCommand` (nguồn gốc của bẫy). +10 test cho builder (71 total).
+
+**v0.1.7 (đã phát hành)** — ảnh nền từ URL (Google Drive/Dropbox, fetch ở main process, validate magic bytes).
+
+**v0.1.6 (đã phát hành)** — 3 tính năng, không đổi schema DB (vẫn **v9**):
 1. **Plugin system v1 (F16)** — plugin JS tin cậy ở `userData/plugins/<id>/` (manifest.json + index.js CJS), chạy trong **worker_thread chung** cô lập lỗi, API có kiểm soát (không đụng vault). Hook: command palette + panel markdown + observe/write output + storage + notify; có **Quét lại** (rescan, mở modal tự quét). Tài liệu dùng + viết plugin gộp trong mục **Plugins** của `docs/USER-GUIDE.md`; mẫu `docs/examples/`.
 2. **Theme studio** — tuỳ biến 11 màu UI per base-theme (Settings → Giao diện → 🎨) + xuất/nhập theme JSON.
 3. **Favorites** — nút ⭐ ghim host lên mục Yêu thích đầu sidebar (localStorage, per-máy).
@@ -60,11 +66,11 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 > $env:ELECTRON_RUN_AS_NODE='1'; Start-Process -FilePath "$PWD\node_modules\electron\dist\electron.exe" -ArgumentList "$PWD\node_modules\vitest\vitest.mjs","run" -WorkingDirectory "$PWD\packages\core" -NoNewWindow -Wait; $env:ELECTRON_RUN_AS_NODE=$null
 > ```
 
-**Chưa sửa (chấp nhận được / để sau):** cảnh báo style SonarLint (window vs globalThis, nested-ternary…) — theo convention codebase; `sandbox: false` (preload cần); Bulk/Monitor/SFTP xuyên login-script vẫn chỉ hỗ trợ `ssh …` thuần.
+**Chưa sửa (chấp nhận được / để sau):** cảnh báo style SonarLint (window vs globalThis, nested-ternary…) — theo convention codebase; `sandbox: false` (preload cần). ~~Bulk/Monitor/SFTP xuyên login-script chỉ hỗ trợ `ssh …` thuần~~ → đã sửa ở v0.1.8 (hỗ trợ cả su/sudo + ssh-password).
 
 ## Chi tiết kỹ thuật các tính năng
 
-**v0.1.6 (CHƯA commit)** — Plugin system + Theme studio + Favorites. Typecheck + build + 54 core test sạch.
+**v0.1.6 (đã phát hành)** — Plugin system + Theme studio + Favorites.
 
 - **Plugin system v1 (F16)**: logic thuần ở `packages/core/src/plugins/` (`manifest.ts` validate, `discover.ts` quét, `protocol.ts` message union, `paths.ts` confine, `PluginHost.ts` EventEmitter quản lý vòng đời + registry + responder api-call + ref-count observe). Bootstrap worker ở [worker.ts](../apps/desktop/src/main/plugins/worker.ts) (CJS qua `createRequire`); IPC ở [ipc/plugins.ts](../apps/desktop/src/main/ipc/plugins.ts). **Pitfall đã xử lý**: electron-vite emit CJS phẳng → thêm **input thứ 2** trong `electron.vite.config.ts` để emit `out/main/plugin-worker.js`; nạp bằng `new Worker(join(__dirname,'plugin-worker.js'))`. Terminal tee qua `TerminalBridge` ([terminal.ts](../apps/desktop/src/main/ipc/terminal.ts), gate theo subscriber + `TERM_SET_ACTIVE`). Renderer: `stores/plugins.ts`, `lib/miniMarkdown.tsx` (render markdown an toàn, KHÔNG dangerouslySetInnerHTML), `PluginsModal`/`PluginPanelModal`. **Rescan**: `PluginHost.rescan()` + mở modal tự quét → thấy plugin mới không cần restart. 3 test file (33 test). Bảo mật: không truyền DEK/secret vào worker; storage confine trong thư mục plugin; crash worker → respawn 1 lần.
 - **Theme studio**: `CUSTOM_PALETTE_VARS` (11 biến `--c-*`) + `CustomColors` per base-theme + `applyCustomTheme()` (override CSS var inline như accent) trong [stores/settings.ts](../apps/desktop/src/renderer/src/stores/settings.ts); key `infra.theme.custom`; áp boot trong main.tsx; UI [CustomPaletteSection.tsx](../apps/desktop/src/renderer/src/components/CustomPaletteSection.tsx) (color pickers + reset + xuất/nhập JSON qua textarea). setTheme reapply đúng bộ khi đổi dark↔light.
@@ -99,11 +105,11 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 - Mở lại file này để nhớ ngữ cảnh.
 - Chọn 1 hạng mục ở trên → bắt đầu luôn.
 
-## Git + Release v0.1.6 (anh tự chạy; tôi không tự commit)
+## Git + Release v0.1.8 (anh tự chạy; tôi không tự commit)
 
-> v0.1.5 ĐÃ tag/phát hành (copy/dán bằng chuột). Phần đang chờ là **v0.1.6** (Plugin system + Theme studio + Favorites).
+> v0.1.7 ĐÃ tag/phát hành (ảnh nền từ URL). Phần đang chờ là **v0.1.8** (fix Monitoring/Bulk xuyên login-script + stderr khi parse metrics fail).
 
-Version đã bump sẵn `0.1.5 → 0.1.6` ở `package.json` (gốc + `apps/desktop`); CHANGELOG thêm [0.1.6], README/ROADMAP/handoff đã cập nhật. Release tự kích hoạt khi **push tag `v*.*.*`** (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux).
+Version đã bump sẵn `0.1.7 → 0.1.8` ở `package.json` (gốc + `apps/desktop`); CHANGELOG thêm [0.1.8], README/USER-GUIDE/landing/handoff đã cập nhật. Release tự kích hoạt khi **push tag `v*.*.*`** (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux).
 
 **Landing page = flow ĐỘC LẬP** (`.github/workflows/pages.yml`, deploy `docs/landing/`): tự chạy khi **push thay đổi `docs/landing/**` lên `main`** (hoặc chạy tay workflow_dispatch) — **KHÔNG gắn tag/release → không build lại app**. `ci.yml` đã thêm `paths-ignore: docs/** + **/*.md` để push chỉ-docs không kích hoạt build 3-OS. **Setting 1 lần**: repo → Settings → Pages → Source = **GitHub Actions**. URL: `https://xshiroenguyenx.github.io/infra-companion/`. Link User guide/Changelog/Roadmap trong landing trỏ GitHub blob/main (không tương đối) để hoạt động khi publish.
 
@@ -111,11 +117,11 @@ Version đã bump sẵn `0.1.5 → 0.1.6` ở `package.json` (gốc + `apps/desk
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
 git add -A
 git status            # xem lại trước khi commit
-git commit -m "feat: plugin system (F16) + theme studio + favorite hosts (v0.1.6)"
+git commit -m "fix: monitoring/bulk xuyên login-script (bọc nhầm lệnh SFTP) + docs v0.1.8"
 git push origin main
 # Phát hành: tạo tag để CI build + tạo release
-git tag v0.1.6
-git push origin v0.1.6
+git tag v0.1.8
+git push origin v0.1.8
 ```
 
 > Môi trường dev: Node 20, pnpm 9, Electron 42 (Node 24 runtime — dùng `node:sqlite`), ssh2/node-pty/serialport là native nhưng đã externalize + prebuilt nên không cần build C++. Khi chạy electron từ terminal đã dính biến `ELECTRON_RUN_AS_NODE` thì thêm `$env:ELECTRON_RUN_AS_NODE=$null` cùng lệnh (chỉ là gotcha của terminal, không phải lỗi app).

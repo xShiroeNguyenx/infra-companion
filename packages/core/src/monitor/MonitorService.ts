@@ -1,7 +1,8 @@
 import { EventEmitter } from 'node:events'
 import { StringDecoder } from 'node:string_decoder'
 import type { Client } from 'ssh2'
-import { establishChain, wrapSshCommand, type ChainEndpoint } from '../connection/establish'
+import { establishChain, type ChainEndpoint } from '../connection/establish'
+import { deriveExecFromLoginSteps, type LoginStepLike } from '../connection/loginScript'
 import type { HostKeyVerifier } from '../connection/types'
 
 export interface MetricSample {
@@ -21,8 +22,8 @@ export interface MetricSample {
 export interface MonitorTarget {
   hostId: string
   chain: ChainEndpoint[]
-  /** Host vào bằng login-script "ssh …" → đo metric xuyên qua máy đích bên trong. */
-  sshArgs?: string
+  /** Host vào bằng login-script (ssh/su/sudo…) → đo metric xuyên qua máy đích bên trong. */
+  loginSteps?: LoginStepLike[]
 }
 
 export interface MonitorServiceEvents {
@@ -48,7 +49,8 @@ const POLL_WATCHDOG_MS = 10_000
 
 interface ActiveMonitor {
   hostId: string
-  sshArgs?: string
+  /** Lệnh đo metric hoàn chỉnh — đã bọc qua login script nếu có. */
+  metricCmd: string
   client: Client | null
   closeChain: (() => void) | null
   /** Tách riêng 2 timer — dùng chung 1 field sẽ leak setInterval cũ mỗi lần reconnect. */
@@ -69,7 +71,8 @@ export class MonitorService extends EventEmitter<MonitorServiceEvents> {
     if (this.monitors.has(target.hostId)) return
     const monitor: ActiveMonitor = {
       hostId: target.hostId,
-      sshArgs: target.sshArgs,
+      // Host vào bằng login-script → bọc lệnh đo để chạy trên máy đích bên trong
+      metricCmd: (target.loginSteps?.length ? deriveExecFromLoginSteps(target.loginSteps, METRIC_CMD) : null) ?? METRIC_CMD,
       client: null,
       closeChain: null,
       pollTimer: null,
@@ -129,24 +132,39 @@ export class MonitorService extends EventEmitter<MonitorServiceEvents> {
       monitor.polling = false
       if (!monitor.stopped) this.emit('sample', errorSample(monitor.hostId, 'Lệnh đo metric không phản hồi'))
     }, POLL_WATCHDOG_MS)
-    // Host vào bằng login-script "ssh …" → đo metric xuyên qua: ssh <args> '<metric cmd>'
-    const cmd = monitor.sshArgs ? wrapSshCommand(monitor.sshArgs, METRIC_CMD) : METRIC_CMD
-    client.exec(cmd, (error, stream) => {
+    client.exec(monitor.metricCmd, (error, stream) => {
       if (error) {
         clearTimeout(watchdog)
         monitor.polling = false
         return
       }
       let out = ''
+      let errOut = ''
       const decoder = new StringDecoder('utf8')
+      const stderrDecoder = new StringDecoder('utf8')
       stream.on('data', (chunk: Buffer) => {
         out += decoder.write(chunk)
+      })
+      stream.stderr.on('data', (chunk: Buffer) => {
+        errOut += stderrDecoder.write(chunk)
       })
       stream.on('close', () => {
         clearTimeout(watchdog)
         if (!monitor.polling) return // watchdog đã nổ — bỏ kết quả trễ
         monitor.polling = false
-        if (!monitor.stopped) this.emit('sample', parseMetrics(monitor.hostId, out + decoder.end()))
+        if (monitor.stopped) return
+        let sample = parseMetrics(monitor.hostId, out + decoder.end())
+        // Parse fail mà remote có báo lỗi → hiện lỗi thật (ssh hop chết, sshpass thiếu…)
+        // thay vì đoán mò "không phải Linux?"
+        if (!sample.ok) {
+          const hint = (errOut + stderrDecoder.end())
+            .split('\n')
+            .filter((line) => !/^Warning: Permanently added/i.test(line.trim()))
+            .join(' ')
+            .trim()
+          if (hint) sample = errorSample(monitor.hostId, `Không parse được metrics — ${hint.slice(0, 200)}`)
+        }
+        this.emit('sample', sample)
       })
     })
   }

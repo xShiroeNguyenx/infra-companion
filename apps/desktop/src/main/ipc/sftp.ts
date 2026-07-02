@@ -3,7 +3,7 @@ import * as fsp from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
-import { SftpService, deriveSshArgsFromLoginSteps } from '@infra/core'
+import { SftpService, deriveSftpExecFromLoginSteps } from '@infra/core'
 import { IPC, type FileEntryDto, type SftpOpenResponse } from '@infra/shared'
 import { getVault, touchActivity } from './vault'
 import { makeHostKeyVerifier, prepareConnection } from './connection'
@@ -39,11 +39,11 @@ export function registerSftpIpc(): () => void {
     if (!host) throw new Error('Host không tồn tại')
     const prepared = await prepareConnection(event.sender, hostId)
     // Host dùng login script kiểu "ssh <đích>" → SFTP đi qua exec `ssh -s sftp` trên gate
-    const viaSshArgs = deriveSshArgsFromLoginSteps(prepared.loginSteps) ?? undefined
+    const viaExecCommand = deriveSftpExecFromLoginSteps(prepared.loginSteps) ?? undefined
     const { sessionId, home } = await service.open(
       prepared.chain,
       makeHostKeyVerifier(event.sender),
-      viaSshArgs
+      viaExecCommand
     )
     return { sessionId, title: `SFTP — ${prepared.title}`, home }
   })

@@ -1,5 +1,6 @@
 import { StringDecoder } from 'node:string_decoder'
-import { establishChain, wrapSshCommand, type ChainEndpoint } from '../connection/establish'
+import { establishChain, type ChainEndpoint } from '../connection/establish'
+import { deriveExecFromLoginSteps, type LoginStepLike } from '../connection/loginScript'
 import type { HostKeyVerifier } from '../connection/types'
 
 export interface BulkTarget {
@@ -7,8 +8,8 @@ export interface BulkTarget {
   label: string
   /** [hop1, …, target] đã phân giải (password đã sẵn). */
   chain: ChainEndpoint[]
-  /** Nếu host vào bằng login-script "ssh …" — lệnh sẽ chạy xuyên qua: ssh <sshArgs> '<cmd>'. */
-  sshArgs?: string
+  /** Nếu host vào bằng login-script (ssh/su/sudo…) — lệnh sẽ chạy trên máy đích bên trong. */
+  loginSteps?: LoginStepLike[]
 }
 
 export interface BulkResult {
@@ -82,8 +83,9 @@ export class BulkService {
       if (signal?.aborted) return onAbort()
       signal?.addEventListener('abort', onAbort)
 
-      // Host vào bằng login-script "ssh …" → chạy lệnh xuyên qua: ssh <args> '<cmd>' trên gate
-      const effectiveCommand = target.sshArgs ? wrapSshCommand(target.sshArgs, command) : command
+      // Host vào bằng login-script → bọc lệnh để chạy trên máy đích bên trong (exec trên gate)
+      const effectiveCommand =
+        (target.loginSteps?.length ? deriveExecFromLoginSteps(target.loginSteps, command) : null) ?? command
       establishChain(target.chain, verifyHostKey)
         .then(({ client, closeAll }) => {
           if (settled) {

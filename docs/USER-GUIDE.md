@@ -227,7 +227,7 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 
 **Test**: tick all 3 hosts → type `hostname; uptime` → each machine returns **its own** hostname (web-01/02 differ from the gate).
 
-> Limitation: only `ssh …`-style login scripts are traversed; if there's a `su` first, that host runs on the gate.
+> Since v0.1.8 this matches SFTP: `su` / `sudo` steps and password-protected `ssh` hops are traversed too (password hops need `sshpass` installed on the gate).
 
 ---
 
@@ -238,6 +238,8 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 **Use**: pick hosts → **Start monitoring** → one card per host: a load sparkline + Load/RAM/Disk bars (red >90%, yellow >70%) + uptime. Auto-reconnects on drop; auto-stops when the dashboard closes.
 
 **Runs through login scripts**: like Bulk — web-01/02 measure the inner machine, not the gate.
+
+**Troubleshooting**: if a card says metrics can't be parsed, the message includes the remote error (e.g. `Permission denied`, `sshpass: command not found`) — that tells you which hop failed.
 
 **Test**: pick web-01 + web-02 → Start → see each machine's own numbers.
 
@@ -443,7 +445,7 @@ New connection protocols (pluggable SessionKind) · permission enforcement + con
 
 ## 18. Known limitations of the current release
 
-- **Bulk/Monitor/SFTP over a login script** only applies to plain `ssh …`-style scripts; if there's a `su` first, the command/monitor still runs on the gate.
+- **Bulk/Monitor/SFTP over a login script** rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` on the gate) and `su`/`sudo` steps are supported; setups that force a TTY password prompt may still fail.
 - **Sync** currently has only the **folder** backend (Google Drive/Dropbox/Syncthing/network share); WebDAV, S3, Git are planned.
 - **Secrets manager** supports 1Password, Bitwarden, HashiCorp Vault via CLI; KeePassXC is planned.
 - **Plugin system** is at **v1** (commands + observe/write output + panel + storage); no new protocols, permission enforcement, output transform, or marketplace yet — see §16D.

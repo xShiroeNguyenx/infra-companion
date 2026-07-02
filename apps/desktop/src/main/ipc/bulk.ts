@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { ipcMain } from 'electron'
-import { BulkService, deriveSshArgsFromLoginSteps, type BulkTarget } from '@infra/core'
+import { BulkService, type BulkTarget } from '@infra/core'
 import { IPC, type BulkRunEvent } from '@infra/shared'
 import { getVault, touchActivity } from './vault'
 import { makeHostKeyVerifier, prepareConnection } from './connection'
 
 /**
  * Bulk exec: chạy 1 lệnh trên nhiều host song song.
- * Dùng credential đã lưu / key / agent; host cần hỏi mật khẩu sẽ được hỏi tuần tự trước khi chạy.
- * Login-script (su→ssh) không áp dụng cho exec — host loại này sẽ chạy lệnh trên đích TCP.
+ * Dùng credential đã lưu / key / agent; host vào bằng login-script (ssh/su/sudo…) sẽ
+ * chạy lệnh trên máy đích bên trong qua lệnh exec lồng nhau trên gate.
  */
 export function registerBulkIpc(): void {
   const service = new BulkService()
@@ -42,9 +42,8 @@ export function registerBulkIpc(): void {
       }
       try {
         const prepared = await prepareConnection(sender, hostId)
-        // Host vào bằng login-script "ssh …" → chạy lệnh xuyên qua tới máy đích bên trong
-        const sshArgs = deriveSshArgsFromLoginSteps(prepared.loginSteps) ?? undefined
-        targets.push({ hostId, label: prepared.title, chain: prepared.chain, sshArgs })
+        // Host vào bằng login-script → chạy lệnh xuyên qua tới máy đích bên trong
+        targets.push({ hostId, label: prepared.title, chain: prepared.chain, loginSteps: prepared.loginSteps })
       } catch (error) {
         emit({ hostId, phase: 'error', error: error instanceof Error ? error.message : String(error) })
       }
