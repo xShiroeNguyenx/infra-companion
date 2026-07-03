@@ -11,6 +11,7 @@ import { KeysModal } from './components/KeysModal'
 import { BulkRunModal } from './components/BulkRunModal'
 import { NetToolboxModal } from './components/NetToolboxModal'
 import { MonitorModal } from './components/MonitorModal'
+import { MonitorDock } from './components/MonitorDock'
 import { SyncModal } from './components/SyncModal'
 import { AiModal } from './components/AiModal'
 import { RecordingsModal } from './components/RecordingsModal'
@@ -28,6 +29,7 @@ import { useSettingsStore } from './stores/settings'
 import { useToastsStore } from './stores/toasts'
 import { useUiStore } from './stores/ui'
 import { usePluginStore } from './stores/plugins'
+import { useMonitorStore } from './stores/monitor'
 import { useVaultStore } from './stores/vault'
 
 export default function App() {
@@ -46,6 +48,7 @@ export default function App() {
   const modal = useUiStore((s) => s.modal)
   const setModal = useUiStore((s) => s.setModal)
   const pluginPanel = usePluginStore((s) => s.panel)
+  const monitorActive = useMonitorStore((s) => s.active)
   const pluginCommands = usePluginStore((s) => s.contributions)
   const booted = useRef(false)
   const openedInitialTab = useRef(false)
@@ -72,6 +75,7 @@ export default function App() {
     )
     const offPanel = window.infra.plugins.onPanel((p) => usePluginStore.getState().setPanel(p))
     const offNotify = window.infra.plugins.onNotify((n) => useToastsStore.getState().push(n.message))
+    const offSample = window.infra.monitor.onSample((s) => useMonitorStore.getState().applySample(s))
     return () => {
       offLocked()
       offExit()
@@ -80,6 +84,7 @@ export default function App() {
       offContrib()
       offPanel()
       offNotify()
+      offSample()
     }
   }, [])
 
@@ -254,6 +259,7 @@ export default function App() {
       {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} />}
       {modal === 'workspaces' && <WorkspacesModal onClose={() => setModal(null)} />}
       {modal === 'plugins' && <PluginsModal onClose={() => setModal(null)} />}
+      {monitorActive && <MonitorDock />}
       {pluginPanel && (
         <PluginPanelModal panel={pluginPanel} onClose={() => usePluginStore.getState().setPanel(null)} />
       )}

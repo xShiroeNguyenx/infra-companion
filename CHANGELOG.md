@@ -5,6 +5,27 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.9] — 2026-07-03
+
+### Added
+
+- **Access Log Analyzer — third sample plugin** ([docs/examples/access-log-analyzer](docs/examples/access-log-analyzer)) — one Command Palette command analyzes the web-server access log **on the host of the active SSH session**: top 15 IPs, requests per minute (last 30 marks), top URLs, top User-Agents, status-code distribution, and what the most suspicious IP is calling — results open in a panel together with a short how-to-read guide. It types a single, fully visible shell one-liner into the session (`tail` + `awk` over the last 50 000 lines), so it works on any Linux box with no agent. Log path and sample size are constants at the top of its `index.js` (default `/etc/httpd/logs/ssl_access_log`) — edit + **Reload** to adapt to nginx etc.
+
+### Changed
+
+- **Plugin panels no longer block the app** — a panel now docks to the **top-right corner**, translucent (fully opaque on hover), with no backdrop: you can keep typing in the terminal while reading the result. Close it with the ✕ button; Esc is deliberately left to the terminal (vim…).
+- **Monitoring dashboard is now a docked panel, independent of modals** — picking hosts and pressing *Start* closes the picker and docks a compact dashboard to the right edge (one card per host, translucent, hover to focus). It keeps monitoring while you open other modals, switch tabs or run plugins, and disappears **only when you press Stop** — previously, closing the modal (or opening any other one) silently stopped monitoring. Re-opening `⋯ → Monitoring` pre-ticks the hosts being watched; *Start* replaces the watched set.
+
+### Fixed
+
+- **Plugin-typed commands could be killed by bash history expansion** — the analyzer's one-liner contained a `!` inside double quotes; interactive bash expands history *before executing* (`bash: !: event not found`) and discards the entire line, so nothing ran and the plugin timed out after 30s. Generated commands no longer contain `!`.
+
+### Notes
+
+- Renderer + sample plugin + docs only — DB schema unchanged (still **v9**), no core/main-process changes.
+
+---
+
 ## [0.1.8] — 2026-07-02
 
 ### Fixed

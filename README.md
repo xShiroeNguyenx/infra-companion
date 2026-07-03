@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, AI assistance with local LLM support, and more.
 
-**Current release: v0.1.8 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.1.9 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -249,12 +249,12 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.1.8)
+## Known Limitations (v0.1.9)
 
 - Bulk / Monitor / SFTP through login scripts rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` installed on the gate) and `su` / `sudo` steps are supported; exotic setups that force a TTY password prompt may still fail
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))
 - Secrets Manager: 1Password, Bitwarden, HashiCorp Vault via CLI (KeePassXC planned)
-- No RDP/VNC, team server, plugin system, cloud import (AWS/GCP…), Docker/K8s browser — see [ROADMAP.md](ROADMAP.md)
+- No RDP/VNC, team server, cloud import (AWS/GCP…), Docker/K8s browser — see [ROADMAP.md](ROADMAP.md); plugin system is at **v1** (no permission enforcement / output transform / marketplace yet)
 
 ---
 

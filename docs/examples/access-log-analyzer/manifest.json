@@ -1,0 +1,10 @@
+{
+  "id": "access-log-analyzer",
+  "name": "Access Log Analyzer",
+  "version": "1.0.0",
+  "description": "Phân tích nhanh access log trên host đang mở: top IP, request/phút, top URL, User-Agent, status code, hành vi của IP nghi vấn nhất — kết quả hiện trong panel.",
+  "permissions": ["terminal.observe", "terminal.write", "ui.panel", "ui.notify"],
+  "contributes": {
+    "commands": [{ "id": "alog.analyze", "title": "Access log: Phân tích 6 thông số" }]
+  }
+}

@@ -235,7 +235,7 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 
 **What it is**: track **CPU load / RAM / disk / uptime** in real time, **no agent required** (reads `/proc` + `df` over SSH every 3s). Linux only.
 
-**Use**: pick hosts → **Start monitoring** → one card per host: a load sparkline + Load/RAM/Disk bars (red >90%, yellow >70%) + uptime. Auto-reconnects on drop; auto-stops when the dashboard closes.
+**Use**: pick hosts → **Start monitoring** → the picker closes and a compact dashboard **docks to the top-right corner** — one card per host: a load sparkline + Load/RAM/Disk bars (red >90%, yellow >70%) + uptime. The dock is translucent (hover to focus) and doesn't block anything: keep working in the terminal, open other modals, switch tabs — monitoring continues until you press **Stop** on the dock. Auto-reconnects on drop. Re-opening `⋯ → Monitoring` pre-ticks the hosts being watched; **Start** replaces the watched set.
 
 **Runs through login scripts**: like Bulk — web-01/02 measure the inner machine, not the gate.
 
@@ -334,9 +334,9 @@ Each plugin is a folder under `<userData>/plugins/<plugin-id>/`:
 ```
 `<userData>`: Windows `%APPDATA%\<app name>\plugins` · macOS `~/Library/Application Support/<app name>/plugins` · Linux `~/.config/<app name>/plugins`.
 
-**Quick install of the 2 sample plugins** (in the repo at `docs/examples/`):
+**Quick install of the 3 sample plugins** (in the repo at `docs/examples/`):
 1. `⋯` → **🧩 Plugins** → **📂 Open plugins folder** (opens the exact folder — don't guess the path).
-2. Copy `docs/examples/hello-world` and `docs/examples/output-highlighter` into it.
+2. Copy `docs/examples/hello-world`, `docs/examples/output-highlighter` and `docs/examples/access-log-analyzer` into it.
 3. Click **↻ Rescan** (or close/reopen the modal) — **no app restart needed**.
 
 **The Plugins modal** (`⋯` → 🧩 Plugins): each plugin has a status badge (**Active** / Disabled / Failed / Crashed / Loading), plus:
@@ -349,9 +349,10 @@ Each plugin is a folder under `<userData>/plugins/<plugin-id>/`:
 ### B. Using plugins
 
 - **Commands**: `Ctrl+Shift+P` → type a plugin command name (hinted `plugin`) → Enter. E.g. the sample *Hello World*: the **"Hello: Say hi"** command opens a markdown **panel**.
-- **Panel**: markdown/text content a plugin produces (reports, tables…); click **Close** to dismiss.
+- **Panel**: markdown/text content a plugin produces (reports, tables…) — docks to the **top-right corner**, translucent (hover to focus), and doesn't block the terminal: keep typing while reading. Close with **✕** (Esc is left to the terminal).
 - **Toast**: a plugin can raise a short notification (e.g. *Output Highlighter* warns when it sees "error" in the terminal).
 - **Light automation**: a plugin can listen to terminal output and write a command into the open session (e.g. the "Highlighter: send echo to active session" command).
+- **Real-world sample — *Access Log Analyzer***: SSH into a web server (root helps for reading the log), then run **"Access log: Phân tích 6 thông số"** from the Palette. It types one visible shell one-liner into the session and opens a panel with 6 stats: top 15 IPs, requests/minute, top URLs, top User-Agents, status codes, and what the most suspicious IP is calling — plus a short how-to-read guide. Defaults live at the top of its `index.js` (`LOG_PATH = /etc/httpd/logs/ssl_access_log`, 50 000-line sample) — edit + **Reload** for nginx or other paths.
 
 ### C. Writing a plugin
 
