@@ -26,6 +26,8 @@ export function Sidebar() {
   const t = useT()
   const { hosts, groups, history, refreshAll } = useDataStore()
   const { openSsh, openQuick, openSshGroup } = useTabsStore()
+  const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed)
+  const toggleSidebar = useUiStore((s) => s.toggleSidebar)
   const favIds = useFavoritesStore((s) => s.ids)
   const [query, setQuery] = useState('')
   const [modal, setModal] = useState<OpenModal>(null)
@@ -93,21 +95,47 @@ export function Sidebar() {
     for (const warning of result.warnings.slice(0, 3)) push(warning)
   }
 
+  // Thu gọn: chỉ còn thanh hẹp với nút mở lại — vùng làm việc chiếm phần còn lại.
+  if (sidebarCollapsed) {
+    return (
+      <div className="border-edge bg-panel flex w-8 shrink-0 flex-col items-center border-r py-1.5 select-none">
+        <button
+          className="text-muted hover:bg-hover hover:text-content rounded px-1.5 py-1 text-sm leading-none"
+          title={`${t('sidebar.expand')} (Ctrl+Shift+H)`}
+          aria-label={t('sidebar.expand')}
+          onClick={toggleSidebar}
+        >
+          »
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="border-edge bg-panel flex w-60 shrink-0 flex-col border-r select-none">
       <div className="p-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              if (isQuick) connectQuick()
-              else if (filtered.length === 1) void openSsh(filtered[0]!.id)
-            }
-          }}
-          placeholder={t('sidebar.searchPlaceholder')}
-          className="border-edge bg-input text-content placeholder-subtle focus:border-accent w-full rounded border px-2.5 py-1.5 text-xs outline-none"
-        />
+        <div className="flex items-center gap-1">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                if (isQuick) connectQuick()
+                else if (filtered.length === 1) void openSsh(filtered[0]!.id)
+              }
+            }}
+            placeholder={t('sidebar.searchPlaceholder')}
+            className="border-edge bg-input text-content placeholder-subtle focus:border-accent w-full min-w-0 flex-1 rounded border px-2.5 py-1.5 text-xs outline-none"
+          />
+          <button
+            className="text-subtle hover:bg-hover hover:text-content shrink-0 rounded px-1 py-1 text-sm leading-none"
+            title={`${t('sidebar.collapse')} (Ctrl+Shift+H)`}
+            aria-label={t('sidebar.collapse')}
+            onClick={toggleSidebar}
+          >
+            «
+          </button>
+        </div>
         {isQuick && (
           <button
             className="border-accent/40 bg-accent-soft/40 text-accent-fg hover:bg-accent-soft/60 mt-1.5 flex w-full items-center gap-1.5 rounded border px-2.5 py-1.5 text-left text-xs"

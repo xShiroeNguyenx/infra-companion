@@ -5,6 +5,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.11] — 2026-07-06
+
+### Added
+
+- **Collapsible sidebar** — the left host list can now be collapsed to a thin rail so the terminal gets the full width: the `«` button next to the search box, **Ctrl+Shift+H**, or the palette command *Collapse/expand host list*. The collapsed rail keeps a `»` button to expand; the state is remembered across launches (localStorage). Terminals re-fit automatically on toggle.
+- **Resizable split panes** — the borders between panes in a split tab are now **draggable**: grab the line between two panes (cursor changes) and drag to give one pane more room; the whole column/row resizes so the grid stays aligned. Panes can't shrink below ~12% (still readable), terminals re-fit live while dragging, and **double-clicking a divider resets to equal sizes**. Sizes reset when panes are added/closed.
+- **Minimizable docks** — both the plugin panel (top-right) and the Monitoring dashboard (right edge) now have a `–` button that shrinks them to a small pill: the plugin pill (`🧩 title`, top-right) restores on click and **auto-restores when the plugin pushes new content** (e.g. a section re-run finishes); the monitoring pill (`📊 n hosts`, bottom-right so the two pills never overlap) carries a status dot showing the worst host state (green/amber/red) while minimized, and monitoring keeps polling in the background.
+
+### Fixed
+
+- **Terminal scrollbar hidden** — the xterm viewport scrollbar took horizontal space in every pane (noticeably with 4-6 splits); it's now fully hidden. Wheel / PgUp-PgDn scrolling unchanged.
+
+---
+
 ## [0.1.10] — 2026-07-06
 
 ### Added

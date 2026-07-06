@@ -146,6 +146,10 @@ export default function App() {
         event.preventDefault()
         event.stopPropagation()
         if (state.activeId) state.toggleBroadcast(state.activeId)
+      } else if (event.shiftKey && event.code === 'KeyH') {
+        event.preventDefault()
+        event.stopPropagation()
+        useUiStore.getState().toggleSidebar()
       } else if (!event.shiftKey && event.code === 'KeyI') {
         event.preventDefault()
         event.stopPropagation()
@@ -179,6 +183,7 @@ export default function App() {
     { id: 'open-settings', label: t('menu.settings'), run: () => setModal('settings') },
     { id: 'open-plugins', label: t('menu.plugins'), run: () => setModal('plugins') },
     { id: 'open-logs', label: t('menu.openLogs'), run: () => window.infra.terminal.openLogFolder() },
+    { id: 'toggle-sidebar', label: t('menu.toggleSidebar'), run: () => useUiStore.getState().toggleSidebar() },
     ...pluginCommands.map((c) => ({
       id: `plugin-${c.pluginId}-${c.commandId}`,
       label: c.title,

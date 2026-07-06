@@ -115,6 +115,7 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 | **Add a pane to a tab** | `Ctrl+Shift+D` adds a local pane; the **⊟** icon on a sidebar host opens it into a new pane of the current tab |
 | **Merge tabs ⇄ split** (the **⊞ Split** button) | Click **⊞ Split** in the toolbar: merge **ALL open terminal tabs** into panes within one tab (so Broadcast spans them); click again to split back into separate tabs. Scrollback is preserved across merge/split |
 | **Open a whole group** | The **grid** button on a group header in the sidebar (or the **Open group** command in the Command Palette): opens every host in the group as pre-split panes in one tab — ready for Broadcast |
+| **Resize panes** | **Drag the divider** between panes (whole column/row resizes); **double-click** a divider to reset to equal sizes |
 | **Broadcast** | The **📡 Broadcast** button or `Ctrl+Shift+B`: type in one pane → it's sent to **ALL panes** in the tab |
 | **Switch tabs** | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
 | **Close tab/pane** | `Ctrl+Shift+W`, or `✕` on the tab/pane, or middle-click the tab |
@@ -122,6 +123,7 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 | **Copy / Paste** | `Ctrl+Shift+C` / `Ctrl+Shift+V` |
 | **Copy with the mouse** | Select text → **left-click inside the highlight** = copy (a *"Copied"* toast confirms) |
 | **Paste with the mouse** | **Right-click** anywhere in the terminal = paste the clipboard at the cursor (respects Broadcast) |
+| **Wheel prints `65;53;18M…` garbage?** | A remote program left xterm **mouse reporting** on (or an escape sequence sneaked in while `cat`/`tail`-ing a log). Type `reset` in that shell to clear it; holding **Shift** while scrolling always bypasses mouse reporting |
 
 ### Test Broadcast (the "type once, run on many servers" feature)
 1. Open SSH to web-01. 2. Hover web-02 in the sidebar → click **⊟ split** → two panes side by side.
@@ -235,7 +237,7 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 
 **What it is**: track **CPU load / RAM / disk / uptime** in real time, **no agent required** (reads `/proc` + `df` over SSH every 3s). Linux only.
 
-**Use**: pick hosts → **Start monitoring** → the picker closes and a compact dashboard **docks to the top-right corner** — one card per host: a load sparkline + Load/RAM/Disk bars (red >90%, yellow >70%) + uptime. The dock is translucent (hover to focus) and doesn't block anything: keep working in the terminal, open other modals, switch tabs — monitoring continues until you press **Stop** on the dock. Auto-reconnects on drop. Re-opening `⋯ → Monitoring` pre-ticks the hosts being watched; **Start** replaces the watched set.
+**Use**: pick hosts → **Start monitoring** → the picker closes and a compact dashboard **docks to the top-right corner** — one card per host: a load sparkline + Load/RAM/Disk bars (red >90%, yellow >70%) + uptime. The dock is translucent (hover to focus) and doesn't block anything: keep working in the terminal, open other modals, switch tabs — monitoring continues until you press **Stop** on the dock. Press **–** to minimize it to a `📊` pill at the bottom-right: polling continues, and the pill's status dot shows the worst host state (green OK / amber connecting / red error) — click the pill to restore. Auto-reconnects on drop. Re-opening `⋯ → Monitoring` pre-ticks the hosts being watched; **Start** replaces the watched set.
 
 **Runs through login scripts**: like Bulk — web-01/02 measure the inner machine, not the gate.
 
@@ -349,7 +351,7 @@ Each plugin is a folder under `<userData>/plugins/<plugin-id>/`:
 ### B. Using plugins
 
 - **Commands**: `Ctrl+Shift+P` → type a plugin command name (hinted `plugin`) → Enter. E.g. the sample *Hello World*: the **"Hello: Say hi"** command opens a markdown **panel**.
-- **Panel**: markdown/text content a plugin produces (reports, tables…) — docks to the **top-right corner**, translucent (hover to focus), and doesn't block the terminal: keep typing while reading. Close with **✕** (Esc is left to the terminal).
+- **Panel**: markdown/text content a plugin produces (reports, tables…) — docks to the **top-right corner**, translucent (hover to focus), and doesn't block the terminal: keep typing while reading. Close with **✕**, or minimize with **–** to a small `🧩` pill (click to restore; it also restores automatically when the plugin pushes new content). Esc is left to the terminal.
 - **Toast**: a plugin can raise a short notification (e.g. *Output Highlighter* warns when it sees "error" in the terminal).
 - **Light automation**: a plugin can listen to terminal output and write a command into the open session (e.g. the "Highlighter: send echo to active session" command).
 - **Real-world sample — *Access Log Analyzer***: SSH into a web server (root helps for reading the log), then run **"Access log: Phân tích 6 thông số"** from the Palette. It types one visible shell one-liner into the session and opens a panel with 6 stats: top 15 IPs, requests/minute, top URLs, top User-Agents, status codes, and what the most suspicious IP is calling — plus a short how-to-read guide. When invoked it first asks for the **log path** in a small dialog — leave it empty to use the default (`/etc/httpd/logs/ssl_access_log`), or type e.g. `/var/log/nginx/access.log`; the last entered path is remembered for next time. It handles both the standard combined format and custom formats with a **leading vhost** (`www.site.com:443 1.2.3.4 - - [...]`) — the column offset is auto-detected from the first line, and with a vhost present the top-URL sections print `vhost/path` (one file often aggregates many domains). Each panel section shows the exact shell pipeline it ran and has **↻ re-run** / **✎ edit-command** buttons: edit opens a dialog pre-filled with the current command (clear it to restore the default), and only that section re-runs and updates in place; edited commands persist and are reused by the next full analysis. The default path, sample size (50 000 lines) and a `FIELD_OFFSET` override live at the top of its `index.js` — edit + **Reload** for exotic formats.
@@ -434,6 +436,7 @@ New connection protocols (pluggable SessionKind) · permission enforcement + con
 | `Ctrl+Shift+W` | Close current tab |
 | `Ctrl+Shift+D` | Split an extra local pane |
 | `Ctrl+Shift+B` | Toggle Broadcast |
+| `Ctrl+Shift+H` | Collapse/expand the host sidebar (more room for the terminal) |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Switch tabs |
 | `Ctrl+F` | Find in terminal |
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | Copy / Paste |

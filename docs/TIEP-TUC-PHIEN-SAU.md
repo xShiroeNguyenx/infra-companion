@@ -1,18 +1,25 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
-> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật 2026-07-06: **v0.1.10 ĐÃ CODE XONG, CHƯA commit/tag, CHƯA test GUI** (Plugin API `ui.prompt` + Access Log Analyzer hỏi đường dẫn log). v0.1.9 đã phát hành (commit `9b6002d` + tag trên origin); PLAN/ROADMAP có thêm **Wave 3** (F23–F54, đề xuất — chưa code) cũng chưa commit.
+> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật 2026-07-06: **v0.1.10 ĐÃ phát hành** (commit `2c5565b` + tag `v0.1.10`, kèm commit docs Wave 3 `ba2c871`); **v0.1.11 ĐÃ CODE XONG, CHƯA commit/tag** (sidebar thu gọn + dock thu nhỏ + ẩn scrollbar terminal + kéo resize pane — đã bump version/CHANGELOG/README/landing, lệnh git ở cuối file).
 
 ## Đang ở đâu
 
-Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 → v0.1.9 (đã tag/phát hành)**. App build + typecheck + test đều sạch (72 core test).
+Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 → v0.1.10 (đã tag/phát hành)**. App build + typecheck + test đều sạch (72 core test).
 
-**v0.1.10 (2026-07-06, ĐÃ bump version + CHANGELOG + USER-GUIDE, CHƯA commit/tag, CHƯA test GUI)** — Plugin API mới + nâng cấp plugin mẫu, không đổi schema DB (vẫn **v9**):
+**v0.1.11 (2026-07-06, ĐÃ bump version + CHANGELOG + README + landing, CHƯA commit/tag, CHƯA test GUI)** — thuần renderer (UI/UX terminal), không đổi schema DB (vẫn **v9**):
+1. **Sidebar thu gọn được** — nút `«` cạnh ô tìm kiếm / `Ctrl+Shift+H` / lệnh palette "Thu gọn/mở danh sách host": cột host trái thu về thanh hẹp w-8 chỉ còn nút `»` mở lại; state nhớ qua localStorage `infra.sidebar.collapsed` ([stores/ui.ts](../apps/desktop/src/renderer/src/stores/ui.ts) thêm `sidebarCollapsed`/`toggleSidebar`). Terminal tự fit nhờ ResizeObserver sẵn có trong TerminalPane. ⚠️ Chọn Ctrl+Shift+H vì Ctrl+B là prefix tmux (cấm global-intercept), Ctrl+Shift+B đã là Broadcast.
+2. **Dock thu nhỏ được** — panel plugin và MonitorDock có nút `–`: plugin thu về pill `🧩 <title>` GÓC TRÊN phải (bấm bung lại; **tự bung khi plugin push nội dung mới** — useEffect theo prop panel), monitor thu về pill `📊 n host` GÓC DƯỚI phải (bottom-8, tránh đè pill plugin; chấm màu = trạng thái xấu nhất: đỏ lỗi/vàng đang nối/xanh OK; polling vẫn chạy). State local useState (không persist — chủ ý). i18n `panel.minimize`/`panel.restore` vi/en/ja.
+3. **Ẩn scrollbar terminal** — scrollbar `.xterm-viewport` ẩn hẳn trong [main.css](../apps/desktop/src/renderer/src/styles/main.css) (`scrollbar-width:none` + `::-webkit-scrollbar{display:none}`) — trước là thanh 10px chiếm ngang mỗi pane. ⚠️ Ghi chú lịch sử: từng làm thêm nút "🖱 Sửa cuộn" (tắt mouse-reporting kẹt — remote bật xterm mouse mode rồi không tắt / escape lẫn trong log khi cat/tail → lăn chuột in rác "65;53;18M…", Broadcast làm lan mọi pane) bằng cách ghi DECRST trực tiếp vào xterm qua termBus — **user quyết định BỎ, đã gỡ sạch (nút + resetTermMouse + i18n), ĐỪNG tự thêm lại**. Workaround cho user khi gặp: gõ `reset` trên shell, hoặc giữ **Shift khi lăn** (xterm.js luôn bypass mouse reporting).
+4. **Kéo chỉnh kích thước pane split** — ranh giới giữa các pane kéo được ([TerminalTabView.tsx](../apps/desktop/src/renderer/src/features/terminal/TerminalTabView.tsx)): state local `colFr[]`/`rowFr[]` (fr per cột/hàng) thay `repeat(n, 1fr)`; gutter = div absolute (con của grid — abs-pos KHÔNG chiếm ô grid) rộng 6px đè lên ranh giới tại `cutPct()`%, kéo đổi cặp track 2 bên (min ~12%/track), double-click chia đều, overlay z-20 khi kéo chặn xterm nuốt chuột; reset khi cols/rows đổi; xterm tự fit qua ResizeObserver. Không đụng store — sizes sống theo component (mất khi merge/unmerge, chấp nhận).
+5. Kiểm tra: typecheck 3 package + `pnpm build` xanh. **Chưa test GUI**: sidebar thu gọn + nút – thu nhỏ 2 dock + kéo resize pane — cần `pnpm dev` bản mới trước khi tag.
+
+**v0.1.10 (ĐÃ phát hành 2026-07-06, commit `2c5565b` + tag)** — Plugin API mới + plugin mẫu tương tác, không đổi schema DB (vẫn **v9**):
 1. **Plugin API `api.ui.prompt({ title?, label?, placeholder?, value? })` → `string | null`** — plugin hỏi user 1 dòng text qua modal (null = Huỷ/timeout). Chuỗi xuyên suốt: `packages/core/src/plugins/protocol.ts` (method `ui.prompt` + interface `PluginPromptOptions`) → `PluginHost` (adapter **bắt buộc mới** `promptUser(pluginId, opts)` — implementor/fake test nào cũng phải thêm) → [ipc/plugins.ts](../apps/desktop/src/main/ipc/plugins.ts) dùng lại hạ tầng `askRenderer` sẵn có (kênh mới `IPC.PLUGINS_PROMPT`; renderer trả lời qua kênh chung `PROMPT_ANSWER`, timeout 120s phía main) → [PromptsHost.tsx](../apps/desktop/src/renderer/src/components/PromptsHost.tsx) thêm loại câu hỏi `'plugin'` (modal + TextInput, nút OK/Huỷ). ⚠️ Worker: `callApi` nhận **timeout riêng** — `ui.prompt` chờ 130s (dài hơn 120s của main) thay vì 8s mặc định.
 2. **Access Log Analyzer v1.2.0** (`docs/examples/access-log-analyzer/`): khi chạy lệnh sẽ **hỏi đường dẫn log** — bỏ trống = mặc định `/etc/httpd/logs/ssl_access_log`, gõ ví dụ `/var/log/nginx/access.log`; **nhớ lần nhập trước** qua `api.storage` (key `logPath`); validate path `^[A-Za-z0-9._/-]+$` (chặn khoảng trắng/ký tự phá one-liner shell). Manifest thêm permissions `ui.prompt`, `storage`. **ĐÃ copy đè** sang thư mục plugin đã cài `%APPDATA%\@infra\desktop\plugins\access-log-analyzer\` — chạy `pnpm dev` bản mới là dùng được ngay (API mới cần build app mới).
    - **Hỗ trợ log format custom của server user** (vhost:port đứng ĐẦU dòng `www.site.com:443 1.2.3.4 - - [...]` + đuôi `| Country Code | ASN…`): mọi cột dịch +1 so với combined chuẩn (IP $1→$2, URL $7→$8, status $9→$10). Plugin **tự dò offset** từ dòng đầu file (cột 1 là IP → chuẩn, không phải → +1; hằng `FIELD_OFFSET='auto'` đầu index.js, đặt số để ép). Khi có vhost, mục top-URL in `vhost/path` (1 file gộp nhiều domain). Thời gian (tách theo `[`) và User-Agent (tách theo `"`) vốn không phụ thuộc vị trí cột. Đã test pipeline awk với log mẫu cả 2 format. Sửa kèm: thông báo "(x) Khong doc duoc..." trước đây nằm giữa BEGIN và S1 nên parser vứt mất (path sai → 6 mục trống không lý do) — giờ nằm trong mục 1.
 3. **Plugin API: nút hành động `cmd:` trong panel + `ctx.arg`** — markdown link `[nhãn](cmd:command.id?arg)` render thành nút, bấm gọi command CỦA CHÍNH plugin sở hữu panel với `ctx.arg` = phần sau `?` (URI-decoded). Chuỗi: `miniMarkdown.tsx` (prop `onCommand`, nơi khác không truyền → render text thường) → `PluginPanelModal.tsx` (tự tính activeSessionId từ tabs store như palette) → `invokeCommand(pluginId, commandId, sid, arg)` xuyên preload/IPC/PluginHost → `CommandCtx.arg` (protocol.ts).
 4. **Access Log Analyzer v1.3.0 — panel tương tác**: mỗi mục hiện lệnh pipeline đã chạy (`$ awk …` đầu code block) + nút **↻ Chạy lại** (chạy lại riêng mục đó trên đúng phiên/log cũ, tail mẫu mới) + **✎ Sửa lệnh** (ui.prompt điền sẵn lệnh hiện tại → sửa → chỉ mục đó chạy lại và cập nhật tại chỗ; để trống = về mặc định). Lệnh đã sửa lưu `api.storage` key `cmds` (per mục, dùng cả cho lần phân tích đầy đủ sau). Validate lệnh sửa: 1 dòng, cấm `!` (history expansion), cấm chuỗi `@ALOG`. State module: `lastRun={logPath,sessionId,contents[]}` (mất khi Reload plugin — nút ↻/✎ báo "chạy phân tích trước"), `overrides={}`. Commands mới `alog.rerun`/`alog.edit` (hiện cả trong palette — gọi chay sẽ notify hướng dẫn).
-5. Kiểm tra: **72 test pass** (+1 test `ui.prompt` round-trip trong `PluginHost.test.ts`), typecheck 3 package + `pnpm build` xanh; `node --check` plugin OK. **ui.prompt user ĐÃ chạy thử OK** (data.json có logPath). **Chưa test GUI**: nút ↻/✎ trong panel — cần `pnpm dev` bản mới (có cmd: link), chạy phân tích rồi bấm thử 2 nút.
+5. Kiểm tra khi release: **72 test pass** (+1 test `ui.prompt` round-trip trong `PluginHost.test.ts`), typecheck 3 package + build xanh; `node --check` plugin OK; ui.prompt user đã chạy thử OK trên server thật (data.json có logPath).
 
 **v0.1.9 (ĐÃ phát hành 2026-07-03)** — thuần renderer + plugin mẫu + docs, không đổi schema DB (vẫn **v9**):
 1. **Plugin mẫu thứ 3: Access Log Analyzer** (`docs/examples/access-log-analyzer/`) — 1 lệnh palette, gõ 1 dòng shell (tail+awk trên 50k dòng cuối) vào phiên SSH đang mở, bóc output theo marker `@ALOG:...@` (token tách đôi khi echo để dòng lệnh terminal echo lại không match), hiện panel 6 thông số + hướng dẫn đọc. Config hardcode đầu `index.js` (`LOG_PATH`, `SAMPLE_LINES`, timeout 30s). ⚠️ **Bài học: CẤM ký tự `!` trong lệnh gửi vào bash tương tác** — history expansion chạy TRƯỚC khi thực thi, `!)` → "event not found" → bash vứt cả dòng; `set +H` cùng dòng không cứu được.
@@ -121,7 +128,7 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 
 ## Git (anh tự chạy; tôi không tự commit)
 
-> Đang chờ commit 2 phần: (1) **docs Wave 3** (PLAN.md/ROADMAP.md, 2026-07-04); (2) **feat v0.1.10** — Plugin API `ui.prompt` + Access Log Analyzer hỏi đường dẫn log (2026-07-06, code + docs + bump version). Nên tách 2 commit; tag `v0.1.10` chỉ đánh SAU khi đã test GUI (`pnpm dev` → chạy lệnh Access log → kiểm modal).
+> **v0.1.10 ĐÃ phát hành** (commit `2c5565b` + tag). Đang chờ commit: **feat v0.1.11** — sidebar thu gọn + dock thu nhỏ + ẩn scrollbar terminal + kéo resize pane (đã bump version + CHANGELOG [0.1.11] + README + landing hero v0.1.11 — landing đổi sẽ tự deploy Pages khi push). Tag `v0.1.11` chỉ đánh SAU khi test GUI.
 
 Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps/desktop`) + CHANGELOG + README/USER-GUIDE/landing/handoff, rồi push tag `v*.*.*` — release tự kích hoạt (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux). Lưu ý: đổi `docs/landing/index.html` (version trên hero) sẽ tự deploy lại landing page qua flow Pages riêng khi push lên `main`.
 
@@ -130,22 +137,18 @@ Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps
 ```powershell
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
 
-# Commit 1 — docs Wave 3 (chỉ .md, ci.yml paths-ignore bỏ qua, không build app)
-git add PLAN.md ROADMAP.md
-git commit -m "docs: Wave 3 roadmap (F23-F54) + parity gap audit"
-
-# Commit 2 — feat v0.1.10 (code + docs + bump version)
-git add packages/core/src/plugins/protocol.ts packages/core/src/plugins/PluginHost.ts packages/core/src/plugins/PluginHost.test.ts packages/core/src/index.ts
-git add packages/shared/src/ipc.ts packages/shared/src/types.ts
-git add apps/desktop/src/main/plugins/worker.ts apps/desktop/src/main/ipc/plugins.ts apps/desktop/src/preload/index.ts apps/desktop/src/renderer/src/components/PromptsHost.tsx
-git add docs/examples/access-log-analyzer/ docs/USER-GUIDE.md docs/TIEP-TUC-PHIEN-SAU.md CHANGELOG.md package.json apps/desktop/package.json
+# feat v0.1.11 — sidebar thu gọn + dock thu nhỏ + ẩn scrollbar terminal + kéo resize pane
+git add apps/desktop/src/renderer/src/components/Sidebar.tsx apps/desktop/src/renderer/src/components/PluginPanelModal.tsx apps/desktop/src/renderer/src/components/MonitorDock.tsx
+git add apps/desktop/src/renderer/src/features/terminal/TerminalTabView.tsx apps/desktop/src/renderer/src/lib/termBus.ts
+git add apps/desktop/src/renderer/src/stores/ui.ts apps/desktop/src/renderer/src/App.tsx apps/desktop/src/renderer/src/i18n/dict.ts apps/desktop/src/renderer/src/styles/main.css
+git add docs/USER-GUIDE.md docs/TIEP-TUC-PHIEN-SAU.md docs/landing/index.html CHANGELOG.md README.md package.json apps/desktop/package.json
 git status            # xem lại trước khi commit
-git commit -m "feat: plugin API ui.prompt + Access Log Analyzer hoi duong dan log (v0.1.10)"
+git commit -m "feat: sidebar thu gon + dock thu nho + an scrollbar terminal + keo resize pane (v0.1.11)"
 git push origin main
 
-# Tag/release — CHỈ chạy sau khi đã test GUI OK (pnpm dev → lệnh Access log → kiểm modal)
-git tag v0.1.10
-git push origin v0.1.10
+# Tag/release — CHỈ chạy sau khi test GUI OK (pnpm dev → thử «/» + Ctrl+Shift+H, nút – 2 dock, kéo vạch giữa pane)
+git tag v0.1.11
+git push origin v0.1.11
 ```
 
 > Môi trường dev: Node 20, pnpm 9, Electron 42 (Node 24 runtime — dùng `node:sqlite`), ssh2/node-pty/serialport là native nhưng đã externalize + prebuilt nên không cần build C++. Khi chạy electron từ terminal đã dính biến `ELECTRON_RUN_AS_NODE` thì thêm `$env:ELECTRON_RUN_AS_NODE=$null` cùng lệnh (chỉ là gotcha của terminal, không phải lỗi app).

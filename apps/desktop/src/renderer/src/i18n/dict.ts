@@ -66,6 +66,7 @@ export const vi = {
   'menu.settings': '⚙ Cài đặt',
   'menu.plugins': '🧩 Plugins',
   'menu.openLogs': '📂 Mở thư mục log phiên',
+  'menu.toggleSidebar': 'Thu gọn/mở danh sách host (Ctrl+Shift+H)',
 
   // Plugins (F16)
   'plugins.title': '🧩 Plugins',
@@ -84,6 +85,8 @@ export const vi = {
   'plugins.status.crashed': 'Crash',
   'plugins.status.loading': 'Đang nạp',
   'panel.close': 'Đóng',
+  'panel.minimize': 'Thu nhỏ',
+  'panel.restore': 'Mở lại',
 
   // Tabs / terminal
   'tabs.split': '⊞ Split',
@@ -99,6 +102,7 @@ export const vi = {
   'tabs.record': '⏯ Ghi hình',
   'tabs.recording': '⏯ Đang ghi hình',
   'tabs.recordTip': 'Ghi hình phiên (asciicast) — xem lại replay trong mục Recordings',
+  'tabs.dragResize': 'Kéo để chỉnh kích thước pane — double-click để chia đều lại',
   'tabs.panes': '{n} panes',
   'tabs.closePane': 'Đóng pane',
   'tabs.close': 'Đóng tab (Ctrl+Shift+W)',
@@ -210,6 +214,8 @@ export const vi = {
   'host.notesEdit': 'Sửa',
   'sidebar.viewNotes': 'Xem ghi chú',
   'sidebar.favorites': 'Yêu thích',
+  'sidebar.collapse': 'Thu gọn danh sách host',
+  'sidebar.expand': 'Mở danh sách host',
   'sidebar.favorite': 'Ghim vào Yêu thích',
   'sidebar.unfavorite': 'Bỏ ghim',
   'host.newGroupName': 'Tên group mới',
@@ -522,6 +528,7 @@ export const en: Partial<Record<I18nKey, string>> = {
   'menu.settings': '⚙ Settings',
   'menu.plugins': '🧩 Plugins',
   'menu.openLogs': '📂 Open session log folder',
+  'menu.toggleSidebar': 'Collapse/expand host list (Ctrl+Shift+H)',
 
   'plugins.title': '🧩 Plugins',
   'plugins.count': '{n} plugin(s)',
@@ -539,6 +546,8 @@ export const en: Partial<Record<I18nKey, string>> = {
   'plugins.status.crashed': 'Crashed',
   'plugins.status.loading': 'Loading',
   'panel.close': 'Close',
+  'panel.minimize': 'Minimize',
+  'panel.restore': 'Restore',
 
   'tabs.split': '⊞ Split',
   'tabs.splitOn': '⊞ Split ON',
@@ -553,6 +562,7 @@ export const en: Partial<Record<I18nKey, string>> = {
   'tabs.record': '⏯ Record',
   'tabs.recording': '⏯ Recording',
   'tabs.recordTip': 'Record session (asciicast) — replay it in Recordings',
+  'tabs.dragResize': 'Drag to resize panes — double-click to reset to equal sizes',
   'tabs.panes': '{n} panes',
   'tabs.closePane': 'Close pane',
   'tabs.close': 'Close tab (Ctrl+Shift+W)',
@@ -657,6 +667,8 @@ export const en: Partial<Record<I18nKey, string>> = {
   'host.notesEdit': 'Edit',
   'sidebar.viewNotes': 'View notes',
   'sidebar.favorites': 'Favorites',
+  'sidebar.collapse': 'Collapse host list',
+  'sidebar.expand': 'Expand host list',
   'sidebar.favorite': 'Pin to Favorites',
   'sidebar.unfavorite': 'Unpin',
   'host.newGroupOpt': '+ Create new group…',
@@ -957,6 +969,7 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'menu.settings': '⚙ 設定',
   'menu.plugins': '🧩 プラグイン',
   'menu.openLogs': '📂 セッションログフォルダを開く',
+  'menu.toggleSidebar': 'ホスト一覧の折りたたみ/展開 (Ctrl+Shift+H)',
 
   'plugins.title': '🧩 プラグイン',
   'plugins.count': '{n} 個のプラグイン',
@@ -974,6 +987,8 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'plugins.status.crashed': 'クラッシュ',
   'plugins.status.loading': '読み込み中',
   'panel.close': '閉じる',
+  'panel.minimize': '最小化',
+  'panel.restore': '元に戻す',
 
   'tabs.split': '⊞ 分割',
   'tabs.splitOn': '⊞ 分割 ON',
@@ -988,6 +1003,7 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'tabs.record': '⏯ 録画',
   'tabs.recording': '⏯ 録画中',
   'tabs.recordTip': 'セッションを録画（asciicast）— Recordings で再生',
+  'tabs.dragResize': 'ドラッグでペインのサイズ調整 — ダブルクリックで均等に戻す',
   'tabs.panes': '{n} ペイン',
   'tabs.closePane': 'ペインを閉じる',
   'tabs.close': 'タブを閉じる (Ctrl+Shift+W)',
@@ -1092,6 +1108,8 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'host.notesEdit': '編集',
   'sidebar.viewNotes': 'メモを見る',
   'sidebar.favorites': 'お気に入り',
+  'sidebar.collapse': 'ホスト一覧を折りたたむ',
+  'sidebar.expand': 'ホスト一覧を展開',
   'sidebar.favorite': 'お気に入りに固定',
   'sidebar.unfavorite': '固定を解除',
   'host.newGroupOpt': '+ 新しいグループを作成…',

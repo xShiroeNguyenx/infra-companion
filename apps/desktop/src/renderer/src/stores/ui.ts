@@ -18,7 +18,12 @@ export type AppModal =
 interface UiState {
   modal: AppModal
   setModal: (m: AppModal) => void
+  /** Thu gọn cột host bên trái để phóng to vùng làm việc (nhớ qua localStorage). */
+  sidebarCollapsed: boolean
+  toggleSidebar: () => void
 }
+
+const SIDEBAR_KEY = 'infra.sidebar.collapsed'
 
 /**
  * Modal toàn cục mount MỘT instance duy nhất (ở App). Sidebar/Command Palette chỉ gọi setModal.
@@ -27,5 +32,16 @@ interface UiState {
  */
 export const useUiStore = create<UiState>((set) => ({
   modal: null,
-  setModal: (modal) => set({ modal })
+  setModal: (modal) => set({ modal }),
+  sidebarCollapsed: localStorage.getItem(SIDEBAR_KEY) === '1',
+  toggleSidebar: () =>
+    set((s) => {
+      const collapsed = !s.sidebarCollapsed
+      try {
+        localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0')
+      } catch {
+        /* localStorage lỗi — chỉ mất persist, vẫn toggle được */
+      }
+      return { sidebarCollapsed: collapsed }
+    })
 }))

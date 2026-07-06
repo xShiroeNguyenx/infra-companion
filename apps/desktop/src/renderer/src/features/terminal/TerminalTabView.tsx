@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { useTabsStore, type AppTab } from '../../stores/tabs'
 import { useToastsStore } from '../../stores/toasts'
 import { useSettingsStore } from '../../stores/settings'
@@ -56,6 +56,51 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
     )
   }
 
+  // ── Kéo chỉnh kích thước pane: tỷ lệ fr per cột/hàng, gutter đè lên ranh giới grid.
+  // Kéo = đổi cặp track hai bên ranh giới; double-click = chia đều lại; xterm tự fit
+  // nhờ ResizeObserver sẵn có. Reset khi số cột/hàng đổi (thêm/đóng pane).
+  const gridRef = useRef<HTMLDivElement>(null)
+  const [colFr, setColFr] = useState<number[]>(() => Array(cols).fill(1))
+  const [rowFr, setRowFr] = useState<number[]>(() => Array(rows).fill(1))
+  const [dragAxis, setDragAxis] = useState<'col' | 'row' | null>(null)
+  useEffect(() => {
+    setColFr(Array(cols).fill(1))
+    setRowFr(Array(rows).fill(1))
+  }, [cols, rows])
+
+  const startDrag = (e: ReactMouseEvent, index: number, axis: 'col' | 'row'): void => {
+    e.preventDefault()
+    const rect = gridRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const startPos = axis === 'col' ? e.clientX : e.clientY
+    const sizePx = axis === 'col' ? rect.width : rect.height
+    const startFr = axis === 'col' ? [...colFr] : [...rowFr]
+    const total = startFr.reduce((a, b) => a + b, 0)
+    const min = total * 0.12 // không cho pane bé hơn ~12% — vẫn đọc được nội dung
+    const setFr = axis === 'col' ? setColFr : setRowFr
+    setDragAxis(axis)
+    const onMove = (ev: MouseEvent): void => {
+      const raw = (((axis === 'col' ? ev.clientX : ev.clientY) - startPos) / sizePx) * total
+      const delta = Math.max(-(startFr[index - 1]! - min), Math.min(startFr[index]! - min, raw))
+      const next = [...startFr]
+      next[index - 1] = startFr[index - 1]! + delta
+      next[index] = startFr[index]! - delta
+      setFr(next)
+    }
+    const onUp = (): void => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      setDragAxis(null)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  const frTemplate = (fr: number[]): string => fr.map((f) => `minmax(0, ${f}fr)`).join(' ')
+  /** Vị trí ranh giới thứ i (0-100%) theo tổng fr phía trước. */
+  const cutPct = (fr: number[], i: number): number =>
+    (fr.slice(0, i).reduce((a, b) => a + b, 0) / fr.reduce((a, b) => a + b, 0)) * 100
+
   return (
     <div className={`absolute inset-0 flex flex-col ${active ? '' : 'hidden'}`}>
       {/* Thanh công cụ chỉ hiện khi có nhiều pane hoặc để bật split/broadcast */}
@@ -112,10 +157,11 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
       </div>
 
       <div
-        className={`grid min-h-0 flex-1 gap-px ${hasBackground ? '' : 'bg-edge'}`}
+        ref={gridRef}
+        className={`relative grid min-h-0 flex-1 gap-px ${hasBackground ? '' : 'bg-edge'}`}
         style={{
-          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-          gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`
+          gridTemplateColumns: frTemplate(colFr),
+          gridTemplateRows: frTemplate(rowFr)
         }}
       >
         {tab.panes.map((pane) => {
@@ -156,6 +202,34 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
             </div>
           )
         })}
+
+        {/* Gutter kéo chỉnh kích thước — con absolute của grid nên KHÔNG chiếm ô grid */}
+        {colFr.slice(1).map((_, idx) => (
+          <div
+            key={`gutter-col-${idx + 1}`}
+            className="hover:bg-accent/50 absolute top-0 bottom-0 z-10 w-1.5 -translate-x-1/2 cursor-col-resize"
+            style={{ left: `${cutPct(colFr, idx + 1)}%` }}
+            title={t('tabs.dragResize')}
+            onMouseDown={(e) => startDrag(e, idx + 1, 'col')}
+            onDoubleClick={() => setColFr(Array(cols).fill(1))}
+          />
+        ))}
+        {rowFr.slice(1).map((_, idx) => (
+          <div
+            key={`gutter-row-${idx + 1}`}
+            className="hover:bg-accent/50 absolute right-0 left-0 z-10 h-1.5 -translate-y-1/2 cursor-row-resize"
+            style={{ top: `${cutPct(rowFr, idx + 1)}%` }}
+            title={t('tabs.dragResize')}
+            onMouseDown={(e) => startDrag(e, idx + 1, 'row')}
+            onDoubleClick={() => setRowFr(Array(rows).fill(1))}
+          />
+        ))}
+        {/* Đang kéo: phủ toàn grid để xterm không nuốt mousemove/không bôi đen text */}
+        {dragAxis && (
+          <div
+            className={`absolute inset-0 z-20 ${dragAxis === 'col' ? 'cursor-col-resize' : 'cursor-row-resize'}`}
+          />
+        )}
       </div>
     </div>
   )

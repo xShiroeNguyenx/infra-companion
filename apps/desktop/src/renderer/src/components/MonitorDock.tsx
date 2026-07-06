@@ -1,23 +1,56 @@
+import { useState } from 'react'
 import { useMonitorStore, type HostMonitor } from '../stores/monitor'
 import { useT } from '../i18n'
 
 /** Dashboard monitoring neo góc phải — mờ khi không rê chuột, KHÔNG backdrop nên
- *  vẫn thao tác terminal bình thường. Chỉ biến mất khi user bấm Dừng. */
+ *  vẫn thao tác terminal bình thường. Chỉ biến mất khi user bấm Dừng.
+ *  Nút – thu nhỏ về pill 📊 góc DƯỚI phải (tránh đè pill plugin góc trên);
+ *  chấm màu trên pill = trạng thái xấu nhất trong các host đang theo dõi. */
 export function MonitorDock() {
   const t = useT()
   const data = useMonitorStore((s) => s.data)
   const stop = useMonitorStore((s) => s.stop)
+  const [minimized, setMinimized] = useState(false)
   const monitors = Object.values(data)
+
+  if (minimized) {
+    const anyError = monitors.some((m) => m.sample && !m.sample.ok)
+    const anyPending = monitors.some((m) => !m.sample)
+    const dot = anyError ? 'bg-danger' : anyPending ? 'bg-warning animate-pulse' : 'bg-success'
+    return (
+      <div
+        className="bg-elevated/95 border-edge-strong absolute right-3 bottom-8 z-30 flex max-w-[280px] cursor-pointer items-center gap-2 rounded-full border py-1.5 pr-3 pl-3 opacity-75 shadow-2xl transition-opacity duration-150 hover:opacity-100"
+        title={t('panel.restore')}
+        onClick={() => setMinimized(false)}
+      >
+        <span className={`size-1.5 shrink-0 rounded-full ${dot}`} />
+        <span className="text-content min-w-0 truncate text-xs">
+          📊 {t('monitor.watching', { n: monitors.length })}
+        </span>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-elevated/95 border-edge-strong absolute top-14 right-3 z-30 flex max-h-[calc(100%-6rem)] w-[320px] max-w-[85vw] flex-col overflow-hidden rounded-lg border opacity-75 shadow-2xl transition-opacity duration-150 hover:opacity-100">
       <div className="border-edge flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2">
         <span className="text-subtle truncate text-[11px]">{t('monitor.watching', { n: monitors.length })}</span>
-        <button
-          className="border-edge-strong text-muted hover:bg-hover shrink-0 rounded border px-2 py-0.5 text-xs font-medium"
-          onClick={stop}
-        >
-          {t('monitor.stop')}
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            className="text-subtle hover:text-content px-1 text-sm leading-none"
+            aria-label={t('panel.minimize')}
+            title={t('panel.minimize')}
+            onClick={() => setMinimized(true)}
+          >
+            –
+          </button>
+          <button
+            className="border-edge-strong text-muted hover:bg-hover rounded border px-2 py-0.5 text-xs font-medium"
+            onClick={stop}
+          >
+            {t('monitor.stop')}
+          </button>
+        </div>
       </div>
       <div className="flex flex-col gap-2 overflow-y-auto p-2">
         {monitors.map((m) => (
