@@ -489,6 +489,17 @@ export interface PluginNotifyDto {
   message: string
 }
 
+/** Câu hỏi nhập liệu do plugin phát (ui.prompt) — trả lời qua prompts.answer(requestId, ...). */
+export interface PluginPromptDto {
+  requestId: string
+  pluginId: string
+  title?: string
+  label?: string
+  placeholder?: string
+  /** Giá trị điền sẵn trong ô nhập. */
+  value?: string
+}
+
 export interface InfraApi {
   vault: {
     status(): Promise<VaultStatus>
@@ -650,11 +661,13 @@ export interface InfraApi {
     rescan(): Promise<PluginInfoDto[]>
     /** Mở thư mục plugins (hoặc thư mục 1 plugin) bằng file explorer. */
     openFolder(id?: string): void
-    /** Chạy 1 lệnh do plugin đóng góp; activeSessionId lấy từ tab đang mở. */
-    invokeCommand(pluginId: string, commandId: string, activeSessionId: string | null): Promise<void>
+    /** Chạy 1 lệnh do plugin đóng góp; activeSessionId lấy từ tab đang mở; arg tuỳ ý (link cmd: trong panel). */
+    invokeCommand(pluginId: string, commandId: string, activeSessionId: string | null, arg?: string): Promise<void>
     contributions(): Promise<ContributedCommandDto[]>
     onContributionsChanged(cb: (list: ContributedCommandDto[]) => void): () => void
     onPanel(cb: (p: PluginPanelDto) => void): () => void
     onNotify(cb: (n: PluginNotifyDto) => void): () => void
+    /** Plugin hỏi user 1 chuỗi (ui.prompt) — trả lời qua prompts.answer(requestId, chuỗi | null). */
+    onPrompt(cb: (q: PluginPromptDto) => void): () => void
   }
 }

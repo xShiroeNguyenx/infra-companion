@@ -8,6 +8,8 @@ import type { PluginManifest } from './manifest'
 /** Context truyền cho command handler lúc chạy (renderer cấp activeSessionId khi gọi). */
 export interface CommandCtx {
   activeSessionId?: string
+  /** Tham số tuỳ ý — vd link hành động trong panel: [nhãn](cmd:id?arg). */
+  arg?: string
 }
 
 /** Method API mà plugin gọi — round-trip qua main, trả về api-result. */
@@ -16,8 +18,18 @@ export type ApiMethod =
   | 'terminal.getActiveSessionId'
   | 'ui.showPanel'
   | 'ui.notify'
+  | 'ui.prompt'
   | 'storage.get'
   | 'storage.set'
+
+/** Tuỳ chọn hộp nhập liệu plugin hỏi user (ui.prompt). */
+export interface PluginPromptOptions {
+  title?: string
+  label?: string
+  placeholder?: string
+  /** Giá trị điền sẵn trong ô nhập. */
+  value?: string
+}
 
 /** Đóng góp plugin đăng ký khi activate. */
 export interface WorkerContributions {

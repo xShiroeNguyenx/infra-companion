@@ -23,6 +23,8 @@ interface LoadedPlugin {
 const plugins = new Map<string, LoadedPlugin>()
 const pending = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>()
 const API_TIMEOUT_MS = 8_000
+/** ui.prompt chờ user gõ — phải dài hơn timeout 120s của askRenderer phía main. */
+const PROMPT_TIMEOUT_MS = 130_000
 
 function post(msg: WorkerToHost): void {
   port?.postMessage(msg)
@@ -41,13 +43,13 @@ function fmt(args: unknown[]): string {
     .join(' ')
 }
 
-function callApi(pluginId: string, method: ApiMethod, args: unknown[]): Promise<unknown> {
+function callApi(pluginId: string, method: ApiMethod, args: unknown[], timeoutMs = API_TIMEOUT_MS): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const callId = randomUUID()
     const timer = setTimeout(() => {
       pending.delete(callId)
       reject(new Error(`API "${method}" quá hạn`))
-    }, API_TIMEOUT_MS)
+    }, timeoutMs)
     pending.set(callId, { resolve, reject, timer })
     post({ t: 'api-call', callId, pluginId, method, args })
   })
@@ -89,6 +91,9 @@ function buildApi(p: LoadedPlugin): unknown {
       },
       notify(message: string): Promise<void> {
         return callApi(p.id, 'ui.notify', [message]) as Promise<void>
+      },
+      prompt(opts: { title?: string; label?: string; placeholder?: string; value?: string }): Promise<string | null> {
+        return callApi(p.id, 'ui.prompt', [opts], PROMPT_TIMEOUT_MS) as Promise<string | null>
       }
     },
     storage: {

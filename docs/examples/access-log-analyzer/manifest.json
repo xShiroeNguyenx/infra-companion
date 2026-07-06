@@ -1,10 +1,14 @@
 {
   "id": "access-log-analyzer",
   "name": "Access Log Analyzer",
-  "version": "1.0.0",
-  "description": "Phân tích nhanh access log trên host đang mở: top IP, request/phút, top URL, User-Agent, status code, hành vi của IP nghi vấn nhất — kết quả hiện trong panel.",
-  "permissions": ["terminal.observe", "terminal.write", "ui.panel", "ui.notify"],
+  "version": "1.3.0",
+  "description": "Phân tích nhanh access log trên host đang mở: top IP, request/phút, top URL, User-Agent, status code, hành vi của IP nghi vấn nhất — kết quả hiện trong panel. Khi chạy sẽ hỏi đường dẫn log (bỏ trống = mặc định). Tự nhận cả log combined chuẩn lẫn log custom có vhost đứng đầu dòng. Panel hiện lệnh từng mục + nút ↻ chạy lại / ✎ sửa lệnh riêng từng mục.",
+  "permissions": ["terminal.observe", "terminal.write", "ui.panel", "ui.notify", "ui.prompt", "storage"],
   "contributes": {
-    "commands": [{ "id": "alog.analyze", "title": "Access log: Phân tích 6 thông số" }]
+    "commands": [
+      { "id": "alog.analyze", "title": "Access log: Phân tích 6 thông số" },
+      { "id": "alog.rerun", "title": "Access log: Chạy lại 1 mục (nút ↻ trong panel)" },
+      { "id": "alog.edit", "title": "Access log: Sửa lệnh 1 mục (nút ✎ trong panel)" }
+    ]
   }
 }

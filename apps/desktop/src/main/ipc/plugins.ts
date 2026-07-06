@@ -10,6 +10,7 @@ import {
 } from '@infra/core'
 import { IPC, type PluginInfoDto } from '@infra/shared'
 import { touchActivity } from './vault'
+import { askRenderer } from './prompts'
 import type { TerminalBridge } from './terminal'
 
 /**
@@ -102,6 +103,11 @@ export function registerPluginsIpc(
       }
       data[key] = value
       writeFileSync(file, JSON.stringify(data, null, 2))
+    },
+    promptUser: (pluginId, opts) => {
+      const win = getWin()
+      if (!win || win.webContents.isDestroyed()) return Promise.resolve(null)
+      return askRenderer<string | null>(win.webContents, IPC.PLUGINS_PROMPT, { pluginId, ...opts })
     }
   }
 
@@ -129,9 +135,9 @@ export function registerPluginsIpc(
   ipcMain.handle(IPC.PLUGINS_CONTRIBUTIONS, () => host.contributions())
   ipcMain.handle(
     IPC.PLUGINS_INVOKE_COMMAND,
-    (_e, pluginId: string, commandId: string, activeSessionId: string | null) => {
+    (_e, pluginId: string, commandId: string, activeSessionId: string | null, arg?: string) => {
       touchActivity()
-      host.invokeCommand(pluginId, commandId, activeSessionId)
+      host.invokeCommand(pluginId, commandId, activeSessionId, arg)
     }
   )
   ipcMain.on(IPC.PLUGINS_OPEN_FOLDER, (_e, id?: string) => {

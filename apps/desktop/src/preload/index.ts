@@ -12,6 +12,7 @@ import {
   type PasswordQuestion,
   type PluginNotifyDto,
   type PluginPanelDto,
+  type PluginPromptDto,
   type SnippetInput,
   type TerminalCreateRequest,
   type TerminalDataEvent,
@@ -166,12 +167,13 @@ const api: InfraApi = {
     reload: (id) => ipcRenderer.invoke(IPC.PLUGINS_RELOAD, id),
     rescan: () => ipcRenderer.invoke(IPC.PLUGINS_RESCAN),
     openFolder: (id) => ipcRenderer.send(IPC.PLUGINS_OPEN_FOLDER, id),
-    invokeCommand: (pluginId, commandId, activeSessionId) =>
-      ipcRenderer.invoke(IPC.PLUGINS_INVOKE_COMMAND, pluginId, commandId, activeSessionId),
+    invokeCommand: (pluginId, commandId, activeSessionId, arg) =>
+      ipcRenderer.invoke(IPC.PLUGINS_INVOKE_COMMAND, pluginId, commandId, activeSessionId, arg),
     contributions: () => ipcRenderer.invoke(IPC.PLUGINS_CONTRIBUTIONS),
     onContributionsChanged: (cb) => subscribe<ContributedCommandDto[]>(IPC.PLUGINS_CONTRIBUTIONS_CHANGED, cb),
     onPanel: (cb) => subscribe<PluginPanelDto>(IPC.PLUGINS_PANEL_SHOW, cb),
-    onNotify: (cb) => subscribe<PluginNotifyDto>(IPC.PLUGINS_NOTIFY, cb)
+    onNotify: (cb) => subscribe<PluginNotifyDto>(IPC.PLUGINS_NOTIFY, cb),
+    onPrompt: (cb) => subscribe<PluginPromptDto>(IPC.PLUGINS_PROMPT, cb)
   }
 }
 

@@ -46,5 +46,6 @@ export type {
   WorkerToHost,
   ApiMethod,
   CommandCtx,
-  WorkerContributions
+  WorkerContributions,
+  PluginPromptOptions
 } from './plugins/protocol'

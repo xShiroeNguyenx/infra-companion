@@ -352,7 +352,7 @@ Each plugin is a folder under `<userData>/plugins/<plugin-id>/`:
 - **Panel**: markdown/text content a plugin produces (reports, tables…) — docks to the **top-right corner**, translucent (hover to focus), and doesn't block the terminal: keep typing while reading. Close with **✕** (Esc is left to the terminal).
 - **Toast**: a plugin can raise a short notification (e.g. *Output Highlighter* warns when it sees "error" in the terminal).
 - **Light automation**: a plugin can listen to terminal output and write a command into the open session (e.g. the "Highlighter: send echo to active session" command).
-- **Real-world sample — *Access Log Analyzer***: SSH into a web server (root helps for reading the log), then run **"Access log: Phân tích 6 thông số"** from the Palette. It types one visible shell one-liner into the session and opens a panel with 6 stats: top 15 IPs, requests/minute, top URLs, top User-Agents, status codes, and what the most suspicious IP is calling — plus a short how-to-read guide. Defaults live at the top of its `index.js` (`LOG_PATH = /etc/httpd/logs/ssl_access_log`, 50 000-line sample) — edit + **Reload** for nginx or other paths.
+- **Real-world sample — *Access Log Analyzer***: SSH into a web server (root helps for reading the log), then run **"Access log: Phân tích 6 thông số"** from the Palette. It types one visible shell one-liner into the session and opens a panel with 6 stats: top 15 IPs, requests/minute, top URLs, top User-Agents, status codes, and what the most suspicious IP is calling — plus a short how-to-read guide. When invoked it first asks for the **log path** in a small dialog — leave it empty to use the default (`/etc/httpd/logs/ssl_access_log`), or type e.g. `/var/log/nginx/access.log`; the last entered path is remembered for next time. It handles both the standard combined format and custom formats with a **leading vhost** (`www.site.com:443 1.2.3.4 - - [...]`) — the column offset is auto-detected from the first line, and with a vhost present the top-URL sections print `vhost/path` (one file often aggregates many domains). Each panel section shows the exact shell pipeline it ran and has **↻ re-run** / **✎ edit-command** buttons: edit opens a dialog pre-filled with the current command (clear it to restore the default), and only that section re-runs and updates in place; edited commands persist and are reused by the next full analysis. The default path, sample size (50 000 lines) and a `FIELD_OFFSET` override live at the top of its `index.js` — edit + **Reload** for exotic formats.
 
 ### C. Writing a plugin
 
@@ -386,16 +386,17 @@ An invalid manifest → the plugin shows a **Failed** status (with the message w
 | API | Kind | Description |
 |-----|------|-------------|
 | `api.id` | `string` | the plugin id |
-| `api.commands.register(id, title, handler)` | sync | Register a command; `handler(ctx)` runs when invoked from the Palette. `ctx.activeSessionId?: string`. |
+| `api.commands.register(id, title, handler)` | sync | Register a command; `handler(ctx)` runs when invoked from the Palette or a panel `cmd:` button. `ctx.activeSessionId?: string`, `ctx.arg?: string` (the part after `?` in a `cmd:` link). |
 | `api.terminal.onData(cb)` | sync → `() => void` | Listen to output of all sessions: `cb({ sessionId, data })`. Returns an unsubscribe fn. **Observe-only.** |
 | `api.terminal.write(sessionId, data)` | async | Send text/a command into a session (as if typed). |
 | `api.terminal.getActiveSessionId()` | async → `string \| null` | The currently active terminal session. |
 | `api.ui.showPanel({ title, markdown?, text? })` | async | Open a panel showing `markdown` (safe subset) or plain `text`. |
 | `api.ui.notify(message)` | async | Show a short toast. |
+| `api.ui.prompt({ title?, label?, placeholder?, value? })` | async → `string \| null` | Ask the user for one line of text via a modal. Returns the entered string (may be empty), or `null` if the user cancelled. Waits up to 120s (not the usual 8s). |
 | `api.storage.get(key)` / `api.storage.set(key, value)` | async | Read/write JSON private to the plugin (`data.json`). |
 | `api.log(...args)` | sync | Write to the log (view in Plugins → ▼). |
 
-> **async** functions return a `Promise` (round-tripped through main, 8s timeout) — remember to `await`. `register`/`onData`/`log` are sync. `showPanel` markdown supports: `#`/`##`/`###`, `**bold**`, `*italic*`, `` `code` ``, code blocks, `- ` lists, `http(s)` links; **no** raw HTML.
+> **async** functions return a `Promise` (round-tripped through main, 8s timeout; `ui.prompt` waits 120s) — remember to `await`. `register`/`onData`/`log` are sync. `showPanel` markdown supports: `#`/`##`/`###`, `**bold**`, `*italic*`, `` `code` ``, code blocks, `- ` lists, `http(s)` links, and **action buttons** `[label](cmd:command.id?arg)` that invoke a command of the same plugin with `ctx.arg` set to the (URI-decoded) text after `?`; **no** raw HTML.
 
 **Example** — observe output → notify + send a command:
 ```js

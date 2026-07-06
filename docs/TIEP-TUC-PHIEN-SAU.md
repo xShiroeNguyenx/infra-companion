@@ -1,12 +1,25 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
-> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật: chuẩn bị release **v0.1.8** (fix Monitoring/Bulk xuyên login-script), sau khi v0.1.6/v0.1.7 đã phát hành.
+> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật 2026-07-06: **v0.1.10 ĐÃ CODE XONG, CHƯA commit/tag, CHƯA test GUI** (Plugin API `ui.prompt` + Access Log Analyzer hỏi đường dẫn log). v0.1.9 đã phát hành (commit `9b6002d` + tag trên origin); PLAN/ROADMAP có thêm **Wave 3** (F23–F54, đề xuất — chưa code) cũng chưa commit.
 
 ## Đang ở đâu
 
-Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 → v0.1.7 (đã tag/phát hành)**. App build + typecheck + test đều sạch (71 core test).
+Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 → v0.1.9 (đã tag/phát hành)**. App build + typecheck + test đều sạch (72 core test).
 
-**v0.1.8 đã sẵn sàng nhưng CHƯA commit/tag** (xem mục cuối) — bugfix, không đổi schema DB (vẫn **v9**):
+**v0.1.10 (2026-07-06, ĐÃ bump version + CHANGELOG + USER-GUIDE, CHƯA commit/tag, CHƯA test GUI)** — Plugin API mới + nâng cấp plugin mẫu, không đổi schema DB (vẫn **v9**):
+1. **Plugin API `api.ui.prompt({ title?, label?, placeholder?, value? })` → `string | null`** — plugin hỏi user 1 dòng text qua modal (null = Huỷ/timeout). Chuỗi xuyên suốt: `packages/core/src/plugins/protocol.ts` (method `ui.prompt` + interface `PluginPromptOptions`) → `PluginHost` (adapter **bắt buộc mới** `promptUser(pluginId, opts)` — implementor/fake test nào cũng phải thêm) → [ipc/plugins.ts](../apps/desktop/src/main/ipc/plugins.ts) dùng lại hạ tầng `askRenderer` sẵn có (kênh mới `IPC.PLUGINS_PROMPT`; renderer trả lời qua kênh chung `PROMPT_ANSWER`, timeout 120s phía main) → [PromptsHost.tsx](../apps/desktop/src/renderer/src/components/PromptsHost.tsx) thêm loại câu hỏi `'plugin'` (modal + TextInput, nút OK/Huỷ). ⚠️ Worker: `callApi` nhận **timeout riêng** — `ui.prompt` chờ 130s (dài hơn 120s của main) thay vì 8s mặc định.
+2. **Access Log Analyzer v1.2.0** (`docs/examples/access-log-analyzer/`): khi chạy lệnh sẽ **hỏi đường dẫn log** — bỏ trống = mặc định `/etc/httpd/logs/ssl_access_log`, gõ ví dụ `/var/log/nginx/access.log`; **nhớ lần nhập trước** qua `api.storage` (key `logPath`); validate path `^[A-Za-z0-9._/-]+$` (chặn khoảng trắng/ký tự phá one-liner shell). Manifest thêm permissions `ui.prompt`, `storage`. **ĐÃ copy đè** sang thư mục plugin đã cài `%APPDATA%\@infra\desktop\plugins\access-log-analyzer\` — chạy `pnpm dev` bản mới là dùng được ngay (API mới cần build app mới).
+   - **Hỗ trợ log format custom của server user** (vhost:port đứng ĐẦU dòng `www.site.com:443 1.2.3.4 - - [...]` + đuôi `| Country Code | ASN…`): mọi cột dịch +1 so với combined chuẩn (IP $1→$2, URL $7→$8, status $9→$10). Plugin **tự dò offset** từ dòng đầu file (cột 1 là IP → chuẩn, không phải → +1; hằng `FIELD_OFFSET='auto'` đầu index.js, đặt số để ép). Khi có vhost, mục top-URL in `vhost/path` (1 file gộp nhiều domain). Thời gian (tách theo `[`) và User-Agent (tách theo `"`) vốn không phụ thuộc vị trí cột. Đã test pipeline awk với log mẫu cả 2 format. Sửa kèm: thông báo "(x) Khong doc duoc..." trước đây nằm giữa BEGIN và S1 nên parser vứt mất (path sai → 6 mục trống không lý do) — giờ nằm trong mục 1.
+3. **Plugin API: nút hành động `cmd:` trong panel + `ctx.arg`** — markdown link `[nhãn](cmd:command.id?arg)` render thành nút, bấm gọi command CỦA CHÍNH plugin sở hữu panel với `ctx.arg` = phần sau `?` (URI-decoded). Chuỗi: `miniMarkdown.tsx` (prop `onCommand`, nơi khác không truyền → render text thường) → `PluginPanelModal.tsx` (tự tính activeSessionId từ tabs store như palette) → `invokeCommand(pluginId, commandId, sid, arg)` xuyên preload/IPC/PluginHost → `CommandCtx.arg` (protocol.ts).
+4. **Access Log Analyzer v1.3.0 — panel tương tác**: mỗi mục hiện lệnh pipeline đã chạy (`$ awk …` đầu code block) + nút **↻ Chạy lại** (chạy lại riêng mục đó trên đúng phiên/log cũ, tail mẫu mới) + **✎ Sửa lệnh** (ui.prompt điền sẵn lệnh hiện tại → sửa → chỉ mục đó chạy lại và cập nhật tại chỗ; để trống = về mặc định). Lệnh đã sửa lưu `api.storage` key `cmds` (per mục, dùng cả cho lần phân tích đầy đủ sau). Validate lệnh sửa: 1 dòng, cấm `!` (history expansion), cấm chuỗi `@ALOG`. State module: `lastRun={logPath,sessionId,contents[]}` (mất khi Reload plugin — nút ↻/✎ báo "chạy phân tích trước"), `overrides={}`. Commands mới `alog.rerun`/`alog.edit` (hiện cả trong palette — gọi chay sẽ notify hướng dẫn).
+5. Kiểm tra: **72 test pass** (+1 test `ui.prompt` round-trip trong `PluginHost.test.ts`), typecheck 3 package + `pnpm build` xanh; `node --check` plugin OK. **ui.prompt user ĐÃ chạy thử OK** (data.json có logPath). **Chưa test GUI**: nút ↻/✎ trong panel — cần `pnpm dev` bản mới (có cmd: link), chạy phân tích rồi bấm thử 2 nút.
+
+**v0.1.9 (ĐÃ phát hành 2026-07-03)** — thuần renderer + plugin mẫu + docs, không đổi schema DB (vẫn **v9**):
+1. **Plugin mẫu thứ 3: Access Log Analyzer** (`docs/examples/access-log-analyzer/`) — 1 lệnh palette, gõ 1 dòng shell (tail+awk trên 50k dòng cuối) vào phiên SSH đang mở, bóc output theo marker `@ALOG:...@` (token tách đôi khi echo để dòng lệnh terminal echo lại không match), hiện panel 6 thông số + hướng dẫn đọc. Config hardcode đầu `index.js` (`LOG_PATH`, `SAMPLE_LINES`, timeout 30s). ⚠️ **Bài học: CẤM ký tự `!` trong lệnh gửi vào bash tương tác** — history expansion chạy TRƯỚC khi thực thi, `!)` → "event not found" → bash vứt cả dòng; `set +H` cùng dòng không cứu được.
+2. **Panel plugin neo góc phải** ([PluginPanelModal.tsx](../apps/desktop/src/renderer/src/components/PluginPanelModal.tsx)) — bỏ Modal+backdrop; dock top-right 460px, mờ 75% (hover 100%), z-40, đóng bằng ✕. **Cố ý bỏ Esc** (Esc thuộc về terminal/vim).
+3. **Monitoring tách khỏi vòng đời modal** — trước đây đóng modal (hoặc mở modal KHÁC) là unmount → `stopAll()` giết monitoring ngầm. Giờ: store mới [stores/monitor.ts](../apps/desktop/src/renderer/src/stores/monitor.ts) (active + data, subscribe onSample ở App.tsx); [MonitorDock.tsx](../apps/desktop/src/renderer/src/components/MonitorDock.tsx) dock phải 320px 1 cột card, mờ 75%, z-30 (dưới panel plugin z-40 — mở cả 2 thì plugin đè dock, chấp nhận); [MonitorModal.tsx](../apps/desktop/src/renderer/src/components/MonitorModal.tsx) chỉ còn form chọn host (mở lại khi đang chạy = tick sẵn tập đang theo dõi). `store.start()` gọi `stopAll()` trước → ngữ nghĩa THAY tập host (backend dedupe theo hostId). Chỉ nút **Dừng** trên dock mới tắt.
+
+**v0.1.8 (đã phát hành)** — bugfix, không đổi schema DB (vẫn **v9**):
 1. **Fix Monitoring/Bulk xuyên login-script** — từ v0.1.3, `deriveSshArgsFromLoginSteps` bị đổi ngữ nghĩa để trả về nguyên lệnh SFTP (`ssh … -s sftp`), nhưng Monitor/Bulk vẫn bọc thêm một lớp `ssh` bên ngoài → lệnh rác, stdout rỗng, dashboard báo "Không parse được metrics (không phải Linux?)" với host Linux bình thường sau gate (phát hiện trên một host AlmaLinux vào qua login script). Đã tách builder chung [loginScript.ts](../packages/core/src/connection/loginScript.ts): `deriveSftpExecFromLoginSteps` (SFTP, giữ nguyên hành vi) + `deriveExecFromLoginSteps(steps, command)` (Bulk/Monitor). Nhờ đó Bulk/Monitor giờ xuyên được cả **su/sudo + ssh-có-password** (sshpass trên gate) như SFTP. ⚠️ Biến thể exec nạp password su/sudo bằng `echo PASS |` chứ KHÔNG `{ echo; cat; } |` như SFTP — caller không bao giờ đóng stdin kênh exec nên `cat` sẽ chờ EOF vô hạn, kênh không bao giờ close.
 2. **Monitor thu stderr** — parse fail thì card hiện lỗi thật từ remote (Permission denied, sshpass thiếu…) thay vì đoán "không phải Linux?". Đã xoá `wrapSshCommand` (nguồn gốc của bẫy). +10 test cho builder (71 total).
 
@@ -24,7 +37,7 @@
 | 0 — Skeleton (Electron + React + xterm + node-pty, monorepo pnpm) | ✅ |
 | 1 — SSH core + Vault (argon2id + AES-256-GCM, hosts/groups/keys, TOFU, auto-reconnect) | ✅ |
 | 2 — SFTP, tunnels L/R/D (SOCKS5), jump chain, snippets, import ssh_config, group inheritance, agent | ✅ |
-| 3 — Split panes + **broadcast**, command palette, Telnet, Serial, session logs | ✅ (còn: workspaces, FIDO2, SSH certs) |
+| 3 — Split panes + **broadcast**, command palette, Telnet, Serial, session logs | ✅ (còn: FIDO2, SSH certs — workspaces đã xong v0.1.4) |
 | 4 — **Sync E2EE** (zero-knowledge, backend thư mục) | ✅ (còn: WebDAV/S3/Git) |
 | 5 — **Bulk Execution**, **Monitoring** (không agent), Network Toolbox; Bulk/Monitor/SFTP **xuyên login-script** | ✅ (còn: cloud import F05, Docker/K8s F06) |
 | 6 — **AI assistant** (Claude/OpenAI/Gemini/Ollama), **Session recording** (asciicast), **Secrets manager** (op/bw/vault) | ✅ (còn: plugin F16) |
@@ -97,31 +110,42 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 
 ## Gợi ý cho phiên sau (Plugin system F16 v1 đã xong ở v0.1.6)
 
-1. **VNC (noVNC)** — xem màn hình remote trong tab. Thuần JS khả thi hơn RDP (RDP cần FreeRDP native, nặng). Rủi ro trung bình.
-2. **Plugin v2** — protocol mới (SessionKind) + permission enforcement + transform output (mở rộng nền v1).
-3. **SSH Certificates / FIDO2**, hoặc **Sync backend WebDAV/S3/Git**, hoặc **ssh_config 2 chiều** — xem ROADMAP.
+1. **Wave 3 top-5** (thêm 2026-07-04, xem ROADMAP mục "Wave 3"): TOTP trong vault (F41) · alert ngưỡng + lịch sử metrics (F04+F32) · AI giải thích output đang chọn (F46) · SFTP transfer queue (P46) · Shell integration OSC 133 (F23).
+2. **VNC (noVNC)** — xem màn hình remote trong tab. Thuần JS khả thi hơn RDP (RDP cần FreeRDP native, nặng). Rủi ro trung bình.
+3. **Plugin v2** — protocol mới (SessionKind) + permission enforcement + transform output + panel HTML sandbox (F51) (mở rộng nền v1).
+4. **SSH Certificates / FIDO2**, hoặc **Sync backend WebDAV/S3/Git**, hoặc **ssh_config 2 chiều** — xem ROADMAP.
 
 ## Việc cần làm khi mở phiên mới
 - Mở lại file này để nhớ ngữ cảnh.
 - Chọn 1 hạng mục ở trên → bắt đầu luôn.
 
-## Git + Release v0.1.8 (anh tự chạy; tôi không tự commit)
+## Git (anh tự chạy; tôi không tự commit)
 
-> v0.1.7 ĐÃ tag/phát hành (ảnh nền từ URL). Phần đang chờ là **v0.1.8** (fix Monitoring/Bulk xuyên login-script + stderr khi parse metrics fail).
+> Đang chờ commit 2 phần: (1) **docs Wave 3** (PLAN.md/ROADMAP.md, 2026-07-04); (2) **feat v0.1.10** — Plugin API `ui.prompt` + Access Log Analyzer hỏi đường dẫn log (2026-07-06, code + docs + bump version). Nên tách 2 commit; tag `v0.1.10` chỉ đánh SAU khi đã test GUI (`pnpm dev` → chạy lệnh Access log → kiểm modal).
 
-Version đã bump sẵn `0.1.7 → 0.1.8` ở `package.json` (gốc + `apps/desktop`); CHANGELOG thêm [0.1.8], README/USER-GUIDE/landing/handoff đã cập nhật. Release tự kích hoạt khi **push tag `v*.*.*`** (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux).
+Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps/desktop`) + CHANGELOG + README/USER-GUIDE/landing/handoff, rồi push tag `v*.*.*` — release tự kích hoạt (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux). Lưu ý: đổi `docs/landing/index.html` (version trên hero) sẽ tự deploy lại landing page qua flow Pages riêng khi push lên `main`.
 
 **Landing page = flow ĐỘC LẬP** (`.github/workflows/pages.yml`, deploy `docs/landing/`): tự chạy khi **push thay đổi `docs/landing/**` lên `main`** (hoặc chạy tay workflow_dispatch) — **KHÔNG gắn tag/release → không build lại app**. `ci.yml` đã thêm `paths-ignore: docs/** + **/*.md` để push chỉ-docs không kích hoạt build 3-OS. **Setting 1 lần**: repo → Settings → Pages → Source = **GitHub Actions**. URL: `https://xshiroenguyenx.github.io/infra-companion/`. Link User guide/Changelog/Roadmap trong landing trỏ GitHub blob/main (không tương đối) để hoạt động khi publish.
 
 ```powershell
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
-git add -A
+
+# Commit 1 — docs Wave 3 (chỉ .md, ci.yml paths-ignore bỏ qua, không build app)
+git add PLAN.md ROADMAP.md
+git commit -m "docs: Wave 3 roadmap (F23-F54) + parity gap audit"
+
+# Commit 2 — feat v0.1.10 (code + docs + bump version)
+git add packages/core/src/plugins/protocol.ts packages/core/src/plugins/PluginHost.ts packages/core/src/plugins/PluginHost.test.ts packages/core/src/index.ts
+git add packages/shared/src/ipc.ts packages/shared/src/types.ts
+git add apps/desktop/src/main/plugins/worker.ts apps/desktop/src/main/ipc/plugins.ts apps/desktop/src/preload/index.ts apps/desktop/src/renderer/src/components/PromptsHost.tsx
+git add docs/examples/access-log-analyzer/ docs/USER-GUIDE.md docs/TIEP-TUC-PHIEN-SAU.md CHANGELOG.md package.json apps/desktop/package.json
 git status            # xem lại trước khi commit
-git commit -m "fix: monitoring/bulk xuyên login-script (bọc nhầm lệnh SFTP) + docs v0.1.8"
+git commit -m "feat: plugin API ui.prompt + Access Log Analyzer hoi duong dan log (v0.1.10)"
 git push origin main
-# Phát hành: tạo tag để CI build + tạo release
-git tag v0.1.8
-git push origin v0.1.8
+
+# Tag/release — CHỈ chạy sau khi đã test GUI OK (pnpm dev → lệnh Access log → kiểm modal)
+git tag v0.1.10
+git push origin v0.1.10
 ```
 
 > Môi trường dev: Node 20, pnpm 9, Electron 42 (Node 24 runtime — dùng `node:sqlite`), ssh2/node-pty/serialport là native nhưng đã externalize + prebuilt nên không cần build C++. Khi chạy electron từ terminal đã dính biến `ELECTRON_RUN_AS_NODE` thì thêm `$env:ELECTRON_RUN_AS_NODE=$null` cùng lệnh (chỉ là gotcha của terminal, không phải lỗi app).

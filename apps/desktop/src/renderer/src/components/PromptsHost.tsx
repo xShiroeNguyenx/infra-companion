@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react'
-import type { HostKeyQuestion, PasswordQuestion } from '@infra/shared'
+import type { HostKeyQuestion, PasswordQuestion, PluginPromptDto } from '@infra/shared'
 import { Button, Field, Modal, TextInput } from './ui'
 import { useT } from '../i18n'
 
 type Question =
   | { type: 'hostkey'; q: HostKeyQuestion }
   | { type: 'password'; q: PasswordQuestion }
+  | { type: 'plugin'; q: PluginPromptDto }
 
-/** Hứng câu hỏi từ main (host key TOFU, password Quick Connect) và hiện modal lần lượt. */
+/** Hứng câu hỏi từ main (host key TOFU, password Quick Connect, ui.prompt của plugin) và hiện modal lần lượt. */
 export function PromptsHost() {
   const t = useT()
   const [queue, setQueue] = useState<Question[]>([])
   const [password, setPassword] = useState('')
+  const [text, setText] = useState<string | null>(null)
 
   useEffect(() => {
     const offHostKey = window.infra.prompts.onHostKey((q) =>
@@ -20,9 +22,13 @@ export function PromptsHost() {
     const offPassword = window.infra.prompts.onPassword((q) =>
       setQueue((prev) => [...prev, { type: 'password', q }])
     )
+    const offPlugin = window.infra.plugins.onPrompt((q) =>
+      setQueue((prev) => [...prev, { type: 'plugin', q }])
+    )
     return () => {
       offHostKey()
       offPassword()
+      offPlugin()
     }
   }, [])
 
@@ -33,6 +39,39 @@ export function PromptsHost() {
     window.infra.prompts.answer(requestId, answer)
     setQueue((prev) => prev.slice(1))
     setPassword('')
+    setText(null)
+  }
+
+  if (current.type === 'plugin') {
+    const { q } = current
+    const value = text ?? q.value ?? ''
+    return (
+      <Modal title={q.title ?? q.pluginId} onClose={() => finish(q.requestId, null)} closeOnBackdrop={false}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            finish(q.requestId, value)
+          }}
+        >
+          <Field label={q.label ?? ''}>
+            <TextInput
+              autoFocus
+              value={value}
+              placeholder={q.placeholder}
+              onChange={(e) => setText(e.target.value)}
+            />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button type="button" onClick={() => finish(q.requestId, null)}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" variant="primary">
+              OK
+            </Button>
+          </div>
+        </form>
+      </Modal>
+    )
   }
 
   if (current.type === 'password') {

@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { discoverPlugins, type DiscoveredPlugin } from './discover'
-import type { ApiMethod, HostToWorker, WorkerToHost } from './protocol'
+import type { ApiMethod, HostToWorker, PluginPromptOptions, WorkerToHost } from './protocol'
 
 /** Worker tối giản để PluginHost dùng — desktop bọc node:worker_threads, test dùng fake. */
 export interface PluginWorkerLike {
@@ -26,6 +26,8 @@ export interface PluginHostAdapters {
   /** Đọc/ghi storage plugin-scoped (đã confine đường dẫn). */
   storageGet(pluginId: string, key: string): unknown
   storageSet(pluginId: string, key: string, value: unknown): void
+  /** Hỏi user 1 chuỗi qua modal (ui.prompt) — null nếu Huỷ/timeout. */
+  promptUser(pluginId: string, opts: PluginPromptOptions): Promise<string | null>
 }
 
 export type PluginStatus = 'active' | 'disabled' | 'failed' | 'crashed' | 'loading'
@@ -281,6 +283,11 @@ export class PluginHost extends EventEmitter<PluginHostEvents> {
         case 'ui.notify':
           this.emit('notify', { pluginId, message: String(args[0]) })
           break
+        case 'ui.prompt': {
+          const opts = (args[0] ?? {}) as PluginPromptOptions
+          value = await this.adapters.promptUser(pluginId, opts)
+          break
+        }
         case 'storage.get':
           value = this.adapters.storageGet(pluginId, String(args[0]))
           break
@@ -363,14 +370,14 @@ export class PluginHost extends EventEmitter<PluginHostEvents> {
     return this.list()
   }
 
-  invokeCommand(pluginId: string, commandId: string, activeSessionId: string | null): void {
+  invokeCommand(pluginId: string, commandId: string, activeSessionId: string | null, arg?: string): void {
     const p = this.plugins.get(pluginId)
     if (!p || p.status !== 'active') return
     this.send({
       t: 'invokeCommand',
       pluginId,
       commandId,
-      ctx: { activeSessionId: activeSessionId ?? undefined }
+      ctx: { activeSessionId: activeSessionId ?? undefined, arg }
     })
   }
 

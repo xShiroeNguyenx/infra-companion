@@ -5,11 +5,15 @@ import type { ReactNode } from 'react'
  * (KHÔNG dùng dangerouslySetInnerHTML, KHÔNG thêm dependency).
  * Hỗ trợ: heading #/##/###, **đậm**, *nghiêng*, `code`, code block ```, danh sách "- ", link http(s).
  * Link chỉ nhận http/https (an toàn) — Electron mở bằng trình duyệt ngoài.
+ * Link `cmd:` = nút hành động gọi ngược về plugin sở hữu panel: [nhãn](cmd:command.id?arg)
+ * — chỉ hoạt động khi caller truyền onCommand (PluginPanelModal); nơi khác render text thường.
  */
 
-const INLINE_RE = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`/g
+type OnCommand = (commandId: string, arg?: string) => void
 
-function renderRich(text: string, keyPrefix: string): ReactNode[] {
+const INLINE_RE = /\[([^\]]+)\]\(((?:https?:\/\/|cmd:)[^\s)]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`/g
+
+function renderRich(text: string, keyPrefix: string, onCommand?: OnCommand): ReactNode[] {
   const out: ReactNode[] = []
   let last = 0
   let i = 0
@@ -19,11 +23,34 @@ function renderRich(text: string, keyPrefix: string): ReactNode[] {
     if (m.index > last) out.push(text.slice(last, m.index))
     const key = `${keyPrefix}-${i++}`
     if (m[1] && m[2]) {
-      out.push(
-        <a key={key} href={m[2]} target="_blank" rel="noreferrer" className="text-accent underline">
-          {m[1]}
-        </a>
-      )
+      const label = m[1]
+      const url = m[2]
+      if (url.startsWith('cmd:')) {
+        const rest = url.slice(4)
+        const q = rest.indexOf('?')
+        const commandId = q >= 0 ? rest.slice(0, q) : rest
+        const arg = q >= 0 ? decodeURIComponent(rest.slice(q + 1)) : undefined
+        out.push(
+          onCommand ? (
+            <button
+              key={key}
+              type="button"
+              className="border-edge-strong bg-hover text-accent hover:border-accent inline-block cursor-pointer rounded border px-1.5 py-0.5 text-[11px] leading-none"
+              onClick={() => onCommand(commandId, arg)}
+            >
+              {label}
+            </button>
+          ) : (
+            label
+          )
+        )
+      } else {
+        out.push(
+          <a key={key} href={url} target="_blank" rel="noreferrer" className="text-accent underline">
+            {label}
+          </a>
+        )
+      }
     } else if (m[3]) {
       out.push(<strong key={key}>{m[3]}</strong>)
     } else if (m[4]) {
@@ -41,7 +68,7 @@ function renderRich(text: string, keyPrefix: string): ReactNode[] {
   return out
 }
 
-function renderBlocks(md: string): ReactNode[] {
+function renderBlocks(md: string, onCommand?: OnCommand): ReactNode[] {
   const lines = md.replace(/\r\n/g, '\n').split('\n')
   const blocks: ReactNode[] = []
   let i = 0
@@ -71,7 +98,7 @@ function renderBlocks(md: string): ReactNode[] {
       const cls = level === 1 ? 'text-base font-semibold' : level === 2 ? 'text-sm font-semibold' : 'text-sm font-medium'
       blocks.push(
         <div key={bi} className={`mt-2 mb-1 text-content ${cls}`}>
-          {renderRich(h[2]!, `h${bi++}`)}
+          {renderRich(h[2]!, `h${bi++}`, onCommand)}
         </div>
       )
       i++
@@ -82,7 +109,7 @@ function renderBlocks(md: string): ReactNode[] {
       const items: ReactNode[] = []
       while (i < lines.length && /^\s*[-*]\s+/.test(lines[i]!)) {
         const item = lines[i]!.replace(/^\s*[-*]\s+/, '')
-        items.push(<li key={items.length}>{renderRich(item, `li${bi}-${items.length}`)}</li>)
+        items.push(<li key={items.length}>{renderRich(item, `li${bi}-${items.length}`, onCommand)}</li>)
         i++
       }
       blocks.push(
@@ -111,13 +138,13 @@ function renderBlocks(md: string): ReactNode[] {
     }
     blocks.push(
       <p key={bi} className="my-1 text-sm leading-relaxed text-content">
-        {renderRich(para.join(' '), `p${bi++}`)}
+        {renderRich(para.join(' '), `p${bi++}`, onCommand)}
       </p>
     )
   }
   return blocks
 }
 
-export function MiniMarkdown({ source }: { source: string }) {
-  return <div className="break-words">{renderBlocks(source)}</div>
+export function MiniMarkdown({ source, onCommand }: { source: string; onCommand?: OnCommand }) {
+  return <div className="break-words">{renderBlocks(source, onCommand)}</div>
 }

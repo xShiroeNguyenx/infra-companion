@@ -5,6 +5,21 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.10] — 2026-07-06
+
+### Added
+
+- **Plugin API: `api.ui.prompt({ title?, label?, placeholder?, value? })`** — a plugin can now ask the user for one line of text via a modal dialog (same prompt pipeline as the host-key/password questions). Resolves to the entered string (may be empty) or `null` on Cancel; waits up to 120s instead of the usual 8s API timeout. Declared as the `ui.prompt` permission in `manifest.json` (v1: displayed only).
+- **Plugin panels: `cmd:` action buttons** — a markdown link of the form `[label](cmd:command.id?arg)` renders as a small button that invokes that command **of the panel's own plugin**, passing the text after `?` as `ctx.arg` (URI-decoded). Command handlers receive the new optional `ctx.arg: string`. This lets a plugin build interactive reports (re-run a part, drill down) without any HTML.
+
+### Changed
+
+- **Access Log Analyzer v1.2.0 asks for the log path when invoked** — a dialog pre-filled with the last-used path opens first; leave it **empty to use the default** (`/etc/httpd/logs/ssl_access_log`) or type e.g. `/var/log/nginx/access.log`. The last entered path is remembered (plugin storage). Input is validated (letters, digits, `. _ / -` only) so the generated one-liner can't be broken by spaces/shell metacharacters. Editing `index.js` is no longer needed to analyze a different vhost's log.
+- **Access Log Analyzer handles custom log formats with a leading vhost** — logs like `www.site.com:443 1.2.3.4 - - [...] "GET … " 200 …` (vhost:port prepended, extra `| Country Code | ASN …` fields appended) shift every column by one. The plugin now **auto-detects the offset** from the first line (column 1 is an IP → standard combined; otherwise → +1) and, when a vhost is present, prints top URLs as `vhost/path` since one file aggregates many domains. Timestamp (`[`-split) and User-Agent (`"`-split) parsing were already position-independent. A `FIELD_OFFSET` constant at the top of `index.js` overrides auto-detection for more exotic formats. The empty-file error message now lands inside section 1 (previously it was dropped by the marker parser, so a wrong path showed six silently-empty sections).
+- **Access Log Analyzer v1.3.0: each panel section shows its shell command and is individually editable/re-runnable** — every section now displays the exact pipeline it ran (`$ awk … | sort | …` above the output) plus two buttons: **↻ Chạy lại** re-runs just that section on the same host/log (fresh `tail` sample), and **✎ Sửa lệnh** opens a dialog pre-filled with the current command — edit it (e.g. change `head -15` to `head -50`), press OK and only that section re-runs and updates in place. Edited commands are remembered per section (plugin storage) and also used by the next full analysis; clearing the field restores the default. Edits are validated (single line, no `!` — interactive bash history expansion would kill the whole line, no `@ALOG` marker text).
+
+---
+
 ## [0.1.9] — 2026-07-03
 
 ### Added

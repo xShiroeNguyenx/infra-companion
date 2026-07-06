@@ -62,6 +62,8 @@ interface Harness {
   writes: { sessionId: string; data: string }[]
   storage: Record<string, Record<string, unknown>>
   activeSessionId: string | null
+  prompts: { pluginId: string; opts: unknown }[]
+  promptAnswer: string | null
 }
 
 function makeHost(pluginsDir: string, overrides: Partial<PluginHostAdapters> = {}): Harness {
@@ -73,7 +75,9 @@ function makeHost(pluginsDir: string, overrides: Partial<PluginHostAdapters> = {
     state: {},
     writes: [],
     storage: {},
-    activeSessionId: 'sess-active'
+    activeSessionId: 'sess-active',
+    prompts: [],
+    promptAnswer: null
   }
   const adapters: PluginHostAdapters = {
     pluginsDir,
@@ -93,6 +97,10 @@ function makeHost(pluginsDir: string, overrides: Partial<PluginHostAdapters> = {
     storageGet: (pluginId, key) => h.storage[pluginId]?.[key],
     storageSet: (pluginId, key, value) => {
       ;(h.storage[pluginId] ??= {})[key] = value
+    },
+    promptUser: (pluginId, opts) => {
+      h.prompts.push({ pluginId, opts })
+      return Promise.resolve(h.promptAnswer)
     },
     ...overrides
   }
@@ -220,6 +228,34 @@ describe('PluginHost', () => {
     await tick()
     expect(panels).toEqual([{ pluginId: 'demo', title: 'T', markdown: '# hi', text: undefined }])
     expect(notifs).toEqual([{ pluginId: 'demo', message: 'xin chào' }])
+  })
+
+  test('ui.prompt round-trip qua adapter promptUser → api-result trả câu trả lời (null = Huỷ)', async () => {
+    const dir = newPluginsDir()
+    writePlugin(dir, 'demo')
+    const h = makeHost(dir)
+    h.promptAnswer = '/var/log/nginx/access.log'
+    h.host.init()
+    h.last().emit({ t: 'ready' })
+    h.last().emit({
+      t: 'api-call',
+      callId: 'q1',
+      pluginId: 'demo',
+      method: 'ui.prompt',
+      args: [{ title: 'Chọn log', placeholder: '/etc/httpd/logs/ssl_access_log' }]
+    })
+    await tick()
+    expect(h.prompts).toEqual([
+      { pluginId: 'demo', opts: { title: 'Chọn log', placeholder: '/etc/httpd/logs/ssl_access_log' } }
+    ])
+    const res = h.last().posted.find((m) => m.t === 'api-result' && m.callId === 'q1')
+    expect(res).toMatchObject({ ok: true, value: '/var/log/nginx/access.log' })
+
+    h.promptAnswer = null // user Huỷ / timeout
+    h.last().emit({ t: 'api-call', callId: 'q2', pluginId: 'demo', method: 'ui.prompt', args: [{}] })
+    await tick()
+    const res2 = h.last().posted.find((m) => m.t === 'api-result' && m.callId === 'q2')
+    expect(res2).toMatchObject({ ok: true, value: null })
   })
 
   test('subscribe-terminal ref-count + onTerminalData chỉ forward khi có subscriber active', () => {
