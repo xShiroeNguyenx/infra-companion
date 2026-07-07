@@ -13,6 +13,7 @@ import { registerSftpIpc } from './ipc/sftp'
 import { registerTerminalIpc } from './ipc/terminal'
 import { registerTunnelsIpc } from './ipc/tunnels'
 import { registerPluginsIpc } from './ipc/plugins'
+import { registerMarketplaceIpc } from './ipc/marketplace'
 import { getVault, registerVaultIpc } from './ipc/vault'
 
 const isDev = !app.isPackaged
@@ -86,6 +87,7 @@ registerBulkIpc()
 registerAiIpc()
 registerNetToolsIpc()
 registerSyncIpc()
+registerMarketplaceIpc()
 const disposeMonitor = registerMonitorIpc()
 const terminal = registerTerminalIpc()
 const disposeSftp = registerSftpIpc()

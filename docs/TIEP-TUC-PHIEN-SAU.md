@@ -1,6 +1,6 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
-> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật 2026-07-06: **v0.1.10 ĐÃ phát hành** (commit `2c5565b` + tag `v0.1.10`, kèm commit docs Wave 3 `ba2c871`); **v0.1.11 ĐÃ CODE XONG, CHƯA commit/tag** (sidebar thu gọn + dock thu nhỏ + ẩn scrollbar terminal + kéo resize pane — đã bump version/CHANGELOG/README/landing, lệnh git ở cuối file).
+> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật 2026-07-07: **v0.1.11 ĐÃ phát hành** (commit `e7ee853` + tag `v0.1.11`). **v0.1.12 ĐÃ CODE + BUMP XONG, CHƯA commit/tag** (lệnh git ở cuối file): (1) fix pill plugin đè header MonitorDock; (2) CI quét secrets bằng gitleaks (`.github/workflows/secret-scan.yml`); (3) **Marketplace plugin F52 v1** — tab 🛒 trong modal Plugins, registry JSON tĩnh trên GitHub Pages (`docs/landing/registry/plugins.json`, sinh bằng `node scripts/build-registry.mjs`), cài/cập nhật 1 click có verify SHA-256 (core `registry.ts` + main `ipc/marketplace.ts` + preload/renderer; 87 test pass). Đã bump 0.1.12 (2 package.json) + CHANGELOG [0.1.12] + README + landing hero. ⚠️ Marketplace CHƯA test GUI — **push main trước** (Pages deploy registry ~1 phút) rồi `pnpm dev` thử tab 🛒, OK mới đánh tag v0.1.12. Bên GitHub Settings: Secret scanning/Push protection/Dependabot/CodeQL đã bật tay 2026-07-07. Hướng đã chốt cho marketplace TRẢ PHÍ (làm sau): bước 2 = ký số package ed25519, bước 3 = license key qua merchant-of-record (Lemon Squeezy/Paddle — Stripe không có ở VN).
 
 ## Đang ở đâu
 
@@ -128,7 +128,7 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 
 ## Git (anh tự chạy; tôi không tự commit)
 
-> **v0.1.10 ĐÃ phát hành** (commit `2c5565b` + tag). Đang chờ commit: **feat v0.1.11** — sidebar thu gọn + dock thu nhỏ + ẩn scrollbar terminal + kéo resize pane (đã bump version + CHANGELOG [0.1.11] + README + landing hero v0.1.11 — landing đổi sẽ tự deploy Pages khi push). Tag `v0.1.11` chỉ đánh SAU khi test GUI.
+> **v0.1.11 ĐÃ phát hành** (commit `e7ee853` + tag, 2026-07-07). Fix dock + CI gitleaks ĐÃ commit/push (`a7ad5bc`). Đang chờ: commit (b) bên dưới + tag **v0.1.12**. Lưu ý thứ tự: push main xong thì flow Pages tự deploy registry (`docs/landing/registry/`) — tab 🛒 mới hoạt động với URL mặc định → test GUI → rồi mới tag (tag kích hoạt build release 3 OS).
 
 Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps/desktop`) + CHANGELOG + README/USER-GUIDE/landing/handoff, rồi push tag `v*.*.*` — release tự kích hoạt (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux). Lưu ý: đổi `docs/landing/index.html` (version trên hero) sẽ tự deploy lại landing page qua flow Pages riêng khi push lên `main`.
 
@@ -137,18 +137,26 @@ Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps
 ```powershell
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
 
-# feat v0.1.11 — sidebar thu gọn + dock thu nhỏ + ẩn scrollbar terminal + kéo resize pane
-git add apps/desktop/src/renderer/src/components/Sidebar.tsx apps/desktop/src/renderer/src/components/PluginPanelModal.tsx apps/desktop/src/renderer/src/components/MonitorDock.tsx
-git add apps/desktop/src/renderer/src/features/terminal/TerminalTabView.tsx apps/desktop/src/renderer/src/lib/termBus.ts
-git add apps/desktop/src/renderer/src/stores/ui.ts apps/desktop/src/renderer/src/App.tsx apps/desktop/src/renderer/src/i18n/dict.ts apps/desktop/src/renderer/src/styles/main.css
-git add docs/USER-GUIDE.md docs/TIEP-TUC-PHIEN-SAU.md docs/landing/index.html CHANGELOG.md README.md package.json apps/desktop/package.json
+# (a) fix dock + CI gitleaks — ĐÃ commit + push (a7ad5bc), bỏ qua
+
+# (b) feat Marketplace F52 v1 + bump v0.1.12
+git add packages/core/src/plugins/registry.ts packages/core/src/plugins/registry.test.ts packages/core/src/plugins/registry-file-check.test.ts packages/core/src/index.ts
+git add packages/shared/src/ipc.ts packages/shared/src/types.ts
+git add apps/desktop/src/main/ipc/marketplace.ts apps/desktop/src/main/index.ts apps/desktop/src/preload/index.ts
+git add apps/desktop/src/renderer/src/components/PluginsModal.tsx apps/desktop/src/renderer/src/i18n/dict.ts
+git add scripts/build-registry.mjs docs/landing/registry/plugins.json docs/landing/index.html
+git add CHANGELOG.md README.md ROADMAP.md docs/USER-GUIDE.md docs/TIEP-TUC-PHIEN-SAU.md
+git add package.json apps/desktop/package.json
 git status            # xem lại trước khi commit
-git commit -m "feat: sidebar thu gon + dock thu nho + an scrollbar terminal + keo resize pane (v0.1.11)"
+git commit -m "feat: plugin marketplace F52 v1 - registry tren Pages + tab cai/cap nhat verify sha256 (v0.1.12)"
 git push origin main
 
-# Tag/release — CHỈ chạy sau khi test GUI OK (pnpm dev → thử «/» + Ctrl+Shift+H, nút – 2 dock, kéo vạch giữa pane)
-git tag v0.1.11
-git push origin v0.1.11
+# Test GUI SAU khi push (Pages deploy registry ~1 phút): pnpm dev → ⋯ → 🧩 Plugins → tab 🛒
+# thử Cài hello-world → plugin hiện tab Đã cài + lệnh vào palette; thử lại nút ✓ Đã cài
+
+# Tag/release — CHỈ chạy sau khi test GUI OK (tag kích hoạt build release 3 OS)
+git tag v0.1.12
+git push origin v0.1.12
 ```
 
 > Môi trường dev: Node 20, pnpm 9, Electron 42 (Node 24 runtime — dùng `node:sqlite`), ssh2/node-pty/serialport là native nhưng đã externalize + prebuilt nên không cần build C++. Khi chạy electron từ terminal đã dính biến `ELECTRON_RUN_AS_NODE` thì thêm `$env:ELECTRON_RUN_AS_NODE=$null` cùng lệnh (chỉ là gotcha của terminal, không phải lỗi app).

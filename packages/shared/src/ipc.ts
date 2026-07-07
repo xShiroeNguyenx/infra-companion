@@ -122,7 +122,10 @@ export const IPC = {
   PLUGINS_CONTRIBUTIONS_CHANGED: 'plugins:contributions-changed',
   PLUGINS_PANEL_SHOW: 'plugins:panel-show',
   PLUGINS_NOTIFY: 'plugins:notify',
-  PLUGINS_PROMPT: 'plugins:prompt'
+  PLUGINS_PROMPT: 'plugins:prompt',
+
+  MARKETPLACE_LIST: 'marketplace:list',
+  MARKETPLACE_INSTALL: 'marketplace:install'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

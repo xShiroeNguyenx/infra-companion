@@ -22,7 +22,7 @@
 - **Docker & Kubernetes** (F06) — liệt kê container/pod, exec vào shell, xem log, port-forward kubectl; nguồn: Docker local/remote qua SSH, kubeconfig contexts.
 
 ### Vượt trội Wave 2 — còn lại (Phase 6)
-- ~~**Plugin system** (F16)~~ — ✅ **v1 đã làm (v0.1.6)**: plugin JS tin cậy chạy trong worker_thread cô lập, hook vào command palette + panel markdown + quan sát/gửi output terminal + storage; kèm tài liệu (mục Plugins trong [docs/USER-GUIDE.md](docs/USER-GUIDE.md)) + plugin mẫu. *Còn lại (v2): protocol mới (SessionKind), permission enforcement + dialog, transform output, panel HTML sandbox (F51), marketplace/plugin index (F52).*
+- ~~**Plugin system** (F16)~~ — ✅ **v1 đã làm (v0.1.6)**: plugin JS tin cậy chạy trong worker_thread cô lập, hook vào command palette + panel markdown + quan sát/gửi output terminal + storage; kèm tài liệu (mục Plugins trong [docs/USER-GUIDE.md](docs/USER-GUIDE.md)) + plugin mẫu. *Còn lại (v2): protocol mới (SessionKind), permission enforcement + dialog, transform output, panel HTML sandbox (F51). Marketplace F52 v1 ✅ đã làm (xem 3G).*
 - **KeePassXC** (F11 mở rộng) — tích hợp Secrets Manager thêm KeePassXC qua KeePassXC-proxy.
 - ~~**tmux-aware resume** (F14)~~ — ✅ Đã làm (v0.1.4): bật per-host → sau login `tmux new-session -A -s ic-main`, tự re-attach khi reconnect/mở lại (resume). *Còn lại (sau): auto-wrap toàn cục mọi phiên.*
 - **ssh_config 2 chiều** (F12) — ghi ngược thay đổi vào `~/.ssh/config` (tuỳ chọn), dùng song song CLI ssh.
@@ -92,7 +92,7 @@
 
 ### 3G. Plugin ecosystem
 - **F51 — Plugin panel HTML sandbox** — panel iframe sandbox để plugin vẽ đồ thị/bảng đẹp hơn miniMarkdown (thuộc gói Plugin v2).
-- **F52 — Plugin index kiểu git** — file JSON trên GitHub liệt kê plugin cộng đồng, app cài từ URL — "marketplace" 0 server.
+- ~~**F52 — Plugin index kiểu git**~~ — ✅ **v1 đã làm**: registry JSON tĩnh trên GitHub Pages (`docs/landing/registry/plugins.json`, sinh bằng `scripts/build-registry.mjs`) + tab 🛒 Marketplace trong modal Plugins — cài/cập nhật 1 click, verify SHA-256 từng file trước khi ghi. *Còn lại: ký số package (ed25519), plugin trả phí (license key qua merchant-of-record).*
 - **Bộ plugin mẫu mới** ⚡ — mỗi mẫu vừa là tính năng vừa là marketing: cert-expiry checker, fail2ban report, backup verifier, MySQL slow-log analyzer (cùng khuôn Access Log Analyzer).
 
 ### 3H. App & QoL

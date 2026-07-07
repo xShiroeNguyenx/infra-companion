@@ -174,6 +174,10 @@ const api: InfraApi = {
     onPanel: (cb) => subscribe<PluginPanelDto>(IPC.PLUGINS_PANEL_SHOW, cb),
     onNotify: (cb) => subscribe<PluginNotifyDto>(IPC.PLUGINS_NOTIFY, cb),
     onPrompt: (cb) => subscribe<PluginPromptDto>(IPC.PLUGINS_PROMPT, cb)
+  },
+  marketplace: {
+    list: () => ipcRenderer.invoke(IPC.MARKETPLACE_LIST),
+    install: (id) => ipcRenderer.invoke(IPC.MARKETPLACE_INSTALL, id)
   }
 }
 

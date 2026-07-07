@@ -5,10 +5,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased]
+## [0.1.12] — 2026-07-07
 
 ### Added
 
+- **Plugin Marketplace (F52, v1)** — the Plugins modal now has a **🛒 Marketplace tab**: a public JSON registry (static file on GitHub Pages — zero servers) lists community plugins; one click **installs or updates** them into your plugins folder. Safety first: every file in the registry carries a **SHA-256 checksum verified before writing**, file names are strictly validated (no path traversal), the downloaded `manifest.json` must pass the same validation as local plugins, and nothing is written unless *all* files verify. Registry is regenerated from `docs/examples/` via `node scripts/build-registry.mjs`; override the registry URL with `INFRA_REGISTRY_URL` for testing. The three sample plugins (Hello World, Output Highlighter, Access Log Analyzer) are the first catalog entries.
 - **Secret scanning in CI** — new `secret-scan.yml` workflow runs [gitleaks](https://github.com/gitleaks/gitleaks) on every push/PR plus a weekly full-history sweep; complements GitHub Push Protection (which only checks new pushes against known patterns). Deliberately has no `paths-ignore` so docs/markdown are scanned too.
 
 ### Fixed

@@ -500,6 +500,28 @@ export interface PluginPromptDto {
   value?: string
 }
 
+// ── Marketplace (F52) ────────────────────────────────────────────────────────
+/** 1 plugin trong registry công khai — bản rút gọn cho UI (files/URL ở lại main). */
+export interface MarketplacePluginDto {
+  id: string
+  name: string
+  version: string
+  description: string | null
+  author: string | null
+}
+
+export interface MarketplaceListDto {
+  ok: boolean
+  plugins: MarketplacePluginDto[]
+  /** Thông báo lỗi (mất mạng, registry hỏng…) khi ok=false. */
+  error: string | null
+}
+
+export interface MarketplaceInstallResultDto {
+  ok: boolean
+  error: string | null
+}
+
 export interface InfraApi {
   vault: {
     status(): Promise<VaultStatus>
@@ -669,5 +691,11 @@ export interface InfraApi {
     onNotify(cb: (n: PluginNotifyDto) => void): () => void
     /** Plugin hỏi user 1 chuỗi (ui.prompt) — trả lời qua prompts.answer(requestId, chuỗi | null). */
     onPrompt(cb: (q: PluginPromptDto) => void): () => void
+  }
+  marketplace: {
+    /** Tải + validate registry công khai (cache trong main 5 phút). */
+    list(): Promise<MarketplaceListDto>
+    /** Tải file plugin theo registry, verify sha256 rồi cài vào thư mục plugins. */
+    install(id: string): Promise<MarketplaceInstallResultDto>
   }
 }

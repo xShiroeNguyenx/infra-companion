@@ -323,9 +323,13 @@ Type to reach any action (keyboard-first): SSH/SFTP/Split to any host, open a lo
 
 **What it is**: extend the app with **JavaScript plugins** without touching the core — add Command Palette commands, observe/automate terminal output, and show info panels.
 
-> **Trust model**: a plugin is JS that **you/your team install yourself** (not a marketplace). Each plugin runs in a shared Node `worker_thread` — **fault-isolated**, so a crashing plugin can't take down the app — and **only reaches the app through the `api`** object; a plugin **cannot** read the vault or secrets. Because it's a trust model, the sandbox does not defend against deliberately malicious code → only install plugins you trust.
+> **Trust model**: a plugin is JS that runs with the app's trust. Each plugin runs in a shared Node `worker_thread` — **fault-isolated**, so a crashing plugin can't take down the app — and **only reaches the app through the `api`** object; a plugin **cannot** read the vault or secrets. The sandbox does not defend against deliberately malicious code → only install plugins you trust.
 
-### A. Install & manage
+### A0. Marketplace (one-click install)
+
+The Plugins modal has a **🛒 Marketplace tab**: it lists plugins from a public registry (a static JSON on GitHub Pages — no account, no server) and installs or updates them with one click. Safety measures: every file has a **SHA-256 checksum verified before anything is written**, file names are strictly validated, and the plugin's `manifest.json` must pass the same validation as a locally installed plugin. Installed plugins land in the same `<userData>/plugins/` folder and behave exactly like manually copied ones (the trust model above still applies — the current catalog contains only the maintainer's sample plugins).
+
+### A. Install & manage (manual)
 
 Each plugin is a folder under `<userData>/plugins/<plugin-id>/`:
 ```
@@ -453,5 +457,5 @@ New connection protocols (pluggable SessionKind) · permission enforcement + con
 - **Bulk/Monitor/SFTP over a login script** rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` on the gate) and `su`/`sudo` steps are supported; setups that force a TTY password prompt may still fail.
 - **Sync** currently has only the **folder** backend (Google Drive/Dropbox/Syncthing/network share); WebDAV, S3, Git are planned.
 - **Secrets manager** supports 1Password, Bitwarden, HashiCorp Vault via CLI; KeePassXC is planned.
-- **Plugin system** is at **v1** (commands + observe/write output + panel + storage); no new protocols, permission enforcement, output transform, or marketplace yet — see §16D.
+- **Plugin system** is at **v1** (commands + observe/write output + panel + storage + Marketplace tab); no new protocols, permission enforcement, output transform, or package signing yet — see §16D.
 - Not yet available: **RDP/VNC**, a self-hosted **team server**, **cloud import** (AWS/GCP…), a **Docker/K8s browser** — see [../ROADMAP.md](../ROADMAP.md).

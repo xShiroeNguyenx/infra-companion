@@ -31,6 +31,8 @@ export type { PluginManifest, PluginCommandManifest, ManifestResult } from './pl
 export { discoverPlugins } from './plugins/discover'
 export type { DiscoveredPlugin, InvalidPlugin, DiscoverResult } from './plugins/discover'
 export { pluginScopedPath } from './plugins/paths'
+export { validateRegistry, parseRegistry, semverGt } from './plugins/registry'
+export type { RegistryFile, RegistryPluginEntry, RegistryResult } from './plugins/registry'
 export { PluginHost } from './plugins/PluginHost'
 export type {
   PluginHostAdapters,
