@@ -5,6 +5,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Secret scanning in CI** — new `secret-scan.yml` workflow runs [gitleaks](https://github.com/gitleaks/gitleaks) on every push/PR plus a weekly full-history sweep; complements GitHub Push Protection (which only checks new pushes against known patterns). Deliberately has no `paths-ignore` so docs/markdown are scanned too.
+
+### Fixed
+
+- **Plugin pill no longer covers the Monitoring dock header** — the minimized plugin pill (top-right) sat exactly on the Monitoring dashboard's `–`/Stop buttons; the dashboard now shifts down (top-14 → top-24) whenever a plugin panel is open, so both stay clickable.
+
+---
+
 ## [0.1.11] — 2026-07-06
 
 ### Added

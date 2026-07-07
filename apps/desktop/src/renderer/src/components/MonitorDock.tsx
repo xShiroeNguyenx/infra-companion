@@ -1,15 +1,19 @@
 import { useState } from 'react'
 import { useMonitorStore, type HostMonitor } from '../stores/monitor'
+import { usePluginStore } from '../stores/plugins'
 import { useT } from '../i18n'
 
 /** Dashboard monitoring neo góc phải — mờ khi không rê chuột, KHÔNG backdrop nên
  *  vẫn thao tác terminal bình thường. Chỉ biến mất khi user bấm Dừng.
  *  Nút – thu nhỏ về pill 📊 góc DƯỚI phải (tránh đè pill plugin góc trên);
- *  chấm màu trên pill = trạng thái xấu nhất trong các host đang theo dõi. */
+ *  chấm màu trên pill = trạng thái xấu nhất trong các host đang theo dõi.
+ *  Khi có panel plugin (pill 🧩 neo top-14 right-3 z-40) → dock tụt xuống top-24
+ *  để pill không che hàng nút – / Dừng của dock. */
 export function MonitorDock() {
   const t = useT()
   const data = useMonitorStore((s) => s.data)
   const stop = useMonitorStore((s) => s.stop)
+  const hasPluginPanel = usePluginStore((s) => s.panel !== null)
   const [minimized, setMinimized] = useState(false)
   const monitors = Object.values(data)
 
@@ -32,7 +36,11 @@ export function MonitorDock() {
   }
 
   return (
-    <div className="bg-elevated/95 border-edge-strong absolute top-14 right-3 z-30 flex max-h-[calc(100%-6rem)] w-[320px] max-w-[85vw] flex-col overflow-hidden rounded-lg border opacity-75 shadow-2xl transition-opacity duration-150 hover:opacity-100">
+    <div
+      className={`bg-elevated/95 border-edge-strong absolute right-3 z-30 flex w-[320px] max-w-[85vw] flex-col overflow-hidden rounded-lg border opacity-75 shadow-2xl transition-all duration-150 hover:opacity-100 ${
+        hasPluginPanel ? 'top-24 max-h-[calc(100%-8.5rem)]' : 'top-14 max-h-[calc(100%-6rem)]'
+      }`}
+    >
       <div className="border-edge flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2">
         <span className="text-subtle truncate text-[11px]">{t('monitor.watching', { n: monitors.length })}</span>
         <div className="flex shrink-0 items-center gap-1">
