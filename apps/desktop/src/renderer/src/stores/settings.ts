@@ -8,6 +8,8 @@ export type BgPosition = 'center' | 'left' | 'right' | 'top' | 'bottom'
 export type BgFit = 'cover' | 'contain'
 /** Kiểu con trỏ terminal (xterm cursorStyle). */
 export type TermCursor = 'block' | 'bar' | 'underline'
+/** Trang mở khi khởi động app (sau khi unlock vault). */
+export type StartupPage = 'dashboard' | 'terminal'
 
 const THEME_KEY = 'infra.theme'
 const LANG_KEY = 'infra.lang'
@@ -22,6 +24,7 @@ const TERM_SIZE_KEY = 'infra.term.size'
 const TERM_LH_KEY = 'infra.term.lineHeight'
 const TERM_CURSOR_KEY = 'infra.term.cursor'
 const CUSTOM_COLORS_KEY = 'infra.theme.custom'
+const STARTUP_KEY = 'infra.startup.page'
 
 /** Các biến màu UI cho phép tuỳ biến (accent có control riêng nên không nằm ở đây). */
 export const CUSTOM_PALETTE_VARS = [
@@ -108,6 +111,10 @@ function readTermLineHeight(): number {
 function readTermCursor(): TermCursor {
   const v = localStorage.getItem(TERM_CURSOR_KEY)
   return v === 'bar' || v === 'underline' ? v : 'block'
+}
+
+function readStartupPage(): StartupPage {
+  return localStorage.getItem(STARTUP_KEY) === 'terminal' ? 'terminal' : 'dashboard'
 }
 
 function readCustomColors(): CustomColors {
@@ -206,6 +213,8 @@ interface SettingsState {
   termLineHeight: number
   /** Kiểu con trỏ terminal. */
   termCursor: TermCursor
+  /** Trang mở khi khởi động: dashboard (mặc định) hay terminal local như trước. */
+  startupPage: StartupPage
   setTheme: (t: ThemeMode) => void
   setLanguage: (l: Language) => void
   setAccentColor: (c: string | null) => void
@@ -219,6 +228,7 @@ interface SettingsState {
   setTermFontSize: (n: number) => void
   setTermLineHeight: (n: number) => void
   setTermCursor: (c: TermCursor) => void
+  setStartupPage: (p: StartupPage) => void
   /** Override màu UI theo base theme hiện tại. */
   customColors: CustomColors
   /** Đặt/gỡ 1 màu cho theme đang chọn (null = gỡ override). */
@@ -245,6 +255,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   termFontSize: readTermSize(),
   termLineHeight: readTermLineHeight(),
   termCursor: readTermCursor(),
+  startupPage: readStartupPage(),
   setTheme: (theme) => {
     localStorage.setItem(THEME_KEY, theme)
     applyTheme(theme)
@@ -310,6 +321,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setTermCursor: (cursor) => {
     localStorage.setItem(TERM_CURSOR_KEY, cursor)
     set({ termCursor: cursor })
+  },
+  setStartupPage: (page) => {
+    localStorage.setItem(STARTUP_KEY, page)
+    set({ startupPage: page })
   },
   setCustomColor: (varName, hex) => {
     const { theme, customColors } = get()

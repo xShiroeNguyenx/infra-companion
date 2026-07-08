@@ -1,5 +1,5 @@
 // Plugin "Access Log Analyzer" — gõ 1 lệnh vào phiên SSH đang mở, gom output,
-// hiện 6 thông số phân tích access log trong panel markdown.
+// hiện 7 thông số phân tích access log trong panel markdown.
 //
 // Cách hoạt động: lệnh shell in kết quả kèm các marker @ALOG:...@; plugin observe
 // output của đúng phiên đó, thấy marker END thì parse và mở panel.
@@ -68,6 +68,17 @@ const SECTIONS = [
       `IP=$(awk -v o="$O" '{print $(1+o)}' "$T" | sort | uniq -c | sort -rn | awk 'NR==1{print $2}')`,
       `echo "IP: $IP"`,
       `awk -v o="$O" -v ip="$IP" '$(1+o)==ip{u=$(7+o); if (o>0) u=$1 u; print u}' "$T" | sort | uniq -c | sort -rn | head -10`
+    ].join('; ')
+  },
+  {
+    // Log custom có đuôi "| ... | ASN_ORGANIZATION: VNPT Corp" — tách theo chuỗi đó,
+    // lấy phần sau (tên tổ chức, có khoảng trắng vẫn ổn vì là cuối dòng). Log không
+    // có trường này (combined chuẩn) → NF==1 bị bỏ qua → in thông báo rồi thôi.
+    tok: TOK('S7'),
+    title: '7. Top 15 nhà mạng/tổ chức (ASN_ORGANIZATION)',
+    cmd: [
+      `R=$(awk -F'ASN_ORGANIZATION: ' 'NF>1{print $2}' "$T" | sort | uniq -c | sort -rn | head -15)`,
+      `[ -n "$R" ] && echo "$R" || echo "(log khong co truong ASN_ORGANIZATION - bo qua muc nay)"`
     ].join('; ')
   }
 ]
@@ -162,7 +173,7 @@ function cleanupRun() {
 
 function buildMarkdown() {
   const parts = [
-    `# 📊 Access log — 6 thông số`,
+    `# 📊 Access log — 7 thông số`,
     ``,
     `File: \`${lastRun.logPath}\` · mẫu: ${SAMPLE_LINES.toLocaleString('vi')} dòng cuối · ${new Date().toLocaleString('vi')}`,
     ``
@@ -189,6 +200,7 @@ function buildMarkdown() {
     `- Mục 4: UA \`curl\`/\`python-requests\`/scrapy → bot; Googlebot/Bingbot → chỉnh robots.txt là đủ.`,
     `- Mục 5: nhiều **404/403** dồn dập → scanner dò lỗ hổng.`,
     `- Mục 6: IP đứng đầu đang gọi gì — pattern lặp 1 URL vô nghĩa là chữ ký tấn công.`,
+    `- Mục 7: traffic dồn về ASN **hosting/datacenter** (OVH, DigitalOcean, AWS, Tencent…) → gần như chắc bot, chặn theo dải ASN được; ASN **nhà mạng dân dụng** (VNPT, Viettel…) → user thật hoặc botnet thiết bị gia đình, chặn phải cẩn thận.`,
     ``,
     `**⚠ Lưu ý:** sau CDN/load-balancer thì cột IP là IP của proxy — phải lấy từ header \`X-Forwarded-For\`.`
   )
@@ -246,7 +258,7 @@ module.exports.activate = async (api) => {
   const saved = await api.storage.get('cmds').catch(() => undefined)
   if (saved && typeof saved === 'object') overrides = saved
 
-  api.commands.register('alog.analyze', 'Access log: Phân tích 6 thông số', async (ctx) => {
+  api.commands.register('alog.analyze', 'Access log: Phân tích 7 thông số', async (ctx) => {
     const sessionId = ctx.activeSessionId || (await api.terminal.getActiveSessionId())
     if (!sessionId) {
       await api.ui.notify('Không có phiên terminal đang mở — SSH vào server trước đã')
@@ -282,11 +294,11 @@ module.exports.activate = async (api) => {
   api.commands.register('alog.rerun', 'Access log: Chạy lại 1 mục (nút ↻ trong panel)', async (ctx) => {
     const k = Number(ctx.arg)
     if (!Number.isInteger(k) || k < 0 || k >= SECTIONS.length) {
-      await api.ui.notify('Nút này dùng từ panel kết quả — chạy "Phân tích 6 thông số" trước')
+      await api.ui.notify('Nút này dùng từ panel kết quả — chạy "Phân tích 7 thông số" trước')
       return
     }
     if (!lastRun) {
-      await api.ui.notify('Chưa có phân tích nào — chạy "Phân tích 6 thông số" trước')
+      await api.ui.notify('Chưa có phân tích nào — chạy "Phân tích 7 thông số" trước')
       return
     }
     if (run) {
@@ -300,11 +312,11 @@ module.exports.activate = async (api) => {
   api.commands.register('alog.edit', 'Access log: Sửa lệnh 1 mục (nút ✎ trong panel)', async (ctx) => {
     const k = Number(ctx.arg)
     if (!Number.isInteger(k) || k < 0 || k >= SECTIONS.length) {
-      await api.ui.notify('Nút này dùng từ panel kết quả — chạy "Phân tích 6 thông số" trước')
+      await api.ui.notify('Nút này dùng từ panel kết quả — chạy "Phân tích 7 thông số" trước')
       return
     }
     if (!lastRun) {
-      await api.ui.notify('Chưa có phân tích nào — chạy "Phân tích 6 thông số" trước')
+      await api.ui.notify('Chưa có phân tích nào — chạy "Phân tích 7 thông số" trước')
       return
     }
     if (run) {

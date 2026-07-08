@@ -32,7 +32,7 @@ function statusDotClass(tab: AppTab): string {
 /** Thanh tab trên cùng: danh sách tab + nút snippet ⚡ + nút mở tab local mới. */
 export function TabsBar() {
   const t = useT()
-  const { tabs, activeId, openLocal, closeTab, setActive } = useTabsStore()
+  const { tabs, activeId, openLocal, showDashboard, closeTab, setActive } = useTabsStore()
   const snippets = useDataStore((s) => s.snippets)
   const [menuOpen, setMenuOpen] = useState(false)
   const [snippetMenuOpen, setSnippetMenuOpen] = useState(false)
@@ -69,6 +69,19 @@ export function TabsBar() {
 
   return (
     <div className="border-edge bg-panel flex h-9 shrink-0 items-stretch gap-px border-b pl-1 select-none">
+      <div className="flex items-center">
+        {/* 🏠 CHÍNH LÀ Dashboard (home, không phải tab) — sáng khi không tab nào active */}
+        <button
+          aria-selected={activeId === null}
+          className={`flex h-7 items-center rounded px-2 ${
+            activeId === null ? 'bg-app text-content' : 'text-muted hover:bg-hover hover:text-content'
+          }`}
+          title={t('tabs.openDashboard')}
+          onClick={showDashboard}
+        >
+          🏠
+        </button>
+      </div>
       <div className="flex flex-1 items-stretch gap-px overflow-x-auto">
         {tabs.map((tab) => (
           <div

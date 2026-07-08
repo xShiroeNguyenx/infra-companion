@@ -21,6 +21,7 @@ import { PluginsModal } from './components/PluginsModal'
 import { PluginPanelModal } from './components/PluginPanelModal'
 import { UpdateBanner } from './components/UpdateBanner'
 import { SftpView } from './features/sftp/SftpView'
+import { DashboardView } from './features/dashboard/DashboardView'
 import { useT } from './i18n'
 import { TerminalTabView } from './features/terminal/TerminalTabView'
 import { useDataStore } from './stores/data'
@@ -94,7 +95,11 @@ export default function App() {
     void usePluginStore.getState().refresh()
     if (!openedInitialTab.current) {
       openedInitialTab.current = true
-      if (useTabsStore.getState().tabs.length === 0) void openLocal()
+      // Mặc định khởi động vào Dashboard (activeId=null = home, không cần mở gì);
+      // chọn "Terminal" trong Settings thì auto-mở shell local như bản cũ
+      if (useTabsStore.getState().tabs.length === 0 && useSettingsStore.getState().startupPage === 'terminal') {
+        void openLocal()
+      }
     }
   }, [vaultState, openLocal])
 
@@ -170,6 +175,7 @@ export default function App() {
   const locked = vaultState !== 'unlocked'
 
   const paletteCommands: Command[] = [
+    { id: 'open-dashboard', label: t('menu.dashboard'), run: () => useTabsStore.getState().showDashboard() },
     { id: 'open-workspaces', label: t('menu.workspaces'), run: () => setModal('workspaces') },
     { id: 'open-bulk', label: t('menu.bulk'), run: () => setModal('bulk') },
     { id: 'open-monitor', label: t('menu.monitor'), run: () => setModal('monitor') },
@@ -227,6 +233,8 @@ export default function App() {
           <div className="relative flex-1 overflow-hidden">
             {/* Tab ẩn được giấu bằng CSS (active=false), KHÔNG unmount — unmount xterm → mất scrollback */}
             <div className="relative h-full">
+              {/* Dashboard = màn hình home nằm dưới các tab: hiện khi không tab nào active (nút 🏠 / đóng hết tab) */}
+              <DashboardView active={activeId === null} />
               {tabs.map((tab) =>
                 tab.kind === 'sftp' ? (
                   <SftpView key={tab.id} tab={tab} active={tab.id === activeId} />
@@ -235,16 +243,6 @@ export default function App() {
                 )
               )}
             </div>
-            {tabs.length === 0 && (
-              <div className="flex h-full items-center justify-center">
-                <button
-                  className="border-edge-strong text-muted hover:border-subtle hover:text-content rounded-lg border px-6 py-3 text-sm"
-                  onClick={() => void openLocal()}
-                >
-                  {t('app.newTerminalHint')}
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>

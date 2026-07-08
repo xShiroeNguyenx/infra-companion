@@ -33,6 +33,26 @@ pnpm test     # Core tests: crypto / sync merge / ssh_config parser (merge needs
 
 ---
 
+## 1B. Dashboard (home screen)
+
+**What it is**: after unlocking, the app lands on a **Dashboard** — the home screen that lives *behind* your tabs. The **🏠 button** at the left of the tab bar returns to it anytime (it lights up while you're home); clicking any tab goes back to that tab, and closing the last tab drops you home instead of an empty screen.
+
+**What's on it**:
+- **Stats** — hosts, groups, connections today / last 7 days (derived from Quick-Connect history)
+- **Quick connect** — type `user@host[:port]` and press Enter
+- **★ Favorites** — one click opens an SSH tab
+- **Host group chips** — one click opens the whole group as split panes in a single tab (ready to broadcast)
+- **Recent connections** — click to reconnect (ad-hoc targets reconnect via Quick Connect)
+- **🗂 Workspaces** — restore a saved tab/split layout in one click (*Manage* opens the full modal)
+- **🔀 Tunnels** — live status dot per rule with **Start/Stop** right on the row
+- **⌨ Keyboard shortcuts** — a cheat sheet of every global shortcut
+
+**Prefer the old boot-to-shell?** Settings → **Startup page** → *Terminal* auto-opens a local shell on launch instead (the dashboard stays reachable via 🏠).
+
+**Test**: unlock → dashboard shows and 🏠 is highlighted; open a host → tab activates and 🏠 dims; press 🏠 → dashboard returns with the SSH tab still alive; close all tabs → you land on the dashboard.
+
+---
+
 ## 2. Managing Hosts / Groups / Keys
 
 ### Host
@@ -358,7 +378,7 @@ Each plugin is a folder under `<userData>/plugins/<plugin-id>/`:
 - **Panel**: markdown/text content a plugin produces (reports, tables…) — docks to the **top-right corner**, translucent (hover to focus), and doesn't block the terminal: keep typing while reading. Close with **✕**, or minimize with **–** to a small `🧩` pill (click to restore; it also restores automatically when the plugin pushes new content). Esc is left to the terminal.
 - **Toast**: a plugin can raise a short notification (e.g. *Output Highlighter* warns when it sees "error" in the terminal).
 - **Light automation**: a plugin can listen to terminal output and write a command into the open session (e.g. the "Highlighter: send echo to active session" command).
-- **Real-world sample — *Access Log Analyzer***: SSH into a web server (root helps for reading the log), then run **"Access log: Phân tích 6 thông số"** from the Palette. It types one visible shell one-liner into the session and opens a panel with 6 stats: top 15 IPs, requests/minute, top URLs, top User-Agents, status codes, and what the most suspicious IP is calling — plus a short how-to-read guide. When invoked it first asks for the **log path** in a small dialog — leave it empty to use the default (`/etc/httpd/logs/ssl_access_log`), or type e.g. `/var/log/nginx/access.log`; the last entered path is remembered for next time. It handles both the standard combined format and custom formats with a **leading vhost** (`www.site.com:443 1.2.3.4 - - [...]`) — the column offset is auto-detected from the first line, and with a vhost present the top-URL sections print `vhost/path` (one file often aggregates many domains). Each panel section shows the exact shell pipeline it ran and has **↻ re-run** / **✎ edit-command** buttons: edit opens a dialog pre-filled with the current command (clear it to restore the default), and only that section re-runs and updates in place; edited commands persist and are reused by the next full analysis. The default path, sample size (50 000 lines) and a `FIELD_OFFSET` override live at the top of its `index.js` — edit + **Reload** for exotic formats.
+- **Real-world sample — *Access Log Analyzer***: SSH into a web server (root helps for reading the log), then run **"Access log: Phân tích 7 thông số"** from the Palette. It types one visible shell one-liner into the session and opens a panel with 7 stats: top 15 IPs, requests/minute, top URLs, top User-Agents, status codes, what the most suspicious IP is calling, and — when the log carries GeoIP enrichment (`… | ASN_NUMBER: 45899 | ASN_ORGANIZATION: VNPT Corp`) — the **top 15 network organizations (ASN)** behind the traffic (logs without that field just show a skip note) — plus a short how-to-read guide. When invoked it first asks for the **log path** in a small dialog — leave it empty to use the default (`/etc/httpd/logs/ssl_access_log`), or type e.g. `/var/log/nginx/access.log`; the last entered path is remembered for next time. It handles both the standard combined format and custom formats with a **leading vhost** (`www.site.com:443 1.2.3.4 - - [...]`) — the column offset is auto-detected from the first line, and with a vhost present the top-URL sections print `vhost/path` (one file often aggregates many domains). Each panel section shows the exact shell pipeline it ran and has **↻ re-run** / **✎ edit-command** buttons: edit opens a dialog pre-filled with the current command (clear it to restore the default), and only that section re-runs and updates in place; edited commands persist and are reused by the next full analysis. The default path, sample size (50 000 lines) and a `FIELD_OFFSET` override live at the top of its `index.js` — edit + **Reload** for exotic formats.
 
 ### C. Writing a plugin
 

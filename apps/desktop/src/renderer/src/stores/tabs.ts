@@ -70,6 +70,8 @@ interface TabsState {
   openSshGroup: (hostIds: string[]) => Promise<void>
   openQuick: (target: string) => Promise<void>
   openSftp: (hostId: string) => Promise<void>
+  /** Hiện trang Dashboard (home) — KHÔNG phải tab: activeId=null là đang ở home, chọn tab để quay lại. */
+  showDashboard: () => void
   /** Mở thêm pane trong tab đang active (split). opener tạo phiên. */
   splitLocal: (profileId?: string) => Promise<void>
   splitSsh: (hostId: string) => Promise<void>
@@ -215,6 +217,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     }
   },
 
+  showDashboard: () => set({ activeId: null }),
+
   splitLocal: async (profileId) => {
     const tab = get().activeTab()
     if (!tab || tab.kind !== 'terminal') return get().openLocal(profileId)
@@ -286,7 +290,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   toggleBroadcast: (tabId) =>
     set((state) => ({
-      tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, broadcast: !t.broadcast } : t))
+      // Chỉ tab terminal mới có broadcast (sftp/dashboard không có pane để gõ)
+      tabs: state.tabs.map((t) => (t.id === tabId && t.kind === 'terminal' ? { ...t, broadcast: !t.broadcast } : t))
     })),
 
   applyStatus: (sessionId, status, detail) => {

@@ -202,7 +202,8 @@ export function Sidebar() {
             <div className="text-subtle px-1 py-1 text-[10px] font-semibold tracking-wider uppercase">
               {t('sidebar.recent')}
             </div>
-            {history.map((entry) => (
+            {/* Store giữ 50 mục cho Dashboard tính thống kê — sidebar chỉ hiện 8 như cũ */}
+            {history.slice(0, 8).map((entry) => (
               <button
                 key={entry.id}
                 className="text-muted hover:bg-hover hover:text-content block w-full truncate rounded px-2 py-1 text-left text-[11px]"

@@ -1,12 +1,17 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
-> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật 2026-07-07 (tối): **v0.1.12 ĐÃ phát hành** (commit `4fc3b11` + tag — Marketplace F52 v1; trước đó `a7ad5bc` fix dock + CI gitleaks). **Đang chờ commit: KÝ SỐ registry ed25519 (bước 2 marketplace)** — lệnh git cuối file. Nội dung: mỗi entry registry có `signature` ed25519 phủ id+version+sha256 các file; app verify bằng public key NHÚNG (`packages/core/src/plugins/signing.ts`), entry không/sai chữ ký bị loại ngay lúc tải registry (`ipc/marketplace.ts`); private key ở `~/.infra-companion/registry-signing-key.pem` (sinh 1 lần bằng `node scripts/registry-keygen.mjs` — **⚠️ PHẢI BACKUP, mất là xoay khóa + phát hành app mới**; env `INFRA_SIGNING_KEY` đổi đường dẫn); `build-registry.mjs` từ chối chạy nếu thiếu key; test `registry-file-check.test.ts` verify chữ ký mọi entry bằng pubkey nhúng (chốt chặn lệch payload JS/TS); 98 test pass (92 chạy + 6 skip). Dev test registry local: `INFRA_REGISTRY_URL` + `INFRA_REGISTRY_PUBKEY_FILE`. Registry đã ký tương thích ngược app v0.1.12 (validator bỏ qua field lạ). Bước 3 (sau): plugin trả phí — license key qua merchant-of-record (Lemon Squeezy/Paddle — Stripe không có ở VN). GitHub Settings: Secret scanning/Push protection/Dependabot/CodeQL đã bật tay 2026-07-07.
+> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật 2026-07-08: **ký số registry ed25519 + trang marketplace plugins.html ĐÃ phát hành** (commit `33f8084`). **Đang chờ commit/tag: v0.1.13** (đã bump version 2 package.json + CHANGELOG [0.1.13] + README/USER-GUIDE/landing/handoff) — lệnh git cuối file. Nội dung v0.1.13: (1) **Dashboard home screen** — mở app vào Dashboard thay vì auto-mở PowerShell; KHÔNG phải tab, là màn hình home hiện khi `activeId === null`, nút 🏠 trái thanh tab; gồm stats + quick connect + favorites + chip nhóm + gần đây + workspaces + tunnels (start/stop tại chỗ) + bảng phím tắt; setting `infra.startup.page` (Settings → Trang khi mở app) chọn lại kiểu cũ. (2) **Access Log Analyzer v1.4.0** — mục 7 mới: top 15 ASN_ORGANIZATION (log không có trường này → in ghi chú bỏ qua); registry đã build+ký lại. ⚠️ Bản plugin ĐÃ CÀI ở `%APPDATA%\@infra\desktop\plugins\` đang CỐ Ý để v1.3.0 (khôi phục từ git) — để test flow **Cập nhật** trên tab 🛒 Marketplace sau khi push (registry Pages lên 1.4.0 → nút Cập nhật hiện ra). Private key ký registry: `~/.infra-companion/registry-signing-key.pem` — **PHẢI BACKUP**. Bước 3 (sau): plugin trả phí — license key qua merchant-of-record (Lemon Squeezy/Paddle).
 
 ## Đang ở đâu
 
-Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 → v0.1.10 (đã tag/phát hành)**. App build + typecheck + test đều sạch (72 core test).
+Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 → v0.1.12 (đã tag/phát hành)**. App build + typecheck + test đều sạch (98 core test: 92 chạy + 6 skip).
 
-**v0.1.11 (2026-07-06, ĐÃ bump version + CHANGELOG + README + landing, CHƯA commit/tag, CHƯA test GUI)** — thuần renderer (UI/UX terminal), không đổi schema DB (vẫn **v9**):
+**v0.1.13 (2026-07-08, ĐÃ bump version + docs, CHƯA commit/tag, GUI đã xem bằng pnpm dev trong lúc dev)** — thuần renderer + plugin mẫu, không đổi schema DB (vẫn **v9**):
+1. **Dashboard home screen** — mở app (sau unlock) vào Dashboard thay vì auto-mở PowerShell. Kiến trúc: KHÔNG phải tab kind mới — là màn hình home mount thường trực, hiện khi `activeId === null` ([DashboardView.tsx](../apps/desktop/src/renderer/src/features/dashboard/DashboardView.tsx), render trong App.tsx cạnh tabs); nút **🏠** trái TabsBar highlight khi đang ở home, `showDashboard()` trong tabs store chỉ là `set({ activeId: null })`; đóng tab cuối rơi về home (empty-state cũ đã xoá). Layout 1 cột max-w-3xl: stats (hosts/groups/kết nối hôm nay/7 ngày — `listHistory` nâng 8→50 trong data.ts, Sidebar tự `slice(0,8)`) → quick connect (regex như Sidebar) → ★ favorites → chip nhóm (openSshGroup) → gần đây → workspaces (open 1 click) → tunnels (dot trạng thái live + Start/Stop tại chỗ) → bảng phím tắt. Setting `infra.startup.page` (`startupPage`, mặc định 'dashboard') trong Settings → "Trang khi mở app". ⚠️ Đã thử 2 cột + khối Monitoring tóm tắt — user BỎ cả hai (chưa cân đối / trùng MonitorDock) — đừng thêm lại. toggleBroadcast giờ guard chỉ tab terminal (fix luôn bug 📡 trên tab SFTP). i18n `dashboard.*` (~30 key) vi/en/ja.
+2. **Access Log Analyzer v1.4.0** — mục **7. Top 15 nhà mạng/tổ chức (ASN_ORGANIZATION)**: log GeoIP có đuôi `| ... | ASN_ORGANIZATION: VNPT Corp` → `awk -F'ASN_ORGANIZATION: ' 'NF>1{print $2}' | sort | uniq -c | sort -rn | head -15`; không có trường → in "(log khong co truong ASN_ORGANIZATION - bo qua muc nay)". Đã test cả 2 nhánh trên log mẫu thật (webike). "6 thông số"→"7 thông số" toàn file + title lệnh trong manifest; registry build + ký lại. ⚠️ Lưu ý ngữ nghĩa: user gọi ASN org là "agent" — mục 4 Top User-Agent là thứ KHÁC, đã có từ trước.
+3. Kiểm tra: typecheck 3 package + build + 98 test xanh. **Test update plugin qua Marketplace**: bản cài %APPDATA% đang để v1.3.0 CHỦ Ý — sau khi push (Pages deploy registry 1.4.0, chờ ~1-2 phút) mở 🧩 Plugins → 🛒 Marketplace → Access Log Analyzer hiện nút **Cập nhật** → bấm → verify sha256+chữ ký → Nạp lại → chạy thử "Phân tích 7 thông số". (Marketplace cache registry 5 phút — mở lại tab nếu chưa thấy.)
+
+**v0.1.11 (ĐÃ phát hành 2026-07-07, commit `e7ee853` + tag)** — thuần renderer (UI/UX terminal), không đổi schema DB (vẫn **v9**):
 1. **Sidebar thu gọn được** — nút `«` cạnh ô tìm kiếm / `Ctrl+Shift+H` / lệnh palette "Thu gọn/mở danh sách host": cột host trái thu về thanh hẹp w-8 chỉ còn nút `»` mở lại; state nhớ qua localStorage `infra.sidebar.collapsed` ([stores/ui.ts](../apps/desktop/src/renderer/src/stores/ui.ts) thêm `sidebarCollapsed`/`toggleSidebar`). Terminal tự fit nhờ ResizeObserver sẵn có trong TerminalPane. ⚠️ Chọn Ctrl+Shift+H vì Ctrl+B là prefix tmux (cấm global-intercept), Ctrl+Shift+B đã là Broadcast.
 2. **Dock thu nhỏ được** — panel plugin và MonitorDock có nút `–`: plugin thu về pill `🧩 <title>` GÓC TRÊN phải (bấm bung lại; **tự bung khi plugin push nội dung mới** — useEffect theo prop panel), monitor thu về pill `📊 n host` GÓC DƯỚI phải (bottom-8, tránh đè pill plugin; chấm màu = trạng thái xấu nhất: đỏ lỗi/vàng đang nối/xanh OK; polling vẫn chạy). State local useState (không persist — chủ ý). i18n `panel.minimize`/`panel.restore` vi/en/ja.
 3. **Ẩn scrollbar terminal** — scrollbar `.xterm-viewport` ẩn hẳn trong [main.css](../apps/desktop/src/renderer/src/styles/main.css) (`scrollbar-width:none` + `::-webkit-scrollbar{display:none}`) — trước là thanh 10px chiếm ngang mỗi pane. ⚠️ Ghi chú lịch sử: từng làm thêm nút "🖱 Sửa cuộn" (tắt mouse-reporting kẹt — remote bật xterm mouse mode rồi không tắt / escape lẫn trong log khi cat/tail → lăn chuột in rác "65;53;18M…", Broadcast làm lan mọi pane) bằng cách ghi DECRST trực tiếp vào xterm qua termBus — **user quyết định BỎ, đã gỡ sạch (nút + resetTermMouse + i18n), ĐỪNG tự thêm lại**. Workaround cho user khi gặp: gõ `reset` trên shell, hoặc giữ **Shift khi lăn** (xterm.js luôn bypass mouse reporting).
@@ -128,7 +133,7 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 
 ## Git (anh tự chạy; tôi không tự commit)
 
-> **v0.1.12 ĐÃ phát hành** (commit `4fc3b11` + tag, 2026-07-07). Đang chờ commit: **ký số registry ed25519** (chưa bump version — gộp vào release sau cùng các tính năng khác, hoặc bump 0.1.13 khi muốn phát hành). Lưu ý: push xong Pages deploy registry ĐÃ KÝ; app v0.1.12 ngoài kia vẫn đọc được (bỏ qua field signature), app build mới thì BẮT BUỘC chữ ký.
+> **v0.1.12 + ký số registry + plugins.html ĐÃ phát hành** (commit `33f8084`, 2026-07-08). Đang chờ commit + tag: **v0.1.13** (Dashboard home screen + Access Log Analyzer v1.4.0 — đã bump version + docs đầy đủ).
 
 Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps/desktop`) + CHANGELOG + README/USER-GUIDE/landing/handoff, rồi push tag `v*.*.*` — release tự kích hoạt (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux). Lưu ý: đổi `docs/landing/index.html` (version trên hero) sẽ tự deploy lại landing page qua flow Pages riêng khi push lên `main`.
 
@@ -137,17 +142,25 @@ Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps
 ```powershell
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
 
-# Ký số registry ed25519 (bước 2 marketplace) + trang web marketplace trên landing
-git add packages/core/src/plugins/signing.ts packages/core/src/plugins/signing.test.ts
-git add packages/core/src/plugins/registry.ts packages/core/src/plugins/registry-file-check.test.ts packages/core/src/index.ts
-git add apps/desktop/src/main/ipc/marketplace.ts
-git add scripts/registry-keygen.mjs scripts/build-registry.mjs docs/landing/registry/plugins.json
-git add docs/landing/plugins.html docs/landing/index.html
-git add CHANGELOG.md README.md ROADMAP.md docs/USER-GUIDE.md docs/TIEP-TUC-PHIEN-SAU.md
+# v0.1.13 — Dashboard home screen + Access Log Analyzer v1.4.0 (plugin + registry PHẢI cùng commit)
+git add apps/desktop/src/renderer/src
+git add docs/examples/access-log-analyzer docs/landing/registry/plugins.json
+git add package.json apps/desktop/package.json
+git add CHANGELOG.md README.md docs/USER-GUIDE.md docs/landing/index.html docs/TIEP-TUC-PHIEN-SAU.md
 git status            # xem lại trước khi commit
-git commit -m "feat: ky so registry ed25519 + trang web marketplace tren landing (plugins.html)"
+git commit -m "feat: Dashboard home screen (nut Home) + Access Log Analyzer v1.4.0 top ASN (v0.1.13)"
 git push origin main
-# Push xong: Pages tự deploy → https://xshiroenguyenx.github.io/infra-companion/plugins.html
+# Push xong: Pages tự deploy landing + registry v1.4.0 (~1-2 phút)
+
+# Tag để CI build installer 3 OS + tạo GitHub Release
+git tag v0.1.13
+git push origin v0.1.13
 ```
+
+**Test update plugin qua Marketplace (sau khi push main, KHÔNG cần chờ tag build):**
+1. Bản cài `%APPDATA%\@infra\desktop\plugins\access-log-analyzer\` đang là **v1.3.0** (đã khôi phục chủ ý).
+2. Chờ Pages deploy xong (~1-2 phút, xem tab Actions) → registry live có v1.4.0.
+3. Mở app → ⋯ → 🧩 Plugins → tab **🛒 Marketplace** → Access Log Analyzer hiện nút **Cập nhật** (1.3.0 → 1.4.0) → bấm (app verify sha256 + chữ ký ed25519 rồi mới ghi file) → về tab Đã cài bấm **Nạp lại** → palette chạy "Access log: Phân tích 7 thông số" trên phiên SSH → thấy mục 7 ASN.
+4. Nếu chưa thấy nút Cập nhật: registry cache 5 phút — đóng mở lại modal Plugins sau ít phút.
 
 > Môi trường dev: Node 20, pnpm 9, Electron 42 (Node 24 runtime — dùng `node:sqlite`), ssh2/node-pty/serialport là native nhưng đã externalize + prebuilt nên không cần build C++. Khi chạy electron từ terminal đã dính biến `ELECTRON_RUN_AS_NODE` thì thêm `$env:ELECTRON_RUN_AS_NODE=$null` cùng lệnh (chỉ là gotcha của terminal, không phải lỗi app).

@@ -61,7 +61,10 @@ export const useDataStore = create<DataState>((set, get) => ({
         window.infra.data.listHosts(),
         window.infra.data.listGroups(),
         window.infra.data.listKeys(),
-        window.infra.data.listHistory(8),
+        // Lấy tối đa (vault cap 50) để Dashboard tính "kết nối hôm nay/7 ngày";
+        // sidebar chỉ hiển thị 8 mục đầu (tự slice). Lưu ý: vault dedup theo target
+        // nên số đếm thực chất là "số target khác nhau" — chấp nhận được.
+        window.infra.data.listHistory(50),
         window.infra.data.listSnippets(),
         window.infra.tunnels.list(),
         window.infra.tunnels.states()
@@ -76,7 +79,7 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   refreshHistory: async () => {
     try {
-      set({ history: await window.infra.data.listHistory(8) })
+      set({ history: await window.infra.data.listHistory(50) })
     } catch {
       // vault có thể vừa khoá — bỏ qua
     }

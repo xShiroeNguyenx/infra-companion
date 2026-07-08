@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, AI assistance with local LLM support, and more.
 
-**Current release: v0.1.12 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.1.13 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -40,6 +40,7 @@
 - **Local terminal** — PowerShell, cmd, Git Bash, WSL shells via node-pty
 
 ### Terminal UX
+- **Dashboard home screen** — the app boots into a home page behind your tabs (🏠 button): quick stats, quick-connect box, favorite hosts, host-group chips (open a group as splits in one click), recent connections, saved workspaces, tunnels with live status + start/stop, and a keyboard-shortcut cheat sheet; prefer boot-to-shell? Settings → Startup page → Terminal
 - **xterm.js** with WebGL renderer — smooth even at high throughput (`yes`, large `cat`)
 - **Multi-tab** with Ctrl+Shift+T / middle-click close
 - **Split panes** — side-by-side sessions, Ctrl+Shift+D
@@ -249,7 +250,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.1.12)
+## Known Limitations (v0.1.13)
 
 - Bulk / Monitor / SFTP through login scripts rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` installed on the gate) and `su` / `sudo` steps are supported; exotic setups that force a TTY password prompt may still fail
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))

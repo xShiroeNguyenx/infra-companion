@@ -1,26 +1,26 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-07",
+  "updatedAt": "2026-07-08",
   "plugins": [
     {
       "id": "access-log-analyzer",
       "name": "Access Log Analyzer",
-      "version": "1.3.0",
-      "description": "Phân tích nhanh access log trên host đang mở: top IP, request/phút, top URL, User-Agent, status code, hành vi của IP nghi vấn nhất — kết quả hiện trong panel. Khi chạy sẽ hỏi đường dẫn log (bỏ trống = mặc định). Tự nhận cả log combined chuẩn lẫn log custom có vhost đứng đầu dòng. Panel hiện lệnh từng mục + nút ↻ chạy lại / ✎ sửa lệnh riêng từng mục.",
+      "version": "1.4.0",
+      "description": "Phân tích nhanh access log trên host đang mở: top IP, request/phút, top URL, User-Agent, status code, hành vi của IP nghi vấn nhất, top nhà mạng/tổ chức (ASN_ORGANIZATION — nếu log có trường này) — kết quả hiện trong panel. Khi chạy sẽ hỏi đường dẫn log (bỏ trống = mặc định). Tự nhận cả log combined chuẩn lẫn log custom có vhost đứng đầu dòng. Panel hiện lệnh từng mục + nút ↻ chạy lại / ✎ sửa lệnh riêng từng mục.",
       "author": "xShiroeNguyenx",
       "files": [
         {
           "name": "index.js",
           "url": "https://raw.githubusercontent.com/xShiroeNguyenx/infra-companion/main/docs/examples/access-log-analyzer/index.js",
-          "sha256": "fa686aa064d4fd1e623040210246fd8f15c75086433e3bd70d805f4d00b0eb22"
+          "sha256": "82b0a1f12341777ec65f6a184e23bcc320d52098336dbc370f4d71db9dd31c11"
         },
         {
           "name": "manifest.json",
           "url": "https://raw.githubusercontent.com/xShiroeNguyenx/infra-companion/main/docs/examples/access-log-analyzer/manifest.json",
-          "sha256": "386a7424bebbe09981e74632fcafd6ac8faddbb921137617d598b1713ec58848"
+          "sha256": "a11dfc275eede63e440b5287234111e6d68119e7b958575c294108810b6fee8a"
         }
       ],
-      "signature": "v0hkYIIUTDXrqZL3vLW9YY94RrVr3wNjFDsS67G8Cmp3GtYnTBIyDbbNy+BpyC+19/M4fsLUsKiv1+rjj3B0AQ=="
+      "signature": "eNFOykJqqV6/PVMWUZwYZ1wUbhBAf8JR9QZ2JEpIkBPigJ3o0fS+iOBa3v2dDYmw2//k1NLYOWqH+Rgr3fMBDg=="
     },
     {
       "id": "hello-world",

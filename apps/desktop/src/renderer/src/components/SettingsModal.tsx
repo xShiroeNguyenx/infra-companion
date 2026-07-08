@@ -6,6 +6,7 @@ import {
   type BgFit,
   type BgPosition,
   type Language,
+  type StartupPage,
   type TermCursor,
   type ThemeMode
 } from '../stores/settings'
@@ -66,6 +67,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     termFontSize,
     termLineHeight,
     termCursor,
+    startupPage,
     setTheme,
     setLanguage,
     setAccentColor,
@@ -77,7 +79,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     setTermFontFamily,
     setTermFontSize,
     setTermLineHeight,
-    setTermCursor
+    setTermCursor,
+    setStartupPage
   } = useSettingsStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const push = useToastsStore((s) => s.push)
@@ -106,6 +109,11 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const themeOptions: Array<{ value: ThemeMode; label: string; swatch: string }> = [
     { value: 'dark', label: t('settings.themeDark'), swatch: '#0b0e14' },
     { value: 'light', label: t('settings.themeLight'), swatch: '#f4f5f7' }
+  ]
+
+  const startupOptions: Array<{ value: StartupPage; label: string }> = [
+    { value: 'dashboard', label: t('settings.startupDashboard') },
+    { value: 'terminal', label: t('settings.startupTerminal') }
   ]
 
   const langOptions: Array<{ value: Language; label: string }> = [
@@ -181,6 +189,25 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                     : 'border-edge text-muted hover:bg-hover'
                 }`}
               >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <Field label={t('settings.startupPage')}>
+          <div className="grid grid-cols-2 gap-2">
+            {startupOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setStartupPage(opt.value)}
+                className={`rounded border px-3 py-2 text-sm ${
+                  startupPage === opt.value
+                    ? 'border-accent text-content bg-accent-soft/40'
+                    : 'border-edge text-muted hover:bg-hover'
+                }`}
+              >
+                {opt.value === 'dashboard' ? '🏠 ' : '>_ '}
                 {opt.label}
               </button>
             ))}
