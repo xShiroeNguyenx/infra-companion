@@ -92,7 +92,7 @@
 
 ### 3G. Plugin ecosystem
 - **F51 — Plugin panel HTML sandbox** — panel iframe sandbox để plugin vẽ đồ thị/bảng đẹp hơn miniMarkdown (thuộc gói Plugin v2).
-- ~~**F52 — Plugin index kiểu git**~~ — ✅ **v1 đã làm**: registry JSON tĩnh trên GitHub Pages (`docs/landing/registry/plugins.json`, sinh bằng `scripts/build-registry.mjs`) + tab 🛒 Marketplace trong modal Plugins — cài/cập nhật 1 click, verify SHA-256 từng file trước khi ghi. *Còn lại: ký số package (ed25519), plugin trả phí (license key qua merchant-of-record).*
+- ~~**F52 — Plugin index kiểu git**~~ — ✅ **v1 đã làm**: registry JSON tĩnh trên GitHub Pages (`docs/landing/registry/plugins.json`, sinh bằng `scripts/build-registry.mjs`) + tab 🛒 Marketplace trong modal Plugins — cài/cập nhật 1 click, verify SHA-256 từng file trước khi ghi. ✅ **Ký số ed25519 đã làm** (bước 2): registry ký bằng private key ngoài repo, app verify bằng public key nhúng, entry không chữ ký bị loại. *Còn lại: plugin trả phí (license key qua merchant-of-record — Lemon Squeezy/Paddle).*
 - **Bộ plugin mẫu mới** ⚡ — mỗi mẫu vừa là tính năng vừa là marketing: cert-expiry checker, fail2ban report, backup verifier, MySQL slow-log analyzer (cùng khuôn Access Log Analyzer).
 
 ### 3H. App & QoL

@@ -33,6 +33,12 @@ export type { DiscoveredPlugin, InvalidPlugin, DiscoverResult } from './plugins/
 export { pluginScopedPath } from './plugins/paths'
 export { validateRegistry, parseRegistry, semverGt } from './plugins/registry'
 export type { RegistryFile, RegistryPluginEntry, RegistryResult } from './plugins/registry'
+export {
+  pluginSigningPayload,
+  signPluginEntry,
+  verifyPluginEntry,
+  OFFICIAL_REGISTRY_PUBLIC_KEY_PEM
+} from './plugins/signing'
 export { PluginHost } from './plugins/PluginHost'
 export type {
   PluginHostAdapters,

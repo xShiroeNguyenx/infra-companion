@@ -23,6 +23,8 @@ export interface RegistryPluginEntry {
   description: string | null
   author: string | null
   files: RegistryFile[]
+  /** Chữ ký ed25519 base64 phủ id+version+files (xem signing.ts). Thiếu/sai → app không cài. */
+  signature: string | null
 }
 
 export type RegistryResult =
@@ -32,6 +34,8 @@ export type RegistryResult =
 const ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-.]+)?$/
 const SHA256_RE = /^[0-9a-f]{64}$/
+/** Chữ ký ed25519 = 64 byte → base64 88 ký tự (kèm padding). Nới nhẹ cho an toàn parse. */
+const SIGNATURE_RE = /^[A-Za-z0-9+/]{80,100}={0,2}$/
 /** Tên file phẳng an toàn: manifest.json hoặc *.js kebab/word đơn giản. */
 const FILE_NAME_RE = /^[A-Za-z0-9._-]+$/
 const MAX_FILES_PER_PLUGIN = 16
@@ -138,7 +142,18 @@ function validateEntry(raw: unknown, index: number, errors: string[]): RegistryP
     return null
   }
 
-  return { id, name: (name as string).trim(), version, description, author, files }
+  // Optional ở tầng PARSE (registry cũ chưa ký vẫn đọc được); bắt buộc hay không là
+  // chính sách của caller — app luôn verify bằng verifyPluginEntry trước khi hiện/cài.
+  let signature: string | null = null
+  if (obj.signature !== undefined && obj.signature !== null) {
+    if (typeof obj.signature !== 'string' || !SIGNATURE_RE.test(obj.signature)) {
+      errors.push(`${where}.signature phải là chữ ký ed25519 base64`)
+      return null
+    }
+    signature = obj.signature
+  }
+
+  return { id, name: (name as string).trim(), version, description, author, files, signature }
 }
 
 /** Validate toàn bộ registry. Entry lỗi làm fail cả registry (dữ liệu công khai phải sạch 100%). */

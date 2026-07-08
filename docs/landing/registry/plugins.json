@@ -19,7 +19,8 @@
           "url": "https://raw.githubusercontent.com/xShiroeNguyenx/infra-companion/main/docs/examples/access-log-analyzer/manifest.json",
           "sha256": "386a7424bebbe09981e74632fcafd6ac8faddbb921137617d598b1713ec58848"
         }
-      ]
+      ],
+      "signature": "v0hkYIIUTDXrqZL3vLW9YY94RrVr3wNjFDsS67G8Cmp3GtYnTBIyDbbNy+BpyC+19/M4fsLUsKiv1+rjj3B0AQ=="
     },
     {
       "id": "hello-world",
@@ -38,7 +39,8 @@
           "url": "https://raw.githubusercontent.com/xShiroeNguyenx/infra-companion/main/docs/examples/hello-world/manifest.json",
           "sha256": "186e0e25f4a8a647ce8e2424474077b919a99a460443b073012b9105362d7862"
         }
-      ]
+      ],
+      "signature": "N63uSxRR3AKHHlCbKeow7jKAuihvROSvN+7RbhlL1Y44wwL9Pw2tGxaydObjbRxkgVHGpVAzP3vn2eIiTS7qBg=="
     },
     {
       "id": "output-highlighter",
@@ -57,7 +59,8 @@
           "url": "https://raw.githubusercontent.com/xShiroeNguyenx/infra-companion/main/docs/examples/output-highlighter/manifest.json",
           "sha256": "1d42b90383906a08bb0cd3fff648d13b447e5f7ea5db6555837f5363a3521077"
         }
-      ]
+      ],
+      "signature": "9JQRV0LZ+4j0IFxC8j8N1KK6gBO6TseTJ9/avcB7l114KsYGHdM+qDCs/vKbtqfnYA0E/5AbOxsZkUK4GYLVDw=="
     }
   ]
 }

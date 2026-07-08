@@ -254,7 +254,7 @@ infra-companion/
 - Bulk / Monitor / SFTP through login scripts rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` installed on the gate) and `su` / `sudo` steps are supported; exotic setups that force a TTY password prompt may still fail
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))
 - Secrets Manager: 1Password, Bitwarden, HashiCorp Vault via CLI (KeePassXC planned)
-- No RDP/VNC, team server, cloud import (AWS/GCP…), Docker/K8s browser — see [ROADMAP.md](ROADMAP.md); plugin system is at **v1** (🛒 Marketplace tab installs from a static registry; no permission enforcement / output transform / package signing yet)
+- No RDP/VNC, team server, cloud import (AWS/GCP…), Docker/K8s browser — see [ROADMAP.md](ROADMAP.md); plugin system is at **v1** (🛒 Marketplace tab installs from a static registry, entries are ed25519-signed; no permission enforcement / output transform yet)
 
 ---
 

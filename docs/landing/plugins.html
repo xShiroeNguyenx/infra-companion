@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0b0e14" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<title>Plugin Marketplace — Infra Companion</title>
+<meta name="description" content="Browse Infra Companion plugins — the same signed catalog the app installs from. One-click install inside the app; every entry is ed25519-signed." />
+<style>
+  /* Design tokens — giữ ĐỒNG BỘ với index.html (đổi ở đây thì đổi cả bên đó) */
+  :root {
+    --app: #0b0e14; --panel: #0e121b; --elevated: #161b27; --card: #11151f;
+    --edge: #232a39; --edge-strong: #323b4f;
+    --text: #e6e8ee; --muted: #a1a7b6; --subtle: #6b7385;
+    --accent: #3b82f6; --accent-2: #6366f1; --accent-soft: rgba(59,130,246,.14);
+    --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --magenta: #c084fc;
+    --mono: ui-monospace, "Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, system-ui, sans-serif;
+    --maxw: 1120px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--app); color: var(--text);
+    font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  body::before {
+    content: ""; position: fixed; inset: -20% -20% auto -20%; height: 70vh; z-index: 0;
+    background: radial-gradient(60% 60% at 50% 0%, rgba(59,130,246,.18), transparent 70%),
+                radial-gradient(40% 40% at 80% 10%, rgba(99,102,241,.12), transparent 70%);
+    pointer-events: none;
+  }
+
+  nav {
+    position: sticky; top: 0; z-index: 50; backdrop-filter: blur(10px);
+    background: rgba(11,14,20,.7); border-bottom: 1px solid var(--edge);
+  }
+  nav .wrap { display: flex; align-items: center; gap: 16px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -.01em; }
+  .brand .logo {
+    width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; font-size: 16px;
+    box-shadow: 0 4px 14px rgba(59,130,246,.45);
+  }
+  nav .links { margin-left: auto; display: flex; align-items: center; gap: 22px; }
+  nav .links a { color: var(--muted); font-size: 14px; }
+  nav .links a:hover { color: var(--text); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; border-radius: 9px; padding: 10px 16px;
+    font-size: 14px; font-weight: 600; border: 1px solid var(--edge-strong); color: var(--text);
+    transition: .18s; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; color: #fff; box-shadow: 0 6px 20px rgba(59,130,246,.4); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  @media (max-width: 720px){ nav .links a.hide-sm { display:none; } }
+
+  header.hero { position: relative; z-index: 1; padding: 72px 0 20px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12.5px;
+    color: var(--accent); background: var(--accent-soft); border: 1px solid rgba(59,130,246,.3);
+    padding: 5px 12px; border-radius: 999px; margin-bottom: 22px;
+  }
+  .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px var(--success); }
+  h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.05; letter-spacing: -.025em; margin: 0 0 18px; font-weight: 800; }
+  h1 .grad { background: linear-gradient(120deg, #fff 10%, var(--accent) 60%, var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { font-size: clamp(15px, 2vw, 18px); color: var(--muted); max-width: 680px; margin: 0 0 10px; }
+  .hero-note { font-size: 13px; color: var(--subtle); }
+  .hero-note code { font-family: var(--mono); color: var(--muted); background: var(--card); padding: 2px 7px; border-radius: 6px; border: 1px solid var(--edge); }
+
+  section { position: relative; z-index: 1; padding: 36px 0 64px; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 900px){ .grid { grid-template-columns: repeat(2,1fr);} }
+  @media (max-width: 560px){ .grid { grid-template-columns: 1fr;} }
+  .card {
+    background: linear-gradient(180deg, var(--card), var(--panel)); border: 1px solid var(--edge);
+    border-radius: 14px; padding: 22px; transition: .2s; position: relative;
+    display: flex; flex-direction: column;
+  }
+  .card:hover { transform: translateY(-4px); border-color: var(--edge-strong); box-shadow: 0 18px 40px -22px rgba(0,0,0,.9); }
+  .card .ic { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; font-size: 20px; background: var(--accent-soft); border: 1px solid rgba(59,130,246,.22); margin-bottom: 14px; }
+  .card h3 { margin: 0 0 2px; font-size: 16.5px; letter-spacing: -.01em; }
+  .card .meta { font-family: var(--mono); font-size: 11.5px; color: var(--subtle); margin-bottom: 10px; }
+  .card p { margin: 0 0 16px; color: var(--muted); font-size: 14px; flex: 1; }
+  .card .tag {
+    position: absolute; top: 16px; right: 16px; font-family: var(--mono); font-size: 10px;
+    border-radius: 5px; padding: 2px 6px;
+  }
+  .tag.free { color: var(--success); border: 1px solid rgba(16,185,129,.4); background: rgba(16,185,129,.1); }
+  .tag.paid { color: var(--warning); border: 1px solid rgba(245,158,11,.4); background: rgba(245,158,11,.1); }
+  .card .foot { display: flex; align-items: center; gap: 10px; }
+  .card .foot .btn { padding: 7px 13px; font-size: 13px; }
+  .signed { font-family: var(--mono); font-size: 10.5px; color: var(--subtle); margin-left: auto; }
+  .signed .ok { color: var(--success); }
+
+  .state { text-align: center; color: var(--subtle); padding: 48px 0; font-size: 14px; }
+  .state a { color: var(--accent); }
+
+  /* how to install */
+  .how {
+    margin-top: 44px; background: var(--panel); border: 1px solid var(--edge-strong); border-radius: 14px; padding: 26px;
+  }
+  .how h2 { margin: 0 0 14px; font-size: 20px; letter-spacing: -.01em; }
+  .how ol { margin: 0 0 12px; padding-left: 20px; color: var(--muted); font-size: 14.5px; }
+  .how li { margin: 7px 0; }
+  .how b { color: var(--text); font-weight: 600; }
+  .how .note { font-size: 13px; color: var(--subtle); margin: 0; }
+  .how code { font-family: var(--mono); color: var(--muted); background: var(--card); padding: 2px 7px; border-radius: 6px; border: 1px solid var(--edge); }
+
+  footer { border-top: 1px solid var(--edge); padding: 36px 0; color: var(--subtle); font-size: 14px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; }
+  footer a { color: var(--muted); } footer a:hover { color: var(--text); }
+  footer .fl { display: flex; gap: 20px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="index.html"><span class="logo">⌘</span> Infra Companion</a>
+    <div class="links">
+      <a class="hide-sm" href="index.html">Home</a>
+      <a class="hide-sm" href="index.html#features">Features</a>
+      <a class="hide-sm" href="https://github.com/xShiroeNguyenx/infra-companion/blob/main/docs/USER-GUIDE.md">User guide</a>
+      <a class="btn" href="https://github.com/xShiroeNguyenx/infra-companion" target="_blank" rel="noreferrer">★ GitHub</a>
+      <a class="btn primary" href="https://github.com/xShiroeNguyenx/infra-companion/releases/latest" target="_blank" rel="noreferrer">↓ Download</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow"><span class="dot"></span> 🛒 Plugin Marketplace</span>
+    <h1>Extend your terminal.<br><span class="grad">One click at a time.</span></h1>
+    <p class="lead">This is the <b>same catalog</b> the app installs from — a static, signed registry. Every entry is <b>ed25519-signed</b> and verified against a key embedded in the app; files are checked against SHA-256 before anything touches your disk.</p>
+    <p class="hero-note">Raw catalog: <a href="registry/plugins.json" style="color:var(--accent)"><code>registry/plugins.json</code></a></p>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div id="catalog" class="grid" hidden></div>
+    <div id="state" class="state">Loading catalog…</div>
+
+    <div class="how">
+      <h2>How to install</h2>
+      <ol>
+        <li>Open <b>Infra Companion</b> (or <a href="https://github.com/xShiroeNguyenx/infra-companion/releases/latest" style="color:var(--accent)">download it</a> — free, Windows · macOS · Linux).</li>
+        <li>Menu <code>⋯</code> → <b>🧩 Plugins</b> → tab <b>🛒 Marketplace</b>.</li>
+        <li>Click <b>Install</b>. That's it — the plugin's commands appear in the Command Palette instantly, no restart.</li>
+      </ol>
+      <p class="note">Updates show up in the same tab as an <b>Update</b> button when a newer version is published. Plugins run fault-isolated in a worker thread and can't read your vault or secrets — but they are trusted code: the catalog only lists signed entries.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="brand"><span class="logo">⌘</span> Infra Companion</div>
+    <div class="fl">
+      <a href="index.html">Home</a>
+      <a href="https://github.com/xShiroeNguyenx/infra-companion/releases/latest" target="_blank" rel="noreferrer">Download</a>
+      <a href="https://github.com/xShiroeNguyenx/infra-companion/blob/main/docs/USER-GUIDE.md">User guide</a>
+      <a href="https://github.com/xShiroeNguyenx/infra-companion/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/xShiroeNguyenx/infra-companion" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+    <div>Electron · React · xterm.js · node-pty</div>
+  </div>
+</footer>
+
+<script>
+  // Render catalog từ registry — cùng origin (Pages) nên fetch không vướng CORS.
+  // Storefront-ready: entry có trường price (chưa dùng) sẽ hiện badge PAID + nút Buy
+  // trỏ entry.buyUrl (checkout của merchant-of-record) — plugin free không đổi gì.
+  (function () {
+    var ICONS = { 'access-log-analyzer': '📈', 'hello-world': '👋', 'output-highlighter': '🖍️' };
+    var state = document.getElementById('state');
+    var grid = document.getElementById('catalog');
+
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+
+    function card(p) {
+      var paid = p.price != null;
+      var action = paid
+        ? '<a class="btn primary" href="' + esc(p.buyUrl || '#') + '" target="_blank" rel="noreferrer">Buy ' + esc(p.price) + '</a>'
+        : '<a class="btn" href="https://github.com/xShiroeNguyenx/infra-companion/releases/latest" target="_blank" rel="noreferrer" title="Install from the 🛒 Marketplace tab inside the app">Get the app to install</a>';
+      return '<div class="card">'
+        + '<span class="tag ' + (paid ? 'paid' : 'free') + '">' + (paid ? 'PAID' : 'FREE') + '</span>'
+        + '<div class="ic">' + (ICONS[p.id] || '🧩') + '</div>'
+        + '<h3>' + esc(p.name) + '</h3>'
+        + '<div class="meta">v' + esc(p.version) + (p.author ? ' · ' + esc(p.author) : '') + ' · <span title="Plugin id">' + esc(p.id) + '</span></div>'
+        + '<p>' + esc(p.description || '') + '</p>'
+        + '<div class="foot">' + action + '<span class="signed"><span class="ok">✓</span> signed</span></div>'
+        + '</div>';
+    }
+
+    fetch('registry/plugins.json', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (reg) {
+        var plugins = (reg && Array.isArray(reg.plugins)) ? reg.plugins : [];
+        if (plugins.length === 0) { state.textContent = 'Catalog is empty.'; return; }
+        grid.innerHTML = plugins.map(card).join('');
+        grid.hidden = false;
+        state.textContent = plugins.length + ' plugin' + (plugins.length > 1 ? 's' : '') + ' · updated ' + esc(reg.updatedAt || '');
+        state.style.padding = '18px 0 0';
+      })
+      .catch(function (e) {
+        state.innerHTML = 'Could not load the catalog (' + esc(e.message) + '). View the raw file: <a href="registry/plugins.json">registry/plugins.json</a>';
+      });
+  })();
+</script>
+</body>
+</html>

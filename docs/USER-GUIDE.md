@@ -327,7 +327,7 @@ Type to reach any action (keyboard-first): SSH/SFTP/Split to any host, open a lo
 
 ### A0. Marketplace (one-click install)
 
-The Plugins modal has a **🛒 Marketplace tab**: it lists plugins from a public registry (a static JSON on GitHub Pages — no account, no server) and installs or updates them with one click. Safety measures: every file has a **SHA-256 checksum verified before anything is written**, file names are strictly validated, and the plugin's `manifest.json` must pass the same validation as a locally installed plugin. Installed plugins land in the same `<userData>/plugins/` folder and behave exactly like manually copied ones (the trust model above still applies — the current catalog contains only the maintainer's sample plugins).
+The Plugins modal has a **🛒 Marketplace tab**: it lists plugins from a public registry (a static JSON on GitHub Pages — no account, no server) and installs or updates them with one click. Safety measures: every catalog entry is **signed with ed25519** and verified against a public key **embedded in the app** (unsigned or tampered entries are dropped before they're even shown — a compromised registry/CDN can't forge them), every file has a **SHA-256 checksum verified before anything is written**, file names are strictly validated, and the plugin's `manifest.json` must pass the same validation as a locally installed plugin. Installed plugins land in the same `<userData>/plugins/` folder and behave exactly like manually copied ones (the trust model above still applies — the current catalog contains only the maintainer's sample plugins).
 
 ### A. Install & manage (manual)
 
@@ -457,5 +457,5 @@ New connection protocols (pluggable SessionKind) · permission enforcement + con
 - **Bulk/Monitor/SFTP over a login script** rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` on the gate) and `su`/`sudo` steps are supported; setups that force a TTY password prompt may still fail.
 - **Sync** currently has only the **folder** backend (Google Drive/Dropbox/Syncthing/network share); WebDAV, S3, Git are planned.
 - **Secrets manager** supports 1Password, Bitwarden, HashiCorp Vault via CLI; KeePassXC is planned.
-- **Plugin system** is at **v1** (commands + observe/write output + panel + storage + Marketplace tab); no new protocols, permission enforcement, output transform, or package signing yet — see §16D.
+- **Plugin system** is at **v1** (commands + observe/write output + panel + storage + Marketplace tab with ed25519-signed entries); no new protocols, permission enforcement, or output transform yet — see §16D.
 - Not yet available: **RDP/VNC**, a self-hosted **team server**, **cloud import** (AWS/GCP…), a **Docker/K8s browser** — see [../ROADMAP.md](../ROADMAP.md).

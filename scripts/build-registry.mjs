@@ -6,9 +6,14 @@
  *   https://xshiroenguyenx.github.io/infra-companion/registry/plugins.json
  * URL file plugin trỏ raw.githubusercontent.com nhánh main — sha256 tính từ nội dung
  * local, nên registry + file plugin PHẢI được push trong cùng commit để checksum khớp.
+ *
+ * KÝ SỐ: mỗi entry được ký ed25519 bằng private key ~/.infra-companion/registry-signing-key.pem
+ * (sinh bằng scripts/registry-keygen.mjs; override đường dẫn qua env INFRA_SIGNING_KEY).
+ * Không có key → script DỪNG: app từ chối entry không có chữ ký hợp lệ.
  */
-import { createHash } from 'node:crypto'
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { createHash, createPrivateKey, sign as cryptoSign } from 'node:crypto'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -19,7 +24,22 @@ const outFile = join(root, 'docs', 'landing', 'registry', 'plugins.json')
 const RAW_BASE = 'https://raw.githubusercontent.com/xShiroeNguyenx/infra-companion/main/docs/examples'
 const AUTHOR = 'xShiroeNguyenx'
 
+const keyPath = process.env.INFRA_SIGNING_KEY || join(homedir(), '.infra-companion', 'registry-signing-key.pem')
+if (!existsSync(keyPath)) {
+  console.error(`Thiếu private key ký registry: ${keyPath}\n→ chạy: node scripts/registry-keygen.mjs`)
+  process.exit(1)
+}
+const signingKey = createPrivateKey(readFileSync(keyPath, 'utf8'))
+
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex')
+
+/** Payload canonical — PHẢI khớp từng byte với pluginSigningPayload trong
+ *  packages/core/src/plugins/signing.ts (test registry-file-check.test.ts là chốt chặn lệch). */
+const signEntry = (entry) => {
+  const files = [...entry.files].sort((a, b) => (a.name < b.name ? -1 : 1))
+  const lines = ['infra-plugin-v1', entry.id, entry.version, ...files.map((f) => `${f.name}:${f.sha256}`)]
+  return cryptoSign(null, Buffer.from(lines.join('\n'), 'utf8'), signingKey).toString('base64')
+}
 
 const plugins = []
 for (const id of readdirSync(examplesDir).sort()) {
@@ -45,15 +65,17 @@ for (const id of readdirSync(examplesDir).sort()) {
       url: `${RAW_BASE}/${id}/${f}`,
       sha256: sha256(readFileSync(join(dir, f)))
     }))
-  plugins.push({
+  const entry = {
     id,
     name: manifest.name ?? id,
     version: manifest.version ?? '0.0.0',
     description: manifest.description ?? null,
     author: AUTHOR,
     files
-  })
-  console.log(`+ ${id} v${manifest.version} (${files.length} file)`)
+  }
+  entry.signature = signEntry(entry)
+  plugins.push(entry)
+  console.log(`+ ${id} v${manifest.version} (${files.length} file, đã ký)`)
 }
 
 mkdirSync(dirname(outFile), { recursive: true })

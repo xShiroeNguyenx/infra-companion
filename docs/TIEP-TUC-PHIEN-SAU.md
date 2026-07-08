@@ -1,6 +1,6 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
-> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật 2026-07-07: **v0.1.11 ĐÃ phát hành** (commit `e7ee853` + tag `v0.1.11`). **v0.1.12 ĐÃ CODE + BUMP XONG, CHƯA commit/tag** (lệnh git ở cuối file): (1) fix pill plugin đè header MonitorDock; (2) CI quét secrets bằng gitleaks (`.github/workflows/secret-scan.yml`); (3) **Marketplace plugin F52 v1** — tab 🛒 trong modal Plugins, registry JSON tĩnh trên GitHub Pages (`docs/landing/registry/plugins.json`, sinh bằng `node scripts/build-registry.mjs`), cài/cập nhật 1 click có verify SHA-256 (core `registry.ts` + main `ipc/marketplace.ts` + preload/renderer; 87 test pass). Đã bump 0.1.12 (2 package.json) + CHANGELOG [0.1.12] + README + landing hero. ⚠️ Marketplace CHƯA test GUI — **push main trước** (Pages deploy registry ~1 phút) rồi `pnpm dev` thử tab 🛒, OK mới đánh tag v0.1.12. Bên GitHub Settings: Secret scanning/Push protection/Dependabot/CodeQL đã bật tay 2026-07-07. Hướng đã chốt cho marketplace TRẢ PHÍ (làm sau): bước 2 = ký số package ed25519, bước 3 = license key qua merchant-of-record (Lemon Squeezy/Paddle — Stripe không có ở VN).
+> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật 2026-07-07 (tối): **v0.1.12 ĐÃ phát hành** (commit `4fc3b11` + tag — Marketplace F52 v1; trước đó `a7ad5bc` fix dock + CI gitleaks). **Đang chờ commit: KÝ SỐ registry ed25519 (bước 2 marketplace)** — lệnh git cuối file. Nội dung: mỗi entry registry có `signature` ed25519 phủ id+version+sha256 các file; app verify bằng public key NHÚNG (`packages/core/src/plugins/signing.ts`), entry không/sai chữ ký bị loại ngay lúc tải registry (`ipc/marketplace.ts`); private key ở `~/.infra-companion/registry-signing-key.pem` (sinh 1 lần bằng `node scripts/registry-keygen.mjs` — **⚠️ PHẢI BACKUP, mất là xoay khóa + phát hành app mới**; env `INFRA_SIGNING_KEY` đổi đường dẫn); `build-registry.mjs` từ chối chạy nếu thiếu key; test `registry-file-check.test.ts` verify chữ ký mọi entry bằng pubkey nhúng (chốt chặn lệch payload JS/TS); 98 test pass (92 chạy + 6 skip). Dev test registry local: `INFRA_REGISTRY_URL` + `INFRA_REGISTRY_PUBKEY_FILE`. Registry đã ký tương thích ngược app v0.1.12 (validator bỏ qua field lạ). Bước 3 (sau): plugin trả phí — license key qua merchant-of-record (Lemon Squeezy/Paddle — Stripe không có ở VN). GitHub Settings: Secret scanning/Push protection/Dependabot/CodeQL đã bật tay 2026-07-07.
 
 ## Đang ở đâu
 
@@ -128,7 +128,7 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 
 ## Git (anh tự chạy; tôi không tự commit)
 
-> **v0.1.11 ĐÃ phát hành** (commit `e7ee853` + tag, 2026-07-07). Fix dock + CI gitleaks ĐÃ commit/push (`a7ad5bc`). Đang chờ: commit (b) bên dưới + tag **v0.1.12**. Lưu ý thứ tự: push main xong thì flow Pages tự deploy registry (`docs/landing/registry/`) — tab 🛒 mới hoạt động với URL mặc định → test GUI → rồi mới tag (tag kích hoạt build release 3 OS).
+> **v0.1.12 ĐÃ phát hành** (commit `4fc3b11` + tag, 2026-07-07). Đang chờ commit: **ký số registry ed25519** (chưa bump version — gộp vào release sau cùng các tính năng khác, hoặc bump 0.1.13 khi muốn phát hành). Lưu ý: push xong Pages deploy registry ĐÃ KÝ; app v0.1.12 ngoài kia vẫn đọc được (bỏ qua field signature), app build mới thì BẮT BUỘC chữ ký.
 
 Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps/desktop`) + CHANGELOG + README/USER-GUIDE/landing/handoff, rồi push tag `v*.*.*` — release tự kích hoạt (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux). Lưu ý: đổi `docs/landing/index.html` (version trên hero) sẽ tự deploy lại landing page qua flow Pages riêng khi push lên `main`.
 
@@ -137,26 +137,17 @@ Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps
 ```powershell
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
 
-# (a) fix dock + CI gitleaks — ĐÃ commit + push (a7ad5bc), bỏ qua
-
-# (b) feat Marketplace F52 v1 + bump v0.1.12
-git add packages/core/src/plugins/registry.ts packages/core/src/plugins/registry.test.ts packages/core/src/plugins/registry-file-check.test.ts packages/core/src/index.ts
-git add packages/shared/src/ipc.ts packages/shared/src/types.ts
-git add apps/desktop/src/main/ipc/marketplace.ts apps/desktop/src/main/index.ts apps/desktop/src/preload/index.ts
-git add apps/desktop/src/renderer/src/components/PluginsModal.tsx apps/desktop/src/renderer/src/i18n/dict.ts
-git add scripts/build-registry.mjs docs/landing/registry/plugins.json docs/landing/index.html
+# Ký số registry ed25519 (bước 2 marketplace) + trang web marketplace trên landing
+git add packages/core/src/plugins/signing.ts packages/core/src/plugins/signing.test.ts
+git add packages/core/src/plugins/registry.ts packages/core/src/plugins/registry-file-check.test.ts packages/core/src/index.ts
+git add apps/desktop/src/main/ipc/marketplace.ts
+git add scripts/registry-keygen.mjs scripts/build-registry.mjs docs/landing/registry/plugins.json
+git add docs/landing/plugins.html docs/landing/index.html
 git add CHANGELOG.md README.md ROADMAP.md docs/USER-GUIDE.md docs/TIEP-TUC-PHIEN-SAU.md
-git add package.json apps/desktop/package.json
 git status            # xem lại trước khi commit
-git commit -m "feat: plugin marketplace F52 v1 - registry tren Pages + tab cai/cap nhat verify sha256 (v0.1.12)"
+git commit -m "feat: ky so registry ed25519 + trang web marketplace tren landing (plugins.html)"
 git push origin main
-
-# Test GUI SAU khi push (Pages deploy registry ~1 phút): pnpm dev → ⋯ → 🧩 Plugins → tab 🛒
-# thử Cài hello-world → plugin hiện tab Đã cài + lệnh vào palette; thử lại nút ✓ Đã cài
-
-# Tag/release — CHỈ chạy sau khi test GUI OK (tag kích hoạt build release 3 OS)
-git tag v0.1.12
-git push origin v0.1.12
+# Push xong: Pages tự deploy → https://xshiroenguyenx.github.io/infra-companion/plugins.html
 ```
 
 > Môi trường dev: Node 20, pnpm 9, Electron 42 (Node 24 runtime — dùng `node:sqlite`), ssh2/node-pty/serialport là native nhưng đã externalize + prebuilt nên không cần build C++. Khi chạy electron từ terminal đã dính biến `ELECTRON_RUN_AS_NODE` thì thêm `$env:ELECTRON_RUN_AS_NODE=$null` cùng lệnh (chỉ là gotcha của terminal, không phải lỗi app).
