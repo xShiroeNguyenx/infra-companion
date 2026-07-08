@@ -5,6 +5,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.14] — 2026-07-08
+
+### Added
+
+- **Monitoring 2.0 — real CPU, steal, connections, and more** — the monitor now answers *why* a server is slow, not just *that* it's slow. Each 3-second poll additionally collects: **real CPU% split into user / system / iowait / steal** (computed as deltas of `/proc/stat` between polls — sustained steal ≥10% means your VPS host is overselling CPU and is highlighted in red), **run queue** (processes waiting for CPU), **swap usage**, **all real mounts** (the fullest one is shown, e.g. `Disk /var`) plus **inode%**, **network in/out rate**, **TCP connection counts** (ESTABLISHED / TIME_WAIT — the most direct "we're being scraped" signal), and the **top CPU process** — all still agentless over the same single SSH command. The Load row stays. Load thresholds are no longer capped at 100% (normalized load on busy servers legitimately runs 300-400%+; cap is now 10 000) and its chart auto-scales; **new alert thresholds for CPU steal (default 20%) and TCP connections** (default off) join Load/RAM/Disk/offline; history charts add CPU, steal and connections.
+- **Monitoring alert thresholds (F04)** — set Load/RAM/Disk % thresholds (global defaults + per-host overrides) and an offline alarm right in the Monitoring modal. Alerts fire after a sustained ~9s breach (3 polls) with a dead-band hysteresis so a metric flapping at the threshold never spams; while still breached it re-alerts every 15 minutes, and recovery is announced once. Delivery: in-app toast + **Windows notification** (default on) + optional **webhook** — paste one URL and the app auto-detects **Google Chat**, Slack, Discord or Telegram (generic JSON for anything else), with a *Send test* button. Alert rules live in `monitor-settings.json` (userData), deliberately outside the vault so alerts keep firing even while the vault is auto-locked.
+- **Metrics history + charts (F32)** — monitor samples are now downsampled (1-minute buckets kept 48 h, 10-minute buckets kept 30 days, auto-pruned) into a separate unencrypted `metrics.db` (SQLite via `node:sqlite` — zero new dependencies, a few MB/month). The 📈 button on each monitoring card opens **1 h / 24 h charts** for Load (per-CPU %), RAM and Disk; offline periods show as gaps. History survives app restarts; recording only happens while monitoring runs.
+- **AI explain selection (F46)** — select any output in the terminal and hit the floating **✨ Explain** button (or **Ctrl+Shift+E**): the selection goes to your configured AI provider (mode *explain-error*) and the answer appears in a minimizable dock panel on the right — no modal, keep typing while you read. Selections over 6 000 chars keep the tail (errors live at the end). If AI isn't configured yet it opens the AI settings for you.
+
+---
+
 ## [0.1.13] — 2026-07-08
 
 ### Added

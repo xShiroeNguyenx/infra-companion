@@ -12,6 +12,7 @@ import { BulkRunModal } from './components/BulkRunModal'
 import { NetToolboxModal } from './components/NetToolboxModal'
 import { MonitorModal } from './components/MonitorModal'
 import { MonitorDock } from './components/MonitorDock'
+import { MetricsHistoryModal } from './components/MetricsHistoryModal'
 import { SyncModal } from './components/SyncModal'
 import { AiModal } from './components/AiModal'
 import { RecordingsModal } from './components/RecordingsModal'
@@ -19,10 +20,11 @@ import { SettingsModal } from './components/SettingsModal'
 import { WorkspacesModal } from './components/WorkspacesModal'
 import { PluginsModal } from './components/PluginsModal'
 import { PluginPanelModal } from './components/PluginPanelModal'
+import { AiExplainPanel } from './components/AiExplainPanel'
 import { UpdateBanner } from './components/UpdateBanner'
 import { SftpView } from './features/sftp/SftpView'
 import { DashboardView } from './features/dashboard/DashboardView'
-import { useT } from './i18n'
+import { translate, useT } from './i18n'
 import { TerminalTabView } from './features/terminal/TerminalTabView'
 import { useDataStore } from './stores/data'
 import { useTabsStore } from './stores/tabs'
@@ -32,6 +34,33 @@ import { useUiStore } from './stores/ui'
 import { usePluginStore } from './stores/plugins'
 import { useMonitorStore } from './stores/monitor'
 import { useVaultStore } from './stores/vault'
+
+/** Toast cảnh báo monitoring — chạy ngoài component (trong subscribe) nên đọc ngôn ngữ từ store. */
+function formatAlertToast(a: import('@infra/shared').MonitorAlertDto): string {
+  const lang = useSettingsStore.getState().language
+  if (a.metric === 'offline') {
+    return translate(lang, a.kind === 'breach' ? 'monitor.alertOffline' : 'monitor.alertOnline', { host: a.label })
+  }
+  const names: Record<string, string> = {
+    load: 'Load',
+    mem: 'RAM',
+    disk: 'Disk',
+    steal: 'CPU steal',
+    conn: translate(lang, 'monitor.metricConn')
+  }
+  const metric = names[a.metric] ?? a.metric
+  // conn là số tuyệt đối — không gắn %; template i18n không chứa đơn vị
+  const unit = a.metric === 'conn' ? '' : '%'
+  if (a.kind === 'breach') {
+    return translate(lang, 'monitor.alertBreach', {
+      host: a.label,
+      metric,
+      value: `${a.value ?? 0}${unit}`,
+      threshold: `${a.threshold ?? 0}${unit}`
+    })
+  }
+  return translate(lang, 'monitor.alertRecover', { host: a.label, metric, value: `${a.value ?? 0}${unit}` })
+}
 
 export default function App() {
   const t = useT()
@@ -50,6 +79,7 @@ export default function App() {
   const setModal = useUiStore((s) => s.setModal)
   const pluginPanel = usePluginStore((s) => s.panel)
   const monitorActive = useMonitorStore((s) => s.active)
+  const historyHostId = useMonitorStore((s) => s.historyHostId)
   const pluginCommands = usePluginStore((s) => s.contributions)
   const booted = useRef(false)
   const openedInitialTab = useRef(false)
@@ -77,6 +107,9 @@ export default function App() {
     const offPanel = window.infra.plugins.onPanel((p) => usePluginStore.getState().setPanel(p))
     const offNotify = window.infra.plugins.onNotify((n) => useToastsStore.getState().push(n.message))
     const offSample = window.infra.monitor.onSample((s) => useMonitorStore.getState().applySample(s))
+    const offAlert = window.infra.monitor.onAlert((a) =>
+      useToastsStore.getState().push(formatAlertToast(a), a.kind === 'breach' ? 'error' : 'info')
+    )
     return () => {
       offLocked()
       offExit()
@@ -86,6 +119,7 @@ export default function App() {
       offPanel()
       offNotify()
       offSample()
+      offAlert()
     }
   }, [])
 
@@ -262,10 +296,23 @@ export default function App() {
       {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} />}
       {modal === 'workspaces' && <WorkspacesModal onClose={() => setModal(null)} />}
       {modal === 'plugins' && <PluginsModal onClose={() => setModal(null)} />}
+      {historyHostId && (
+        <MetricsHistoryModal
+          hostId={historyHostId}
+          // label: ưu tiên dock đang chạy, fallback danh sách host (xem lịch sử khi monitor đã dừng)
+          label={
+            useMonitorStore.getState().data[historyHostId]?.label ??
+            useDataStore.getState().hosts.find((h) => h.id === historyHostId)?.label ??
+            historyHostId
+          }
+          onClose={() => useMonitorStore.getState().setHistoryHost(null)}
+        />
+      )}
       {monitorActive && <MonitorDock />}
       {pluginPanel && (
         <PluginPanelModal panel={pluginPanel} onClose={() => usePluginStore.getState().setPanel(null)} />
       )}
+      <AiExplainPanel />{/* tự return null khi không có yêu cầu giải thích */}
 
       {locked && (
         <div className="absolute inset-0 z-[100]">

@@ -15,14 +15,18 @@ interface MonitorStoreState {
    *  (độc lập với modal toàn cục → mở modal khác không giết monitoring). */
   active: boolean
   data: Record<string, HostMonitor>
+  /** Host đang mở modal lịch sử metrics (F32) — null = đóng. */
+  historyHostId: string | null
   start: (hosts: { id: string; label: string }[]) => Promise<void>
   stop: () => void
   applySample: (sample: MetricSampleDto) => void
+  setHistoryHost: (hostId: string | null) => void
 }
 
 export const useMonitorStore = create<MonitorStoreState>((set) => ({
   active: false,
   data: {},
+  historyHostId: null,
   start: async (hosts) => {
     // stopAll trước: start backend dedupe theo hostId nên gọi lại = THAY tập host
     // đang theo dõi, không cộng dồn với tập cũ
@@ -30,7 +34,8 @@ export const useMonitorStore = create<MonitorStoreState>((set) => ({
     const data: Record<string, HostMonitor> = {}
     for (const h of hosts) data[h.id] = { hostId: h.id, label: h.label, sample: null, loadHistory: [] }
     set({ data, active: true })
-    await window.infra.monitor.start(hosts.map((h) => h.id))
+    // gửi kèm label để main dựng thông báo/webhook không cần vault (có thể đang khoá)
+    await window.infra.monitor.start(hosts)
   },
   stop: () => {
     window.infra.monitor.stopAll()
@@ -43,5 +48,6 @@ export const useMonitorStore = create<MonitorStoreState>((set) => ({
       const loadHistory =
         sample.load1 !== null ? [...cur.loadHistory, sample.load1].slice(-HISTORY) : cur.loadHistory
       return { data: { ...prev.data, [sample.hostId]: { ...cur, sample, loadHistory } } }
-    })
+    }),
+  setHistoryHost: (hostId) => set({ historyHostId: hostId })
 }))

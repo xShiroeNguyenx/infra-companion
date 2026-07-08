@@ -1,22 +1,65 @@
-import { ipcMain, type WebContents } from 'electron'
-import { MonitorService } from '@infra/core'
-import { IPC } from '@infra/shared'
+import { app, ipcMain, Notification, BrowserWindow, type WebContents } from 'electron'
+import { join } from 'node:path'
+import { AlertEngine, MetricsStore, MonitorService, buildWebhookRequest, formatAlertText, type AlertRules } from '@infra/core'
+import { IPC, type MonitorAlertDto, type MonitorSettingsDto } from '@infra/shared'
 import { touchActivity } from './vault'
 import { makeHostKeyVerifier, prepareConnection } from './connection'
+import { postWebhook, readMonitorSettings, registerMonitorSettingsIpc } from './monitorSettings'
 
-/** Theo dõi tài nguyên host (CPU load/mem/disk/uptime) qua SSH. Trả về hàm dispose. */
+/** AlertRules cho engine = settings bỏ phần webhook/osNotify. */
+function toRules(s: MonitorSettingsDto): AlertRules {
+  return { defaults: s.defaults, perHost: s.perHost }
+}
+
+/**
+ * Theo dõi tài nguyên host (CPU load/mem/disk/uptime) qua SSH. Trả về hàm dispose.
+ * F04/F32 cắm tại event 'sample': đánh giá ngưỡng (AlertEngine) + ghi lịch sử (MetricsStore).
+ */
 export function registerMonitorIpc(): () => void {
   const service = new MonitorService()
   // Set thay vì 1 biến — biến đơn bị ghi đè khi có 2 cửa sổ/2 nơi cùng start
   const subscribers = new Set<WebContents>()
+  // Label host ghi lúc START (renderer gửi kèm) — dựng thông báo/webhook không cần vault (có thể đang khoá)
+  const labels = new Map<string, string>()
+  let settings = readMonitorSettings()
+  const engine = new AlertEngine(toRules(settings))
+  // Lazy: chỉ mở metrics.db khi thật sự cần (start monitor / xem lịch sử)
+  let metrics: MetricsStore | null = null
+  const getMetrics = (): MetricsStore => (metrics ??= new MetricsStore(join(app.getPath('userData'), 'metrics.db')))
+
+  /** Phát 1 cảnh báo ra 3 kênh: renderer toast, OS notification (chỉ breach), webhook. */
+  const dispatch = (alert: ReturnType<AlertEngine['onSample']>[number]): void => {
+    const dto: MonitorAlertDto = { ...alert, label: labels.get(alert.hostId) ?? alert.hostId }
+    for (const subscriber of subscribers) {
+      if (!subscriber.isDestroyed()) subscriber.send(IPC.MONITOR_ALERT, dto)
+    }
+    if (dto.kind === 'breach' && settings.osNotify && Notification.isSupported()) {
+      const notification = new Notification({ title: 'Infra Companion — cảnh báo', body: formatAlertText(dto) })
+      notification.on('click', () => {
+        const win = BrowserWindow.getAllWindows()[0]
+        if (win) {
+          if (win.isMinimized()) win.restore()
+          win.focus()
+        }
+      })
+      notification.show()
+    }
+    if (settings.webhookUrl) {
+      const req = buildWebhookRequest(settings.webhookUrl, dto)
+      // fire-and-forget, KHÔNG retry — cooldown 15' của engine đã chặn storm
+      if (req) void postWebhook(req).catch((e) => console.error('[monitor] webhook lỗi:', (e as Error).message))
+    }
+  }
 
   service.on('sample', (sample) => {
     for (const subscriber of subscribers) {
       if (!subscriber.isDestroyed()) subscriber.send(IPC.MONITOR_SAMPLE, sample)
     }
+    getMetrics().record(sample) // F32
+    for (const alert of engine.onSample(sample)) dispatch(alert) // F04
   })
 
-  ipcMain.handle(IPC.MONITOR_START, async (event, hostIds: string[]) => {
+  ipcMain.handle(IPC.MONITOR_START, async (event, hosts: Array<{ id: string; label: string }>) => {
     touchActivity()
     if (!subscribers.has(event.sender)) {
       const sender = event.sender
@@ -24,29 +67,68 @@ export function registerMonitorIpc(): () => void {
       sender.once('destroyed', () => subscribers.delete(sender))
     }
     const verify = makeHostKeyVerifier(event.sender)
-    for (const hostId of hostIds) {
+    for (const host of hosts) {
+      labels.set(host.id, host.label)
       try {
-        const prepared = await prepareConnection(event.sender, hostId)
-        await service.start({ hostId, chain: prepared.chain, loginSteps: prepared.loginSteps }, verify)
+        const prepared = await prepareConnection(event.sender, host.id)
+        await service.start({ hostId: host.id, chain: prepared.chain, loginSteps: prepared.loginSteps }, verify)
       } catch (error) {
         event.sender.send(IPC.MONITOR_SAMPLE, {
-          hostId,
+          hostId: host.id,
           ts: Date.now(),
           ok: false,
           load1: null,
           loadText: null,
           memUsedPct: null,
           diskUsedPct: null,
+          diskMount: null,
+          inodeUsedPct: null,
           uptimeSec: null,
           cpuCount: null,
+          cpuPct: null,
+          cpuUserPct: null,
+          cpuSystemPct: null,
+          cpuIowaitPct: null,
+          cpuStealPct: null,
+          runQueue: null,
+          swapUsedMb: null,
+          swapTotalMb: null,
+          netRxKbps: null,
+          netTxKbps: null,
+          tcpConns: null,
+          tcpTimeWait: null,
+          topProc: null,
           error: error instanceof Error ? error.message : String(error)
-        })
+        } satisfies import('@infra/shared').MetricSampleDto)
       }
     }
   })
 
-  ipcMain.on(IPC.MONITOR_STOP, (_e, hostId: string) => service.stop(hostId))
-  ipcMain.on(IPC.MONITOR_STOP_ALL, () => service.stopAll())
+  ipcMain.on(IPC.MONITOR_STOP, (_e, hostId: string) => {
+    service.stop(hostId)
+    engine.removeHost(hostId) // không emit recover — dừng ≠ hồi phục
+    metrics?.flushHost(hostId)
+    labels.delete(hostId)
+  })
+  ipcMain.on(IPC.MONITOR_STOP_ALL, () => {
+    service.stopAll()
+    engine.clear()
+    metrics?.flushAll()
+    labels.clear()
+  })
 
-  return () => service.stopAll()
+  // Lịch sử metrics — lazy-open để xem được cả khi chưa start monitoring phiên này
+  ipcMain.handle(IPC.METRICS_QUERY, (_event, hostId: string, fromTs: number, toTs: number, res: 1 | 10) =>
+    getMetrics().query(hostId, fromTs, toTs, res === 10 ? 10 : 1)
+  )
+
+  registerMonitorSettingsIpc((s) => {
+    settings = s
+    engine.setRules(toRules(s))
+  })
+
+  return () => {
+    service.stopAll()
+    metrics?.close() // flush bucket dở + đóng WAL
+  }
 }

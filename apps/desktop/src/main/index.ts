@@ -79,6 +79,9 @@ function createWindow(): BrowserWindow {
   return win
 }
 
+// Windows toast (alert monitoring F04) chỉ hiện khi AppUserModelID khớp appId đã cài (electron-builder.yml)
+if (process.platform === 'win32') app.setAppUserModelId('com.nguyenkhanh.infracompanion')
+
 registerPromptIpc()
 registerVaultIpc()
 registerDataIpc()

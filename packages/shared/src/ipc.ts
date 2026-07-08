@@ -90,6 +90,11 @@ export const IPC = {
   MONITOR_STOP: 'monitor:stop',
   MONITOR_STOP_ALL: 'monitor:stop-all',
   MONITOR_SAMPLE: 'monitor:sample',
+  MONITOR_ALERT: 'monitor:alert',
+  MONITOR_GET_SETTINGS: 'monitor:get-settings',
+  MONITOR_SET_SETTINGS: 'monitor:set-settings',
+  MONITOR_TEST_WEBHOOK: 'monitor:test-webhook',
+  METRICS_QUERY: 'metrics:query',
 
   AI_GET_CONFIG: 'ai:get-config',
   AI_SET_CONFIG: 'ai:set-config',

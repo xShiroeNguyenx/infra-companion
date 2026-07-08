@@ -1,12 +1,19 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
-> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật 2026-07-08: **ký số registry ed25519 + trang marketplace plugins.html ĐÃ phát hành** (commit `33f8084`). **Đang chờ commit/tag: v0.1.13** (đã bump version 2 package.json + CHANGELOG [0.1.13] + README/USER-GUIDE/landing/handoff) — lệnh git cuối file. Nội dung v0.1.13: (1) **Dashboard home screen** — mở app vào Dashboard thay vì auto-mở PowerShell; KHÔNG phải tab, là màn hình home hiện khi `activeId === null`, nút 🏠 trái thanh tab; gồm stats + quick connect + favorites + chip nhóm + gần đây + workspaces + tunnels (start/stop tại chỗ) + bảng phím tắt; setting `infra.startup.page` (Settings → Trang khi mở app) chọn lại kiểu cũ. (2) **Access Log Analyzer v1.4.0** — mục 7 mới: top 15 ASN_ORGANIZATION (log không có trường này → in ghi chú bỏ qua); registry đã build+ký lại. ⚠️ Bản plugin ĐÃ CÀI ở `%APPDATA%\@infra\desktop\plugins\` đang CỐ Ý để v1.3.0 (khôi phục từ git) — để test flow **Cập nhật** trên tab 🛒 Marketplace sau khi push (registry Pages lên 1.4.0 → nút Cập nhật hiện ra). Private key ký registry: `~/.infra-companion/registry-signing-key.pem` — **PHẢI BACKUP**. Bước 3 (sau): plugin trả phí — license key qua merchant-of-record (Lemon Squeezy/Paddle).
+> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật 2026-07-08 (đêm): **v0.1.13 ĐÃ phát hành** (Dashboard home screen + Access Log Analyzer v1.4.0 top ASN — lưu ý sự cố release: lần đầu tag mà QUÊN commit → tag trỏ commit cũ, build ra 0.1.12, phải xoá release rỗng + dời tag; quy trình đúng: **commit → push → tag → push tag**). **Đang chờ commit/tag: v0.1.14** (đã bump version + CHANGELOG [0.1.14] + README/USER-GUIDE/landing/handoff) — lệnh git cuối file. Nội dung v0.1.14: (1) **F04 alert ngưỡng** (hysteresis 3-sample + vùng chết + cooldown 15'; toast + Windows notification + webhook Google Chat/Slack/Discord/Telegram tự nhận diện; rules ở `monitor-settings.json` userData — KHÔNG vault, chạy cả khi vault khoá; Load không chặn 100, mặc định Load/Conn TẮT, Steal 20, RAM/Disk 90). (2) **F32 lịch sử metrics** — metrics.db riêng (bucket 1'=48h, 10'=30 ngày, tự prune), nút 📈 trên card → chart 1h/24h. (3) **F46 AI giải thích selection** — bôi chọn → ✨/Ctrl+Shift+E → panel dock. (4) **Monitoring 2.0** — CPU thật us/sy/wa/**st** (delta /proc/stat; bắt được ca jpap09 steal 40% VPS bị oversell), run queue, swap, disk mount đầy nhất + inode, net ↓↑, TCP conn, top process; dòng chẩn đoán nằm CUỐI card (user yêu cầu, Load giữ nguyên). **Việc mai**: phân tích tiếp jpap08/09 (chặn bot theo ASN từ plugin, khiếu nại steal với nhà cung cấp kèm chart 📈, cân nhắc giảm MaxRequestWorkers 1152→576 SAU khi chặn bot — đã tư vấn kỹ trong phiên). Private key ký registry: `~/.infra-companion/registry-signing-key.pem` — **PHẢI BACKUP**.
 
 ## Đang ở đâu
 
-Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 → v0.1.12 (đã tag/phát hành)**. App build + typecheck + test đều sạch (98 core test: 92 chạy + 6 skip).
+Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 → v0.1.13 (đã tag/phát hành)**. App build + typecheck + test đều sạch (147 core test: 137 Node 20 + suite SQLite chạy qua Electron-Node).
 
-**v0.1.13 (2026-07-08, ĐÃ bump version + docs, CHƯA commit/tag, GUI đã xem bằng pnpm dev trong lúc dev)** — thuần renderer + plugin mẫu, không đổi schema DB (vẫn **v9**):
+**v0.1.14 (2026-07-08 đêm, ĐÃ bump version + docs, CHƯA commit/tag, GUI đã test một phần bằng pnpm dev — card mới hiện đúng trên jpap09)** — schema vault KHÔNG đổi (vẫn **v9**; metrics.db riêng có schema v2 của chính nó):
+1. **F04 Alert ngưỡng monitoring**: `packages/core/src/monitor/AlertEngine.ts` (hysteresis thuần: breach 3 sample ~9s, vùng chết [T-margin,T), recover 3 sample, offline 3 fail/2 ok, re-alert 15'; timing theo sample.ts → test deterministic) + `webhook.ts` (Google Chat/Slack/Discord/Telegram tự nhận diện theo URL, generic JSON fallback; conn không đơn vị %) + `apps/desktop/src/main/ipc/monitorSettings.ts` (`monitor-settings.json` userData — CHỦ Ý không vault để alert chạy khi vault khoá; nút Gửi thử; Load max 10000, Conn max 1e6, Steal/RAM/Disk 0-100). Dispatch 3 kênh trong `main/ipc/monitor.ts`: MONITOR_ALERT → toast renderer; Electron `Notification` (chỉ breach; ĐÃ `setAppUserModelId` win32 — **verify Windows toast trên bản đóng gói**); webhook fire-and-forget không retry. Mặc định: RAM/Disk 90, Steal 20, Load/Conn TẮT (baseline mỗi server một khác), offline bật. ⚠️ ĐỔI chữ ký IPC `monitor.start(hosts: {id,label}[])` — main cần label khi vault khoá.
+2. **F32 Lịch sử metrics**: `downsample.ts` + `MetricsStore.ts` (metrics.db riêng KHÔNG mã hoá trong userData, migrations riêng qua `PRAGMA user_version`, WAL; bucket 1' giữ 48h + 10' giữ 30 ngày song song, prune lúc mở + hourly; flush bucket dở khi stop/quit). Nút **📈** trên MonitorCard → `MetricsHistoryModal` (6 chart SVG tự vẽ: Load auto-scale, CPU, Steal, RAM, Disk, Conn auto-scale; tách đoạn tại gap dữ liệu; refresh 60s). IPC `METRICS_QUERY` lazy-open.
+3. **F46 AI giải thích selection** (thuần renderer): `stores/aiExplain.ts` (cap 6000 ký tự giữ ĐUÔI; `ai.ask('explain-error')` — không code main mới; AI chưa config → toast + mở AiModal) + TerminalPane (nút ✨ theo pattern find-overlay, Ctrl+Shift+E) + `AiExplainPanel.tsx` (dock clone PluginPanelModal, pill ✨, KHÔNG dùng chung store plugin).
+4. **Monitoring 2.0**: METRIC_CMD mở rộng (CHỈ double-quote — shq loginScript bọc single-quote; đếm TCP bằng `grep -c " 01 "`; df lọc fs ảo PHÍA PARSER cho portable) → CPU thật us/sy/**wa**/**st** + run queue + swap + disk mount đầy nhất + inode + net ↓↑ + conn + top process. **CPU%/net = delta giữa 2 poll** (`ActiveMonitor.prev`, reset khi reconnect; poll đầu null → card hiện từ poll 2 ~6s). `parseMetrics`/`applyCounterDeltas` EXPORT có test riêng (⚠️ bẫy `Number('') === 0` đã vá). Card: **GIỮ hàng Load** (user yêu cầu); dòng chẩn đoán `us/sy/wa/st · r · swap` nằm CUỐI card sau đường kẻ (user yêu cầu chuyển xuống); st≥10 đỏ, wa≥20 vàng, r>nproc vàng, inode≥70 vàng. Ngưỡng mới Steal % + Conn trong modal (5 ô). **Bài học vận hành từ ca jpap09**: load 300-600% do CPU steal 34-40% (VPS oversell) + bot ép java/httpd — dashboard cũ mù hoàn toàn, bản mới hiện thẳng trên card.
+5. Kiểm tra: typecheck 3 package + build xanh; 137 test Node 20 + **39/39 test monitor qua Electron-Node** (`$env:ELECTRON_RUN_AS_NODE=1; electron vitest run`).
+
+**v0.1.13 (ĐÃ phát hành 2026-07-08)** — thuần renderer + plugin mẫu, không đổi schema DB (vẫn **v9**):
 1. **Dashboard home screen** — mở app (sau unlock) vào Dashboard thay vì auto-mở PowerShell. Kiến trúc: KHÔNG phải tab kind mới — là màn hình home mount thường trực, hiện khi `activeId === null` ([DashboardView.tsx](../apps/desktop/src/renderer/src/features/dashboard/DashboardView.tsx), render trong App.tsx cạnh tabs); nút **🏠** trái TabsBar highlight khi đang ở home, `showDashboard()` trong tabs store chỉ là `set({ activeId: null })`; đóng tab cuối rơi về home (empty-state cũ đã xoá). Layout 1 cột max-w-3xl: stats (hosts/groups/kết nối hôm nay/7 ngày — `listHistory` nâng 8→50 trong data.ts, Sidebar tự `slice(0,8)`) → quick connect (regex như Sidebar) → ★ favorites → chip nhóm (openSshGroup) → gần đây → workspaces (open 1 click) → tunnels (dot trạng thái live + Start/Stop tại chỗ) → bảng phím tắt. Setting `infra.startup.page` (`startupPage`, mặc định 'dashboard') trong Settings → "Trang khi mở app". ⚠️ Đã thử 2 cột + khối Monitoring tóm tắt — user BỎ cả hai (chưa cân đối / trùng MonitorDock) — đừng thêm lại. toggleBroadcast giờ guard chỉ tab terminal (fix luôn bug 📡 trên tab SFTP). i18n `dashboard.*` (~30 key) vi/en/ja.
 2. **Access Log Analyzer v1.4.0** — mục **7. Top 15 nhà mạng/tổ chức (ASN_ORGANIZATION)**: log GeoIP có đuôi `| ... | ASN_ORGANIZATION: VNPT Corp` → `awk -F'ASN_ORGANIZATION: ' 'NF>1{print $2}' | sort | uniq -c | sort -rn | head -15`; không có trường → in "(log khong co truong ASN_ORGANIZATION - bo qua muc nay)". Đã test cả 2 nhánh trên log mẫu thật (webike). "6 thông số"→"7 thông số" toàn file + title lệnh trong manifest; registry build + ký lại. ⚠️ Lưu ý ngữ nghĩa: user gọi ASN org là "agent" — mục 4 Top User-Agent là thứ KHÁC, đã có từ trước.
 3. Kiểm tra: typecheck 3 package + build + 98 test xanh. **Test update plugin qua Marketplace**: bản cài %APPDATA% đang để v1.3.0 CHỦ Ý — sau khi push (Pages deploy registry 1.4.0, chờ ~1-2 phút) mở 🧩 Plugins → 🛒 Marketplace → Access Log Analyzer hiện nút **Cập nhật** → bấm → verify sha256+chữ ký → Nạp lại → chạy thử "Phân tích 7 thông số". (Marketplace cache registry 5 phút — mở lại tab nếu chưa thấy.)
@@ -133,7 +140,7 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 
 ## Git (anh tự chạy; tôi không tự commit)
 
-> **v0.1.12 + ký số registry + plugins.html ĐÃ phát hành** (commit `33f8084`, 2026-07-08). Đang chờ commit + tag: **v0.1.13** (Dashboard home screen + Access Log Analyzer v1.4.0 — đã bump version + docs đầy đủ).
+> **v0.1.13 ĐÃ phát hành** (2026-07-08). Đang chờ commit + tag: **v0.1.14** (F04 alert + F32 lịch sử metrics + F46 AI giải thích + Monitoring 2.0 — đã bump version + docs đầy đủ). ⚠️ Quy trình: **commit + push main TRƯỚC, tag SAU** — tag khi chưa commit sẽ build từ commit cũ với version cũ (đã dính 1 lần ở v0.1.13).
 
 Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps/desktop`) + CHANGELOG + README/USER-GUIDE/landing/handoff, rồi push tag `v*.*.*` — release tự kích hoạt (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux). Lưu ý: đổi `docs/landing/index.html` (version trên hero) sẽ tự deploy lại landing page qua flow Pages riêng khi push lên `main`.
 
@@ -142,25 +149,28 @@ Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps
 ```powershell
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
 
-# v0.1.13 — Dashboard home screen + Access Log Analyzer v1.4.0 (plugin + registry PHẢI cùng commit)
-git add apps/desktop/src/renderer/src
-git add docs/examples/access-log-analyzer docs/landing/registry/plugins.json
+# v0.1.14 — F04 alert nguong + F32 lich su metrics + F46 AI giai thich + Monitoring 2.0
+# BƯỚC 1: commit + push main (BẮT BUỘC trước khi tag)
+git add packages/shared/src packages/core/src apps/desktop/src
 git add package.json apps/desktop/package.json
 git add CHANGELOG.md README.md docs/USER-GUIDE.md docs/landing/index.html docs/TIEP-TUC-PHIEN-SAU.md
-git status            # xem lại trước khi commit
-git commit -m "feat: Dashboard home screen (nut Home) + Access Log Analyzer v1.4.0 top ASN (v0.1.13)"
+git status            # xem lại — phải hết "Changes not staged" sau khi add
+git commit -m "feat: alert nguong + lich su metrics + AI giai thich + monitoring 2.0 (v0.1.14)"
 git push origin main
-# Push xong: Pages tự deploy landing + registry v1.4.0 (~1-2 phút)
 
-# Tag để CI build installer 3 OS + tạo GitHub Release
-git tag v0.1.13
-git push origin v0.1.13
+# BƯỚC 2: tag SAU KHI push — CI build installer 3 OS + tạo GitHub Release
+git tag v0.1.14
+git push origin v0.1.14
+# Xong: chờ Actions ~5-10 phút → Releases/v0.1.14 phải có InfraCompanion-Setup-0.1.14.exe + latest.yml
+# App 0.1.13 đang cài sẽ hiện banner update sau khi mở lại (~10s)
 ```
 
-**Test update plugin qua Marketplace (sau khi push main, KHÔNG cần chờ tag build):**
-1. Bản cài `%APPDATA%\@infra\desktop\plugins\access-log-analyzer\` đang là **v1.3.0** (đã khôi phục chủ ý).
-2. Chờ Pages deploy xong (~1-2 phút, xem tab Actions) → registry live có v1.4.0.
-3. Mở app → ⋯ → 🧩 Plugins → tab **🛒 Marketplace** → Access Log Analyzer hiện nút **Cập nhật** (1.3.0 → 1.4.0) → bấm (app verify sha256 + chữ ký ed25519 rồi mới ghi file) → về tab Đã cài bấm **Nạp lại** → palette chạy "Access log: Phân tích 7 thông số" trên phiên SSH → thấy mục 7 ASN.
-4. Nếu chưa thấy nút Cập nhật: registry cache 5 phút — đóng mở lại modal Plugins sau ít phút.
+**Checklist test tay trước khi tag (pnpm dev):**
+1. **Alert**: Monitoring → đặt RAM = 5 cho 1 host → Bắt đầu → ~9s: toast đỏ + Windows toast; không lặp trong 15'; đặt lại RAM 90.
+2. **Steal**: nhìn card jpap08/09 — dòng `us/sy/wa/st` cuối card, `st` đỏ nếu ≥10; alert steal mặc định 20%.
+3. **History**: monitor ≥3 phút → 📈 → 6 chart (Load/CPU/Steal/RAM/Disk/Conn), toggle 1h/24h.
+4. **Webhook** (nếu có Google Chat): dán URL → Gửi thử → tin nhắn vào space.
+5. **F46**: bôi chọn output → nút ✨ → panel trả lời; Ctrl+Shift+E; AI chưa config → mở form.
+6. **Vault khoá**: khoá vault thủ công khi đang monitor → Windows notification vẫn nổ khi vượt ngưỡng.
 
 > Môi trường dev: Node 20, pnpm 9, Electron 42 (Node 24 runtime — dùng `node:sqlite`), ssh2/node-pty/serialport là native nhưng đã externalize + prebuilt nên không cần build C++. Khi chạy electron từ terminal đã dính biến `ELECTRON_RUN_AS_NODE` thì thêm `$env:ELECTRON_RUN_AS_NODE=$null` cùng lệnh (chỉ là gotcha của terminal, không phải lỗi app).

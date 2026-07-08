@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, AI assistance with local LLM support, and more.
 
-**Current release: v0.1.13 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.1.14 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -91,10 +91,11 @@
 - Works through login-script hosts — command runs on the **inner** machine, not the gate
 
 ### Monitoring Dashboard
-- Per-host cards: CPU load sparkline, RAM / Disk usage bars, uptime
-- **No agent required** — reads `/proc` and `df` over SSH every 3 seconds
-- Thresholds: red > 90%, yellow > 70%
-- Auto-reconnects on drop; works through login-script hosts
+- Per-host cards: load sparkline + Load / **real CPU%** / RAM / Disk bars, uptime
+- **Diagnoses *why* a server is slow**: CPU split into user / system / **iowait** (disk bottleneck) / **steal** (oversold VPS — highlighted red at ≥10%), run queue, swap, fullest mount + inode%, network in/out rate, **TCP connection count** (scraper radar), top CPU process
+- **No agent required** — one SSH command reading `/proc` + `df` every 3 seconds; auto-reconnects; works through login-script hosts
+- **Alert thresholds** — Load (uncapped, %/CPU) / RAM / Disk / CPU steal / connections / offline, global defaults + per-host overrides, hysteresis + 15-min re-alert; delivered as in-app toast, **Windows notification**, and optional **webhook** (Google Chat / Slack / Discord / Telegram auto-detected, with a test button); alerts keep firing even while the vault is locked
+- **Metrics history** — samples downsampled into a local `metrics.db` (minute buckets kept 48 h, 10-minute kept 30 days); 📈 on any card opens 1 h / 24 h charts for Load, CPU, steal, RAM, disk and connections
 
 ### Network Toolbox
 - Ping (latency), DNS lookup (A / AAAA / PTR), port scan (16 common ports)
@@ -110,6 +111,7 @@
 - **Generate commands** from natural language — inserts into terminal, does NOT auto-run
 - **Explain command** — break down each part and flag risks
 - **Explain error** — diagnose output and suggest fixes
+- **Explain selection** — select any terminal output → floating ✨ button or **Ctrl+Shift+E** → answer in a minimizable dock panel (no modal, keep typing while you read)
 - Providers: **Claude** (`claude-opus-4-8`), **OpenAI** (`gpt-4o-mini`), **Gemini** (`gemini-2.0-flash`), **Ollama** (local, fully private)
 - API keys stored encrypted in vault
 
@@ -250,7 +252,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.1.13)
+## Known Limitations (v0.1.14)
 
 - Bulk / Monitor / SFTP through login scripts rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` installed on the gate) and `su` / `sudo` steps are supported; exotic setups that force a TTY password prompt may still fail
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))

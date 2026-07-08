@@ -7,6 +7,7 @@ import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { saveTermSnapshot, subscribeTermData, takeTermSnapshot } from '../../lib/termBus'
 import { useTabsStore, type Pane } from '../../stores/tabs'
+import { useAiExplainStore } from '../../stores/aiExplain'
 import { useSettingsStore } from '../../stores/settings'
 import { useT } from '../../i18n'
 import { terminalTheme } from './theme'
@@ -36,6 +37,7 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
   const searchRef = useRef<SearchAddon | null>(null)
   const [findOpen, setFindOpen] = useState(false)
   const [findText, setFindText] = useState('')
+  const [hasSelection, setHasSelection] = useState(false)
   const [copied, setCopied] = useState(false)
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const findInputRef = useRef<HTMLInputElement>(null)
@@ -99,6 +101,12 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
         setTimeout(() => findInputRef.current?.focus(), 0)
         return false
       }
+      // F46: AI giải thích đoạn output đang bôi chọn
+      if (event.ctrlKey && event.shiftKey && event.code === 'KeyE') {
+        const selection = term.getSelection().trim()
+        if (selection) void useAiExplainStore.getState().explain(selection)
+        return false
+      }
       return true
     })
 
@@ -118,6 +126,10 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     const dataDisposable = term.onData(handleInput)
     const resizeDisposable = term.onResize(({ cols, rows }) =>
       window.infra.terminal.resize(pane.sessionId, cols, rows)
+    )
+    // F46: nút ✨ Giải thích chỉ hiện khi đang có selection
+    const selectionDisposable = term.onSelectionChange(() =>
+      setHasSelection(term.getSelection().trim().length > 0)
     )
 
     const resizeObserver = new ResizeObserver(() => {
@@ -208,6 +220,7 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
       unsubscribeData()
       dataDisposable.dispose()
       resizeDisposable.dispose()
+      selectionDisposable.dispose()
       resizeObserver.disconnect()
       mouseEl?.removeEventListener('mousedown', onMouseDown, true)
       mouseEl?.removeEventListener('mouseup', onMouseUp, true)
@@ -288,6 +301,19 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
         <div className="pointer-events-none absolute bottom-3 right-3 z-30 rounded border border-edge-strong bg-elevated/95 px-2.5 py-1 text-xs text-content shadow-lg">
           {t('terminal.copied')}
         </div>
+      )}
+
+      {/* F46: nút giải thích selection — cùng slot với thanh Tìm, Tìm mở thì nhường chỗ */}
+      {hasSelection && !findOpen && (
+        <button
+          className="border-edge-strong bg-elevated/95 text-content hover:bg-hover absolute top-2 right-3 z-30 rounded border px-2.5 py-1 text-xs shadow-lg"
+          onClick={() => {
+            const selection = termRef.current?.getSelection().trim()
+            if (selection) void useAiExplainStore.getState().explain(selection)
+          }}
+        >
+          ✨ {t('terminal.explainSelection')}
+        </button>
       )}
 
       {findOpen && (

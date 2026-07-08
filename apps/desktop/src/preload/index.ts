@@ -9,6 +9,7 @@ import {
   type KeyImportInput,
   type ContributedCommandDto,
   type MetricSampleDto,
+  type MonitorAlertDto,
   type PasswordQuestion,
   type PluginNotifyDto,
   type PluginPanelDto,
@@ -126,10 +127,15 @@ const api: InfraApi = {
     fetchImage: (url) => ipcRenderer.invoke(IPC.NET_FETCH_IMAGE, url)
   },
   monitor: {
-    start: (hostIds) => ipcRenderer.invoke(IPC.MONITOR_START, hostIds),
+    start: (hosts) => ipcRenderer.invoke(IPC.MONITOR_START, hosts),
     stop: (hostId) => ipcRenderer.send(IPC.MONITOR_STOP, hostId),
     stopAll: () => ipcRenderer.send(IPC.MONITOR_STOP_ALL),
-    onSample: (cb) => subscribe<MetricSampleDto>(IPC.MONITOR_SAMPLE, cb)
+    onSample: (cb) => subscribe<MetricSampleDto>(IPC.MONITOR_SAMPLE, cb),
+    onAlert: (cb) => subscribe<MonitorAlertDto>(IPC.MONITOR_ALERT, cb),
+    getSettings: () => ipcRenderer.invoke(IPC.MONITOR_GET_SETTINGS),
+    setSettings: (s) => ipcRenderer.invoke(IPC.MONITOR_SET_SETTINGS, s),
+    testWebhook: (url) => ipcRenderer.invoke(IPC.MONITOR_TEST_WEBHOOK, url),
+    queryHistory: (hostId, fromTs, toTs, res) => ipcRenderer.invoke(IPC.METRICS_QUERY, hostId, fromTs, toTs, res)
   },
   ai: {
     getConfig: () => ipcRenderer.invoke(IPC.AI_GET_CONFIG),

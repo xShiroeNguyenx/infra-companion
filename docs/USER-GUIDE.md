@@ -255,15 +255,26 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 
 ## 11. Monitoring Dashboard — `⋯` → Monitoring
 
-**What it is**: track **CPU load / RAM / disk / uptime** in real time, **no agent required** (reads `/proc` + `df` over SSH every 3s). Linux only.
+**What it is**: real-time host health, **no agent required** (one SSH command reading `/proc` + `df` every 3s). Linux only. Designed to answer not just *"is it slow?"* but ***"why is it slow?"***.
 
-**Use**: pick hosts → **Start monitoring** → the picker closes and a compact dashboard **docks to the top-right corner** — one card per host: a load sparkline + Load/RAM/Disk bars (red >90%, yellow >70%) + uptime. The dock is translucent (hover to focus) and doesn't block anything: keep working in the terminal, open other modals, switch tabs — monitoring continues until you press **Stop** on the dock. Press **–** to minimize it to a `📊` pill at the bottom-right: polling continues, and the pill's status dot shows the worst host state (green OK / amber connecting / red error) — click the pill to restore. Auto-reconnects on drop. Re-opening `⋯ → Monitoring` pre-ticks the hosts being watched; **Start** replaces the watched set.
+**Use**: pick hosts → **Start monitoring** → the picker closes and a compact dashboard **docks to the top-right corner** — one card per host. The dock is translucent (hover to focus) and doesn't block anything: keep working in the terminal, open other modals, switch tabs — monitoring continues until you press **Stop** on the dock. Press **–** to minimize it to a `📊` pill at the bottom-right (polling continues; the pill's dot shows the worst host state). Re-opening `⋯ → Monitoring` pre-ticks the hosts being watched; **Start** replaces the watched set.
+
+**Reading a card** (top to bottom):
+- **Load** — classic load average (1/5/15 min) with a bar normalized per CPU (uncapped: 300-400% is real on busy servers).
+- **CPU** — *real* CPU busy % (computed from `/proc/stat` deltas between polls; appears from the 2nd poll).
+- **RAM / Disk** — RAM via MemAvailable; Disk shows the **fullest real mount** (e.g. `Disk /var`), not just `/`.
+- **Diagnostic line** `us · sy · wa · st`: `us` = application code, `sy` = kernel, `wa` = **waiting on disk** (≥20% turns yellow — I/O bottleneck, more CPU won't help), `st` = **CPU stolen by the hypervisor** (≥10% turns red — your VPS is oversold; complain to the provider, no server config fixes this). Plus `r N` (processes queued for CPU, shown when > core count) and `swap` (shown when in use).
+- **Bottom line**: network `↓/↑` rate, **TCP connection count** (the most direct "we're being scraped" signal), `inode %` (shown at ≥70% — full inodes with free space is a classic silent killer), and the top-CPU process name.
+
+**Alert thresholds** (in the Monitoring modal, under the host picker): Load %/CPU (uncapped — set to *your* baseline, e.g. 500), RAM %, Disk %, **Steal %** (default 20), **Conn** (absolute count, default off), and an offline alarm. Global defaults + per-host overrides (empty field = inherit). Alerts need a **sustained ~9s breach** (3 polls) and won't flap around the threshold; while still breached they repeat every 15 min; recovery is announced once. Delivery: in-app toast + **Windows notification** + optional **webhook** — paste one URL (Google Chat / Slack / Discord / Telegram auto-detected, anything else gets generic JSON) and press **Send test**. Alerts keep working while the vault is auto-locked.
+
+**Metrics history**: samples are downsampled into a local `metrics.db` (minute buckets kept 48 h, 10-minute buckets 30 days, auto-pruned — a few MB/month). Press **📈** on any card → charts for Load, CPU, steal, RAM, disk and connections over **1 h / 24 h**; offline periods show as gaps. History survives restarts; recording only happens while monitoring runs.
 
 **Runs through login scripts**: like Bulk — web-01/02 measure the inner machine, not the gate.
 
-**Troubleshooting**: if a card says metrics can't be parsed, the message includes the remote error (e.g. `Permission denied`, `sshpass: command not found`) — that tells you which hop failed.
+**Troubleshooting**: if a card says metrics can't be parsed, the message includes the remote error (e.g. `Permission denied`, `sshpass: command not found`) — that tells you which hop failed. CPU/net/steal need a second poll (~6s) before they appear.
 
-**Test**: pick web-01 + web-02 → Start → see each machine's own numbers.
+**Test**: pick web-01 + web-02 → Start → see each machine's own numbers; set RAM threshold to 5 → red toast + Windows notification within ~9s; press 📈 after a few minutes for charts.
 
 ---
 
@@ -306,7 +317,9 @@ Purely local, no SSH. Enter a host/IP then:
 2. **Explain command** — paste a command → a part-by-part explanation + risks.
 3. **Explain error** — paste output/an error → diagnosis + how to fix.
 
-**Test**: configure Gemini → Generate command "kill the process on port 8080" → open a terminal tab → Insert into terminal.
+**Explain selection (no copy-paste needed)**: select any output directly in the terminal → a floating **✨ Explain** button appears (or press **Ctrl+Shift+E**) → the answer opens in a translucent dock panel on the right (minimizable to a ✨ pill; close with ✕; Esc stays with the terminal). Selections longer than ~6 000 chars keep the tail — errors live at the end. If AI isn't configured yet, the settings form opens automatically.
+
+**Test**: configure Gemini → Generate command "kill the process on port 8080" → open a terminal tab → Insert into terminal. Then `cat` a config file, select a chunk → Ctrl+Shift+E.
 
 ---
 
@@ -463,6 +476,7 @@ New connection protocols (pluggable SessionKind) · permission enforcement + con
 | `Ctrl+Shift+H` | Collapse/expand the host sidebar (more room for the terminal) |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Switch tabs |
 | `Ctrl+F` | Find in terminal |
+| `Ctrl+Shift+E` | AI-explain the selected terminal output |
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | Copy / Paste |
 | Left-click inside a selection | Copy the highlighted text |
 | Right-click in the terminal | Paste the clipboard at the cursor |

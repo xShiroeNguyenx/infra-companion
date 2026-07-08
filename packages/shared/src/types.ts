@@ -341,10 +341,80 @@ export interface MetricSampleDto {
   load1: number | null
   loadText: string | null
   memUsedPct: number | null
+  /** % dùng cao nhất trong các mount thật (bỏ tmpfs…) — mount tương ứng ở diskMount. */
   diskUsedPct: number | null
+  diskMount: string | null
+  inodeUsedPct: number | null
   uptimeSec: number | null
   cpuCount: number | null
+  /** CPU thật từ delta /proc/stat (null ở lần poll đầu). cpuPct = 100 − idle − iowait. */
+  cpuPct: number | null
+  cpuUserPct: number | null
+  cpuSystemPct: number | null
+  cpuIowaitPct: number | null
+  /** % CPU bị hypervisor lấy (VPS) — ≥10% kéo dài là bất thường. */
+  cpuStealPct: number | null
+  /** Số tiến trình chờ CPU (cột r của vmstat). */
+  runQueue: number | null
+  swapUsedMb: number | null
+  swapTotalMb: number | null
+  netRxKbps: number | null
+  netTxKbps: number | null
+  tcpConns: number | null
+  tcpTimeWait: number | null
+  topProc: string | null
   error?: string
+}
+
+export type MonitorAlertMetric = 'load' | 'mem' | 'disk' | 'steal' | 'conn' | 'offline'
+
+/** Ngưỡng cảnh báo — null = tắt metric đó. loadPct chuẩn hoá theo core: load1/cpuCount*100
+ *  (KHÔNG chặn 100 — server bận thường trực 300-400%+). connCount là số tuyệt đối. */
+export interface MonitorThresholdsDto {
+  loadPct: number | null
+  memPct: number | null
+  diskPct: number | null
+  /** % CPU steal (VPS bị oversubscribe). */
+  stealPct: number | null
+  /** Số kết nối TCP ESTABLISHED. */
+  connCount: number | null
+  offline: boolean
+}
+
+/** Cài đặt cảnh báo monitoring — lưu file JSON userData (KHÔNG vault: alert phải chạy cả khi vault khoá). */
+export interface MonitorSettingsDto {
+  defaults: MonitorThresholdsDto
+  /** Override từng host — thiếu field nào dùng defaults. Key của host đã xoá là vô hại (bị bỏ qua). */
+  perHost: Record<string, Partial<MonitorThresholdsDto>>
+  /** '' = tắt webhook. Tự nhận diện Google Chat/Slack/Discord/Telegram/generic theo URL. */
+  webhookUrl: string
+  /** Thông báo hệ điều hành (Windows toast) khi breach. */
+  osNotify: boolean
+}
+
+export interface MonitorAlertDto {
+  hostId: string
+  label: string
+  metric: MonitorAlertMetric
+  kind: 'breach' | 'recover'
+  /** Giá trị đo được lúc chốt cảnh báo (%; null với offline). */
+  value: number | null
+  /** Ngưỡng hiệu lực (null với offline). */
+  threshold: number | null
+  ts: number
+}
+
+/** Một bucket lịch sử metrics (đầu bucket, giá trị trung bình trong bucket). */
+export interface MetricHistoryPointDto {
+  ts: number
+  loadPct: number | null
+  cpuPct: number | null
+  stealPct: number | null
+  memPct: number | null
+  diskPct: number | null
+  conns: number | null
+  /** ok_count/total_count trong bucket (0..1). */
+  okRatio: number
 }
 
 export interface SshConfigImportResult {
@@ -631,11 +701,19 @@ export interface InfraApi {
     fetchImage(url: string): Promise<string>
   }
   monitor: {
-    /** Bắt đầu theo dõi các host (mở kết nối + poll). */
-    start(hostIds: string[]): Promise<void>
+    /** Bắt đầu theo dõi các host (mở kết nối + poll). Kèm label để main dựng thông báo/webhook kể cả khi vault khoá. */
+    start(hosts: { id: string; label: string }[]): Promise<void>
     stop(hostId: string): void
     stopAll(): void
     onSample(cb: (s: MetricSampleDto) => void): () => void
+    /** Cảnh báo ngưỡng breach/recover (F04). */
+    onAlert(cb: (a: MonitorAlertDto) => void): () => void
+    getSettings(): Promise<MonitorSettingsDto>
+    setSettings(s: MonitorSettingsDto): Promise<void>
+    /** Gửi alert giả qua webhook để kiểm tra URL. */
+    testWebhook(url: string): Promise<{ ok: boolean; message: string }>
+    /** Lịch sử metrics đã downsample (res 1 = bucket phút, 10 = bucket 10 phút). */
+    queryHistory(hostId: string, fromTs: number, toTs: number, res: 1 | 10): Promise<MetricHistoryPointDto[]>
   }
   ai: {
     getConfig(): Promise<AiConfigDto | null>

@@ -78,6 +78,13 @@ function MonitorCard({ monitor }: { monitor: HostMonitor }) {
         <span className={`size-1.5 rounded-full ${!s ? 'bg-warning animate-pulse' : s.ok ? 'bg-success' : 'bg-danger'}`} />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-content">{monitor.label}</span>
         {s?.uptimeSec != null && <span className="text-[10px] text-subtle">up {formatUptime(s.uptimeSec)}</span>}
+        <button
+          className="text-subtle hover:text-content shrink-0 leading-none"
+          title={t('monitor.history')}
+          onClick={() => useMonitorStore.getState().setHistoryHost(monitor.hostId)}
+        >
+          📈
+        </button>
       </div>
       {!s && <p className="text-[11px] text-subtle">{t('monitor.connecting')}</p>}
       {s && !s.ok && <p className="text-[11px] text-danger">{s.error}</p>}
@@ -85,12 +92,49 @@ function MonitorCard({ monitor }: { monitor: HostMonitor }) {
         <div className="space-y-1.5">
           <Sparkline values={monitor.loadHistory} cpuCount={s.cpuCount} />
           <Bar label={`Load ${s.loadText ?? ''}`} pct={loadPct(s.load1, s.cpuCount)} />
+          {/* CPU thật từ /proc/stat (null ở poll đầu) — phân biệt thiếu CPU / nghẽn I/O / bị steal */}
+          {s.cpuPct !== null && <Bar label="CPU" pct={s.cpuPct} />}
           <Bar label="RAM" pct={s.memUsedPct} />
-          <Bar label="Disk /" pct={s.diskUsedPct} />
+          <Bar label={`Disk ${s.diskMount ?? '/'}`} pct={s.diskUsedPct} />
+          {/* Dòng chẩn đoán CPU: ai đang ăn (us/sy), nghẽn đĩa (wa), bị hypervisor trộm (st) */}
+          {s.cpuUserPct !== null && (
+            <div className="text-subtle border-edge/70 mt-1 flex flex-wrap gap-x-2 border-t pt-1.5 text-[10px]">
+              <span>us {s.cpuUserPct}</span>
+              <span>sy {s.cpuSystemPct ?? '—'}</span>
+              <span className={(s.cpuIowaitPct ?? 0) >= 20 ? 'text-warning font-semibold' : ''}>
+                wa {s.cpuIowaitPct ?? '—'}
+              </span>
+              <span className={(s.cpuStealPct ?? 0) >= 10 ? 'text-danger font-semibold' : ''}>
+                st {s.cpuStealPct ?? '—'}
+              </span>
+              {s.runQueue !== null && s.runQueue > (s.cpuCount ?? 1) && (
+                <span className="text-warning">r {s.runQueue}</span>
+              )}
+              {(s.swapUsedMb ?? 0) > 0 && <span>swap {s.swapUsedMb}MB</span>}
+            </div>
+          )}
+          {(s.netRxKbps !== null || s.tcpConns !== null || s.topProc) && (
+            <div className="text-muted flex flex-wrap items-center gap-x-2 text-[10px]">
+              {s.netRxKbps !== null && (
+                <span>
+                  ↓{fmtRate(s.netRxKbps)} ↑{fmtRate(s.netTxKbps ?? 0)}
+                </span>
+              )}
+              {s.tcpConns !== null && <span>{s.tcpConns} conn</span>}
+              {(s.inodeUsedPct ?? 0) >= 70 && <span className="text-warning">inode {s.inodeUsedPct}%</span>}
+              {s.topProc && <span className="min-w-0 truncate">[{s.topProc}]</span>}
+            </div>
+          )}
         </div>
       )}
     </div>
   )
+}
+
+/** Kbps → chuỗi gọn: 850 Kb/s, 12.3 Mb/s. */
+function fmtRate(kbps: number): string {
+  if (kbps >= 1000) return `${(kbps / 1000).toFixed(1)} Mb/s`
+  return `${kbps} Kb/s`
 }
 
 function Bar({ label, pct }: { label: string; pct: number | null }) {
