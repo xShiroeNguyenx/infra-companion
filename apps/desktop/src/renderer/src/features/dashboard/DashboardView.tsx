@@ -1,12 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { MetricHistoryHostDto, MetricHistoryPointDto } from '@infra/shared'
 import type { WorkspaceTab } from '../../stores/tabs'
 import { useDataStore } from '../../stores/data'
 import { useFavoritesStore } from '../../stores/favorites'
+import { useMonitorStore } from '../../stores/monitor'
 import { useSettingsStore } from '../../stores/settings'
 import { useTabsStore } from '../../stores/tabs'
 import { useUiStore } from '../../stores/ui'
 import { useWorkspacesStore } from '../../stores/workspaces'
 import { Button } from '../../components/ui'
+import { MetricChart } from '../../components/MetricsHistoryModal'
 import { useT } from '../../i18n'
 
 const LOCALES = { vi: 'vi-VN', en: 'en-US', ja: 'ja-JP' } as const
@@ -36,9 +39,10 @@ function summarize(tabs: WorkspaceTab[], t: ReturnType<typeof useT>): string {
 
 /**
  * Trang Dashboard — màn hình home nằm dưới các tab (activeId=null), mở qua nút 🏠.
- * Chỉ đọc dữ liệu có sẵn ở renderer (hosts/history/favorites/tunnels/workspaces),
- * không IPC riêng. Card dùng bg-panel: khi bật ảnh nền, --c-panel đã bán trong suốt.
- * Không hiện tóm tắt Monitoring ở đây — MonitorDock góc phải đã lo việc đó.
+ * Đọc dữ liệu có sẵn ở renderer (hosts/history/favorites/tunnels/workspaces); riêng mục
+ * "Lịch sử monitoring" query metrics.db qua IPC (chỉ khi Dashboard đang hiện).
+ * Card dùng bg-panel: khi bật ảnh nền, --c-panel đã bán trong suốt.
+ * Trạng thái realtime vẫn là việc của MonitorDock góc phải — ở đây chỉ có LỊCH SỬ.
  */
 export function DashboardView({ active }: { active: boolean }) {
   const t = useT()
@@ -182,6 +186,8 @@ export function DashboardView({ active }: { active: boolean }) {
           </section>
         )}
 
+        <MonitorHistorySection active={active} locale={locale} />
+
         <section>
           <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">
             {t('dashboard.recent')}
@@ -307,6 +313,95 @@ export function DashboardView({ active }: { active: boolean }) {
         </section>
       </div>
     </div>
+  )
+}
+
+const MON_HISTORY_LIMIT = 6
+const MON_REFRESH_MS = 60_000
+
+/** Mục "Lịch sử monitoring": các host từng được monitor (dữ liệu metrics.db còn trong
+ *  hạn giữ 30 ngày) + chart Load 24h thu gọn; bấm card mở modal lịch sử đầy đủ.
+ *  Chỉ fetch khi Dashboard đang hiện (active) — tránh query nền vô ích. */
+function MonitorHistorySection({ active, locale }: { active: boolean; locale: string }) {
+  const t = useT()
+  const hosts = useDataStore((s) => s.hosts)
+  const [monHosts, setMonHosts] = useState<MetricHistoryHostDto[] | null>(null)
+  const [charts, setCharts] = useState<Record<string, MetricHistoryPointDto[]>>({})
+
+  useEffect(() => {
+    if (!active) return
+    let alive = true
+    const load = async (): Promise<void> => {
+      const list = (await window.infra.monitor.historyHosts()).slice(0, MON_HISTORY_LIMIT)
+      if (!alive) return
+      setMonHosts(list)
+      const now = Date.now()
+      // Chart Load 24h (bucket 10') từng host — tuần tự cho nhẹ (tối đa 6 query SQLite local)
+      for (const h of list) {
+        const points = await window.infra.monitor.queryHistory(h.hostId, now - 24 * 3_600_000, now, 10)
+        if (!alive) return
+        setCharts((prev) => ({ ...prev, [h.hostId]: points }))
+      }
+    }
+    void load()
+    const timer = setInterval(() => void load(), MON_REFRESH_MS)
+    return () => {
+      alive = false
+      clearInterval(timer)
+    }
+  }, [active])
+
+  // Chưa từng monitor host nào → không chiếm chỗ trên Dashboard (khác danh sách rỗng do đang load)
+  if (monHosts !== null && monHosts.length === 0) {
+    return (
+      <section>
+        <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">
+          📈 {t('dashboard.monHistory')}
+        </h2>
+        <p className="text-subtle text-[11px]">{t('dashboard.noMonHistory')}</p>
+      </section>
+    )
+  }
+
+  return (
+    <section>
+      <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">
+        📈 {t('dashboard.monHistory')}
+      </h2>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {(monHosts ?? []).map((mh) => {
+          const label = hosts.find((h) => h.id === mh.hostId)?.label ?? `${mh.hostId.slice(0, 8)}…`
+          const points = charts[mh.hostId]
+          return (
+            <button
+              key={mh.hostId}
+              className="border-edge bg-panel hover:bg-hover rounded border p-3 text-left"
+              title={t('dashboard.monOpen')}
+              onClick={() => useMonitorStore.getState().setHistoryHost(mh.hostId)}
+            >
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="text-content min-w-0 truncate text-xs font-medium">{label}</span>
+                <span className="text-subtle shrink-0 text-[10px]">
+                  {t('dashboard.monLast', { when: formatWhen(mh.lastTs, locale) })}
+                </span>
+              </div>
+              {points && points.length > 0 ? (
+                <MetricChart
+                  label={`Load 24h (${t('monitor.loadNorm')})`}
+                  points={points}
+                  field="loadPct"
+                  resMs={600_000}
+                  autoScale
+                  compact
+                />
+              ) : (
+                <div className="h-10" />
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 

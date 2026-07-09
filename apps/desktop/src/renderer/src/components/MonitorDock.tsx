@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { MetricHistoryPointDto } from '@infra/shared'
 import { useMonitorStore, type HostMonitor } from '../stores/monitor'
 import { usePluginStore } from '../stores/plugins'
 import { useT } from '../i18n'
+import { MetricChart } from './MetricsHistoryModal'
 
 /** Dashboard monitoring neo góc phải — mờ khi không rê chuột, KHÔNG backdrop nên
  *  vẫn thao tác terminal bình thường. Chỉ biến mất khi user bấm Dừng.
@@ -72,6 +74,7 @@ export function MonitorDock() {
 function MonitorCard({ monitor }: { monitor: HostMonitor }) {
   const t = useT()
   const s = monitor.sample
+  const [showHistory, setShowHistory] = useState(false)
   return (
     <div className="rounded border border-edge bg-input p-3">
       <div className="mb-2 flex items-center gap-2">
@@ -79,9 +82,9 @@ function MonitorCard({ monitor }: { monitor: HostMonitor }) {
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-content">{monitor.label}</span>
         {s?.uptimeSec != null && <span className="text-[10px] text-subtle">up {formatUptime(s.uptimeSec)}</span>}
         <button
-          className="text-subtle hover:text-content shrink-0 leading-none"
-          title={t('monitor.history')}
-          onClick={() => useMonitorStore.getState().setHistoryHost(monitor.hostId)}
+          className={`shrink-0 leading-none ${showHistory ? 'text-content' : 'text-subtle hover:text-content'}`}
+          title={t('monitor.historyInline')}
+          onClick={() => setShowHistory(!showHistory)}
         >
           📈
         </button>
@@ -91,42 +94,113 @@ function MonitorCard({ monitor }: { monitor: HostMonitor }) {
       {s?.ok && (
         <div className="space-y-1.5">
           <Sparkline values={monitor.loadHistory} cpuCount={s.cpuCount} />
-          <Bar label={`Load ${s.loadText ?? ''}`} pct={loadPct(s.load1, s.cpuCount)} />
+          <Bar label={`Load ${s.loadText ?? ''}`} pct={loadPct(s.load1, s.cpuCount)} tip={t('monitor.tip.load')} />
           {/* CPU thật từ /proc/stat (null ở poll đầu) — phân biệt thiếu CPU / nghẽn I/O / bị steal */}
-          {s.cpuPct !== null && <Bar label="CPU" pct={s.cpuPct} />}
-          <Bar label="RAM" pct={s.memUsedPct} />
-          <Bar label={`Disk ${s.diskMount ?? '/'}`} pct={s.diskUsedPct} />
-          {/* Dòng chẩn đoán CPU: ai đang ăn (us/sy), nghẽn đĩa (wa), bị hypervisor trộm (st) */}
+          {s.cpuPct !== null && <Bar label="CPU" pct={s.cpuPct} tip={t('monitor.tip.cpu')} />}
+          <Bar label="RAM" pct={s.memUsedPct} tip={t('monitor.tip.ram')} />
+          <Bar label={`Disk ${s.diskMount ?? '/'}`} pct={s.diskUsedPct} tip={t('monitor.tip.disk')} />
+          {/* Dòng chẩn đoán CPU: ai đang ăn (us/sy), nghẽn đĩa (wa), bị hypervisor trộm (st).
+              Mỗi thông số có tooltip giải thích — hover để đọc. */}
           {s.cpuUserPct !== null && (
             <div className="text-subtle border-edge/70 mt-1 flex flex-wrap gap-x-2 border-t pt-1.5 text-[10px]">
-              <span>us {s.cpuUserPct}</span>
-              <span>sy {s.cpuSystemPct ?? '—'}</span>
-              <span className={(s.cpuIowaitPct ?? 0) >= 20 ? 'text-warning font-semibold' : ''}>
+              <span className="cursor-help" title={t('monitor.tip.us')}>us {s.cpuUserPct}</span>
+              <span className="cursor-help" title={t('monitor.tip.sy')}>sy {s.cpuSystemPct ?? '—'}</span>
+              <span
+                className={`cursor-help ${(s.cpuIowaitPct ?? 0) >= 20 ? 'text-warning font-semibold' : ''}`}
+                title={t('monitor.tip.wa')}
+              >
                 wa {s.cpuIowaitPct ?? '—'}
               </span>
-              <span className={(s.cpuStealPct ?? 0) >= 10 ? 'text-danger font-semibold' : ''}>
+              <span
+                className={`cursor-help ${(s.cpuStealPct ?? 0) >= 10 ? 'text-danger font-semibold' : ''}`}
+                title={t('monitor.tip.st')}
+              >
                 st {s.cpuStealPct ?? '—'}
               </span>
               {s.runQueue !== null && s.runQueue > (s.cpuCount ?? 1) && (
-                <span className="text-warning">r {s.runQueue}</span>
+                <span className="text-warning cursor-help" title={t('monitor.tip.r')}>r {s.runQueue}</span>
               )}
-              {(s.swapUsedMb ?? 0) > 0 && <span>swap {s.swapUsedMb}MB</span>}
+              {(s.swapUsedMb ?? 0) > 0 && (
+                <span className="cursor-help" title={t('monitor.tip.swap')}>swap {s.swapUsedMb}MB</span>
+              )}
             </div>
           )}
           {(s.netRxKbps !== null || s.tcpConns !== null || s.topProc) && (
             <div className="text-muted flex flex-wrap items-center gap-x-2 text-[10px]">
               {s.netRxKbps !== null && (
-                <span>
+                <span className="cursor-help" title={t('monitor.tip.net')}>
                   ↓{fmtRate(s.netRxKbps)} ↑{fmtRate(s.netTxKbps ?? 0)}
                 </span>
               )}
-              {s.tcpConns !== null && <span>{s.tcpConns} conn</span>}
-              {(s.inodeUsedPct ?? 0) >= 70 && <span className="text-warning">inode {s.inodeUsedPct}%</span>}
-              {s.topProc && <span className="min-w-0 truncate">[{s.topProc}]</span>}
+              {s.tcpConns !== null && (
+                <span className="cursor-help" title={t('monitor.tip.conn')}>{s.tcpConns} conn</span>
+              )}
+              {(s.inodeUsedPct ?? 0) >= 70 && (
+                <span className="text-warning cursor-help" title={t('monitor.tip.inode')}>inode {s.inodeUsedPct}%</span>
+              )}
+              {s.topProc && (
+                <span className="min-w-0 cursor-help truncate" title={t('monitor.tip.top')}>[{s.topProc}]</span>
+              )}
+            </div>
+          )}
+          {/* Uptime service (httpd/java/nginx…) — khác uptime server: service restart là thấy ngay ở đây */}
+          {s.services && s.services.length > 0 && (
+            <div className="text-subtle flex cursor-help flex-wrap gap-x-2 text-[10px]" title={t('monitor.tip.svc')}>
+              {s.services.map((svc) => (
+                <span key={svc.name}>
+                  ⟳ {svc.name} {formatUptime(svc.uptimeSec)}
+                </span>
+              ))}
             </div>
           )}
         </div>
       )}
+      {showHistory && <InlineHistory hostId={monitor.hostId} />}
+    </div>
+  )
+}
+
+/** Chart lịch sử 1h nhúng ngay trong card (bấm 📈) — bucket phút từ metrics.db,
+ *  tự refresh mỗi 60s; nút ⤢ mở modal đầy đủ (24h + đủ metric). */
+function InlineHistory({ hostId }: { hostId: string }) {
+  const t = useT()
+  const [points, setPoints] = useState<MetricHistoryPointDto[] | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    const load = (): void => {
+      const now = Date.now()
+      void window.infra.monitor.queryHistory(hostId, now - 3_600_000, now, 1).then((rows) => {
+        if (alive) setPoints(rows)
+      })
+    }
+    load()
+    const timer = setInterval(load, 60_000)
+    return () => {
+      alive = false
+      clearInterval(timer)
+    }
+  }, [hostId])
+
+  return (
+    <div className="border-edge/70 mt-2 space-y-1.5 border-t pt-2">
+      {points === null && <p className="text-subtle text-[10px]">…</p>}
+      {points !== null && points.length === 0 && (
+        <p className="text-subtle text-[10px] leading-relaxed">{t('monitor.historyEmpty')}</p>
+      )}
+      {points !== null && points.length > 0 && (
+        <>
+          <MetricChart label={`Load (${t('monitor.loadNorm')})`} points={points} field="loadPct" resMs={60_000} autoScale compact />
+          <MetricChart label="CPU" points={points} field="cpuPct" resMs={60_000} compact />
+          <MetricChart label={t('monitor.metricConn')} points={points} field="conns" resMs={60_000} autoScale unit="" compact />
+        </>
+      )}
+      <button
+        className="text-subtle hover:text-content text-[10px]"
+        onClick={() => useMonitorStore.getState().setHistoryHost(hostId)}
+      >
+        {t('monitor.historyMore')}
+      </button>
     </div>
   )
 }
@@ -137,11 +211,11 @@ function fmtRate(kbps: number): string {
   return `${kbps} Kb/s`
 }
 
-function Bar({ label, pct }: { label: string; pct: number | null }) {
+function Bar({ label, pct, tip }: { label: string; pct: number | null; tip?: string }) {
   const value = pct ?? 0
   const color = value > 90 ? 'bg-danger' : value > 70 ? 'bg-warning' : 'bg-success'
   return (
-    <div className="flex items-center gap-2 text-[10px]">
+    <div className={`flex items-center gap-2 text-[10px] ${tip ? 'cursor-help' : ''}`} title={tip}>
       <span className="w-24 shrink-0 truncate text-subtle">{label}</span>
       <div className="h-1.5 flex-1 overflow-hidden rounded bg-hover">
         <div className={`h-full ${color}`} style={{ width: `${Math.min(100, value)}%` }} />

@@ -80,14 +80,16 @@ type ChartField = 'loadPct' | 'cpuPct' | 'stealPct' | 'memPct' | 'diskPct' | 'co
 
 /** 1 chart đường: thang Y 0-100% (autoScale: giãn theo max dữ liệu — cho Load/Kết nối),
  *  tách đoạn tại khoảng trống dữ liệu (offline/app tắt). Metric không có dữ liệu
- *  (bản ghi cũ trước v2, server thiếu lệnh) → ẩn chart. */
-function MetricChart({
+ *  (bản ghi cũ trước v2, server thiếu lệnh) → ẩn chart.
+ *  compact: bản thu gọn nhúng trong card MonitorDock (padding/chiều cao nhỏ). */
+export function MetricChart({
   label,
   points,
   field,
   resMs,
   autoScale = false,
-  unit = '%'
+  unit = '%',
+  compact = false
 }: {
   label: string
   points: MetricHistoryPointDto[]
@@ -95,6 +97,7 @@ function MetricChart({
   resMs: number
   autoScale?: boolean
   unit?: string
+  compact?: boolean
 }) {
   if (!points.some((p) => p[field] !== null)) return null
   const from = points[0]!.ts
@@ -134,8 +137,8 @@ function MetricChart({
   }
 
   return (
-    <div className="border-edge bg-input rounded border p-3">
-      <div className="mb-1.5 flex items-center justify-between text-[11px]">
+    <div className={compact ? '' : 'border-edge bg-input rounded border p-3'}>
+      <div className={`flex items-center justify-between ${compact ? 'mb-0.5 text-[10px]' : 'mb-1.5 text-[11px]'}`}>
         <span className="text-subtle">
           {label}
           {yMax !== 100 && (
@@ -148,7 +151,7 @@ function MetricChart({
         </span>
         <span className="text-muted">{last === null || last === undefined ? '—' : `${last}${unit}`}</span>
       </div>
-      <svg viewBox="0 0 100 30" preserveAspectRatio="none" className="h-20 w-full">
+      <svg viewBox="0 0 100 30" preserveAspectRatio="none" className={`w-full ${compact ? 'h-10' : 'h-20'}`}>
         {/* gridline 0/50/100% */}
         {[1, 15, 29].map((y) => (
           <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="currentColor" strokeOpacity="0.12" strokeWidth="0.3" />
@@ -161,10 +164,12 @@ function MetricChart({
           <circle cx="50" cy="15" r="1" fill="#7aa2f7" />
         )}
       </svg>
-      <div className="text-subtle mt-1 flex justify-between text-[10px]">
-        <span>{fmt(from)}</span>
-        <span>{fmt(to)}</span>
-      </div>
+      {!compact && (
+        <div className="text-subtle mt-1 flex justify-between text-[10px]">
+          <span>{fmt(from)}</span>
+          <span>{fmt(to)}</span>
+        </div>
+      )}
     </div>
   )
 }

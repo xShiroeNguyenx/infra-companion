@@ -28,6 +28,7 @@ function sample(over: Partial<MetricSample> = {}): MetricSample {
     tcpConns: null,
     tcpTimeWait: null,
     topProc: null,
+    services: null,
     ...over
   }
 }

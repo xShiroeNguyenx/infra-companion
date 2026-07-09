@@ -34,7 +34,12 @@ Inter-|   Receive                                                |  Transmit
 ==UP==
 35786061.90 421915986.32
 ==CPU==
-12`
+12
+==SVC==
+2592000 httpd
+ 864000 httpd
+1036800 java
+    120 node`
 
 describe('parseMetrics — format mở rộng', () => {
   it('parse đủ mọi metric tức thời', () => {
@@ -54,6 +59,12 @@ describe('parseMetrics — format mở rộng', () => {
     expect(sample.topProc).toBe('httpd')
     expect(sample.uptimeSec).toBe(35786061)
     expect(sample.cpuCount).toBe(12)
+    // services: lấy tiến trình LÂU ĐỜI nhất mỗi tên (httpd có 2 dòng → 2592000), sort giảm dần
+    expect(sample.services).toEqual([
+      { name: 'httpd', uptimeSec: 2592000 },
+      { name: 'java', uptimeSec: 1036800 },
+      { name: 'node', uptimeSec: 120 }
+    ])
     // counter thô cho delta
     expect(counters.cpu).toEqual([100, 10, 50, 800, 20, 5, 5, 10, 0, 0])
     expect(counters.rxBytes).toBe(1000000) // lo bị bỏ
@@ -118,6 +129,7 @@ MemAvailable: 500000 kB
     expect(sample.diskUsedPct).toBeNull()
     expect(sample.tcpConns).toBeNull()
     expect(sample.topProc).toBeNull()
+    expect(sample.services).toBeNull() // thiếu section ==SVC== (bản cũ) → null, không vỡ
   })
 
   it('output rác → sample lỗi', () => {

@@ -42,6 +42,9 @@ export interface MetricSample {
   tcpTimeWait: number | null
   /** Tên tiến trình ăn CPU nhất. */
   topProc: string | null
+  /** Uptime các service quen thuộc đang chạy (httpd/nginx/java…) — tiến trình LÂU ĐỜI nhất
+   *  mỗi tên; khác uptimeSec của server (service restart không đụng server). null = không đo được. */
+  services: { name: string; uptimeSec: number }[] | null
   error?: string
 }
 
@@ -80,7 +83,11 @@ const METRIC_CMD = [
   'echo "==UP=="',
   'cat /proc/uptime 2>/dev/null',
   'echo "==CPU=="',
-  'nproc 2>/dev/null'
+  'nproc 2>/dev/null',
+  // Uptime service quen thuộc (etimes giây + tên) — parser lấy tiến trình lâu đời nhất mỗi tên.
+  // KHÔNG dùng $(...)/awk: login-script bọc lệnh qua nhiều lớp quote, $ sẽ nổ ở sai hop.
+  'echo "==SVC=="',
+  'ps -eo etimes=,comm= 2>/dev/null | grep -E " (httpd|apache2|nginx|java|node|php-fpm|mysqld|mariadbd|postgres|redis-server)$" | head -40'
 ].join('; ')
 
 const POLL_INTERVAL_MS = 3_000
@@ -268,6 +275,7 @@ function errorSample(hostId: string, error: string): MetricSample {
     tcpConns: null,
     tcpTimeWait: null,
     topProc: null,
+    services: null,
     error
   }
 }
@@ -347,6 +355,7 @@ export function parseMetrics(hostId: string, raw: string): ParsedMetrics {
     }
     const n = Number(sec.cpuCount.trim())
     if (Number.isFinite(n) && n > 0) sample.cpuCount = n
+    sample.services = parseServices(sec.svc)
   } catch {
     return { sample: errorSample(hostId, 'Không parse được metrics (không phải Linux?)'), counters }
   }
@@ -399,6 +408,7 @@ interface Sections {
   top: string
   up: string
   cpuCount: string
+  svc: string
 }
 
 function splitSections(raw: string): Sections {
@@ -414,8 +424,27 @@ function splitSections(raw: string): Sections {
   const [net, r6] = cut(r5, 'TCP')
   const [tcp, r7] = cut(r6, 'TOP')
   const [top, r8] = cut(r7, 'UP')
-  const [up, cpuCount] = cut(r8, 'CPU')
-  return { load, stat, mem, disk, inode, net, tcp, top, up, cpuCount }
+  const [up, r9] = cut(r8, 'CPU')
+  const [cpuCount, svc] = cut(r9, 'SVC')
+  return { load, stat, mem, disk, inode, net, tcp, top, up, cpuCount, svc }
+}
+
+/** "  1234 httpd" mỗi dòng → uptime tiến trình LÂU ĐỜI nhất theo tên, sort giảm dần, tối đa 4. */
+function parseServices(text: string): { name: string; uptimeSec: number }[] | null {
+  const best = new Map<string, number>()
+  for (const line of text.split('\n')) {
+    const parts = line.trim().split(/\s+/)
+    if (parts.length < 2) continue
+    const etimes = Number(parts[0])
+    const name = parts.slice(1).join(' ')
+    if (!Number.isFinite(etimes) || !name) continue
+    if ((best.get(name) ?? -1) < etimes) best.set(name, etimes)
+  }
+  if (best.size === 0) return null
+  return [...best.entries()]
+    .map(([name, uptimeSec]) => ({ name, uptimeSec }))
+    .sort((a, b) => b.uptimeSec - a.uptimeSec)
+    .slice(0, 4)
 }
 
 /** df -P output → { pct, mount } của mount thật có % cao nhất (bỏ fs ảo + header). */

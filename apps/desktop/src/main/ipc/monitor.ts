@@ -98,6 +98,7 @@ export function registerMonitorIpc(): () => void {
           tcpConns: null,
           tcpTimeWait: null,
           topProc: null,
+          services: null,
           error: error instanceof Error ? error.message : String(error)
         } satisfies import('@infra/shared').MetricSampleDto)
       }
@@ -121,6 +122,8 @@ export function registerMonitorIpc(): () => void {
   ipcMain.handle(IPC.METRICS_QUERY, (_event, hostId: string, fromTs: number, toTs: number, res: 1 | 10) =>
     getMetrics().query(hostId, fromTs, toTs, res === 10 ? 10 : 1)
   )
+  // Danh sách host từng được monitor (mục "Lịch sử monitoring" trên Dashboard)
+  ipcMain.handle(IPC.METRICS_HOSTS, () => getMetrics().listHosts())
 
   registerMonitorSettingsIpc((s) => {
     settings = s

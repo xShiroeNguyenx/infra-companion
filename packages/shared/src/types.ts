@@ -363,6 +363,9 @@ export interface MetricSampleDto {
   tcpConns: number | null
   tcpTimeWait: number | null
   topProc: string | null
+  /** Uptime service quen thuộc (httpd/nginx/java…) — tiến trình lâu đời nhất mỗi tên,
+   *  sort giảm dần. Khác uptimeSec: service restart không đụng uptime server. */
+  services: { name: string; uptimeSec: number }[] | null
   error?: string
 }
 
@@ -402,6 +405,13 @@ export interface MonitorAlertDto {
   /** Ngưỡng hiệu lực (null với offline). */
   threshold: number | null
   ts: number
+}
+
+/** 1 host có dữ liệu lịch sử metrics (từng được monitor, còn trong hạn giữ 30 ngày). */
+export interface MetricHistoryHostDto {
+  hostId: string
+  firstTs: number
+  lastTs: number
 }
 
 /** Một bucket lịch sử metrics (đầu bucket, giá trị trung bình trong bucket). */
@@ -714,6 +724,8 @@ export interface InfraApi {
     testWebhook(url: string): Promise<{ ok: boolean; message: string }>
     /** Lịch sử metrics đã downsample (res 1 = bucket phút, 10 = bucket 10 phút). */
     queryHistory(hostId: string, fromTs: number, toTs: number, res: 1 | 10): Promise<MetricHistoryPointDto[]>
+    /** Các host từng được monitor (còn dữ liệu lịch sử), mới nhất trước — cho mục Dashboard. */
+    historyHosts(): Promise<MetricHistoryHostDto[]>
   }
   ai: {
     getConfig(): Promise<AiConfigDto | null>

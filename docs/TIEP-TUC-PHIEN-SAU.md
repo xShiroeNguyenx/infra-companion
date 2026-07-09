@@ -1,6 +1,8 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
-> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật 2026-07-08 (đêm): **v0.1.13 ĐÃ phát hành** (Dashboard home screen + Access Log Analyzer v1.4.0 top ASN — lưu ý sự cố release: lần đầu tag mà QUÊN commit → tag trỏ commit cũ, build ra 0.1.12, phải xoá release rỗng + dời tag; quy trình đúng: **commit → push → tag → push tag**). **Đang chờ commit/tag: v0.1.14** (đã bump version + CHANGELOG [0.1.14] + README/USER-GUIDE/landing/handoff) — lệnh git cuối file. Nội dung v0.1.14: (1) **F04 alert ngưỡng** (hysteresis 3-sample + vùng chết + cooldown 15'; toast + Windows notification + webhook Google Chat/Slack/Discord/Telegram tự nhận diện; rules ở `monitor-settings.json` userData — KHÔNG vault, chạy cả khi vault khoá; Load không chặn 100, mặc định Load/Conn TẮT, Steal 20, RAM/Disk 90). (2) **F32 lịch sử metrics** — metrics.db riêng (bucket 1'=48h, 10'=30 ngày, tự prune), nút 📈 trên card → chart 1h/24h. (3) **F46 AI giải thích selection** — bôi chọn → ✨/Ctrl+Shift+E → panel dock. (4) **Monitoring 2.0** — CPU thật us/sy/wa/**st** (delta /proc/stat; bắt được ca jpap09 steal 40% VPS bị oversell), run queue, swap, disk mount đầy nhất + inode, net ↓↑, TCP conn, top process; dòng chẩn đoán nằm CUỐI card (user yêu cầu, Load giữ nguyên). **Việc mai**: phân tích tiếp jpap08/09 (chặn bot theo ASN từ plugin, khiếu nại steal với nhà cung cấp kèm chart 📈, cân nhắc giảm MaxRequestWorkers 1152→576 SAU khi chặn bot — đã tư vấn kỹ trong phiên). Private key ký registry: `~/.infra-companion/registry-signing-key.pem` — **PHẢI BACKUP**.
+> File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật 2026-07-09: **v0.1.14 ĐÃ phát hành** (commit `5c2c0cc` + tag). **v0.1.15 SẴN SÀNG RELEASE — đã bump version (2 package.json) + CHANGELOG [0.1.15] + README + landing hero + USER-GUIDE (§11 Monitoring viết thêm svc uptime/tooltip/chart inline/dashboard history + §14 panel AI kéo thả), CHƯA commit/tag** (lệnh git cuối file — nhớ test GUI theo checklist TRƯỚC khi tag). Mục (5) **AiExplainPanel kéo thả + resize**: kéo header di chuyển (pointer capture, kẹp trong khung app, bấm nút –/✕ không tính là kéo), grip góc dưới-phải = CSS `resize` gốc Chromium (browser ghi width/height inline — React không đè vì không quản 2 key đó); vị trí nhớ trong phiên (component luôn mount); chưa kéo thì neo top-right như cũ (có panel plugin thì top-24); i18n `panel.dragHint` ×3. Các mục còn lại: (1) **service uptime trên card** — dòng `⟳ httpd 30d · java 12d` (tiến trình lâu đời nhất mỗi tên: httpd/apache2/nginx/java/node/php-fpm/mysqld/mariadbd/postgres/redis-server; section `==SVC==` mới trong METRIC_CMD — chủ đích KHÔNG dùng `$()`/awk vì login-script nesting; parser `parseServices` lấy MAX etimes/tên, cap 4; GIỮ uptime server — service uptime là bổ sung, không thay thế). (2) **tooltip giải thích mọi thông số** — hover us/sy/wa/st/r/swap + Load/CPU/RAM/Disk/net/conn/inode/top/svc (i18n `monitor.tip.*` vi/en/ja, cursor-help). (3) **chart lịch sử inline trong card** — bấm 📈 giờ TOGGLE 3 chart 1h (Load/CPU/Conn, bucket phút, refresh 60s) ngay trong dock (`InlineHistory` + prop `compact` của `MetricChart` đã export từ MetricsHistoryModal); nút "⤢ Chi tiết & 24h" mở modal đầy đủ như cũ. (4) **mục "📈 Lịch sử monitoring" trên Dashboard 🏠** (user chỉ rõ vị trí: giữa Nhóm host và Kết nối gần đây) — liệt kê MỌI server từng được monitor (kể cả khi monitoring đang tắt — đọc từ metrics.db, giữ 30 ngày), mới nhất trước, mỗi card = label (fallback id cắt ngắn nếu host đã xoá) + "lần cuối HH:mm" + chart Load 24h compact; bấm card mở MetricsHistoryModal; `MetricsStore.listHosts()` mới (SELECT GROUP BY + gộp bucket dở trong RAM) + IPC `METRICS_HOSTS` + `monitor.historyHosts()`; chỉ fetch khi Dashboard active, refresh 60s. Test 126 + 12 skip (suite SQLite 6/6 pass qua Electron-Node), typecheck + build xanh, CHƯA test GUI.
+
+> Ghi chú release v0.1.13 (giữ để nhớ): lần đầu tag mà QUÊN commit → tag trỏ commit cũ, build ra 0.1.12, phải xoá release rỗng + dời tag; quy trình đúng: **commit → push → tag → push tag**. Nội dung v0.1.14: (1) **F04 alert ngưỡng** (hysteresis 3-sample + vùng chết + cooldown 15'; toast + Windows notification + webhook Google Chat/Slack/Discord/Telegram tự nhận diện; rules ở `monitor-settings.json` userData — KHÔNG vault, chạy cả khi vault khoá; Load không chặn 100, mặc định Load/Conn TẮT, Steal 20, RAM/Disk 90). (2) **F32 lịch sử metrics** — metrics.db riêng (bucket 1'=48h, 10'=30 ngày, tự prune), nút 📈 trên card → chart 1h/24h. (3) **F46 AI giải thích selection** — bôi chọn → ✨/Ctrl+Shift+E → panel dock. (4) **Monitoring 2.0** — CPU thật us/sy/wa/**st** (delta /proc/stat; bắt được ca jpap09 steal 40% VPS bị oversell), run queue, swap, disk mount đầy nhất + inode, net ↓↑, TCP conn, top process; dòng chẩn đoán nằm CUỐI card (user yêu cầu, Load giữ nguyên). **Việc mai**: phân tích tiếp jpap08/09 (chặn bot theo ASN từ plugin, khiếu nại steal với nhà cung cấp kèm chart 📈, cân nhắc giảm MaxRequestWorkers 1152→576 SAU khi chặn bot — đã tư vấn kỹ trong phiên). Private key ký registry: `~/.infra-companion/registry-signing-key.pem` — **PHẢI BACKUP**.
 
 ## Đang ở đâu
 
@@ -140,7 +142,7 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 
 ## Git (anh tự chạy; tôi không tự commit)
 
-> **v0.1.13 ĐÃ phát hành** (2026-07-08). Đang chờ commit + tag: **v0.1.14** (F04 alert + F32 lịch sử metrics + F46 AI giải thích + Monitoring 2.0 — đã bump version + docs đầy đủ). ⚠️ Quy trình: **commit + push main TRƯỚC, tag SAU** — tag khi chưa commit sẽ build từ commit cũ với version cũ (đã dính 1 lần ở v0.1.13).
+> **v0.1.14 ĐÃ phát hành** (commit `5c2c0cc` + tag, 2026-07-08). **Đang chờ: RELEASE v0.1.15** — 5 nâng cấp UI (svc uptime ⟳ + tooltip thông số + chart inline trong dock + mục lịch sử monitoring trên Dashboard 🏠 + panel AI kéo thả/resize), ĐÃ bump version + CHANGELOG [0.1.15] + README + landing + USER-GUIDE. ⚠️ Quy trình: **commit + push main TRƯỚC, tag SAU** — tag khi chưa commit sẽ build từ commit cũ với version cũ (đã dính 1 lần ở v0.1.13). Landing hero đổi → Pages tự deploy lại khi push.
 
 Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps/desktop`) + CHANGELOG + README/USER-GUIDE/landing/handoff, rồi push tag `v*.*.*` — release tự kích hoạt (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux). Lưu ý: đổi `docs/landing/index.html` (version trên hero) sẽ tự deploy lại landing page qua flow Pages riêng khi push lên `main`.
 
@@ -149,28 +151,34 @@ Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps
 ```powershell
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
 
-# v0.1.14 — F04 alert nguong + F32 lich su metrics + F46 AI giai thich + Monitoring 2.0
+# v0.1.15 — svc uptime + tooltip + chart inline + lich su monitoring tren Dashboard + panel AI keo tha
 # BƯỚC 1: commit + push main (BẮT BUỘC trước khi tag)
-git add packages/shared/src packages/core/src apps/desktop/src
+git add packages/shared/src/types.ts packages/shared/src/ipc.ts
+git add packages/core/src/index.ts packages/core/src/monitor/MonitorService.ts packages/core/src/monitor/MetricsStore.ts
+git add packages/core/src/monitor/parseMetrics.test.ts packages/core/src/monitor/AlertEngine.test.ts packages/core/src/monitor/MetricsStore.test.ts packages/core/src/monitor/downsample.test.ts
+git add apps/desktop/src/main/ipc/monitor.ts apps/desktop/src/preload/index.ts
+git add apps/desktop/src/renderer/src/components/MonitorDock.tsx apps/desktop/src/renderer/src/components/MetricsHistoryModal.tsx
+git add apps/desktop/src/renderer/src/components/AiExplainPanel.tsx
+git add apps/desktop/src/renderer/src/features/dashboard/DashboardView.tsx
+git add apps/desktop/src/renderer/src/i18n/dict.ts
 git add package.json apps/desktop/package.json
 git add CHANGELOG.md README.md docs/USER-GUIDE.md docs/landing/index.html docs/TIEP-TUC-PHIEN-SAU.md
 git status            # xem lại — phải hết "Changes not staged" sau khi add
-git commit -m "feat: alert nguong + lich su metrics + AI giai thich + monitoring 2.0 (v0.1.14)"
+git commit -m "feat: svc uptime + tooltip thong so + chart lich su inline & tren dashboard + panel AI keo tha (v0.1.15)"
 git push origin main
 
-# BƯỚC 2: tag SAU KHI push — CI build installer 3 OS + tạo GitHub Release
-git tag v0.1.14
-git push origin v0.1.14
-# Xong: chờ Actions ~5-10 phút → Releases/v0.1.14 phải có InfraCompanion-Setup-0.1.14.exe + latest.yml
-# App 0.1.13 đang cài sẽ hiện banner update sau khi mở lại (~10s)
+# BƯỚC 2: tag SAU KHI push + SAU KHI test GUI OK (checklist trên) — CI build installer 3 OS
+git tag v0.1.15
+git push origin v0.1.15
+# Xong: chờ Actions ~5-10 phút → Releases/v0.1.15 phải có InfraCompanion-Setup-0.1.15.exe + latest.yml
+# App 0.1.14 đang cài sẽ hiện banner update sau khi mở lại (~10s)
 ```
 
-**Checklist test tay trước khi tag (pnpm dev):**
-1. **Alert**: Monitoring → đặt RAM = 5 cho 1 host → Bắt đầu → ~9s: toast đỏ + Windows toast; không lặp trong 15'; đặt lại RAM 90.
-2. **Steal**: nhìn card jpap08/09 — dòng `us/sy/wa/st` cuối card, `st` đỏ nếu ≥10; alert steal mặc định 20%.
-3. **History**: monitor ≥3 phút → 📈 → 6 chart (Load/CPU/Steal/RAM/Disk/Conn), toggle 1h/24h.
-4. **Webhook** (nếu có Google Chat): dán URL → Gửi thử → tin nhắn vào space.
-5. **F46**: bôi chọn output → nút ✨ → panel trả lời; Ctrl+Shift+E; AI chưa config → mở form.
-6. **Vault khoá**: khoá vault thủ công khi đang monitor → Windows notification vẫn nổ khi vượt ngưỡng.
+**Checklist test tay trước khi push (pnpm dev, bật Monitoring vài host):**
+1. **Service uptime**: card host chạy httpd/java phải có dòng `⟳ httpd 30d · java 12d` (dưới dòng net/conn); hover hiện giải thích; host không có service quen thuộc thì KHÔNG có dòng này.
+2. **Tooltip**: hover từng thông số `us sy wa st r swap`, các bar Load/CPU/RAM/Disk, `↓↑`, `conn`, `[proc]` — đều có tooltip tiếng Việt, con trỏ đổi thành dấu hỏi.
+3. **Chart inline**: bấm 📈 → 3 chart 1h (Load/CPU/Kết nối TCP) hiện NGAY TRONG card, tự refresh 60s; bấm 📈 lần nữa thu lại; nút "⤢ Chi tiết & 24h" mở modal đầy đủ như cũ.
+4. **Dashboard 🏠**: mục "📈 Lịch sử monitoring" giữa Nhóm host và Kết nối gần đây — hiện các host từng monitor (jpap0x) kèm chart Load 24h + "lần cuối"; bấm card mở modal lịch sử; TẮT monitoring rồi mở Dashboard vẫn thấy (đọc từ metrics.db); máy chưa từng monitor → dòng gợi ý bật Monitoring.
+5. **Panel AI ✨**: bôi chọn output → ✨ → panel hiện; NẮM HEADER kéo đi chỗ khác (không văng khỏi màn hình); kéo GÓC DƯỚI PHẢI phóng to; bấm –/✕ trên header vẫn hoạt động bình thường (không bị tính là kéo); đóng mở lại panel trong cùng phiên → vị trí giữ nguyên.
 
 > Môi trường dev: Node 20, pnpm 9, Electron 42 (Node 24 runtime — dùng `node:sqlite`), ssh2/node-pty/serialport là native nhưng đã externalize + prebuilt nên không cần build C++. Khi chạy electron từ terminal đã dính biến `ELECTRON_RUN_AS_NODE` thì thêm `$env:ELECTRON_RUN_AS_NODE=$null` cùng lệnh (chỉ là gotcha của terminal, không phải lỗi app).

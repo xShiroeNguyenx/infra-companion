@@ -52,6 +52,13 @@ export interface MetricHistoryPoint {
   okRatio: number
 }
 
+/** 1 host có dữ liệu lịch sử: khoảng thời gian đã ghi (theo mọi độ phân giải). */
+export interface MetricHistoryHost {
+  hostId: string
+  firstTs: number
+  lastTs: number
+}
+
 function openMetricsDb(dbPath: string): DatabaseSync {
   const db = new DatabaseSync(dbPath)
   db.exec('PRAGMA journal_mode = WAL')
@@ -142,6 +149,24 @@ export class MetricsStore {
       conns: r.conns,
       okRatio: r.total_count > 0 ? r.ok_count / r.total_count : 0
     }))
+  }
+
+  /** Các host từng được monitor (còn dữ liệu trong hạn giữ), mới nhất trước.
+   *  Gồm cả bucket đang tích dở trong RAM — host vừa bật monitor <1 phút cũng hiện. */
+  listHosts(): MetricHistoryHost[] {
+    const db = this.ensureDb()
+    const found = new Map<string, MetricHistoryHost>()
+    const rows = db
+      .prepare('SELECT host_id, MIN(ts) AS first_ts, MAX(ts) AS last_ts FROM samples GROUP BY host_id')
+      .all() as Array<{ host_id: string; first_ts: number; last_ts: number }>
+    for (const r of rows) found.set(r.host_id, { hostId: r.host_id, firstTs: r.first_ts, lastTs: r.last_ts })
+    for (const [hostId, hb] of this.buckets) {
+      if (hb.m1.totalCount === 0) continue
+      const cur = found.get(hostId)
+      if (!cur) found.set(hostId, { hostId, firstTs: hb.m1.ts, lastTs: hb.m1.ts })
+      else cur.lastTs = Math.max(cur.lastTs, hb.m1.ts)
+    }
+    return [...found.values()].sort((a, b) => b.lastTs - a.lastTs)
   }
 
   /** Xoá dữ liệu quá hạn giữ. Public để test; tự chạy khi mở + mỗi giờ. */

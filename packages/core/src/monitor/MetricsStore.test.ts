@@ -57,6 +57,7 @@ function sample(ts: number, over: Partial<MetricSample> = {}): MetricSample {
     tcpConns: 1200,
     tcpTimeWait: null,
     topProc: null,
+    services: null,
     ...over
   }
 }
@@ -131,6 +132,18 @@ describe.skipIf(MetricsStoreClass === null)('MetricsStore', () => {
     const b = new MetricsStoreClass!(path)
     stores.push(b)
     expect(b.query('h1', base, base + 60_000, 1)).toHaveLength(1)
+  })
+
+  it('listHosts: gộp DB + bucket dở trong RAM, mới nhất trước', () => {
+    const store = newStore()
+    const base = bucketOf(Date.now(), 1) - 600_000
+    // h-old: đã flush xuống DB; h-live: mới record, bucket còn dở trong RAM
+    store.record(sample(base, { hostId: 'h-old' }))
+    store.flushHost('h-old')
+    store.record(sample(base + 300_000, { hostId: 'h-live' }))
+    const hosts = store.listHosts()
+    expect(hosts.map((h) => h.hostId)).toEqual(['h-live', 'h-old'])
+    expect(hosts[1]!.firstTs).toBeLessThanOrEqual(hosts[1]!.lastTs)
   })
 })
 

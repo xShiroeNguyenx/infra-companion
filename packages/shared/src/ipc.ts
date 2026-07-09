@@ -95,6 +95,7 @@ export const IPC = {
   MONITOR_SET_SETTINGS: 'monitor:set-settings',
   MONITOR_TEST_WEBHOOK: 'monitor:test-webhook',
   METRICS_QUERY: 'metrics:query',
+  METRICS_HOSTS: 'metrics:hosts',
 
   AI_GET_CONFIG: 'ai:get-config',
   AI_SET_CONFIG: 'ai:set-config',

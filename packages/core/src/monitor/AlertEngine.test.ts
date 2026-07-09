@@ -26,7 +26,8 @@ const EXTRA: Omit<
   netTxKbps: null,
   tcpConns: null,
   tcpTimeWait: null,
-  topProc: null
+  topProc: null,
+  services: null
 }
 
 let seq = 0

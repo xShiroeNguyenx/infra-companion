@@ -5,6 +5,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.15] — 2026-07-09
+
+### Added
+
+- **Service uptime on monitoring cards** — each card now shows how long well-known services have been running (`⟳ httpd 30d · java 12d` — oldest process per name, covering httpd/apache2/nginx/java/node/php-fpm/mysqld/mariadbd/postgres/redis), *alongside* the server uptime, not replacing it: server uptime tells you when the machine last rebooted (kernel patches!), service uptime tells you when Tomcat/Apache last restarted. Agentless like everything else — one extra `ps` in the same poll command; hosts where `ps`/`grep` differ simply omit the line.
+- **Metric explanations on hover** — every number on a monitoring card now has a plain-language tooltip: the `us / sy / wa / st / r / swap` diagnostic row (e.g. *st = CPU stolen by the hypervisor for other VPS on the same physical host; sustained ≥10 means your provider oversold the box*), the Load/CPU/RAM/Disk bars, network rate, TCP connections, inode and top-process tags. Hover any value to learn what it means and when to worry (cursor shows *help*).
+- **Inline history charts on the dashboard** — clicking 📈 on a card now expands **1-hour Load / CPU / TCP-connection charts right inside the dock** (auto-refresh every minute) instead of jumping straight to a modal; a *⤢ Details & 24h* link still opens the full history window with all metrics and ranges.
+- **Monitoring history on the Home dashboard** — the 🏠 Dashboard gains a **📈 Monitoring history** section listing every server that has ever been monitored (data retained 30 days in `metrics.db`), newest first, each with its **24-hour Load chart** and last-monitored time; click a card to open the full history window. Works even when monitoring isn't currently running — it reads recorded history, so you can review yesterday's incident after a restart.
+- **AI Explain panel is now movable and resizable** — grab the ✨ panel's header to drag it anywhere (it starts docked top-right as before), and drag the bottom-right corner to resize it for comfortable reading of long answers. Position is remembered for the session; the panel never gets stuck off-screen (clamped to the window).
+
+---
+
 ## [0.1.14] — 2026-07-08
 
 ### Added

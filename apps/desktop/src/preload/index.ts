@@ -135,7 +135,8 @@ const api: InfraApi = {
     getSettings: () => ipcRenderer.invoke(IPC.MONITOR_GET_SETTINGS),
     setSettings: (s) => ipcRenderer.invoke(IPC.MONITOR_SET_SETTINGS, s),
     testWebhook: (url) => ipcRenderer.invoke(IPC.MONITOR_TEST_WEBHOOK, url),
-    queryHistory: (hostId, fromTs, toTs, res) => ipcRenderer.invoke(IPC.METRICS_QUERY, hostId, fromTs, toTs, res)
+    queryHistory: (hostId, fromTs, toTs, res) => ipcRenderer.invoke(IPC.METRICS_QUERY, hostId, fromTs, toTs, res),
+    historyHosts: () => ipcRenderer.invoke(IPC.METRICS_HOSTS)
   },
   ai: {
     getConfig: () => ipcRenderer.invoke(IPC.AI_GET_CONFIG),
