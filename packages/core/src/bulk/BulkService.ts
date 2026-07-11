@@ -1,6 +1,6 @@
-import { StringDecoder } from 'node:string_decoder'
-import { establishChain, type ChainEndpoint } from '../connection/establish'
-import { deriveExecFromLoginSteps, type LoginStepLike } from '../connection/loginScript'
+import { execOnce } from '../connection/execOnce'
+import type { ChainEndpoint } from '../connection/establish'
+import type { LoginStepLike } from '../connection/loginScript'
 import type { HostKeyVerifier } from '../connection/types'
 
 export interface BulkTarget {
@@ -61,71 +61,6 @@ export class BulkService {
     timeoutMs: number,
     signal?: AbortSignal
   ): Promise<Omit<BulkResult, 'hostId' | 'durationMs'>> {
-    return new Promise((resolve) => {
-      let settled = false
-      // Giữ ref đóng kết nối ngoài closure .then — timeout/cancel phải đóng được chain,
-      // nếu không lệnh treo (tail -f…) giữ kết nối + tiếp tục chạy trên remote sau khi UI báo lỗi
-      let close: (() => void) | null = null
-      const done = (r: Omit<BulkResult, 'hostId' | 'durationMs'>): void => {
-        if (settled) return
-        settled = true
-        clearTimeout(timer)
-        signal?.removeEventListener('abort', onAbort)
-        close?.()
-        close = null
-        resolve(r)
-      }
-      const timer = setTimeout(
-        () => done({ status: 'error', stdout: '', stderr: '', code: null, error: `Timeout sau ${timeoutMs / 1000}s` }),
-        timeoutMs
-      )
-      const onAbort = (): void => done({ status: 'error', stdout: '', stderr: '', code: null, error: 'Đã hủy' })
-      if (signal?.aborted) return onAbort()
-      signal?.addEventListener('abort', onAbort)
-
-      // Host vào bằng login-script → bọc lệnh để chạy trên máy đích bên trong (exec trên gate)
-      const effectiveCommand =
-        (target.loginSteps?.length ? deriveExecFromLoginSteps(target.loginSteps, command) : null) ?? command
-      establishChain(target.chain, verifyHostKey)
-        .then(({ client, closeAll }) => {
-          if (settled) {
-            // timeout/cancel nổ trong lúc establishChain — KHÔNG exec để lệnh không chạy ngoài tầm quan sát
-            closeAll()
-            return
-          }
-          close = closeAll
-          client.exec(effectiveCommand, (error, stream) => {
-            if (error) {
-              return done({ status: 'error', stdout: '', stderr: '', code: null, error: error.message })
-            }
-            let stdout = ''
-            let stderr = ''
-            let code: number | null = null
-            const stdoutDecoder = new StringDecoder('utf8')
-            const stderrDecoder = new StringDecoder('utf8')
-            stream.on('data', (chunk: Buffer) => {
-              stdout += stdoutDecoder.write(chunk)
-            })
-            stream.stderr.on('data', (chunk: Buffer) => {
-              stderr += stderrDecoder.write(chunk)
-            })
-            stream.on('exit', (c: number | null) => {
-              code = c
-            })
-            stream.on('close', () => {
-              done({ status: 'done', stdout: stdout + stdoutDecoder.end(), stderr: stderr + stderrDecoder.end(), code })
-            })
-          })
-        })
-        .catch((error: unknown) => {
-          done({
-            status: 'error',
-            stdout: '',
-            stderr: '',
-            code: null,
-            error: error instanceof Error ? error.message : String(error)
-          })
-        })
-    })
+    return execOnce(target.chain, command, verifyHostKey, { loginSteps: target.loginSteps, timeoutMs, signal })
   }
 }

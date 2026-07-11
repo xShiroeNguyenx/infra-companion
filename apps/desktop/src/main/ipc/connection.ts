@@ -1,8 +1,34 @@
 import type { WebContents } from 'electron'
 import { resolveSecret, type ChainEndpoint, type HostKeyInfo } from '@infra/core'
+import type { ResolvedEndpoint } from '@infra/core'
 import { IPC, type LoginStep } from '@infra/shared'
 import { askRenderer } from './prompts'
 import { getVault } from './vault'
+
+/** Phân giải 1 endpoint (đã resolve từ vault) thành ChainEndpoint — hỏi password nếu thiếu. */
+async function toChainEndpoint(sender: WebContents, endpoint: ResolvedEndpoint): Promise<ChainEndpoint> {
+  let password = endpoint.password
+  if (endpoint.secretRef) {
+    // F11: lấy password từ secret manager (op/bw/vault) đúng lúc kết nối
+    password = await resolveSecret(endpoint.secretRef)
+  } else if (endpoint.needsPassword) {
+    const answer = await askRenderer<string | null>(sender, IPC.PROMPT_PASSWORD, {
+      target: `${endpoint.username}@${endpoint.host}`
+    })
+    if (!answer) throw new Error('Đã huỷ kết nối')
+    password = answer
+  }
+  return {
+    host: endpoint.host,
+    port: endpoint.port,
+    username: endpoint.username,
+    password,
+    privateKey: endpoint.privateKey,
+    passphrase: endpoint.passphrase,
+    useAgent: endpoint.authType === 'agent',
+    label: endpoint.label
+  }
+}
 
 /** Xác minh host key theo TOFU với bảng known_hosts; hỏi user khi lạ/mismatch. */
 export function makeHostKeyVerifier(sender: WebContents) {
@@ -54,27 +80,7 @@ export async function prepareConnection(sender: WebContents, hostId: string): Pr
   const endpoints = [...resolved.hops, resolved.target]
   const chain: ChainEndpoint[] = []
   for (const endpoint of endpoints) {
-    let password = endpoint.password
-    if (endpoint.secretRef) {
-      // F11: lấy password từ secret manager (op/bw/vault) đúng lúc kết nối
-      password = await resolveSecret(endpoint.secretRef)
-    } else if (endpoint.needsPassword) {
-      const answer = await askRenderer<string | null>(sender, IPC.PROMPT_PASSWORD, {
-        target: `${endpoint.username}@${endpoint.host}`
-      })
-      if (!answer) throw new Error('Đã huỷ kết nối')
-      password = answer
-    }
-    chain.push({
-      host: endpoint.host,
-      port: endpoint.port,
-      username: endpoint.username,
-      password,
-      privateKey: endpoint.privateKey,
-      passphrase: endpoint.passphrase,
-      useAgent: endpoint.authType === 'agent',
-      label: endpoint.label
-    })
+    chain.push(await toChainEndpoint(sender, endpoint))
   }
   // Bước secret chưa lưu giá trị → hỏi user trước khi kết nối
   const loginSteps: LoginStep[] = []
@@ -101,5 +107,36 @@ export async function prepareConnection(sender: WebContents, hostId: string): Pr
     title: target.label,
     subtitle: `${target.username}@${target.host}:${target.port}`,
     historyTarget: `${target.username}@${target.host}:${target.port}`
+  }
+}
+
+export interface PreparedForward {
+  /** Chuỗi SSH jump host để xuyên tới đích (rỗng = nối thẳng, đích cùng mạng). */
+  jumps: ChainEndpoint[]
+  /** Máy đích (VNC/RDP) — KHÔNG phải endpoint SSH, chỉ là host:port để forwardOut/net.connect. */
+  destHost: string
+  destPort: number
+  label: string
+  /** Username (nếu có) — RDP điền sẵn vào file .rdp. */
+  user: string
+}
+
+/**
+ * Chuẩn bị tunnel tới cổng VNC/RDP của host (F13). Khác prepareConnection: máy ĐÍCH không
+ * phải SSH — chỉ resolve jump chain (các hop SSH) rồi trả host:port đích để forwardOut.
+ */
+export async function prepareForward(sender: WebContents, hostId: string): Promise<PreparedForward> {
+  const vault = getVault()
+  const resolved = vault.resolveConnection(hostId)
+  const jumps: ChainEndpoint[] = []
+  for (const hop of resolved.hops) {
+    jumps.push(await toChainEndpoint(sender, hop))
+  }
+  return {
+    jumps,
+    destHost: resolved.target.host,
+    destPort: resolved.target.port,
+    label: resolved.target.label,
+    user: resolved.target.username
   }
 }

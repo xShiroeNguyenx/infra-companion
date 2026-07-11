@@ -9,6 +9,7 @@ export type AppModal =
   | 'monitor'
   | 'sync'
   | 'ai'
+  | 'ai-diagnose'
   | 'recordings'
   | 'settings'
   | 'workspaces'

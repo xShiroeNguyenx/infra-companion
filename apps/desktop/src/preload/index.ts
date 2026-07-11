@@ -103,6 +103,16 @@ const api: InfraApi = {
     edit: (sessionId, remotePath) => ipcRenderer.invoke(IPC.SFTP_EDIT, sessionId, remotePath),
     onTransfer: (cb) => subscribe<TransferEvent>(IPC.TRANSFER_EVENT, cb)
   },
+  vnc: {
+    open: (hostId) => ipcRenderer.invoke(IPC.VNC_OPEN, hostId),
+    close: (sessionId) => ipcRenderer.send(IPC.VNC_CLOSE, sessionId)
+  },
+  rdp: {
+    open: (hostId) => ipcRenderer.invoke(IPC.RDP_OPEN, hostId),
+    close: (sessionId) => ipcRenderer.send(IPC.RDP_CLOSE, sessionId),
+    list: () => ipcRenderer.invoke(IPC.RDP_LIST),
+    onChange: (cb) => subscribe<void>(IPC.RDP_EVENT, cb)
+  },
   fs: {
     roots: () => ipcRenderer.invoke(IPC.FS_ROOTS),
     home: () => ipcRenderer.invoke(IPC.FS_HOME),
@@ -141,7 +151,8 @@ const api: InfraApi = {
   ai: {
     getConfig: () => ipcRenderer.invoke(IPC.AI_GET_CONFIG),
     setConfig: (input) => ipcRenderer.invoke(IPC.AI_SET_CONFIG, input),
-    ask: (mode, input, context) => ipcRenderer.invoke(IPC.AI_ASK, mode, input, context)
+    ask: (mode, input, context) => ipcRenderer.invoke(IPC.AI_ASK, mode, input, context),
+    diagnoseExec: (hostId, command) => ipcRenderer.invoke(IPC.AI_DIAGNOSE_EXEC, hostId, command)
   },
   sync: {
     status: () => ipcRenderer.invoke(IPC.SYNC_STATUS),

@@ -28,7 +28,7 @@ export interface Pane {
   origin?: PaneOrigin
 }
 
-export type TabKind = 'terminal' | 'sftp'
+export type TabKind = 'terminal' | 'sftp' | 'vnc'
 
 export interface AppTab {
   id: string
@@ -43,6 +43,12 @@ export interface AppTab {
   sftpHome?: string
   /** sftp: host đã mở — để lưu/dựng lại workspace. */
   sftpHostId?: string
+  /** vnc (F13): phiên VNC — noVNC nối vào ws://127.0.0.1:<wsPort>/?token=<token>. */
+  vncSessionId?: string
+  vncWsPort?: number
+  vncToken?: string
+  vncTitle?: string
+  vncHostId?: string
 }
 
 /** Một tab trong workspace đã lưu (chỉ spec để mở lại, không có session sống). */
@@ -70,6 +76,8 @@ interface TabsState {
   openSshGroup: (hostIds: string[]) => Promise<void>
   openQuick: (target: string) => Promise<void>
   openSftp: (hostId: string) => Promise<void>
+  /** Mở tab VNC (F13): main dựng cầu ws↔tcp qua jump host, noVNC render trong tab. */
+  openVnc: (hostId: string) => Promise<void>
   /** Hiện trang Dashboard (home) — KHÔNG phải tab: activeId=null là đang ở home, chọn tab để quay lại. */
   showDashboard: () => void
   /** Mở thêm pane trong tab đang active (split). opener tạo phiên. */
@@ -217,6 +225,27 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     }
   },
 
+  openVnc: async (hostId) => {
+    try {
+      const res = await window.infra.vnc.open(hostId)
+      const tab: AppTab = {
+        id: newTabId(),
+        kind: 'vnc',
+        panes: [],
+        activePaneId: null,
+        broadcast: false,
+        vncSessionId: res.sessionId,
+        vncWsPort: res.wsPort,
+        vncToken: res.token,
+        vncTitle: res.title,
+        vncHostId: hostId
+      }
+      set((s) => ({ tabs: [...s.tabs, tab], activeId: tab.id }))
+    } catch (error) {
+      toastError(error)
+    }
+  },
+
   showDashboard: () => set({ activeId: null }),
 
   splitLocal: async (profileId) => {
@@ -246,6 +275,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     if (!tab) return
     if (tab.kind === 'sftp') {
       if (tab.sftpSessionId) window.infra.sftp.close(tab.sftpSessionId)
+    } else if (tab.kind === 'vnc') {
+      if (tab.vncSessionId) window.infra.vnc.close(tab.vncSessionId)
     } else {
       for (const pane of tab.panes) {
         window.infra.terminal.kill(pane.sessionId)

@@ -10,6 +10,8 @@ import { registerNetToolsIpc } from './ipc/nettools'
 import { registerSyncIpc } from './ipc/sync'
 import { registerPromptIpc } from './ipc/prompts'
 import { registerSftpIpc } from './ipc/sftp'
+import { registerVncIpc } from './ipc/vnc'
+import { registerRdpIpc } from './ipc/rdp'
 import { registerTerminalIpc } from './ipc/terminal'
 import { registerTunnelsIpc } from './ipc/tunnels'
 import { registerPluginsIpc } from './ipc/plugins'
@@ -49,6 +51,9 @@ function createWindow(): BrowserWindow {
     title: 'Infra Companion',
     backgroundColor: '#0b0e14',
     autoHideMenuBar: true,
+    // Dev (pnpm dev) chạy bằng electron.exe → taskbar/title bar mang icon Electron mặc định;
+    // trỏ icon thật cho dev (out/main → ../../build). Bản đóng gói lấy icon nhúng trong exe.
+    ...(isDev ? { icon: join(__dirname, '../../build/icon.png') } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -94,6 +99,8 @@ registerMarketplaceIpc()
 const disposeMonitor = registerMonitorIpc()
 const terminal = registerTerminalIpc()
 const disposeSftp = registerSftpIpc()
+const disposeVnc = registerVncIpc()
+const disposeRdp = registerRdpIpc()
 const disposeTunnels = registerTunnelsIpc()
 let disposePlugins: (() => void) | null = null
 
@@ -116,6 +123,8 @@ app.on('before-quit', () => {
   disposePlugins?.()
   terminal.dispose()
   disposeSftp()
+  disposeVnc()
+  disposeRdp()
   disposeTunnels()
   disposeMonitor()
   getVault().lock()

@@ -3,6 +3,7 @@ import type { GroupDto, HostDto } from '@infra/shared'
 import { useDataStore } from '../stores/data'
 import { useTabsStore } from '../stores/tabs'
 import { useToastsStore } from '../stores/toasts'
+import { useRdpStore } from '../stores/rdp'
 import { useFavoritesStore } from '../stores/favorites'
 import { useUiStore, type AppModal } from '../stores/ui'
 import { GroupEditorModal } from './GroupEditorModal'
@@ -295,12 +296,20 @@ function HostRow({
   const openSsh = useTabsStore((s) => s.openSsh)
   const splitSsh = useTabsStore((s) => s.splitSsh)
   const openSftp = useTabsStore((s) => s.openSftp)
+  const openVnc = useTabsStore((s) => s.openVnc)
+  const openRdp = useRdpStore((s) => s.open)
   const favorite = useFavoritesStore((s) => s.ids.includes(host.id))
   const toggleFav = useFavoritesStore((s) => s.toggle)
+  const isRemoteDesktop = host.protocol === 'vnc' || host.protocol === 'rdp'
+  const openHost = (): void => {
+    if (host.protocol === 'vnc') void openVnc(host.id)
+    else if (host.protocol === 'rdp') void openRdp(host.id)
+    else void openSsh(host.id)
+  }
   return (
     <div
       className="group hover:bg-hover flex cursor-pointer items-center gap-2 rounded px-2 py-1.5"
-      onClick={() => void openSsh(host.id)}
+      onClick={openHost}
       title={`${host.username ?? '(group)'}@${host.hostname}:${host.port}${host.jumpChain?.length ? ` (qua ${host.jumpChain.length} jump)` : ''}`}
     >
       <span className="bg-subtle size-1.5 shrink-0 rounded-full group-hover:bg-success" />
@@ -338,26 +347,41 @@ function HostRow({
           <NoteIcon />
         </button>
       )}
-      <button
-        className="text-subtle hover:bg-edge-strong hover:text-warning rounded p-1 opacity-0 group-hover:opacity-100"
-        title={t('sidebar.splitHost')}
-        onClick={(e) => {
-          e.stopPropagation()
-          void splitSsh(host.id)
-        }}
-      >
-        <SplitIcon />
-      </button>
-      <button
-        className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
-        title={t('sidebar.openSftp')}
-        onClick={(e) => {
-          e.stopPropagation()
-          void openSftp(host.id)
-        }}
-      >
-        <FolderIcon />
-      </button>
+      {isRemoteDesktop ? (
+        <button
+          className="text-subtle hover:bg-edge-strong hover:text-content shrink-0 rounded p-1 text-xs opacity-0 group-hover:opacity-100"
+          title={host.protocol === 'vnc' ? t('sidebar.openVnc') : t('sidebar.openRdp')}
+          onClick={(e) => {
+            e.stopPropagation()
+            openHost()
+          }}
+        >
+          🖥️
+        </button>
+      ) : (
+        <>
+          <button
+            className="text-subtle hover:bg-edge-strong hover:text-warning rounded p-1 opacity-0 group-hover:opacity-100"
+            title={t('sidebar.splitHost')}
+            onClick={(e) => {
+              e.stopPropagation()
+              void splitSsh(host.id)
+            }}
+          >
+            <SplitIcon />
+          </button>
+          <button
+            className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
+            title={t('sidebar.openSftp')}
+            onClick={(e) => {
+              e.stopPropagation()
+              void openSftp(host.id)
+            }}
+          >
+            <FolderIcon />
+          </button>
+        </>
+      )}
       <button
         className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
         title={t('sidebar.duplicateHost')}

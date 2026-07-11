@@ -15,6 +15,7 @@ import { MonitorDock } from './components/MonitorDock'
 import { MetricsHistoryModal } from './components/MetricsHistoryModal'
 import { SyncModal } from './components/SyncModal'
 import { AiModal } from './components/AiModal'
+import { AiDiagnoseModal } from './components/AiDiagnoseModal'
 import { RecordingsModal } from './components/RecordingsModal'
 import { SettingsModal } from './components/SettingsModal'
 import { WorkspacesModal } from './components/WorkspacesModal'
@@ -23,6 +24,8 @@ import { PluginPanelModal } from './components/PluginPanelModal'
 import { AiExplainPanel } from './components/AiExplainPanel'
 import { UpdateBanner } from './components/UpdateBanner'
 import { SftpView } from './features/sftp/SftpView'
+import { VncView } from './features/vnc/VncView'
+import { RdpDock } from './components/RdpDock'
 import { DashboardView } from './features/dashboard/DashboardView'
 import { translate, useT } from './i18n'
 import { TerminalTabView } from './features/terminal/TerminalTabView'
@@ -215,6 +218,7 @@ export default function App() {
     { id: 'open-monitor', label: t('menu.monitor'), run: () => setModal('monitor') },
     { id: 'open-net', label: t('menu.net'), run: () => setModal('net') },
     { id: 'open-ai', label: t('menu.ai'), run: () => setModal('ai') },
+    { id: 'open-ai-diagnose', label: `🩺 ${t('ai.diagnose.title')}`, run: () => setModal('ai-diagnose') },
     { id: 'open-recordings', label: t('menu.recordings'), run: () => setModal('recordings') },
     { id: 'open-sync', label: t('menu.sync'), run: () => setModal('sync') },
     { id: 'open-snippets', label: t('menu.snippets'), run: () => setModal('snippets') },
@@ -269,13 +273,11 @@ export default function App() {
             <div className="relative h-full">
               {/* Dashboard = màn hình home nằm dưới các tab: hiện khi không tab nào active (nút 🏠 / đóng hết tab) */}
               <DashboardView active={activeId === null} />
-              {tabs.map((tab) =>
-                tab.kind === 'sftp' ? (
-                  <SftpView key={tab.id} tab={tab} active={tab.id === activeId} />
-                ) : (
-                  <TerminalTabView key={tab.id} tab={tab} active={tab.id === activeId} />
-                )
-              )}
+              {tabs.map((tab) => {
+                if (tab.kind === 'sftp') return <SftpView key={tab.id} tab={tab} active={tab.id === activeId} />
+                if (tab.kind === 'vnc') return <VncView key={tab.id} tab={tab} active={tab.id === activeId} />
+                return <TerminalTabView key={tab.id} tab={tab} active={tab.id === activeId} />
+              })}
             </div>
           </div>
         </div>
@@ -292,6 +294,7 @@ export default function App() {
       {modal === 'monitor' && <MonitorModal onClose={() => setModal(null)} />}
       {modal === 'sync' && <SyncModal onClose={() => setModal(null)} />}
       {modal === 'ai' && <AiModal onClose={() => setModal(null)} />}
+      {modal === 'ai-diagnose' && <AiDiagnoseModal onClose={() => setModal(null)} />}
       {modal === 'recordings' && <RecordingsModal onClose={() => setModal(null)} />}
       {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} />}
       {modal === 'workspaces' && <WorkspacesModal onClose={() => setModal(null)} />}
@@ -309,6 +312,7 @@ export default function App() {
         />
       )}
       {monitorActive && <MonitorDock />}
+      <RdpDock />{/* tự return null khi không có tunnel RDP nào */}
       {pluginPanel && (
         <PluginPanelModal panel={pluginPanel} onClose={() => usePluginStore.getState().setPanel(null)} />
       )}

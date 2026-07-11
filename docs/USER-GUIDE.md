@@ -239,6 +239,23 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 
 ---
 
+## 9B. Remote Desktop — VNC & RDP (new)
+
+Connect to a **graphical desktop**, tunneling through your SSH jump hosts when needed.
+
+**Add the host**: + host → **Protocol = VNC** (default port 5900) or **RDP** (default port 3389) → hostname/IP of the target. Optionally add **Jump hosts** (the same picker as SSH) so the app SSHes through a gate and bridges to the target's VNC/RDP port. RDP also has an optional **username** field (pre-filled into the connection).
+
+**Open it**: click the host row, or the **🖥️** button that appears on hover.
+
+- **VNC** opens **inside a tab** — the remote screen renders via noVNC. Enter the VNC password when prompted; the view scales to the tab; if the connection drops there's a **Reconnect** button. Behind the scenes the app opens a local WebSocket↔TCP bridge on `127.0.0.1` (one-time token) that forwards through the jump chain to port 5900 — nothing is exposed on your LAN.
+- **RDP** does **not** embed a window — the app forwards the target's `3389` to a local port and launches your OS RDP client (**Windows**: `mstsc.exe`; macOS/Linux: it opens the tunnel and tells you the `127.0.0.1:<port>` to point your client at). A small **🖥 RDP open** dock (bottom-left) lists active tunnels with a **Stop** button; closing the RDP window also tears the tunnel down.
+
+**Requirements**: a real **VNC server** must be running on the target (e.g. x11vnc/TigerVNC on Linux, TightVNC/UltraVNC on Windows), or **Remote Desktop enabled** for RDP. The target must be **reachable** — same LAN, or through the jump chain. Note: Chrome Remote Desktop / TeamViewer are **not** VNC/RDP servers and cannot be used here.
+
+**Limitation**: tunneling supports **jump-host chains** (SSH `-J` style). A target reachable only via an interactive **login-script gate** is not yet supported.
+
+---
+
 ## 10. Bulk Execution (run a command across hosts) — `⋯` → Bulk Execution
 
 **What it is**: run one command across N hosts **in parallel** (up to 8 at once), grouping output to spot divergent machines.
@@ -322,6 +339,21 @@ Purely local, no SSH. Enter a host/IP then:
 **Explain selection (no copy-paste needed)**: select any output directly in the terminal → a floating **✨ Explain** button appears (or press **Ctrl+Shift+E**) → the answer opens in a translucent dock panel on the right (minimizable to a ✨ pill; close with ✕; Esc stays with the terminal). The panel is **movable and resizable**: drag its header to put it anywhere, drag the bottom-right corner to enlarge it for long answers — position is remembered for the session. Selections longer than ~6 000 chars keep the tail — errors live at the end. If AI isn't configured yet, the settings form opens automatically.
 
 **Test**: configure Gemini → Generate command "kill the process on port 8080" → open a terminal tab → Insert into terminal. Then `cat` a config file, select a chunk → Ctrl+Shift+E.
+
+---
+
+## 14C. AI troubleshooter (step-by-step diagnosis) — palette → 🩺
+
+**What it is**: an **agent mode** for diagnosing a sick server. You describe a symptom; the AI proposes **one read-only diagnostic command at a time** (with a one-line rationale); **you approve each step**; the command runs and the AI reads the output before proposing the next — until it reaches a conclusion and suggested fix.
+
+**Use**: `Ctrl+Shift+P` → **🩺 AI troubleshooter** → pick an SSH host → type the symptom ("web returns 502", "load is high") → **Start**. For each step: **Approve & run** / **Skip** / **Stop**. The conclusion appears at the end; **New diagnosis** resets.
+
+**Safety** (this is the important part):
+- The commands run over a **separate SSH exec channel** — your open terminal is never touched, and each command's output is captured cleanly (works through jump hosts and login scripts).
+- It is **read-only**. The AI is instructed to only gather information, and — regardless of what it proposes — a **guard in the main process blocks anything that writes/restarts/deletes** (`rm`, `systemctl restart`, `kill`, `>`/`>>`, package installs, `sed -i`…). A blocked command is shown in red and skipped; the real safety gate is **your per-step approval**.
+- To actually *fix* something, run the suggested command yourself in a normal terminal.
+
+Needs AI configured (see §14). If not, the settings form opens.
 
 ---
 
@@ -494,4 +526,6 @@ New connection protocols (pluggable SessionKind) · permission enforcement + con
 - **Sync** currently has only the **folder** backend (Google Drive/Dropbox/Syncthing/network share); WebDAV, S3, Git are planned.
 - **Secrets manager** supports 1Password, Bitwarden, HashiCorp Vault via CLI; KeePassXC is planned.
 - **Plugin system** is at **v1** (commands + observe/write output + panel + storage + Marketplace tab with ed25519-signed entries); no new protocols, permission enforcement, or output transform yet — see §16D.
-- Not yet available: **RDP/VNC**, a self-hosted **team server**, **cloud import** (AWS/GCP…), a **Docker/K8s browser** — see [../ROADMAP.md](../ROADMAP.md).
+- **Remote desktop (VNC/RDP)** tunnels through **jump-host chains** only; a target reachable solely via an interactive **login-script gate** is not yet supported. **RDP** launches the OS client through a tunnel (not embedded); embedded FreeRDP isn't planned. VNC requires a real VNC server on the target and network reachability (LAN or SSH tunnel).
+- **AI troubleshooter** runs **read-only** commands only (blocked by a main-process guard + your per-step approval); to apply a fix you run it yourself.
+- Not yet available: a self-hosted **team server**, **cloud import** (AWS/GCP…), a **Docker/K8s browser** — see [../ROADMAP.md](../ROADMAP.md).

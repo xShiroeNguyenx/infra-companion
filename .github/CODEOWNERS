@@ -1,0 +1,15 @@
+# CODEOWNERS — quy dinh nguoi phai duyet PR cho tung phan cua repo.
+# Cu phap: <pattern>  <@owner...>
+# Doc: https://docs.github.com/articles/about-code-owners
+#
+# LUU Y: file nay chi co hieu luc khi rule "Require review from Code Owners"
+# duoc bat trong Rulesets (Settings -> Rules -> Rulesets).
+
+# Owner mac dinh cho TOAN BO repo
+* @xShiroeNguyenx
+
+# Cau hinh CI/CD & workflow — vung nhay cam (co the lo secret), bat buoc chu repo duyet
+/.github/ @xShiroeNguyenx
+
+# Xu ly secrets trong code — bat buoc chu repo duyet
+/packages/core/src/secrets/ @xShiroeNguyenx

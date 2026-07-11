@@ -29,8 +29,9 @@ export interface VaultStatus {
 /** 'none' = server cho vào không cần xác thực. 'secret' = lấy password từ secret manager (op/bw/vault). */
 export type AuthType = 'password' | 'key' | 'agent' | 'none' | 'secret'
 
-/** Giao thức của host. serial: hostname = COM port, port = baud rate. */
-export type HostProtocol = 'ssh' | 'telnet' | 'serial'
+/** Giao thức của host. serial: hostname = COM port, port = baud rate.
+ *  vnc/rdp (F13): remote desktop — hostname:port của máy đích, có thể xuyên jump host. */
+export type HostProtocol = 'ssh' | 'telnet' | 'serial' | 'vnc' | 'rdp'
 
 /** Group với các field cấu hình kế thừa — null nghĩa là "kế thừa tiếp từ group cha". */
 export interface GroupDto {
@@ -267,7 +268,7 @@ export interface BulkRunEvent {
 // ---------------------------------------------------------------------------
 
 export type AiProviderDto = 'claude' | 'openai' | 'gemini' | 'ollama'
-export type AiModeDto = 'generate' | 'explain' | 'explain-error'
+export type AiModeDto = 'generate' | 'explain' | 'explain-error' | 'diagnose'
 
 export interface AiConfigDto {
   provider: AiProviderDto
@@ -287,6 +288,52 @@ export interface AiConfigInput {
 export interface AiAskResultDto {
   text: string
   command?: string
+}
+
+/** F48 — kết quả chạy MỘT lệnh chẩn đoán read-only qua kênh exec riêng. */
+export interface AiDiagnoseExecResultDto {
+  /** false = lệnh bị guard read-only chặn (blocked), không hề chạy trên remote. */
+  ok: boolean
+  /** Lý do chặn khi ok=false. */
+  blockedReason?: string
+  stdout: string
+  stderr: string
+  code: number | null
+  /** Lỗi kết nối/timeout khi chạy (khác blockedReason). */
+  error?: string
+}
+
+// ---------------------------------------------------------------------------
+// Remote desktop — VNC + RDP (F13)
+// ---------------------------------------------------------------------------
+
+/** VNC nhúng: main mở cầu WebSocket↔TCP (qua jump host), noVNC ở renderer nối vào. */
+export interface VncOpenResultDto {
+  sessionId: string
+  /** Cổng WebSocket local (127.0.0.1) để noVNC nối: ws://127.0.0.1:<wsPort>/?token=… */
+  wsPort: number
+  /** Token 1 phiên — ws server chỉ nhận kết nối có token đúng. */
+  token: string
+  title: string
+}
+
+/** RDP qua tunnel: main forward cổng 3389 rồi mở client RDP hệ điều hành trỏ vào cổng local. */
+export interface RdpOpenResultDto {
+  sessionId: string
+  /** Cổng local (127.0.0.1) đã forward tới 3389 của đích. */
+  localPort: number
+  label: string
+  /** true = đã tự mở client RDP (mstsc…); false = không mở được, user tự nối vào localPort. */
+  launched: boolean
+  /** Hướng dẫn khi launched=false (vd macOS/Linux không có client). */
+  hint?: string
+}
+
+/** Một phiên RDP đang mở (tunnel còn sống) — cho danh sách quản lý/Dừng. */
+export interface RdpSessionDto {
+  sessionId: string
+  label: string
+  localPort: number
 }
 
 // ---------------------------------------------------------------------------
@@ -680,6 +727,18 @@ export interface InfraApi {
     edit(sessionId: string, remotePath: string): Promise<void>
     onTransfer(cb: (e: TransferEvent) => void): () => void
   }
+  vnc: {
+    /** Mở phiên VNC: main dựng cầu ws↔tcp (qua jump host), trả wsPort+token cho noVNC. */
+    open(hostId: string): Promise<VncOpenResultDto>
+    close(sessionId: string): void
+  }
+  rdp: {
+    /** Mở RDP qua tunnel: forward cổng 3389 rồi mở client RDP hệ điều hành. */
+    open(hostId: string): Promise<RdpOpenResultDto>
+    close(sessionId: string): void
+    list(): Promise<RdpSessionDto[]>
+    onChange(cb: () => void): () => void
+  }
   fs: {
     roots(): Promise<string[]>
     home(): Promise<string>
@@ -731,6 +790,8 @@ export interface InfraApi {
     getConfig(): Promise<AiConfigDto | null>
     setConfig(input: AiConfigInput): Promise<void>
     ask(mode: AiModeDto, input: string, context?: string): Promise<AiAskResultDto>
+    /** F48 — chạy 1 lệnh chẩn đoán read-only trên host qua kênh exec riêng (enforce guard ở main). */
+    diagnoseExec(hostId: string, command: string): Promise<AiDiagnoseExecResultDto>
   }
   sync: {
     status(): Promise<SyncStatusDto>

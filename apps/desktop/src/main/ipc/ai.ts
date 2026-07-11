@@ -1,6 +1,14 @@
 import { ipcMain } from 'electron'
-import { AiService, type AiProvider } from '@infra/core'
-import { IPC, type AiAskResultDto, type AiConfigDto, type AiConfigInput, type AiModeDto } from '@infra/shared'
+import { AiService, execOnce, isReadOnlyCommand, type AiProvider } from '@infra/core'
+import {
+  IPC,
+  type AiAskResultDto,
+  type AiConfigDto,
+  type AiConfigInput,
+  type AiDiagnoseExecResultDto,
+  type AiModeDto
+} from '@infra/shared'
+import { makeHostKeyVerifier, prepareConnection } from './connection'
 import { getVault, touchActivity } from './vault'
 
 /** Trợ lý AI (F09): sinh lệnh / giải thích lệnh-lỗi qua Claude / OpenAI / Ollama. */
@@ -35,4 +43,29 @@ export function registerAiIpc(): void {
     )
     return { text: result.text, command: result.command }
   })
+
+  // F48 — chạy 1 lệnh chẩn đoán read-only qua kênh exec riêng (KHÔNG đụng phiên terminal đang mở).
+  // Guard read-only enforce Ở ĐÂY (không tin renderer): lệnh không read-only → trả ok:false, KHÔNG chạy.
+  ipcMain.handle(
+    IPC.AI_DIAGNOSE_EXEC,
+    async (event, hostId: string, command: string): Promise<AiDiagnoseExecResultDto> => {
+      touchActivity()
+      const verdict = isReadOnlyCommand(command)
+      if (!verdict.ok) {
+        return { ok: false, blockedReason: verdict.reason, stdout: '', stderr: '', code: null }
+      }
+      const prepared = await prepareConnection(event.sender, hostId)
+      const res = await execOnce(prepared.chain, command, makeHostKeyVerifier(event.sender), {
+        loginSteps: prepared.loginSteps,
+        timeoutMs: 30_000
+      })
+      return {
+        ok: true,
+        stdout: res.stdout,
+        stderr: res.stderr,
+        code: res.code,
+        error: res.status === 'error' ? res.error : undefined
+      }
+    }
+  )
 }

@@ -7,7 +7,7 @@ import { useT } from '../i18n'
 
 const NEW_GROUP = '__new__'
 const BAUD_RATES = [9600, 19200, 38400, 57600, 115200, 230400]
-const DEFAULT_PORT: Record<HostProtocol, number> = { ssh: 22, telnet: 23, serial: 115200 }
+const DEFAULT_PORT: Record<HostProtocol, number> = { ssh: 22, telnet: 23, serial: 115200, vnc: 5900, rdp: 3389 }
 
 /** Mẫu cho flow: ssh vào A → su sang user khác → ssh tiếp sang B. */
 const SU_SSH_TEMPLATE: LoginStep[] = [
@@ -70,6 +70,7 @@ export function HostEditorModal({
   const jumpCandidates = hosts.filter((h) => h.id !== host?.id && !jumpChain.includes(h.id))
   const isSsh = protocol === 'ssh'
   const isSerial = protocol === 'serial'
+  const isRemoteDesktop = protocol === 'vnc' || protocol === 'rdp'
 
   // Nạp danh sách cổng serial khi chọn protocol serial
   useEffect(() => {
@@ -115,13 +116,14 @@ export function HostEditorModal({
       label: label.trim() || `${username || 'host'}@${hostname}`,
       hostname: hostname.trim(),
       port: portNum,
-      username: sshOnly ? username.trim() || null : null,
+      username: isSsh || protocol === 'rdp' ? username.trim() || null : null,
       authType: sshOnly ? authType || null : null,
       keyId: sshOnly && authType === 'key' ? keyId : null,
       secretRef: sshOnly && authType === 'secret' ? secretRef.trim() : null,
       // undefined = giữ nguyên password cũ; null = xoá; string = đặt mới
       password: sshOnly ? (clearPassword ? null : password ? password : undefined) : null,
-      jumpChain: sshOnly && jumpChain.length > 0 ? jumpChain : null,
+      // vnc/rdp cũng dùng jumpChain để xuyên gate (chỉ SSH hop, đích là VNC/RDP)
+      jumpChain: (isSsh || isRemoteDesktop) && jumpChain.length > 0 ? jumpChain : null,
       env: sshOnly ? textToEnv(envText) : null,
       startupSnippetId: sshOnly ? startupSnippetId || null : null,
       agentForward: sshOnly ? agentForward : false,
@@ -153,6 +155,8 @@ export function HostEditorModal({
             <option value="ssh">SSH</option>
             <option value="telnet">Telnet</option>
             <option value="serial">{t('host.protoSerial')}</option>
+            <option value="vnc">VNC</option>
+            <option value="rdp">RDP</option>
           </Select>
         </Field>
 
@@ -213,12 +217,12 @@ export function HostEditorModal({
           </div>
         )}
 
-        {isSsh && (
+        {(isSsh || protocol === 'rdp') && (
           <Field label={t('host.username')}>
             <TextInput
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder={t('host.inheritGroup')}
+              placeholder={isSsh ? t('host.inheritGroup') : t('host.rdpUserPh')}
             />
           </Field>
         )}
@@ -310,6 +314,53 @@ export function HostEditorModal({
         <Field label={t('host.notes')}>
           <TextArea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('host.notesPh')} />
         </Field>
+
+        {isRemoteDesktop && (
+          <div className="mb-2 rounded border border-edge bg-input/50 p-2.5">
+            <Field label={t('host.jumpHosts')}>
+              <div>
+                {jumpChain.map((id, index) => (
+                  <div key={id} className="mb-1 flex items-center gap-1.5 text-xs text-content">
+                    <span className="text-subtle">{index + 1}.</span>
+                    <span className="flex-1 truncate">{hostLabel(id)}</span>
+                    <button
+                      type="button"
+                      className="rounded px-1 text-subtle hover:bg-hover hover:text-content"
+                      title={t('host.removeJump')}
+                      onClick={() => setJumpChain((prev) => prev.filter((x) => x !== id))}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <div className="flex gap-1.5">
+                  <Select value={jumpToAdd} onChange={(e) => setJumpToAdd(e.target.value)} className="!text-xs">
+                    <option value="">{t('host.addJump')}</option>
+                    {jumpCandidates.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <Button
+                    type="button"
+                    className="!px-2 !py-1 !text-xs"
+                    disabled={!jumpToAdd}
+                    onClick={() => {
+                      if (jumpToAdd) {
+                        setJumpChain((prev) => [...prev, jumpToAdd])
+                        setJumpToAdd('')
+                      }
+                    }}
+                  >
+                    {t('host.add')}
+                  </Button>
+                </div>
+              </div>
+            </Field>
+            <p className="text-[10px] leading-relaxed text-subtle">{t('host.rdpVncTunnelNote')}</p>
+          </div>
+        )}
 
         {isSsh && (
           <button

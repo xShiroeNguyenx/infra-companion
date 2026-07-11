@@ -1,5 +1,7 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
+> **Cập nhật 2026-07-11 — v0.1.16 (F48 + F13) ĐÃ CODE XONG, gộp release với v0.1.15 chưa commit.** Đã bump 0.1.15→**0.1.16** (2 package.json) + CHANGELOG [0.1.16] + README (badge, section Remote Desktop + AI troubleshooter, Known Limitations) + USER-GUIDE (§9B Remote Desktop, §14C AI troubleshooter, §18) + landing (version + card Remote desktop). Typecheck 3 package + build electron-vite + 195 core test (thêm 69 test readonlyGuard) đều xanh. **CHƯA test GUI, CHƯA commit/tag.** Dependency MỚI: `ws` + `@novnc/novnc` (+ `@types/ws`). **F48 AI chẩn đoán** (agent read-only, exec riêng như Bulk, guard chặn lệnh ghi enforce Ở MAIN): palette 🩺; files core `connection/execOnce.ts`, `ai/readonlyGuard.ts` (+test), AiService mode `diagnose`; kênh `AI_DIAGNOSE_EXEC`; renderer `stores/aiDiagnose.ts` + `components/AiDiagnoseModal.tsx`. **F13 VNC nhúng + RDP qua tunnel** (KHÔNG FreeRDP native): core `connection/forward.ts startForward()` (listen(0) + forwardOut qua jump chain HOẶC net.connect thẳng); `ipc/connection.ts` helper `toChainEndpoint` + `prepareForward`; HostProtocol += vnc|rdp; HostEditorModal + Sidebar (nút 🖥️). RDP: `ipc/rdp.ts` (mstsc.exe, win-only) + `stores/rdp.ts` + `RdpDock.tsx`. VNC: `ipc/vnc.ts` (WebSocketServer + token bridge ws↔tcp) + TabKind 'vnc' + `features/vnc/VncView.tsx` (noVNC RFB — import BARE `@novnc/novnc`, KHÔNG subpath vì exports là string, subpath sẽ VỠ build; type shim `renderer/src/novnc.d.ts`); CSP index.html + `connect-src ws://127.0.0.1:*`. ⚠️ Giới hạn: tunnel VNC/RDP chỉ jump-host chain, CHƯA hỗ trợ login-script gate (Phase 2). ⚠️ **Gotcha khi chạy `pnpm dev`**: môi trường có `ELECTRON_RUN_AS_NODE=1` khiến electron chạy như Node → crash `app.isPackaged undefined`; phải `Remove-Item Env:ELECTRON_RUN_AS_NODE` (hoặc unset) trước khi dev. Lệnh release v0.1.16 ở block "Git" dưới (dùng `git add -A` vì gộp cả 0.1.15). Phần dưới đây (v0.1.15) giữ để tham khảo — nội dung 0.1.15 vẫn nằm trong working tree, tag v0.1.16 gánh luôn.
+
 > File bàn giao để mở phiên mới là làm việc được ngay. Cập nhật 2026-07-09: **v0.1.14 ĐÃ phát hành** (commit `5c2c0cc` + tag). **v0.1.15 SẴN SÀNG RELEASE — đã bump version (2 package.json) + CHANGELOG [0.1.15] + README + landing hero + USER-GUIDE (§11 Monitoring viết thêm svc uptime/tooltip/chart inline/dashboard history + §14 panel AI kéo thả), CHƯA commit/tag** (lệnh git cuối file — nhớ test GUI theo checklist TRƯỚC khi tag). Mục (5) **AiExplainPanel kéo thả + resize**: kéo header di chuyển (pointer capture, kẹp trong khung app, bấm nút –/✕ không tính là kéo), grip góc dưới-phải = CSS `resize` gốc Chromium (browser ghi width/height inline — React không đè vì không quản 2 key đó); vị trí nhớ trong phiên (component luôn mount); chưa kéo thì neo top-right như cũ (có panel plugin thì top-24); i18n `panel.dragHint` ×3. Các mục còn lại: (1) **service uptime trên card** — dòng `⟳ httpd 30d · java 12d` (tiến trình lâu đời nhất mỗi tên: httpd/apache2/nginx/java/node/php-fpm/mysqld/mariadbd/postgres/redis-server; section `==SVC==` mới trong METRIC_CMD — chủ đích KHÔNG dùng `$()`/awk vì login-script nesting; parser `parseServices` lấy MAX etimes/tên, cap 4; GIỮ uptime server — service uptime là bổ sung, không thay thế). (2) **tooltip giải thích mọi thông số** — hover us/sy/wa/st/r/swap + Load/CPU/RAM/Disk/net/conn/inode/top/svc (i18n `monitor.tip.*` vi/en/ja, cursor-help). (3) **chart lịch sử inline trong card** — bấm 📈 giờ TOGGLE 3 chart 1h (Load/CPU/Conn, bucket phút, refresh 60s) ngay trong dock (`InlineHistory` + prop `compact` của `MetricChart` đã export từ MetricsHistoryModal); nút "⤢ Chi tiết & 24h" mở modal đầy đủ như cũ. (4) **mục "📈 Lịch sử monitoring" trên Dashboard 🏠** (user chỉ rõ vị trí: giữa Nhóm host và Kết nối gần đây) — liệt kê MỌI server từng được monitor (kể cả khi monitoring đang tắt — đọc từ metrics.db, giữ 30 ngày), mới nhất trước, mỗi card = label (fallback id cắt ngắn nếu host đã xoá) + "lần cuối HH:mm" + chart Load 24h compact; bấm card mở MetricsHistoryModal; `MetricsStore.listHosts()` mới (SELECT GROUP BY + gộp bucket dở trong RAM) + IPC `METRICS_HOSTS` + `monitor.historyHosts()`; chỉ fetch khi Dashboard active, refresh 60s. Test 126 + 12 skip (suite SQLite 6/6 pass qua Electron-Node), typecheck + build xanh, CHƯA test GUI.
 
 > Ghi chú release v0.1.13 (giữ để nhớ): lần đầu tag mà QUÊN commit → tag trỏ commit cũ, build ra 0.1.12, phải xoá release rỗng + dời tag; quy trình đúng: **commit → push → tag → push tag**. Nội dung v0.1.14: (1) **F04 alert ngưỡng** (hysteresis 3-sample + vùng chết + cooldown 15'; toast + Windows notification + webhook Google Chat/Slack/Discord/Telegram tự nhận diện; rules ở `monitor-settings.json` userData — KHÔNG vault, chạy cả khi vault khoá; Load không chặn 100, mặc định Load/Conn TẮT, Steal 20, RAM/Disk 90). (2) **F32 lịch sử metrics** — metrics.db riêng (bucket 1'=48h, 10'=30 ngày, tự prune), nút 📈 trên card → chart 1h/24h. (3) **F46 AI giải thích selection** — bôi chọn → ✨/Ctrl+Shift+E → panel dock. (4) **Monitoring 2.0** — CPU thật us/sy/wa/**st** (delta /proc/stat; bắt được ca jpap09 steal 40% VPS bị oversell), run queue, swap, disk mount đầy nhất + inode, net ↓↑, TCP conn, top process; dòng chẩn đoán nằm CUỐI card (user yêu cầu, Load giữ nguyên). **Việc mai**: phân tích tiếp jpap08/09 (chặn bot theo ASN từ plugin, khiếu nại steal với nhà cung cấp kèm chart 📈, cân nhắc giảm MaxRequestWorkers 1152→576 SAU khi chặn bot — đã tư vấn kỹ trong phiên). Private key ký registry: `~/.infra-companion/registry-signing-key.pem` — **PHẢI BACKUP**.
@@ -149,6 +151,32 @@ Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps
 **Landing page = flow ĐỘC LẬP** (`.github/workflows/pages.yml`, deploy `docs/landing/`): tự chạy khi **push thay đổi `docs/landing/**` lên `main`** (hoặc chạy tay workflow_dispatch) — **KHÔNG gắn tag/release → không build lại app**. `ci.yml` đã thêm `paths-ignore: docs/** + **/*.md` để push chỉ-docs không kích hoạt build 3-OS. **Setting 1 lần**: repo → Settings → Pages → Source = **GitHub Actions**. URL: `https://xshiroenguyenx.github.io/infra-companion/`. Link User guide/Changelog/Roadmap trong landing trỏ GitHub blob/main (không tương đối) để hoạt động khi publish.
 
 ```powershell
+# ============================================================
+# v0.1.16 — F48 (AI chan doan) + F13 (VNC nhung + RDP qua tunnel)
+# GOP CA v0.1.15 chua commit. Dung `git add -A` vi thay doi trai nhieu file 2 phien.
+# ============================================================
+cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
+
+# 0) Bo ELECTRON_RUN_AS_NODE neu dang set (khong lien quan git, nhung can de chay dev/build)
+#    Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+
+# BUOC 1: commit + push main (BAT BUOC truoc khi tag). Kiem `git status` truoc.
+git add -A
+git status                 # ra soat: dung co file rac (release/, out/, node_modules deu da .gitignore)
+git commit -m @'
+feat: AI chan doan su co (F48) + remote desktop VNC nhung/RDP qua tunnel (F13) (v0.1.16)
+'@
+git push origin main
+
+# BUOC 2: tag SAU KHI push + SAU KHI test GUI OK — CI build installer 3 OS
+git tag v0.1.16
+git push origin v0.1.16
+# Xong: cho Actions ~5-10 phut -> Releases/v0.1.16 co InfraCompanion-Setup-0.1.16.exe + latest.yml
+
+# ------------------------------------------------------------
+# (Tham khao) block v0.1.15 cu — cac file nay la TAP CON cua `git add -A` o tren,
+# giu lai de doi chieu; KHONG can chay neu da dung `git add -A` v0.1.16.
+# ------------------------------------------------------------
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
 
 # v0.1.15 — svc uptime + tooltip + chart inline + lich su monitoring tren Dashboard + panel AI keo tha
@@ -156,7 +184,7 @@ cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
 git add packages/shared/src/types.ts packages/shared/src/ipc.ts
 git add packages/core/src/index.ts packages/core/src/monitor/MonitorService.ts packages/core/src/monitor/MetricsStore.ts
 git add packages/core/src/monitor/parseMetrics.test.ts packages/core/src/monitor/AlertEngine.test.ts packages/core/src/monitor/MetricsStore.test.ts packages/core/src/monitor/downsample.test.ts
-git add apps/desktop/src/main/ipc/monitor.ts apps/desktop/src/preload/index.ts
+git add apps/desktop/src/main/index.ts apps/desktop/src/main/ipc/monitor.ts apps/desktop/src/preload/index.ts
 git add apps/desktop/src/renderer/src/components/MonitorDock.tsx apps/desktop/src/renderer/src/components/MetricsHistoryModal.tsx
 git add apps/desktop/src/renderer/src/components/AiExplainPanel.tsx
 git add apps/desktop/src/renderer/src/features/dashboard/DashboardView.tsx
@@ -180,5 +208,6 @@ git push origin v0.1.15
 3. **Chart inline**: bấm 📈 → 3 chart 1h (Load/CPU/Kết nối TCP) hiện NGAY TRONG card, tự refresh 60s; bấm 📈 lần nữa thu lại; nút "⤢ Chi tiết & 24h" mở modal đầy đủ như cũ.
 4. **Dashboard 🏠**: mục "📈 Lịch sử monitoring" giữa Nhóm host và Kết nối gần đây — hiện các host từng monitor (jpap0x) kèm chart Load 24h + "lần cuối"; bấm card mở modal lịch sử; TẮT monitoring rồi mở Dashboard vẫn thấy (đọc từ metrics.db); máy chưa từng monitor → dòng gợi ý bật Monitoring.
 5. **Panel AI ✨**: bôi chọn output → ✨ → panel hiện; NẮM HEADER kéo đi chỗ khác (không văng khỏi màn hình); kéo GÓC DƯỚI PHẢI phóng to; bấm –/✕ trên header vẫn hoạt động bình thường (không bị tính là kéo); đóng mở lại panel trong cùng phiên → vị trí giữ nguyên.
+6. **Icon dev**: chạy `pnpm dev` → taskbar + title bar phải mang logo Infra Companion (không còn icon Electron mặc định).
 
 > Môi trường dev: Node 20, pnpm 9, Electron 42 (Node 24 runtime — dùng `node:sqlite`), ssh2/node-pty/serialport là native nhưng đã externalize + prebuilt nên không cần build C++. Khi chạy electron từ terminal đã dính biến `ELECTRON_RUN_AS_NODE` thì thêm `$env:ELECTRON_RUN_AS_NODE=$null` cùng lệnh (chỉ là gotcha của terminal, không phải lỗi app).

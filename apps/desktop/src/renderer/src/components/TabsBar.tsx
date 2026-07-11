@@ -5,9 +5,10 @@ import { useTabsStore, type AppTab } from '../stores/tabs'
 import { RunSnippetModal } from './RunSnippetModal'
 import { useT } from '../i18n'
 
-/** Tiêu đề tab: SFTP → sftpTitle; terminal → pane active (hoặc "N panes"). */
+/** Tiêu đề tab: SFTP → sftpTitle; vnc → vncTitle; terminal → pane active (hoặc "N panes"). */
 function tabTitle(tab: AppTab): string {
   if (tab.kind === 'sftp') return tab.sftpTitle ?? 'SFTP'
+  if (tab.kind === 'vnc') return tab.vncTitle ?? 'VNC'
   const active = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
   if (tab.panes.length > 1) return `${active?.title ?? 'terminal'} +${tab.panes.length - 1}`
   return active?.title ?? 'terminal'
@@ -15,13 +16,14 @@ function tabTitle(tab: AppTab): string {
 
 function tabSubtitle(tab: AppTab): string | undefined {
   if (tab.kind === 'sftp') return tab.sftpTitle
+  if (tab.kind === 'vnc') return tab.vncTitle
   const active = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
   return active?.subtitle
 }
 
-/** Chấm trạng thái: terminal lấy theo pane active; sftp luôn xanh. */
+/** Chấm trạng thái: terminal lấy theo pane active; sftp/vnc luôn xanh. */
 function statusDotClass(tab: AppTab): string {
-  if (tab.kind === 'sftp') return 'bg-success'
+  if (tab.kind === 'sftp' || tab.kind === 'vnc') return 'bg-success'
   const active = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
   const status = active?.status ?? 'connecting'
   if (status === 'connected') return 'bg-success'
@@ -101,6 +103,7 @@ export function TabsBar() {
           >
             <span className={`size-1.5 shrink-0 rounded-full ${statusDotClass(tab)}`} />
             {tab.kind === 'sftp' && <span className="text-subtle shrink-0">📁</span>}
+            {tab.kind === 'vnc' && <span className="text-subtle shrink-0">🖥️</span>}
             {tab.broadcast && <span className="text-warning shrink-0" title="Broadcast ON">📡</span>}
             <span className="truncate">{tabTitle(tab)}</span>
             <button

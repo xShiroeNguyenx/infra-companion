@@ -1,8 +1,8 @@
 # Infra Companion
 
-> A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, AI assistance with local LLM support, and more.
+> A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, and more.
 
-**Current release: v0.1.15 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.1.16 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -84,6 +84,11 @@
 - **Local** (L), **Remote** (R), **Dynamic / SOCKS5** (D) port forwarding
 - Managed tunnel dashboard — toggle on/off, persistent across restarts
 
+### Remote Desktop (VNC & RDP)
+- **VNC embedded in a tab** — pure-JS [noVNC](https://github.com/novnc/noVNC) renders the remote screen inside the app; a local WebSocket↔TCP bridge (bound to `127.0.0.1`, one-time token) tunnels through the host's **jump chain** to the target's VNC port, so a VNC box reachable only from a gate just works
+- **RDP over an SSH tunnel** — forwards the target's `3389` (jump-host aware) to a local port and launches the OS client (Windows `mstsc.exe`, username pre-filled); a dock lists open tunnels with a **Stop** button, and closing the RDP window tears the tunnel down
+- Add hosts with protocol **VNC** (default 5900) or **RDP** (default 3389) — open them from the sidebar's 🖥️ button
+
 ### Bulk Execution
 - Run one command across N hosts **in parallel** (up to 8 concurrent)
 - Grid output view — enable **"Group by output"** to instantly spot divergent machines (flagged yellow)
@@ -112,6 +117,7 @@
 - **Explain command** — break down each part and flag risks
 - **Explain error** — diagnose output and suggest fixes
 - **Explain selection** — select any terminal output → floating ✨ button or **Ctrl+Shift+E** → answer in a minimizable dock panel (no modal, keep typing while you read)
+- **AI troubleshooter (agent mode)** — describe a symptom → the AI proposes **one read-only diagnostic command at a time** with its reasoning; you **approve each step**, it runs over a separate SSH exec channel (your terminal untouched), reads the output, and proposes the next step until a conclusion. Read-only is enforced by both the prompt and a main-process guard that blocks any write/restart/delete. Command palette → *🩺 AI troubleshooter*
 - Providers: **Claude** (`claude-opus-4-8`), **OpenAI** (`gpt-4o-mini`), **Gemini** (`gemini-2.0-flash`), **Ollama** (local, fully private)
 - API keys stored encrypted in vault
 
@@ -252,12 +258,13 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.1.15)
+## Known Limitations (v0.1.16)
 
 - Bulk / Monitor / SFTP through login scripts rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` installed on the gate) and `su` / `sudo` steps are supported; exotic setups that force a TTY password prompt may still fail
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))
 - Secrets Manager: 1Password, Bitwarden, HashiCorp Vault via CLI (KeePassXC planned)
-- No RDP/VNC, team server, cloud import (AWS/GCP…), Docker/K8s browser — see [ROADMAP.md](ROADMAP.md); plugin system is at **v1** (🛒 Marketplace tab installs from a static registry, entries are ed25519-signed; no permission enforcement / output transform yet)
+- **Remote desktop tunneling** reaches targets via **jump-host chains** (SSH `-J` style); a target reachable only through an interactive **login-script gate** is not yet supported. **RDP** opens the OS client through a tunnel (not embedded); embedded FreeRDP is not planned. VNC needs a real VNC server on the target and network reachability (LAN or SSH tunnel)
+- No team server, cloud import (AWS/GCP…), Docker/K8s browser — see [ROADMAP.md](ROADMAP.md); plugin system is at **v1** (🛒 Marketplace tab installs from a static registry, entries are ed25519-signed; no permission enforcement / output transform yet)
 
 ---
 
@@ -269,7 +276,7 @@ See [ROADMAP.md](ROADMAP.md) for the full list of planned features, including:
 - Sync backends: WebDAV, S3, Git
 - Cloud host import (AWS EC2 / GCP / Azure / DigitalOcean)
 - Docker & Kubernetes browser
-- VNC (noVNC, in-tab) and RDP (FreeRDP)
+- Remote desktop v2: tunneling through login-script gates; embedded RDP
 - Team self-host server with shared vaults and RBAC
 
 ---

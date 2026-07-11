@@ -5,6 +5,19 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.16] — 2026-07-11
+
+### Added
+
+- **AI troubleshooter (F48) — step-by-step diagnosis with approval** — describe a symptom ("web returns 502", "server unusually slow") and the AI proposes **one read-only diagnostic command at a time**, with its reasoning. You **approve each step**; the command runs over a **separate SSH exec channel** (your open terminal is never touched — clean output capture, jump-host / login-script aware), the output is fed back, and the AI proposes the next step until it reaches a conclusion + suggested fix. **Read-only is enforced twice**: a system prompt that only allows information-gathering commands, plus a guard in the main process that blocks anything that writes/deletes/restarts (`rm`, `systemctl restart`, `kill`, redirection to files, package installs…) — the guard is the last line, per-step approval is the real gate. Open from the command palette (*🩺 AI troubleshooter*). Reuses the existing AI provider config (Claude / OpenAI / Gemini / Ollama).
+- **Remote desktop — VNC & RDP (F13)** — connect to graphical desktops that live behind your SSH jump hosts:
+  - **VNC embedded in a tab** — pure-JS [noVNC](https://github.com/novnc/noVNC) rendering the remote screen right inside Infra Companion. The main process opens a local WebSocket↔TCP bridge (bound to `127.0.0.1`, one-time token) that tunnels through the host's jump chain to the target's VNC port — so a VNC box reachable only from a gate just works. Scales to fit, prompts for the VNC password in-tab, reconnect button on drop.
+  - **RDP over a tunnel** — forwards the target's `3389` through SSH (jump-host aware) to a local port and launches the OS RDP client (Windows `mstsc.exe`, with the username pre-filled) pointed at it; closing the RDP window tears the tunnel down. On macOS/Linux it opens the tunnel and tells you where to point your RDP client. A small dock lists open RDP tunnels with a **Stop** button.
+  - Host editor gains **VNC / RDP** protocol options (default ports 5900 / 3389) with an optional **jump-host** chain for tunneling; open from the sidebar's 🖥️ button.
+  - *Known limitation:* remote-desktop tunneling supports **jump-host chains** (SSH `-J` style); a target reachable only via an interactive **login-script gate** is not yet supported (planned).
+
+---
+
 ## [0.1.15] — 2026-07-09
 
 ### Added
@@ -13,7 +26,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Metric explanations on hover** — every number on a monitoring card now has a plain-language tooltip: the `us / sy / wa / st / r / swap` diagnostic row (e.g. *st = CPU stolen by the hypervisor for other VPS on the same physical host; sustained ≥10 means your provider oversold the box*), the Load/CPU/RAM/Disk bars, network rate, TCP connections, inode and top-process tags. Hover any value to learn what it means and when to worry (cursor shows *help*).
 - **Inline history charts on the dashboard** — clicking 📈 on a card now expands **1-hour Load / CPU / TCP-connection charts right inside the dock** (auto-refresh every minute) instead of jumping straight to a modal; a *⤢ Details & 24h* link still opens the full history window with all metrics and ranges.
 - **Monitoring history on the Home dashboard** — the 🏠 Dashboard gains a **📈 Monitoring history** section listing every server that has ever been monitored (data retained 30 days in `metrics.db`), newest first, each with its **24-hour Load chart** and last-monitored time; click a card to open the full history window. Works even when monitoring isn't currently running — it reads recorded history, so you can review yesterday's incident after a restart.
-- **AI Explain panel is now movable and resizable** — grab the ✨ panel's header to drag it anywhere (it starts docked top-right as before), and drag the bottom-right corner to resize it for comfortable reading of long answers. Position is remembered for the session; the panel never gets stuck off-screen (clamped to the window).
+- **All floating panels are now movable and resizable** — grab the header of the ✨ **AI Explain** panel, the 📊 **Monitoring dock**, or a 🧩 **Plugin output** panel to drag it anywhere (each still starts docked in its usual corner), and drag the bottom-right corner to resize it — comfortable for reading long AI answers, watching many hosts, or wide plugin tables. Position is remembered for the session and each panel is clamped to the window so it never gets stuck off-screen. (Shared `useDraggablePanel` hook — one behaviour across all three.)
+
+### Fixed
+
+- **Dev-run taskbar icon** — running from source (`pnpm dev`) now shows the Infra Companion logo on the Windows taskbar and title bar instead of the default Electron icon (packaged builds already used the icon embedded in the exe).
 
 ---
 

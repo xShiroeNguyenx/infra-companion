@@ -17,13 +17,13 @@ export interface AiAskResult {
   command?: string
 }
 
-export type AiMode = 'generate' | 'explain' | 'explain-error'
+export type AiMode = 'generate' | 'explain' | 'explain-error' | 'diagnose'
 
 export interface AiAskRequest {
   mode: AiMode
   /** Yêu cầu của user (ngôn ngữ tự nhiên) hoặc lệnh/lỗi cần giải thích. */
   input: string
-  /** Context tuỳ chọn: OS đích, vài dòng cuối của terminal… */
+  /** Context tuỳ chọn: OS đích, vài dòng cuối của terminal, hoặc transcript các bước đã chạy. */
   context?: string
 }
 
@@ -39,6 +39,20 @@ const SYSTEM_EXPLAIN =
 const SYSTEM_EXPLAIN_ERROR =
   'Bạn là trợ lý debug. Người dùng đưa output/lỗi từ terminal. Giải thích nguyên nhân và đề xuất cách khắc phục (kèm lệnh nếu phù hợp, đặt trong ```sh```). Ngắn gọn, tiếng Việt.'
 
+const SYSTEM_DIAGNOSE =
+  'Bạn là agent chẩn đoán sự cố máy chủ Linux, làm việc TỪNG BƯỚC. Người dùng đưa triệu chứng + lịch sử các lệnh đã chạy kèm output. ' +
+  'Nhiệm vụ mỗi lượt: đề xuất ĐÚNG MỘT lệnh chẩn đoán CHỈ-ĐỌC tiếp theo để thu hẹp nguyên nhân, đặt trong một code block ```sh ... ``` (chỉ một lệnh), rồi 1-2 câu tiếng Việt giải thích vì sao chạy lệnh đó. ' +
+  'TUYỆT ĐỐI chỉ dùng lệnh đọc thông tin (uptime, free, df, ss, netstat, ps, top -bn1, cat/head/tail/grep trên /proc, /var/log…, systemctl status, journalctl, dmesg, ss, dig…). ' +
+  'CẤM mọi lệnh ghi/sửa/khởi động lại/xoá (rm, mv, chmod, chown, kill, systemctl restart|stop|start, service restart, iptables, cài gói, sed -i, ghi ra file bằng > hoặc >>). ' +
+  'Khi đã đủ dữ liệu để kết luận, ĐỪNG đưa code block nữa — thay vào đó trả lời bằng văn xuôi: chẩn đoán nguyên nhân + đề xuất cách khắc phục để NGƯỜI DÙNG tự làm (mô tả các lệnh sửa dưới dạng chữ, không đặt trong ```sh```). Ngắn gọn, tiếng Việt.'
+
+const SYSTEM_PROMPTS: Record<AiMode, string> = {
+  generate: SYSTEM_GENERATE,
+  explain: SYSTEM_EXPLAIN,
+  'explain-error': SYSTEM_EXPLAIN_ERROR,
+  diagnose: SYSTEM_DIAGNOSE
+}
+
 /** Mạng treo không để user chờ vô hạn (undici mặc định ~5 phút, không hủy được từ UI). */
 const REQUEST_TIMEOUT_MS = 60_000
 
@@ -48,7 +62,7 @@ const REQUEST_TIMEOUT_MS = 60_000
  */
 export class AiService {
   async ask(config: AiRuntimeConfig, req: AiAskRequest): Promise<AiAskResult> {
-    const system = req.mode === 'generate' ? SYSTEM_GENERATE : req.mode === 'explain' ? SYSTEM_EXPLAIN : SYSTEM_EXPLAIN_ERROR
+    const system = SYSTEM_PROMPTS[req.mode]
     const prompt = buildPrompt(req)
     const text = await this.complete(config, system, prompt)
     return { text, command: req.mode !== 'explain' ? extractCommand(text) : undefined }
@@ -155,6 +169,7 @@ function buildPrompt(req: AiAskRequest): string {
   const ctx = req.context ? `\n\n--- Bối cảnh ---\n${req.context}` : ''
   if (req.mode === 'generate') return `Yêu cầu: ${req.input}${ctx}`
   if (req.mode === 'explain') return `Giải thích lệnh sau:\n${req.input}${ctx}`
+  if (req.mode === 'diagnose') return `Triệu chứng: ${req.input}${ctx}\n\nĐề xuất lệnh chẩn đoán chỉ-đọc tiếp theo (hoặc kết luận nếu đã đủ dữ liệu).`
   return `Output/lỗi từ terminal:\n${req.input}${ctx}`
 }
 

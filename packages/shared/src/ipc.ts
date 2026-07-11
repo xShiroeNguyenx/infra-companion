@@ -67,6 +67,14 @@ export const IPC = {
   SFTP_EDIT: 'sftp:edit',
   TRANSFER_EVENT: 'transfer:event',
 
+  VNC_OPEN: 'vnc:open',
+  VNC_CLOSE: 'vnc:close',
+
+  RDP_OPEN: 'rdp:open',
+  RDP_CLOSE: 'rdp:close',
+  RDP_LIST: 'rdp:list',
+  RDP_EVENT: 'rdp:event',
+
   FS_ROOTS: 'fs:roots',
   FS_HOME: 'fs:home',
   FS_LIST: 'fs:list',
@@ -100,6 +108,7 @@ export const IPC = {
   AI_GET_CONFIG: 'ai:get-config',
   AI_SET_CONFIG: 'ai:set-config',
   AI_ASK: 'ai:ask',
+  AI_DIAGNOSE_EXEC: 'ai:diagnose:exec',
 
   SYNC_STATUS: 'sync:status',
   SYNC_PICK_FOLDER: 'sync:pick-folder',

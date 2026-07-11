@@ -3,6 +3,7 @@ import type { MetricHistoryPointDto } from '@infra/shared'
 import { useMonitorStore, type HostMonitor } from '../stores/monitor'
 import { usePluginStore } from '../stores/plugins'
 import { useT } from '../i18n'
+import { useDraggablePanel } from '../lib/useDraggablePanel'
 import { MetricChart } from './MetricsHistoryModal'
 
 /** Dashboard monitoring neo góc phải — mờ khi không rê chuột, KHÔNG backdrop nên
@@ -17,6 +18,7 @@ export function MonitorDock() {
   const stop = useMonitorStore((s) => s.stop)
   const hasPluginPanel = usePluginStore((s) => s.panel !== null)
   const [minimized, setMinimized] = useState(false)
+  const { panelRef, pos, headerHandlers } = useDraggablePanel()
   const monitors = Object.values(data)
 
   if (minimized) {
@@ -39,11 +41,17 @@ export function MonitorDock() {
 
   return (
     <div
-      className={`bg-elevated/95 border-edge-strong absolute right-3 z-30 flex w-[320px] max-w-[85vw] flex-col overflow-hidden rounded-lg border opacity-75 shadow-2xl transition-all duration-150 hover:opacity-100 ${
-        hasPluginPanel ? 'top-24 max-h-[calc(100%-8.5rem)]' : 'top-14 max-h-[calc(100%-6rem)]'
-      }`}
+      ref={panelRef}
+      style={pos ? { left: pos.x, top: pos.y } : undefined}
+      className={`bg-elevated/95 border-edge-strong absolute z-30 flex w-[320px] max-w-[85vw] min-h-40 min-w-72 resize flex-col overflow-hidden rounded-lg border opacity-75 shadow-2xl transition-opacity duration-150 hover:opacity-100 ${
+        hasPluginPanel ? 'max-h-[calc(100%-8.5rem)]' : 'max-h-[calc(100%-6rem)]'
+      } ${pos ? '' : `right-3 ${hasPluginPanel ? 'top-24' : 'top-14'}`}`}
     >
-      <div className="border-edge flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2">
+      <div
+        className="border-edge flex shrink-0 cursor-move items-center justify-between gap-2 border-b px-3 py-2 select-none"
+        title={t('panel.dragHint')}
+        {...headerHandlers}
+      >
         <span className="text-subtle truncate text-[11px]">{t('monitor.watching', { n: monitors.length })}</span>
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -62,7 +70,7 @@ export function MonitorDock() {
           </button>
         </div>
       </div>
-      <div className="flex flex-col gap-2 overflow-y-auto p-2">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
         {monitors.map((m) => (
           <MonitorCard key={m.hostId} monitor={m} />
         ))}

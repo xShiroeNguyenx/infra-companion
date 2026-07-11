@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useT } from '../i18n'
 import { MiniMarkdown } from '../lib/miniMarkdown'
+import { useDraggablePanel } from '../lib/useDraggablePanel'
 import { useAiExplainStore } from '../stores/aiExplain'
 import { usePluginStore } from '../stores/plugins'
 import { Button } from './ui'
@@ -20,10 +21,8 @@ export function AiExplainPanel() {
   const retry = useAiExplainStore((s) => s.retry)
   const hasPluginPanel = usePluginStore((s) => s.panel !== null)
   const [minimized, setMinimized] = useState(false)
-  /** null = chưa kéo → neo top-right mặc định; có giá trị = toạ độ user đã thả. */
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ pointerId: number; offX: number; offY: number } | null>(null)
+  /** pos=null → neo top-right mặc định; có giá trị = toạ độ user đã kéo thả. */
+  const { panelRef, pos, headerHandlers } = useDraggablePanel()
 
   // Yêu cầu mới → tự bung để user thấy trạng thái/kết quả
   useEffect(() => {
@@ -57,33 +56,6 @@ export function AiExplainPanel() {
     )
   }
 
-  const onHeaderPointerDown = (e: React.PointerEvent<HTMLDivElement>): void => {
-    // Bấm vào nút –/✕ thì là bấm nút, không phải bắt đầu kéo
-    if ((e.target as HTMLElement).closest('button')) return
-    const rect = panelRef.current?.getBoundingClientRect()
-    if (!rect) return
-    drag.current = { pointerId: e.pointerId, offX: e.clientX - rect.left, offY: e.clientY - rect.top }
-    e.currentTarget.setPointerCapture(e.pointerId)
-  }
-
-  const onHeaderPointerMove = (e: React.PointerEvent<HTMLDivElement>): void => {
-    const d = drag.current
-    const panel = panelRef.current
-    if (!d || d.pointerId !== e.pointerId || !panel) return
-    const parent = panel.offsetParent as HTMLElement | null
-    if (!parent) return
-    const pr = parent.getBoundingClientRect()
-    const rect = panel.getBoundingClientRect()
-    // Kẹp trong khung app: không cho văng mất — header luôn còn với tới được
-    const x = Math.min(Math.max(e.clientX - pr.left - d.offX, 0), Math.max(0, pr.width - rect.width))
-    const y = Math.min(Math.max(e.clientY - pr.top - d.offY, 0), Math.max(0, pr.height - 40))
-    setPos({ x, y })
-  }
-
-  const onHeaderPointerUp = (e: React.PointerEvent<HTMLDivElement>): void => {
-    if (drag.current?.pointerId === e.pointerId) drag.current = null
-  }
-
   return (
     <div
       ref={panelRef}
@@ -95,9 +67,7 @@ export function AiExplainPanel() {
       <div
         className="border-edge flex shrink-0 cursor-move items-center justify-between gap-2 border-b px-4 py-2.5 select-none"
         title={t('panel.dragHint')}
-        onPointerDown={onHeaderPointerDown}
-        onPointerMove={onHeaderPointerMove}
-        onPointerUp={onHeaderPointerUp}
+        {...headerHandlers}
       >
         <span className="text-content truncate text-sm font-semibold">✨ {t('ai.explainTitle')}</span>
         <div className="flex shrink-0 items-center">
