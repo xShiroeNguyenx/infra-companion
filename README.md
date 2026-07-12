@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, and more.
 
-**Current release: v0.1.16 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.1.17 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -82,7 +82,8 @@
 
 ### Tunnels
 - **Local** (L), **Remote** (R), **Dynamic / SOCKS5** (D) port forwarding
-- Managed tunnel dashboard — toggle on/off, persistent across restarts
+- Managed tunnel dashboard — toggle on/off, **edit** rules, persistent across restarts
+- **Tunnel through a login-script gate** — a Local forward whose via-host is reached by a login script (nested `ssh` in a shell) tunnels by running `nc` on the innermost hop, so you can reach e.g. a database only pingable from the deepest machine straight from `127.0.0.1` (needs `nc` on the far end)
 
 ### Remote Desktop (VNC & RDP)
 - **VNC embedded in a tab** — pure-JS [noVNC](https://github.com/novnc/noVNC) renders the remote screen inside the app; a local WebSocket↔TCP bridge (bound to `127.0.0.1`, one-time token) tunnels through the host's **jump chain** to the target's VNC port, so a VNC box reachable only from a gate just works
@@ -258,9 +259,9 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.1.16)
+## Known Limitations (v0.1.17)
 
-- Bulk / Monitor / SFTP through login scripts rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` installed on the gate) and `su` / `sudo` steps are supported; exotic setups that force a TTY password prompt may still fail
+- Bulk / Monitor / SFTP / Local-forward tunnels through login scripts rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` installed on the gate) and `su` / `sudo` steps are supported; exotic setups that force a TTY password prompt may still fail. Login-script tunnels also need `nc` on the innermost hop
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))
 - Secrets Manager: 1Password, Bitwarden, HashiCorp Vault via CLI (KeePassXC planned)
 - **Remote desktop tunneling** reaches targets via **jump-host chains** (SSH `-J` style); a target reachable only through an interactive **login-script gate** is not yet supported. **RDP** opens the OS client through a tunnel (not embedded); embedded FreeRDP is not planned. VNC needs a real VNC server on the target and network reachability (LAN or SSH tunnel)

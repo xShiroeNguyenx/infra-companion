@@ -1,13 +1,19 @@
+import { randomBytes } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import * as net from 'node:net'
+import { Transform, type TransformCallback } from 'node:stream'
 import type { Client } from 'ssh2'
 import type { TunnelRuleDto, TunnelStateDto, TunnelStatus } from '@infra/shared'
 import { establishChain, type ChainEndpoint } from './establish'
+import { deriveStreamExecFromLoginSteps, type LoginStepLike } from './loginScript'
 import type { HostKeyVerifier } from './types'
 
 export interface TunnelConnectionConfig {
   chain: ChainEndpoint[]
   verifyHostKey: HostKeyVerifier
+  /** Login script của via host (nếu có): tunnel L sẽ đi QUA login-script (nc trên máy trong cùng)
+   *  thay vì forwardOut — cho máy chỉ vào được bằng `ssh` trong shell, không nhận jump host `-J`. */
+  loginSteps?: LoginStepLike[]
 }
 
 interface ActiveTunnel {
@@ -18,6 +24,7 @@ interface ActiveTunnel {
   status: TunnelStatus
   detail?: string
   stopping: boolean
+  loginSteps?: LoginStepLike[]
 }
 
 export interface TunnelServiceEvents {
@@ -55,7 +62,8 @@ export class TunnelService extends EventEmitter<TunnelServiceEvents> {
       server: null,
       closeChain: null,
       status: 'starting',
-      stopping: false
+      stopping: false,
+      loginSteps: config.loginSteps
     }
     this.active.set(rule.id, tunnel)
     this.setState(tunnel, 'starting')
@@ -112,6 +120,52 @@ export class TunnelService extends EventEmitter<TunnelServiceEvents> {
   private startLocal(tunnel: ActiveTunnel, client: Client): Promise<void> {
     const { rule } = tunnel
     if (!rule.destHost || !rule.destPort) return Promise.reject(new Error('Tunnel local thiếu đích'))
+
+    // Via host vào bằng login-script (máy đích chỉ ssh được trong shell, không nhận `-J`):
+    // forwardOut sẽ thất bại → thay bằng `nc dest port` chạy trên máy TRONG CÙNG qua exec
+    // (nested ssh do deriveExecFromLoginSteps dựng, y như Bulk/Monitor). Yêu cầu `nc` ở đầu cuối.
+    if (tunnel.loginSteps && tunnel.loginSteps.length > 0) {
+      if (!/^[A-Za-z0-9.-]+$/.test(rule.destHost)) {
+        return Promise.reject(new Error('Địa chỉ đích không hợp lệ cho tunnel qua login-script'))
+      }
+      // In marker NGAY TRƯỚC khi exec nc: mọi rác (MOTD/banner/prompt của các hop ssh chạy qua
+      // shell) đứng TRƯỚC marker → phía client cắt bỏ tới hết marker rồi mới coi phần sau là luồng
+      // binary sạch của DB. (SFTP-over-exec không cần vì dùng subsystem, còn nc chạy qua shell.)
+      const marker = `ICTUN${randomBytes(9).toString('hex')}`
+      const inner = `printf %s ${marker}; exec nc ${rule.destHost} ${rule.destPort}`
+      // deriveStreamExecFromLoginSteps: GIỮ stdin (`… | cat | …`) qua bước su/sudo — tunnel 2 chiều
+      // cần byte client gửi lên vẫn tới nc (feedOneShot của Bulk/Monitor sẽ cắt stdin → gãy auth).
+      const execCmd = deriveStreamExecFromLoginSteps(tunnel.loginSteps, inner) ?? inner
+      const markerBuf = Buffer.from(marker)
+      return this.listen(tunnel, (socket) => {
+        client.exec(execCmd, (error, stream) => {
+          if (error) {
+            socket.destroy()
+            return
+          }
+          // Gom stderr để lộ lỗi thật (sshpass thiếu, Permission denied, nc not found…) khi
+          // kết nối chết mà CHƯA từng thấy marker (nested ssh/nc fail → luồng rỗng).
+          let stderrBuf = ''
+          stream.stderr.on('data', (d: Buffer) => {
+            if (stderrBuf.length < 2_000) stderrBuf += d.toString('utf8')
+          })
+          const stripper = new StripUntilMarker(markerBuf)
+          const onFail = (): void => {
+            if (!stripper.matched && stderrBuf.trim()) {
+              this.setState(tunnel, tunnel.status, `Tunnel login-script lỗi: ${stderrBuf.trim().slice(-300)}`)
+            }
+            socket.destroy()
+          }
+          socket.pipe(stream) // client → nc stdin (raw)
+          stream.pipe(stripper).pipe(socket) // nc stdout → cắt rác tới marker → client
+          stream.on('error', () => socket.destroy())
+          stripper.on('error', onFail)
+          socket.on('error', () => stream.destroy())
+          stream.on('close', onFail)
+        })
+      })
+    }
+
     return this.listen(tunnel, (socket) => {
       client.forwardOut(
         socket.remoteAddress ?? '127.0.0.1',
@@ -214,5 +268,45 @@ export class TunnelService extends EventEmitter<TunnelServiceEvents> {
     tunnel.status = status
     tunnel.detail = detail
     this.emit('state', { ruleId: tunnel.rule.id, status, detail })
+  }
+}
+
+/**
+ * Transform cho tunnel qua login-script: nuốt mọi byte tới HẾT lần xuất hiện đầu của marker,
+ * rồi cho phần còn lại đi qua nguyên vẹn (luồng binary DB sạch). Marker luôn được in ngay
+ * trước `exec nc`, nên rác của mọi hop ssh (MOTD/banner) nằm trước nó.
+ */
+class StripUntilMarker extends Transform {
+  private seen = false
+  private head = Buffer.alloc(0)
+
+  constructor(private readonly marker: Buffer) {
+    super()
+  }
+
+  /** Đã tìm thấy marker chưa (đã bắt đầu forward dữ liệu binary sạch). */
+  get matched(): boolean {
+    return this.seen
+  }
+
+  override _transform(chunk: Buffer, _enc: BufferEncoding, cb: TransformCallback): void {
+    if (this.seen) {
+      cb(null, chunk)
+      return
+    }
+    this.head = Buffer.concat([this.head, chunk])
+    const idx = this.head.indexOf(this.marker)
+    if (idx >= 0) {
+      this.seen = true
+      const rest = this.head.subarray(idx + this.marker.length)
+      this.head = Buffer.alloc(0)
+      cb(null, rest.length > 0 ? rest : undefined)
+    } else if (this.head.length > 65_536) {
+      // Không thấy marker trong 64KB đầu → chuỗi hỏng (nc/ssh lỗi), dừng
+      cb(new Error('Không thấy marker tunnel — có thể thiếu nc hoặc một hop ssh lỗi'))
+    } else {
+      // Giữ lại 4KB đuôi phòng marker bị cắt ngang 2 chunk (marker ngắn hơn nhiều)
+      cb()
+    }
   }
 }

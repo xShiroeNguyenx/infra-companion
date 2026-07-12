@@ -149,7 +149,9 @@ export function friendlySshError(error: Error & { level?: string }, label?: stri
     return `${prefix}Kết nối timeout — kiểm tra địa chỉ host và firewall`
   }
   if (/ECONNREFUSED/.test(message)) return `${prefix}Bị từ chối kết nối — kiểm tra port và sshd trên server`
-  if (/ENOTFOUND|EAI_AGAIN/.test(message)) return `${prefix}Không phân giải được hostname`
+  if (/ENOTFOUND|EAI_AGAIN/.test(message)) {
+    return `${prefix}Không phân giải được hostname — máy bạn không tra được tên này (DNS). Nếu host chỉ vào được qua gate, hãy đặt Jump host cho nó (tên sẽ được phân giải TRÊN gate); hoặc thêm ánh xạ IP vào file hosts; hoặc nhập thẳng IP.`
+  }
   if (/Host key/i.test(message) || /verification/i.test(message)) return `${prefix}Host key bị từ chối`
   return prefix + message
 }

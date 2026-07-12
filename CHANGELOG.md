@@ -5,6 +5,24 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.17] — 2026-07-12
+
+### Added
+
+- **Port-forward tunnels through login-script gates** — a Local (L) tunnel whose **via host** is reached by a **login script** (nested `ssh` in a shell, e.g. `gate → jpapst04 → jpap05`) now forwards by running `nc <dest> <port>` on the innermost machine over an exec channel (the same nested-command mechanism Bulk/Monitor use), instead of `-J` `forwardOut` which those hosts reject. This lets you reach, say, a **database only pingable from the deepest hop** straight from `127.0.0.1:<local port>`. Requires `nc` on the far end (and `sshpass` on intermediate hops if they authenticate by password — same caveat as Bulk/Monitor).
+
+### Changed
+
+- **Edit existing tunnels** — the Tunnels dashboard gains an **Edit** button on each rule (previously only Start / Delete); it reopens the form pre-filled and updates the rule in place (a running tunnel is stopped so the next Start picks up the new config).
+- **Sidebar shows the full host name when idle** — the row's action buttons (split/SFTP/VNC/duplicate/edit and the **note**) are now fully hidden until you hover, instead of reserving space and truncating the name; the note icon in particular only appears on hover.
+- **Clearer "can't resolve hostname" error** — the DNS-resolution failure message now explains it's a client-side lookup and points to the fixes (set a Jump host so the name resolves on the gate, add a `hosts` mapping, or use the IP) instead of the bare "Không phân giải được hostname".
+
+### Fixed
+
+- **Windows taskbar icon** — the app now sets the **window icon explicitly at runtime on Windows for both dev and packaged builds** (`build/icon.ico` in dev; bundled `resources/icon.ico` via `extraResources` when packaged). Previously the packaged app set no window icon, so the running app's taskbar button fell back to the per-AppUserModelID icon — which Windows had cached as the Electron atom from earlier `pnpm dev` runs, showing the wrong icon even though the exe and Start-menu shortcut had the correct one. Note: a stale taskbar icon may still need a Windows icon-cache refresh (or reboot) to clear on a machine that ran the old dev builds.
+
+---
+
 ## [0.1.16] — 2026-07-11
 
 ### Added

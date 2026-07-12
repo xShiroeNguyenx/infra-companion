@@ -23,8 +23,32 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
   const [destPort, setDestPort] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<TunnelRuleDto | null>(null)
+  /** null = form đang TẠO MỚI; có giá trị = đang SỬA rule này (saveTunnel nhận id → UPDATE). */
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const hostLabel = (id: string): string => hosts.find((h) => h.id === id)?.label ?? t('tunnel.hostDeleted')
+
+  const openAdd = (): void => {
+    setEditingId(null)
+    setHostId('')
+    setType('L')
+    setBindPort('')
+    setDestHost('127.0.0.1')
+    setDestPort('')
+    setError(null)
+    setMode('add')
+  }
+
+  const openEdit = (rule: TunnelRuleDto): void => {
+    setEditingId(rule.id)
+    setHostId(rule.hostId)
+    setType(rule.type)
+    setBindPort(String(rule.bindPort))
+    setDestHost(rule.destHost ?? '127.0.0.1')
+    setDestPort(rule.destPort != null ? String(rule.destPort) : '')
+    setError(null)
+    setMode('add')
+  }
 
   const submit = async (): Promise<void> => {
     setError(null)
@@ -38,6 +62,7 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
       if (!Number.isInteger(dest) || dest < 1 || dest > 65_535) return setError(t('tunnel.errDestPort'))
     }
     const ok = await saveTunnel({
+      id: editingId ?? undefined,
       hostId,
       type,
       bindPort: bind,
@@ -46,7 +71,11 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
       label: type === 'D' ? `SOCKS5 :${bind}` : `:${bind} → ${destHost}:${destPort}`
     })
     if (ok) {
+      // Sửa tunnel đang chạy → dừng để lần Chạy sau áp cấu hình mới (rule đang chạy giữ cấu hình cũ)
+      const st = editingId ? tunnelStates[editingId]?.status : undefined
+      if (editingId && (st === 'active' || st === 'starting')) void stopTunnel(editingId)
       setMode('list')
+      setEditingId(null)
       setBindPort('')
       setDestPort('')
     }
@@ -85,9 +114,9 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
                     <div className="truncate text-xs text-content">
                       [{rule.type}] {rule.label || `:${rule.bindPort}`}
                     </div>
-                    <div className="truncate text-[10px] text-subtle">
+                    <div className={`truncate text-[10px] ${detail ? 'text-danger' : 'text-subtle'}`} title={detail}>
                       {hostLabel(rule.hostId)}
-                      {state === 'error' && detail ? ` — ${detail}` : ''}
+                      {detail ? ` — ${detail}` : ''}
                     </div>
                   </div>
                   <Button
@@ -97,6 +126,13 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
                     onClick={() => void (running ? stopTunnel(rule.id) : startTunnel(rule.id))}
                   >
                     {running ? t('tunnel.stop') : t('tunnel.start')}
+                  </Button>
+                  <Button
+                    type="button"
+                    className="!px-2 !py-1 !text-xs"
+                    onClick={() => openEdit(rule)}
+                  >
+                    {t('tunnel.edit')}
                   </Button>
                   <Button
                     type="button"
@@ -111,7 +147,7 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
             })}
           </div>
           <div className="flex justify-end">
-            <Button variant="primary" onClick={() => setMode('add')}>
+            <Button variant="primary" onClick={openAdd}>
               {t('tunnel.new')}
             </Button>
           </div>
@@ -136,6 +172,9 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
             void submit()
           }}
         >
+          <div className="text-content mb-2 text-xs font-semibold">
+            {editingId ? t('tunnel.editTitle') : t('tunnel.new')}
+          </div>
           <Field label={t('tunnel.viaHost')}>
             <Select value={hostId} onChange={(e) => setHostId(e.target.value)} autoFocus>
               <option value="">{t('tunnel.chooseHost')}</option>
@@ -174,7 +213,13 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
           )}
           {error && <p className="mb-3 text-xs text-danger">{error}</p>}
           <div className="flex justify-end gap-2">
-            <Button type="button" onClick={() => setMode('list')}>
+            <Button
+              type="button"
+              onClick={() => {
+                setMode('list')
+                setEditingId(null)
+              }}
+            >
               {t('tunnel.back')}
             </Button>
             <Button type="submit" variant="primary">

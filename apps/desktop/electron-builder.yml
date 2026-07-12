@@ -6,6 +6,11 @@ directories:
   buildResources: build
 files:
   - out/**
+extraResources:
+  # Nhúng icon vào resources để main set window icon lúc chạy (nút taskbar của cửa sổ đang chạy
+  # dùng window icon; nếu không set, Windows lấy icon theo AUMID — có thể bị cache sai).
+  - from: build/icon.ico
+    to: icon.ico
 asarUnpack:
   - "**/node_modules/node-pty/**"
   - "**/node_modules/@serialport/**"

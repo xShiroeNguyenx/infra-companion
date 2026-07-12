@@ -323,85 +323,102 @@ function HostRow({
           {host.hostname}
         </div>
       </div>
-      <button
-        className={`shrink-0 rounded p-1 hover:bg-edge-strong hover:text-warning ${
-          favorite ? 'text-warning opacity-100' : 'text-subtle opacity-0 group-hover:opacity-100'
-        }`}
-        title={favorite ? t('sidebar.unfavorite') : t('sidebar.favorite')}
-        onClick={(e) => {
-          e.stopPropagation()
-          toggleFav(host.id)
-        }}
-      >
-        <StarIcon filled={favorite} />
-      </button>
-      {host.notes && (
+      {/* Host được ghim: sao vàng hiện thường trực (chỉ báo), không chiếm chỗ nhóm hover */}
+      {favorite && (
         <button
-          className="text-muted hover:bg-edge-strong hover:text-content shrink-0 rounded p-1"
-          title={t('sidebar.viewNotes')}
+          className="text-warning hover:bg-edge-strong shrink-0 rounded p-1"
+          title={t('sidebar.unfavorite')}
           onClick={(e) => {
             e.stopPropagation()
-            onNotes(host)
+            toggleFav(host.id)
           }}
         >
-          <NoteIcon />
+          <StarIcon filled />
         </button>
       )}
-      {isRemoteDesktop ? (
+      {/* Nhóm nút hành động: ẩn HẲN khi không hover (hidden) → tên host có đủ chỗ hiện full;
+          chỉ hiện (flex) khi hover. Ghi chú cũng nằm trong đây → chỉ lộ khi hover. */}
+      <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+        {!favorite && (
+          <button
+            className="text-subtle hover:bg-edge-strong hover:text-warning rounded p-1"
+            title={t('sidebar.favorite')}
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleFav(host.id)
+            }}
+          >
+            <StarIcon filled={false} />
+          </button>
+        )}
+        {host.notes && (
+          <button
+            className="text-muted hover:bg-edge-strong hover:text-content rounded p-1"
+            title={t('sidebar.viewNotes')}
+            onClick={(e) => {
+              e.stopPropagation()
+              onNotes(host)
+            }}
+          >
+            <NoteIcon />
+          </button>
+        )}
+        {isRemoteDesktop ? (
+          <button
+            className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 text-xs"
+            title={host.protocol === 'vnc' ? t('sidebar.openVnc') : t('sidebar.openRdp')}
+            onClick={(e) => {
+              e.stopPropagation()
+              openHost()
+            }}
+          >
+            🖥️
+          </button>
+        ) : (
+          <>
+            <button
+              className="text-subtle hover:bg-edge-strong hover:text-warning rounded p-1"
+              title={t('sidebar.splitHost')}
+              onClick={(e) => {
+                e.stopPropagation()
+                void splitSsh(host.id)
+              }}
+            >
+              <SplitIcon />
+            </button>
+            <button
+              className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1"
+              title={t('sidebar.openSftp')}
+              onClick={(e) => {
+                e.stopPropagation()
+                void openSftp(host.id)
+              }}
+            >
+              <FolderIcon />
+            </button>
+          </>
+        )}
         <button
-          className="text-subtle hover:bg-edge-strong hover:text-content shrink-0 rounded p-1 text-xs opacity-0 group-hover:opacity-100"
-          title={host.protocol === 'vnc' ? t('sidebar.openVnc') : t('sidebar.openRdp')}
+          className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1"
+          title={t('sidebar.duplicateHost')}
           onClick={(e) => {
             e.stopPropagation()
-            openHost()
+            onEdit(host, true)
           }}
         >
-          🖥️
+          <CopyIcon />
         </button>
-      ) : (
-        <>
-          <button
-            className="text-subtle hover:bg-edge-strong hover:text-warning rounded p-1 opacity-0 group-hover:opacity-100"
-            title={t('sidebar.splitHost')}
-            onClick={(e) => {
-              e.stopPropagation()
-              void splitSsh(host.id)
-            }}
-          >
-            <SplitIcon />
-          </button>
-          <button
-            className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
-            title={t('sidebar.openSftp')}
-            onClick={(e) => {
-              e.stopPropagation()
-              void openSftp(host.id)
-            }}
-          >
-            <FolderIcon />
-          </button>
-        </>
-      )}
-      <button
-        className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
-        title={t('sidebar.duplicateHost')}
-        onClick={(e) => {
-          e.stopPropagation()
-          onEdit(host, true)
-        }}
-      >
-        <CopyIcon />
-      </button>
-      <button
-        className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1 opacity-0 group-hover:opacity-100"
-        title={t('sidebar.editHost')}
-        onClick={(e) => {
-          e.stopPropagation()
-          onEdit(host)
-        }}
-      >
-        <PencilIcon />
-      </button>
+        <button
+          className="text-subtle hover:bg-edge-strong hover:text-content rounded p-1"
+          title={t('sidebar.editHost')}
+          onClick={(e) => {
+            e.stopPropagation()
+            onEdit(host)
+          }}
+        >
+          <PencilIcon />
+        </button>
+      </div>
     </div>
   )
 }

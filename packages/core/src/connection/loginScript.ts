@@ -209,3 +209,20 @@ export function deriveExecFromLoginSteps(steps: LoginStepLike[], command: string
     feedOneShot
   )
 }
+
+/**
+ * Như deriveExecFromLoginSteps nhưng dùng feedKeepStdin (`{ echo PASS; cat; } | …`) — GIỮ luồng
+ * stdin chảy tiếp sau khi nạp password su/sudo. BẮT BUỘC cho tunnel/luồng 2 CHIỀU (vd `nc` bắc
+ * cầu DB): feedOneShot (`echo PASS |`) cắt stdin sau mật khẩu → byte client gửi lên không tới
+ * được lệnh trong cùng. (Giống hệt cách deriveSftpExecFromLoginSteps giữ stdin cho SFTP.)
+ */
+export function deriveStreamExecFromLoginSteps(steps: LoginStepLike[], command: string): string | null {
+  return deriveNestedCommand(
+    steps,
+    (target, password) => {
+      if (password) return `${sshpassPrefix(password)}ssh ${EXEC_SSH_OPTS_PASSWORD} ${target} ${shq(command)}`
+      return `ssh ${EXEC_SSH_OPTS} ${target} ${shq(command)}`
+    },
+    feedKeepStdin
+  )
+}

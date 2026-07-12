@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, nativeImage, shell } from 'electron'
 import { join } from 'node:path'
 import { registerUpdaterIpc } from './ipc/updater'
 import { registerAiIpc } from './ipc/ai'
@@ -19,6 +19,18 @@ import { registerMarketplaceIpc } from './ipc/marketplace'
 import { getVault, registerVaultIpc } from './ipc/vault'
 
 const isDev = !app.isPackaged
+
+/** Đường dẫn icon cho WINDOW (nút taskbar + title bar). Dev: từ build/. Prod (win): từ
+ *  extraResources (resources/icon.ico). Trả null khi để hệ điều hành tự lấy icon từ app bundle
+ *  (mac/linux prod). Windows luôn set để nút taskbar của cửa sổ đang chạy KHÔNG dùng icon theo
+ *  AUMID (dễ bị Windows cache sai từ các lần chạy trước). */
+function windowIconPath(): string | null {
+  if (process.platform === 'win32') {
+    return isDev ? join(__dirname, '../../build/icon.ico') : join(process.resourcesPath, 'icon.ico')
+  }
+  if (isDev) return join(__dirname, '../../build/icon.png')
+  return null
+}
 
 // Lưới an toàn: lỗi nền từ thư viện (ssh2, net…) không được phép làm app văng dialog đỏ.
 // Lỗi kết nối thật đã được bắt và hiển thị trong từng tab; đây chỉ để chống crash sót.
@@ -43,6 +55,7 @@ app.on('second-instance', () => {
 })
 
 function createWindow(): BrowserWindow {
+  const iconPath = windowIconPath()
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -51,9 +64,7 @@ function createWindow(): BrowserWindow {
     title: 'Infra Companion',
     backgroundColor: '#0b0e14',
     autoHideMenuBar: true,
-    // Dev (pnpm dev) chạy bằng electron.exe → taskbar/title bar mang icon Electron mặc định;
-    // trỏ icon thật cho dev (out/main → ../../build). Bản đóng gói lấy icon nhúng trong exe.
-    ...(isDev ? { icon: join(__dirname, '../../build/icon.png') } : {}),
+    ...(iconPath ? { icon: iconPath } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -61,6 +72,14 @@ function createWindow(): BrowserWindow {
       sandbox: false
     }
   })
+
+  // Ép window icon tường minh (Windows, cả dev lẫn prod): nút taskbar của cửa sổ ĐANG CHẠY sẽ dùng
+  // icon này; nếu không set, Windows lấy icon theo AUMID → dễ hiện icon cũ bị cache (vd atom của
+  // electron.exe từ các lần dev). .ico đa độ phân giải; constructor option đôi khi bị taskbar bỏ qua.
+  if (iconPath && process.platform === 'win32') {
+    const img = nativeImage.createFromPath(iconPath)
+    if (!img.isEmpty()) win.setIcon(img)
+  }
 
   // Link bên ngoài luôn mở bằng browser mặc định, không mở cửa sổ Electron mới
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -84,7 +103,9 @@ function createWindow(): BrowserWindow {
   return win
 }
 
-// Windows toast (alert monitoring F04) chỉ hiện khi AppUserModelID khớp appId đã cài (electron-builder.yml)
+// AUMID custom: (1) bản đóng gói cần khớp appId đã cài để Windows toast (alert F04) hoạt động;
+// (2) trong DEV, AUMID custom TÁCH taskbar button khỏi nhóm electron.exe → Windows dùng window
+// icon (.ico đã setIcon) thay vì icon atom của electron.exe. Nên đặt cho CẢ dev lẫn packaged.
 if (process.platform === 'win32') app.setAppUserModelId('com.nguyenkhanh.infracompanion')
 
 registerPromptIpc()

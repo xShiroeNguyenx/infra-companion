@@ -35,7 +35,13 @@ export function registerTunnelsIpc(): () => void {
     const rule = getVault().getTunnel(id)
     if (!rule) throw new Error('Tunnel không tồn tại')
     const prepared = await prepareConnection(event.sender, rule.hostId)
-    await service.start(rule, { chain: prepared.chain, verifyHostKey: makeHostKeyVerifier(event.sender) })
+    // Via host vào bằng login-script → truyền loginSteps để tunnel L đi qua exec (nc trên máy trong),
+    // vì máy chỉ vào được bằng `ssh` trong shell (không nhận jump host -J).
+    await service.start(rule, {
+      chain: prepared.chain,
+      verifyHostKey: makeHostKeyVerifier(event.sender),
+      loginSteps: prepared.loginSteps
+    })
   })
 
   ipcMain.handle(IPC.TUNNELS_STOP, (_event, id: string) => {

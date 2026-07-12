@@ -237,6 +237,10 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 **Test SOCKS5**: + Tunnel → host `gate-01`, type **Dynamic**, bind `1080` → **Start** (green dot) → set SOCKS5 `127.0.0.1:1080` in your browser → traffic goes through the gate.
 **Test Local**: type L, bind `13306`, dest `127.0.0.1:3306` → connect MySQL to `127.0.0.1:13306`.
 
+**Local tunnel through a login-script chain (reach a DB behind nested SSH)**: if the **via host** is one you reach by a **login script** (e.g. `gate → jpapst04 → jpap05`, where each hop is `ssh` typed inside the shell and won't accept a jump host), a **Local** tunnel forwards by running `nc <dest> <port>` on the innermost machine over the login-script chain (like Bulk/Monitor) — so you can reach a database only pingable from the deepest hop straight from your laptop.
+- **Via host** = that login-script host · **Type** = L · **Bind** = e.g. `13306` · **Destination** = `<db-host-as-seen-from-the-innermost-hop>:3306` → **Start** → point your DB client at `127.0.0.1:13306`.
+- Requires **`nc`** on the innermost machine. If the `ssh` hops authenticate by **password**, the intermediate machines need **`sshpass`** (keys need nothing) — same requirement as Bulk/Monitor over login scripts.
+
 ---
 
 ## 9B. Remote Desktop — VNC & RDP (new)
@@ -522,7 +526,7 @@ New connection protocols (pluggable SessionKind) · permission enforcement + con
 
 ## 18. Known limitations of the current release
 
-- **Bulk/Monitor/SFTP over a login script** rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` on the gate) and `su`/`sudo` steps are supported; setups that force a TTY password prompt may still fail.
+- **Bulk / Monitor / SFTP / Local-forward tunnels over a login script** rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` on the gate) and `su`/`sudo` steps are supported; setups that force a TTY password prompt may still fail. Login-script tunnels additionally need `nc` on the innermost hop.
 - **Sync** currently has only the **folder** backend (Google Drive/Dropbox/Syncthing/network share); WebDAV, S3, Git are planned.
 - **Secrets manager** supports 1Password, Bitwarden, HashiCorp Vault via CLI; KeePassXC is planned.
 - **Plugin system** is at **v1** (commands + observe/write output + panel + storage + Marketplace tab with ed25519-signed entries); no new protocols, permission enforcement, or output transform yet — see §16D.
