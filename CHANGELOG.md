@@ -5,6 +5,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.20] — 2026-07-13
+
+### Changed
+
+- **Typing latency over SSH (especially multi-hop chains) is dramatically lower** — two fixes that together close most of the gap with native clients like Termius:
+  - **TCP_NODELAY on the SSH socket** — the `ssh2` library never disables Nagle's algorithm, so each keystroke (a tiny packet) could sit in the OS buffer waiting for the previous packet's ACK before being sent; over a high-RTT gate this made typing feel rubber-bandy. Every connection now sets `TCP_NODELAY` on the first-hop socket, exactly like OpenSSH does for interactive sessions — this benefits terminals, SFTP, tunnels, Bulk, and Monitoring alike since they share the same chain builder.
+  - **GPU-accelerated terminal rendering (WebGL)** — the terminal now renders on the GPU instead of the DOM renderer, making echo-to-glass and scrolling visibly smoother. The old reason for avoiding WebGL (stale "black frame" background when switching light/dark themes) is handled properly by clearing the glyph texture atlas on theme change; if the GPU context is lost (old drivers) the terminal falls back to the regular renderer automatically, and a new **Settings → Terminal → GPU acceleration** toggle lets you turn it off entirely.
+
+---
+
 ## [0.1.19] — 2026-07-13
 
 ### Fixed

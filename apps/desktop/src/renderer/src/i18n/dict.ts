@@ -606,6 +606,8 @@ export const vi = {
   'settings.termCursorBlock': 'Khối',
   'settings.termCursorBar': 'Gạch đứng',
   'settings.termCursorUnderline': 'Gạch dưới',
+  'settings.termWebgl': 'Tăng tốc GPU (WebGL)',
+  'settings.termWebglHint': 'Gõ phím & cuộn mượt hơn hẳn. Chỉ tắt nếu gặp lỗi hiển thị (driver GPU cũ) — tắt là quay về render thường.',
   'settings.termFont': 'Font chữ',
   'settings.termFontReset': 'Khôi phục mặc định',
   'settings.termFontHint': 'Tên font (CSS font-family). Dùng font đã cài trên máy; không có sẽ tự thay bằng font khác.'
@@ -1190,6 +1192,8 @@ export const en: Partial<Record<I18nKey, string>> = {
   'settings.termCursorBlock': 'Block',
   'settings.termCursorBar': 'Bar',
   'settings.termCursorUnderline': 'Underline',
+  'settings.termWebgl': 'GPU acceleration (WebGL)',
+  'settings.termWebglHint': 'Noticeably smoother typing & scrolling. Turn off only if you see rendering glitches (old GPU drivers) — falls back to the regular renderer.',
   'settings.termFont': 'Font family',
   'settings.termFontReset': 'Reset to default',
   'settings.termFontHint': 'Font family (CSS). Uses a font installed on your machine; falls back if unavailable.'
@@ -1772,6 +1776,8 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'settings.termCursorBlock': 'ブロック',
   'settings.termCursorBar': 'バー',
   'settings.termCursorUnderline': 'アンダーライン',
+  'settings.termWebgl': 'GPU アクセラレーション (WebGL)',
+  'settings.termWebglHint': '入力・スクロールが大幅に滑らかになります。表示の乱れ（古い GPU ドライバー）がある場合のみオフに — 通常レンダラーに戻ります。',
   'settings.termFont': 'フォント',
   'settings.termFontReset': 'デフォルトに戻す',
   'settings.termFontHint': 'フォント名（CSS font-family）。インストール済みのフォントを使用し、なければ代替表示します。'

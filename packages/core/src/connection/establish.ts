@@ -88,6 +88,11 @@ function connectOne(
     })
     client.once('ready', () => {
       settled = true
+      // TCP_NODELAY như OpenSSH/Termius: ssh2 KHÔNG tự tắt Nagle — để nguyên thì mỗi phím gõ
+      // (gói tin nhỏ) bị gom lại chờ ACK, gõ qua chain RTT cao cảm giác giật/dội cục.
+      // Hop 2+ (sock = channel forwardOut) không có setNoDelay — ssh2 tự bỏ qua an toàn;
+      // Nagle chỉ tồn tại trên socket TCP thật của hop đầu. (TelnetSession đã làm từ trước.)
+      client.setNoDelay(true)
       resolve()
     })
     const useAgent = endpoint.useAgent || agentForward

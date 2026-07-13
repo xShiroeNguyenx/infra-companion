@@ -67,6 +67,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     termFontSize,
     termLineHeight,
     termCursor,
+    termWebgl,
     startupPage,
     setTheme,
     setLanguage,
@@ -80,6 +81,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     setTermFontSize,
     setTermLineHeight,
     setTermCursor,
+    setTermWebgl,
     setStartupPage
   } = useSettingsStore()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -402,6 +404,25 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               </button>
             ))}
           </div>
+        </Field>
+
+        <Field label={t('settings.termWebgl')}>
+          <div className="grid grid-cols-2 gap-2">
+            {([true, false] as const).map((on) => (
+              <button
+                key={String(on)}
+                onClick={() => setTermWebgl(on)}
+                className={`rounded border px-2 py-2 text-sm ${
+                  termWebgl === on
+                    ? 'border-accent text-content bg-accent-soft/40'
+                    : 'border-edge text-muted hover:bg-hover'
+                }`}
+              >
+                {on ? t('plugins.enable') : t('plugins.disable')}
+              </button>
+            ))}
+          </div>
+          <p className="text-subtle mt-1 text-[11px]">{t('settings.termWebglHint')}</p>
         </Field>
 
         <Field label={t('settings.termFont')}>

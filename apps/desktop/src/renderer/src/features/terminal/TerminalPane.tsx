@@ -5,6 +5,7 @@ import { SearchAddon } from '@xterm/addon-search'
 import { SerializeAddon } from '@xterm/addon-serialize'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { WebLinksAddon } from '@xterm/addon-web-links'
+import { WebglAddon } from '@xterm/addon-webgl'
 import { saveTermSnapshot, subscribeTermData, takeTermSnapshot } from '../../lib/termBus'
 import { useTabsStore, type Pane } from '../../stores/tabs'
 import { useAiExplainStore } from '../../stores/aiExplain'
@@ -41,6 +42,7 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
   const searchRef = useRef<SearchAddon | null>(null)
+  const webglRef = useRef<WebglAddon | null>(null)
   const [findOpen, setFindOpen] = useState(false)
   const [findText, setFindText] = useState('')
   const [hasSelection, setHasSelection] = useState(false)
@@ -55,6 +57,7 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
   const fontSize = useSettingsStore((s) => s.termFontSize)
   const lineHeight = useSettingsStore((s) => s.termLineHeight)
   const cursorStyle = useSettingsStore((s) => s.termCursor)
+  const webglOn = useSettingsStore((s) => s.termWebgl)
   const t = useT()
 
   useEffect(() => {
@@ -122,8 +125,9 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     })
 
     term.open(host)
-    // Dùng DOM renderer mặc định (không WebGL): đổi theme light/dark repaint nền tin cậy,
-    // không bị "khung đen" do WebGL cache nền. Đủ mượt cho phiên SSH.
+    // Renderer: WebglAddon nạp/gỡ ở effect riêng theo setting termWebgl (GPU mượt hơn hẳn
+    // DOM renderer khi gõ/cuộn). Vụ "khung đen" WebGL cache nền khi đổi theme ngày trước
+    // được xử lý bằng clearTextureAtlas() trong effect đổi theme. Gỡ addon = tự về DOM renderer.
 
     fit.fit()
     window.infra.terminal.resize(pane.sessionId, term.cols, term.rows)
@@ -243,10 +247,11 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
       // pane đã đóng thì clearTermSession dọn rồi — chụp lại sẽ rò bộ nhớ
       const liveSessionId = currentSessionIdOf(pane.id)
       if (liveSessionId) saveTermSnapshot(liveSessionId, serialize.serialize())
-      term.dispose()
+      term.dispose() // dispose cả WebglAddon đã nạp
       termRef.current = null
       fitRef.current = null
       searchRef.current = null
+      webglRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pane.sessionId])
@@ -272,11 +277,40 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     return () => cancelAnimationFrame(frame)
   }, [tabVisible, paneActive])
 
-  // Đổi theme khi user chuyển light/dark hoặc bật/tắt ảnh nền — DOM renderer repaint nền ngay
+  // GPU render (WebGL): nạp/gỡ addon theo setting — áp LIVE cho terminal đang mở
+  // (gỡ addon là xterm tự quay về DOM renderer). Deps có pane.sessionId để terminal
+  // TẠO LẠI (reconnect) cũng được nạp lại addon (effect chính chạy trước theo thứ tự khai báo).
+  useEffect(() => {
+    const term = termRef.current
+    if (!term) return
+    if (webglOn && !webglRef.current) {
+      try {
+        const addon = new WebglAddon()
+        term.loadAddon(addon)
+        // GPU context bị thu hồi (driver reset, quá nhiều context WebGL…) → gỡ addon,
+        // terminal tự quay về DOM renderer thay vì đơ khung trắng
+        addon.onContextLoss(() => {
+          addon.dispose()
+          if (webglRef.current === addon) webglRef.current = null
+        })
+        webglRef.current = addon
+      } catch {
+        webglRef.current = null // máy không có WebGL → giữ DOM renderer như cũ
+      }
+    } else if (!webglOn && webglRef.current) {
+      webglRef.current.dispose()
+      webglRef.current = null
+    }
+  }, [webglOn, pane.sessionId])
+
+  // Đổi theme khi user chuyển light/dark hoặc bật/tắt ảnh nền
   useEffect(() => {
     const term = termRef.current
     if (!term) return
     term.options.theme = terminalTheme(themeMode, hasBackground)
+    // WebGL cache glyph theo màu cũ — không xoá atlas thì đổi theme dính "khung đen"/màu cũ
+    // (chính là lý do ngày trước phải bỏ WebGL; giờ xử lý đúng cách ở đây)
+    webglRef.current?.clearTextureAtlas()
   }, [themeMode, hasBackground])
 
   // Áp font/cỡ chữ/giãn dòng/con trỏ ngay khi đổi trong Settings; fit lại để PTY nhận cols/rows mới

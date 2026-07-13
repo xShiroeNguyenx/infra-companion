@@ -23,6 +23,7 @@ const TERM_FONT_KEY = 'infra.term.font'
 const TERM_SIZE_KEY = 'infra.term.size'
 const TERM_LH_KEY = 'infra.term.lineHeight'
 const TERM_CURSOR_KEY = 'infra.term.cursor'
+const TERM_WEBGL_KEY = 'infra.term.webgl'
 const CUSTOM_COLORS_KEY = 'infra.theme.custom'
 const STARTUP_KEY = 'infra.startup.page'
 
@@ -111,6 +112,11 @@ function readTermLineHeight(): number {
 function readTermCursor(): TermCursor {
   const v = localStorage.getItem(TERM_CURSOR_KEY)
   return v === 'bar' || v === 'underline' ? v : 'block'
+}
+
+/** GPU render (WebGL) cho terminal — mặc định BẬT; '0' = user đã tắt (máy có vấn đề GPU). */
+function readTermWebgl(): boolean {
+  return localStorage.getItem(TERM_WEBGL_KEY) !== '0'
 }
 
 function readStartupPage(): StartupPage {
@@ -213,6 +219,8 @@ interface SettingsState {
   termLineHeight: number
   /** Kiểu con trỏ terminal. */
   termCursor: TermCursor
+  /** Render terminal bằng GPU (WebGL addon) — gõ/cuộn mượt hơn hẳn DOM renderer. */
+  termWebgl: boolean
   /** Trang mở khi khởi động: dashboard (mặc định) hay terminal local như trước. */
   startupPage: StartupPage
   setTheme: (t: ThemeMode) => void
@@ -228,6 +236,7 @@ interface SettingsState {
   setTermFontSize: (n: number) => void
   setTermLineHeight: (n: number) => void
   setTermCursor: (c: TermCursor) => void
+  setTermWebgl: (on: boolean) => void
   setStartupPage: (p: StartupPage) => void
   /** Override màu UI theo base theme hiện tại. */
   customColors: CustomColors
@@ -255,6 +264,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   termFontSize: readTermSize(),
   termLineHeight: readTermLineHeight(),
   termCursor: readTermCursor(),
+  termWebgl: readTermWebgl(),
   startupPage: readStartupPage(),
   setTheme: (theme) => {
     localStorage.setItem(THEME_KEY, theme)
@@ -321,6 +331,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setTermCursor: (cursor) => {
     localStorage.setItem(TERM_CURSOR_KEY, cursor)
     set({ termCursor: cursor })
+  },
+  setTermWebgl: (on) => {
+    localStorage.setItem(TERM_WEBGL_KEY, on ? '1' : '0')
+    set({ termWebgl: on })
   },
   setStartupPage: (page) => {
     localStorage.setItem(STARTUP_KEY, page)
