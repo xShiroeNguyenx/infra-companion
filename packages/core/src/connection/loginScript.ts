@@ -168,6 +168,21 @@ function deriveNestedCommand(
 }
 
 /**
+ * Chạy thẳng binary sftp-server, dò các vị trí phổ biến giữa các distro
+ * (RHEL/Alma → Debian/Ubuntu → SUSE/Alpine → BSD). Dùng khi login script còn su/sudo
+ * SAU hop ssh cuối (hoặc không có hop ssh nào): subsystem `-s sftp` luôn chạy dưới
+ * user ssh — không xuyên qua su/sudo được, nên sửa file của user đã su sẽ bị
+ * Permission denied. Chủ đích KHÔNG dùng biến/`$()`: chuỗi bị shq bọc qua nhiều hop,
+ * tránh mọi ký tự `$` cho chắc (bài học METRIC_CMD).
+ */
+const SFTP_SERVER_PROBE =
+  'if [ -x /usr/libexec/openssh/sftp-server ]; then exec /usr/libexec/openssh/sftp-server; ' +
+  'elif [ -x /usr/lib/openssh/sftp-server ]; then exec /usr/lib/openssh/sftp-server; ' +
+  'elif [ -x /usr/lib/ssh/sftp-server ]; then exec /usr/lib/ssh/sftp-server; ' +
+  'elif [ -x /usr/libexec/sftp-server ]; then exec /usr/libexec/sftp-server; ' +
+  'else echo sftp-server-not-found 1>&2; exit 127; fi'
+
+/**
  * Xây dựng lệnh exec đầy đủ từ login script để truyền vào openSftpOverExec.
  *
  * Xử lý các tình huống theo đúng thứ tự lồng nhau. Ví dụ:
@@ -179,17 +194,56 @@ function deriveNestedCommand(
  *   ssh dùng sshpass (pty riêng) để trả password, stdin/stdout giữ sạch cho dữ liệu.
  *   Yêu cầu: máy chạy ssh-có-password (vd web-02) phải cài sẵn sshpass.
  *
- * Trả về null nếu không có hop ssh nào (mở SFTP trực tiếp trên endpoint cuối chain).
+ * su/sudo đứng SAU hop ssh cuối (vd [ssh web-02, su admin]) — hoặc login script CHỈ có
+ * su/sudo — thì không dùng subsystem được (nó chạy dưới user ssh, mất quyền của user su
+ * → sửa file bị Permission denied): thay bằng chạy thẳng binary sftp-server dưới user
+ * đích qua su/sudo (SFTP_SERVER_PROBE). Ví dụ:
+ *   [ssh web-02, su admin+pass] → ssh OPTS web-02 '{ echo PASS; cat; } | su admin -c PROBE'
+ *   [sudo -i]                   → sudo bash -c PROBE   (exec ngay trên endpoint cuối chain)
+ *
+ * Trả về null nếu không có hop ssh lẫn su/sudo (mở SFTP subsystem trực tiếp trên
+ * endpoint cuối chain).
  */
 export function deriveSftpExecFromLoginSteps(steps: LoginStepLike[]): string | null {
-  return deriveNestedCommand(
-    steps,
-    (target, password) => {
-      if (password) return `${sshpassPrefix(password)}ssh ${EXEC_SSH_OPTS_PASSWORD} ${target} -s sftp`
-      return `ssh ${EXEC_SSH_OPTS} ${target} -s sftp`
-    },
-    feedKeepStdin
-  )
+  if (steps.length === 0) return null
+  const actions = parseLoginActions(steps)
+  if (actions.length === 0) return null
+
+  let lastSshIdx = -1
+  for (let i = actions.length - 1; i >= 0; i--) {
+    if (actions[i].kind === 'ssh') { lastSshIdx = i; break }
+  }
+  // Sau hop ssh cuối chỉ có thể là su/sudo (ssh cuối đã là lastSshIdx)
+  const trailing = actions.slice(lastSshIdx + 1)
+
+  let cmd: string
+  if (trailing.length === 0) {
+    if (lastSshIdx === -1) return null
+    const lastSsh = actions[lastSshIdx] as { kind: 'ssh'; target: string; password: string | null }
+    cmd = lastSsh.password
+      ? `${sshpassPrefix(lastSsh.password)}ssh ${EXEC_SSH_OPTS_PASSWORD} ${lastSsh.target} -s sftp`
+      : `ssh ${EXEC_SSH_OPTS} ${lastSsh.target} -s sftp`
+  } else {
+    cmd = SFTP_SERVER_PROBE
+    for (let i = trailing.length - 1; i >= 0; i--) {
+      const action = trailing[i]
+      if (action.kind === 'su') cmd = wrapSu(action.user, action.password, cmd, feedKeepStdin)
+      else if (action.kind === 'sudo') cmd = wrapSudo(action.user, action.password, cmd, feedKeepStdin)
+    }
+    if (lastSshIdx >= 0) {
+      const lastSsh = actions[lastSshIdx] as { kind: 'ssh'; target: string; password: string | null }
+      cmd = buildSshHopCmd(lastSsh.target, lastSsh.password, cmd)
+    }
+  }
+
+  // Bọc tiếp bằng các action đứng TRƯỚC hop ssh cuối (như deriveNestedCommand)
+  for (let i = lastSshIdx - 1; i >= 0; i--) {
+    const action = actions[i]
+    if (action.kind === 'su') cmd = wrapSu(action.user, action.password, cmd, feedKeepStdin)
+    else if (action.kind === 'sudo') cmd = wrapSudo(action.user, action.password, cmd, feedKeepStdin)
+    else cmd = buildSshHopCmd(action.target, action.password, cmd)
+  }
+  return cmd
 }
 
 /**

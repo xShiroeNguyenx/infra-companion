@@ -99,7 +99,11 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
       }
       if (event.ctrlKey && event.shiftKey && event.code === 'KeyV') {
         void navigator.clipboard.readText().then((text) => {
-          if (text) handleInput(text)
+          // paste() của xterm (không phải handleInput thô): chuẩn hoá \r\n & \n → \r — clipboard
+          // Windows mang \r\n, gửi thô thì vim/nano tính CR và LF là 2 lần xuống dòng → chèn thêm
+          // dòng trống giữa các dòng; kèm bracketed-paste nếu app trên remote có bật.
+          // Broadcast vẫn ăn: paste() đi qua onData → handleInput như gõ phím.
+          if (text) term.paste(text)
         })
         return false
       }
@@ -211,7 +215,8 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     const onContextMenu = (ev: MouseEvent): void => {
       ev.preventDefault()
       void navigator.clipboard.readText().then((text) => {
-        if (text) handleInput(text)
+        // term.paste thay vì handleInput thô — như Ctrl+Shift+V (chuẩn hoá \r\n, bracketed paste)
+        if (text) term.paste(text)
       })
     }
 

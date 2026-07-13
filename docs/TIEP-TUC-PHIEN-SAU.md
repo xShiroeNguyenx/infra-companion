@@ -1,6 +1,6 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
-> **Cập nhật 2026-07-13 — v0.1.17 ĐÃ PHÁT HÀNH (commit `f68c476` + tag `v0.1.17` đã push origin). v0.1.18 SẴN SÀNG RELEASE (chưa commit/tag).** Nội dung v0.1.18 — 3 sửa UX panel ✨ AI giải thích (từ screenshot user): (1) **hết cắt mất phần cuối khi nội dung dài** — maxHeight giờ tính theo TOP THỰC TẾ của panel (neo 56/96px hoặc `pos.y` đã kéo) + 12px lề, thay cho `max-h-[calc(100%-3rem)]` cố định cũ (panel neo top-24 hoặc kéo xuống thấp là đáy tràn khỏi khung → mất đuôi câu trả lời, scroll không tới). (2) **nới chiều rộng** — max-w 85vw→`calc(100%-1.5rem)`; nút **⛶ phóng to gần full khung** trên header (toggle **❐** thu về; khi expanded bỏ class `resize`, bỏ qua pos, style inline width/height — React clear khi un-expand nên grip-size cũ mất, chấp nhận); dấu **◢** gợi ý grip góc dưới-phải (grip Chromium vô hình trên nền tối); `panel.dragHint` nói rõ chỉnh được cả rộng lẫn cao. (3) **copy** — component `CodeBlock` MỚI trong [miniMarkdown.tsx](../apps/desktop/src/renderer/src/lib/miniMarkdown.tsx): nút 📋 hover trên MỌI code block ``` (đổi "Đã sao chép ✓" 1.5s) — panel plugin dùng chung renderer nên hưởng ké; + nút 📋 copy TOÀN BỘ giải thích trên header AiExplainPanel (chỉ hiện khi status done, copy markdown gốc `request.answer`). i18n mới ×3 thứ tiếng: `panel.maximize`/`panel.restoreSize`/`md.copy`/`md.copied`/`ai.copyAll`. Files: AiExplainPanel.tsx + miniMarkdown.tsx + dict.ts. **(4) Nút ↻ Kết nối lại khi phiên chết** (yêu cầu tiếp của user cùng ngày): mất kết nối auto-retry 3 lần thất bại (SshSession exit "Mất kết nối — đã thử kết nối lại 3 lần…") hoặc shell thoát → overlay exited giờ có nút **↻ Kết nối lại** (accent) cạnh Đóng. Cơ chế: action MỚI `reconnectPane(tabId, paneId)` trong [stores/tabs.ts](../apps/desktop/src/renderer/src/stores/tabs.ts) — tạo phiên MỚI từ `pane.origin` (reqOf sẵn có; quick target sẽ hỏi lại password) rồi **thay sessionId tại chỗ trên pane** (giữ layout/split/broadcast; kill+clearTermSession id cũ; status 'connecting' ngay khi bấm để chặn double-click; lỗi tạo phiên → toast + trả lại overlay exited cũ). **Scrollback cũ nối tiếp sang phiên mới**: TerminalPane cleanup đổi từ `paneStillOpen(sessionId)` → `currentSessionIdOf(paneId)` — sessionId đổi thì snapshot serialize được lưu theo id MỚI, lần mount kế `takeTermSnapshot` ghi lại buffer cũ trước khi subscribe data mới (gộp/tách tab giữ nguyên hành vi vì sessionId không đổi; pane đóng hẳn vẫn không chụp — không rò bộ nhớ). i18n `terminal.reconnect` ×3. Files thêm: TerminalPane.tsx + tabs.ts. Bump 0.1.17→**0.1.18** (2 package.json) + CHANGELOG [0.1.18] + README (badge + Known Limitations) + landing hero. Typecheck + build xanh; **CHƯA test GUI** (checklist v0.1.18 dưới). Lệnh git v0.1.18 ở block Git cuối file.
+> **Cập nhật 2026-07-13 — v0.1.18 ĐÃ PHÁT HÀNH (commit `147b3e2` + tag `v0.1.18` đã push origin — gồm mục (1)–(4) dưới; v0.1.17 = commit `f68c476` cũng đã phát hành). v0.1.19 SẴN SÀNG RELEASE (chưa commit/tag — gồm mục (5)–(6): 2 bug fix user báo, đã bump version + tách CHANGELOG).** Nội dung — 3 sửa UX panel ✨ AI giải thích (từ screenshot user): (1) **hết cắt mất phần cuối khi nội dung dài** — maxHeight giờ tính theo TOP THỰC TẾ của panel (neo 56/96px hoặc `pos.y` đã kéo) + 12px lề, thay cho `max-h-[calc(100%-3rem)]` cố định cũ (panel neo top-24 hoặc kéo xuống thấp là đáy tràn khỏi khung → mất đuôi câu trả lời, scroll không tới). (2) **nới chiều rộng** — max-w 85vw→`calc(100%-1.5rem)`; nút **⛶ phóng to gần full khung** trên header (toggle **❐** thu về; khi expanded bỏ class `resize`, bỏ qua pos, style inline width/height — React clear khi un-expand nên grip-size cũ mất, chấp nhận); dấu **◢** gợi ý grip góc dưới-phải (grip Chromium vô hình trên nền tối); `panel.dragHint` nói rõ chỉnh được cả rộng lẫn cao. (3) **copy** — component `CodeBlock` MỚI trong [miniMarkdown.tsx](../apps/desktop/src/renderer/src/lib/miniMarkdown.tsx): nút 📋 hover trên MỌI code block ``` (đổi "Đã sao chép ✓" 1.5s) — panel plugin dùng chung renderer nên hưởng ké; + nút 📋 copy TOÀN BỘ giải thích trên header AiExplainPanel (chỉ hiện khi status done, copy markdown gốc `request.answer`). i18n mới ×3 thứ tiếng: `panel.maximize`/`panel.restoreSize`/`md.copy`/`md.copied`/`ai.copyAll`. Files: AiExplainPanel.tsx + miniMarkdown.tsx + dict.ts. **(4) Nút ↻ Kết nối lại khi phiên chết** (yêu cầu tiếp của user cùng ngày): mất kết nối auto-retry 3 lần thất bại (SshSession exit "Mất kết nối — đã thử kết nối lại 3 lần…") hoặc shell thoát → overlay exited giờ có nút **↻ Kết nối lại** (accent) cạnh Đóng. Cơ chế: action MỚI `reconnectPane(tabId, paneId)` trong [stores/tabs.ts](../apps/desktop/src/renderer/src/stores/tabs.ts) — tạo phiên MỚI từ `pane.origin` (reqOf sẵn có; quick target sẽ hỏi lại password) rồi **thay sessionId tại chỗ trên pane** (giữ layout/split/broadcast; kill+clearTermSession id cũ; status 'connecting' ngay khi bấm để chặn double-click; lỗi tạo phiên → toast + trả lại overlay exited cũ). **Scrollback cũ nối tiếp sang phiên mới**: TerminalPane cleanup đổi từ `paneStillOpen(sessionId)` → `currentSessionIdOf(paneId)` — sessionId đổi thì snapshot serialize được lưu theo id MỚI, lần mount kế `takeTermSnapshot` ghi lại buffer cũ trước khi subscribe data mới (gộp/tách tab giữ nguyên hành vi vì sessionId không đổi; pane đóng hẳn vẫn không chụp — không rò bộ nhớ). i18n `terminal.reconnect` ×3. Files thêm: TerminalPane.tsx + tabs.ts. **(5) Fix paste chèn dòng trống** (bug user báo): right-click paste + Ctrl+Shift+V trước gửi text clipboard THÔ qua handleInput — clipboard Windows mang `\r\n`, vim/nano tính CR và LF = 2 lần xuống dòng → mỗi dòng paste bị chèn thêm 1 dòng trống. Giờ cả 2 đường dùng `term.paste(text)` của xterm (chuẩn hoá `\r\n`/`\n`→`\r` + bracketed-paste nếu remote bật; broadcast vẫn ăn vì paste() đi qua onData→handleInput). Đường Ctrl+V native (paste event của xterm) vốn đã đúng. **(6) Fix SFTP login-script kết thúc bằng su/sudo không có quyền ghi file** (bug user báo "SFTP nhiều lớp sửa file không lưu được"): `deriveSftpExecFromLoginSteps` trước đây BỎ QUA IM LẶNG mọi action su/sudo đứng SAU hop ssh cuối (và trả null khi login script chỉ có su/sudo, vd `sudo -i`) → SFTP chạy dưới user ssh thường, lưu file của user su → Permission denied. Subsystem `-s sftp` không xuyên su được → giờ nhánh đó chạy THẲNG binary sftp-server dưới user đích: hằng `SFTP_SERVER_PROBE` (if/elif dò `/usr/libexec/openssh/` → `/usr/lib/openssh/` → `/usr/lib/ssh/` → `/usr/libexec/`, chủ đích KHÔNG dùng `$`/`$()` vì shq bọc nhiều hop) bọc bởi wrapSu/wrapSudo (feedKeepStdin `{ echo PASS; cat; } |` giữ luồng SFTP) rồi buildSshHopCmd nếu còn hop ssh; su/sudo TRƯỚC ssh cuối giữ nguyên subsystem như cũ; không có ssh lẫn su/sudo vẫn trả null (subsystem trực tiếp). ipc/sftp.ts không phải đổi (`?? undefined` sẵn). ⚠️ deriveExec/deriveStreamExec (Bulk/Monitor/tunnel) VẪN bỏ qua trailing su/sudo — chưa đổi chủ đích (đổi ngữ nghĩa lệnh đang chạy của user; làm sau nếu cần). Test loginScript: sửa 1 (case `sudo -i` null → giờ ra lệnh) + thêm 4 (199 test pass). Files thêm: loginScript.ts + loginScript.test.ts. Bump 0.1.18→**0.1.19** (2 package.json) + CHANGELOG tách **[0.1.19]** (2 bug fix (5)–(6)) khỏi [0.1.18] + README (badge + Known Limitations) + landing hero → v0.1.19. Typecheck (core+desktop) + build + 199 test xanh; **CHƯA test GUI 2 fix này** (checklist mục 8–9 dưới). Lệnh git v0.1.19 ở block Git cuối file.
 
 > **Ghi chú v0.1.17 (giữ tham khảo).** Sau khi 0.1.16 ra mắt, phiên debug thêm: (1) **tunnel port-forward QUA login-script gate** — `TunnelService.startLocal` dùng `deriveStreamExecFromLoginSteps` (MỚI, `feedKeepStdin` giữ stdin 2 chiều) + marker `ICTUN…`/class `StripUntilMarker` cắt rác MOTD của các hop; `ipc/tunnels.ts` truyền `loginSteps`; cần `nc` đầu cuối + `sshpass` hop password. User ĐÃ chạy thông chuỗi `local→ssh gate1(sakurai1)→ssh jpapst05→su vn_root→ssh jpap05→nc→DB 192.168.1.71:3306`. (2) **Sửa tunnel** (TunnelsModal nút Sửa→`saveTunnel` id→UPDATE). (3) **Sidebar full tên host khi không hover** (gom nút hành động vào `hidden group-hover:flex`, ghi chú chỉ hiện khi hover). (4) **Message ENOTFOUND rõ hơn** (establish.ts). (5) **Fix icon taskbar Windows**: set window icon RUNTIME cả prod (`extraResources: resources/icon.ico` + `win.setIcon`), AUMID giữ; ⚠️ Windows cache icon theo AUMID → máy đã dev cũ cần xoá icon cache/reboot mới thấy đúng (exe đã nhúng icon đúng — đã verify bằng trích icon). Bump 0.1.16→**0.1.17** (2 package.json) + CHANGELOG [0.1.17] tách khỏi [0.1.16] + README (badge/tunnels/limitations) + USER-GUIDE §9 + landing. typecheck 3 package + build + 195 test xanh. Lệnh git v0.1.17 ở block Git dưới.
 
@@ -148,7 +148,7 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 
 ## Git (anh tự chạy; tôi không tự commit)
 
-> **v0.1.15/16/17 ĐÃ phát hành** (tag đã push origin; v0.1.17 = commit `f68c476`). **Đang chờ: RELEASE v0.1.18** — 3 sửa UX panel ✨ AI giải thích (hết cắt đáy + phóng to/nới rộng + nút copy), ĐÃ bump version + CHANGELOG [0.1.18] + README + landing. ⚠️ Quy trình: **commit + push main TRƯỚC, tag SAU** — tag khi chưa commit sẽ build từ commit cũ với version cũ (đã dính 1 lần ở v0.1.13). Landing hero đổi → Pages tự deploy lại khi push.
+> **v0.1.15/16/17/18 ĐÃ phát hành** (tag đã push origin; v0.1.18 = commit `147b3e2`). **Đang chờ: RELEASE v0.1.19** — 2 bug fix (paste `\r\n` chèn dòng trống + SFTP login-script kết thúc su/sudo không ghi được file), ĐÃ bump version + CHANGELOG [0.1.19] + README + landing. ⚠️ Quy trình: **commit + push main TRƯỚC, tag SAU** — tag khi chưa commit sẽ build từ commit cũ với version cũ (đã dính 1 lần ở v0.1.13). Landing hero đổi → Pages tự deploy lại khi push.
 
 Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps/desktop`) + CHANGELOG + README/USER-GUIDE/landing/handoff, rồi push tag `v*.*.*` — release tự kích hoạt (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux). Lưu ý: đổi `docs/landing/index.html` (version trên hero) sẽ tự deploy lại landing page qua flow Pages riêng khi push lên `main`.
 
@@ -156,37 +156,27 @@ Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps
 
 ```powershell
 # ============================================================
-# v0.1.18 — panel AI giai thich: het cat day + phong to/noi rong + nut copy
-# (v0.1.17 DA phat hanh: commit f68c476 + tag v0.1.17 da push)
+# v0.1.19 — fix paste chen dong trong (\r\n) + SFTP login-script ket thuc su/sudo ghi duoc file
+# (v0.1.18 DA phat hanh: commit 147b3e2 + tag v0.1.18 da push — panel AI + nut Ket noi lai)
 # ============================================================
 cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
 
 # BUOC 1: commit + push main (BAT BUOC truoc khi tag). Kiem `git status` truoc.
-git add apps/desktop/src/renderer/src/components/AiExplainPanel.tsx
-git add apps/desktop/src/renderer/src/lib/miniMarkdown.tsx
 git add apps/desktop/src/renderer/src/features/terminal/TerminalPane.tsx
-git add apps/desktop/src/renderer/src/stores/tabs.ts
-git add apps/desktop/src/renderer/src/i18n/dict.ts
+git add packages/core/src/connection/loginScript.ts packages/core/src/connection/loginScript.test.ts
 git add package.json apps/desktop/package.json
 git add CHANGELOG.md README.md docs/landing/index.html docs/TIEP-TUC-PHIEN-SAU.md
 git status                 # ra soat: het "Changes not staged" sau khi add
 git commit -m @'
-fix: panel AI giai thich (het cat noi dung + phong to + copy) + nut Ket noi lai khi mat ket noi (v0.1.18)
+fix: paste khong chen dong trong (\r\n -> term.paste) + SFTP login-script ket thuc su/sudo ghi duoc file (v0.1.19)
 '@
 git push origin main
 
-# BUOC 2: tag SAU KHI push + SAU KHI test GUI OK (checklist v0.1.18 duoi) — CI build installer 3 OS
-git tag v0.1.18
-git push origin v0.1.18
-# Xong: cho Actions ~5-10 phut -> Releases/v0.1.18 co InfraCompanion-Setup-0.1.18.exe + latest.yml
-
-# ------------------------------------------------------------
-# (Tham khao) block v0.1.17 cu — DA CHAY XONG, giu de doi chieu
-# ------------------------------------------------------------
-# git add -A
-# git commit -m "feat: tunnel qua login-script gate + sua tunnel + sidebar full-name + fix DNS message & icon taskbar (v0.1.17)"
-# git push origin main
-# git tag v0.1.17 ; git push origin v0.1.17
+# BUOC 2: tag SAU KHI push + SAU KHI test GUI OK (checklist muc 8-9 duoi) — CI build installer 3 OS
+git tag v0.1.19
+git push origin v0.1.19
+# Xong: cho Actions ~5-10 phut -> Releases/v0.1.19 co InfraCompanion-Setup-0.1.19.exe + latest.yml
+# App 0.1.18 dang cai se hien banner update sau khi mo lai (~10s)
 
 # ------------------------------------------------------------
 # (Tham khao) block v0.1.15 cu — cac file nay la TAP CON cua `git add -A` o tren,
@@ -217,7 +207,7 @@ git push origin v0.1.15
 # App 0.1.14 đang cài sẽ hiện banner update sau khi mở lại (~10s)
 ```
 
-**Checklist test tay v0.1.18 trước khi tag (pnpm dev, bôi chọn output dài trong terminal → ✨):**
+**Checklist test tay (mục 1–7 = v0.1.18 ĐÃ release; mục 8–9 = v0.1.19 test TRƯỚC khi tag; pnpm dev):**
 1. **Hết cắt đáy**: hỏi AI ra câu trả lời DÀI → panel không tràn khỏi đáy cửa sổ, phần cuối scroll tới được; KÉO panel xuống thấp → panel tự lùn lại (maxHeight theo vị trí), vẫn scroll đủ nội dung.
 2. **Nới rộng**: kéo grip ◢ góc dưới-phải sang ngang → panel rộng ra (được tới gần full cửa sổ); dấu ◢ mờ hiện đúng góc.
 3. **⛶ phóng to**: bấm ⛶ → panel chiếm gần full khung; bấm ❐ → về cỡ/vị trí mặc định; kéo header khi đang phóng to không làm vỡ layout.
@@ -225,6 +215,8 @@ git push origin v0.1.15
 5. **Copy toàn bộ**: nút 📋 trên header (chỉ khi có kết quả) → paste ra đúng toàn bộ markdown giải thích.
 6. **Không hồi quy**: nút –/✕ vẫn bấm được không bị tính là kéo; pill thu nhỏ hoạt động; panel plugin mở cùng lúc → panel AI tụt xuống top-24 như cũ.
 7. **↻ Kết nối lại**: SSH vào host → rút mạng/chặn firewall để rớt → chờ auto-retry 3 lần thất bại → overlay hiện "Mất kết nối…" với 2 nút **↻ Kết nối lại** + **Đóng**; bấm ↻ → overlay "đang kết nối…", nối lại thành công vào ĐÚNG pane cũ, **scrollback trước khi rớt vẫn còn**; pane trong tab split giữ nguyên vị trí/broadcast; bấm ↻ khi host lỗi thật (vd tắt server) → toast lỗi + overlay quay lại để bấm tiếp; gõ `exit` trên shell thường → overlay cũng có ↻ (mở lại phiên mới); double-click ↻ không tạo 2 phiên.
+8. **Paste nhiều dòng**: mở vim/nano trên server → copy 2+ dòng từ Windows → dán bằng right-click VÀ Ctrl+Shift+V → các dòng liền nhau, KHÔNG còn dòng trống chèn giữa; dán vào shell prompt nhiều lệnh vẫn chạy tuần tự như trước; broadcast bật → dán vào 1 pane vẫn lan đủ các pane.
+9. **SFTP qua su/sudo ghi file**: host có login script kết thúc bằng `su <user>` (hoặc chỉ có `sudo -i`) → mở SFTP → phải vào được home/thư mục của user SAU su (kiểm tra bằng file `ls -l` owner); sửa 1 file thuộc user đó qua nút Edit → **lưu thành công không còn Permission denied**; host login script có su TRƯỚC ssh cuối (vd chuỗi jpapst04→su→jpap05) → SFTP vẫn hoạt động như cũ.
 
 **Checklist test tay v0.1.15 (đã release — giữ tham khảo; pnpm dev, bật Monitoring vài host):**
 1. **Service uptime**: card host chạy httpd/java phải có dòng `⟳ httpd 30d · java 12d` (dưới dòng net/conn); hover hiện giải thích; host không có service quen thuộc thì KHÔNG có dòng này.

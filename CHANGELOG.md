@@ -5,6 +5,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.19] — 2026-07-13
+
+### Fixed
+
+- **Pasting multiple lines no longer inserts blank lines between them** — right-click paste and Ctrl+Shift+V used to send the clipboard text raw; Windows clipboards carry `\r\n` line endings, and editors like vim/nano treat CR and LF as *two* newlines, so every pasted line gained an empty line after it. Both paths now go through xterm's `paste()`, which normalises line endings to `\r` (like pressing Enter) and honours bracketed-paste mode when the remote app has it enabled (vim stops cascading auto-indent on paste, too).
+- **SFTP through a login script ending in `su`/`sudo` can now actually write files** — `su`/`sudo` steps that came *after* the last `ssh` hop (or a login script with no `ssh` hop at all, e.g. just `sudo -i`) were silently dropped when deriving the SFTP command, so the SFTP session ran as the plain ssh user and saving a file owned by the elevated user failed with *Permission denied*. The SFTP subsystem can't pass through `su`, so in that case the app now runs the `sftp-server` binary directly **under the target user** (probing the common distro locations: `/usr/libexec/openssh/`, `/usr/lib/openssh/`, `/usr/lib/ssh/`, `/usr/libexec/`), with the same keep-stdin password feeding used everywhere else. Login scripts whose `su`/`sudo` comes *before* the final `ssh` are unchanged.
+
+---
+
 ## [0.1.18] — 2026-07-13
 
 ### Changed

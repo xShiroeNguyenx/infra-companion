@@ -68,7 +68,48 @@ describe('deriveSftpExecFromLoginSteps (SFTP qua gate)', () => {
     expect(cmd).toBe(`{ echo 'PW'; cat; } | su admin -c 'ssh ${OPTS} web-03 -s sftp'`)
   })
 
-  it('trả null khi không có hop ssh', () => {
-    expect(deriveSftpExecFromLoginSteps([{ send: 'sudo -i' }])).toBeNull()
+  it('trả null khi không có hop ssh lẫn su/sudo', () => {
+    expect(deriveSftpExecFromLoginSteps([{ send: 'export LANG=C' }])).toBeNull()
+    expect(deriveSftpExecFromLoginSteps([])).toBeNull()
+  })
+
+  // su/sudo SAU hop ssh cuối từng bị BỎ QUA im lặng → SFTP chạy dưới user ssh,
+  // sửa file của user su bị Permission denied (bug báo ở v0.1.18)
+  describe('su/sudo sau hop ssh cuối → chạy sftp-server dưới user đích', () => {
+    it('sudo -i không có ssh → sudo bash -c <probe> ngay trên endpoint', () => {
+      const cmd = deriveSftpExecFromLoginSteps([{ send: 'sudo -i' }])
+      expect(cmd).toContain('sudo bash -c')
+      expect(cmd).toContain('sftp-server')
+      expect(cmd).not.toContain('-s sftp')
+    })
+
+    it('su có password không có ssh → giữ stdin "{ echo PASS; cat; } | su … -c <probe>"', () => {
+      const cmd = deriveSftpExecFromLoginSteps([{ send: 'su vn_root' }, { send: 'PW', secret: true }])
+      expect(cmd).toMatch(/^\{ echo 'PW'; cat; \} \| su vn_root -c '/)
+      expect(cmd).toContain('/usr/libexec/openssh/sftp-server')
+      expect(cmd).not.toContain('-s sftp')
+    })
+
+    it('[ssh web-02, su admin+PW] → probe chạy qua su TRÊN web-02, không phải subsystem', () => {
+      const cmd = deriveSftpExecFromLoginSteps([
+        { send: 'ssh web-02' },
+        { send: 'su admin' },
+        { send: 'PW', secret: true }
+      ])
+      expect(cmd).toMatch(new RegExp(`^ssh ${OPTS} web-02 '`))
+      expect(cmd).toContain('su admin -c')
+      expect(cmd).toContain('sftp-server')
+      expect(cmd).not.toContain('-s sftp')
+    })
+
+    it('su TRƯỚC ssh cuối vẫn dùng subsystem như cũ (không đổi hành vi)', () => {
+      const cmd = deriveSftpExecFromLoginSteps([
+        { send: 'su admin' },
+        { send: 'PW', secret: true },
+        { send: 'ssh web-03' }
+      ])
+      expect(cmd).toBe(`{ echo 'PW'; cat; } | su admin -c 'ssh ${OPTS} web-03 -s sftp'`)
+      expect(cmd).not.toContain('sftp-server')
+    })
   })
 })
