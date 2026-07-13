@@ -12,9 +12,15 @@ import { useSettingsStore } from '../../stores/settings'
 import { useT } from '../../i18n'
 import { terminalTheme } from './theme'
 
-/** Pane còn tồn tại trong store không (phân biệt remount do gộp/tách tab với đóng hẳn). */
-function paneStillOpen(sessionId: string): boolean {
-  return useTabsStore.getState().tabs.some((t) => t.panes.some((p) => p.sessionId === sessionId))
+/** sessionId HIỆN TẠI của pane trong store (null = pane đã đóng hẳn).
+ *  Tra theo paneId thay vì sessionId: reconnectPane thay sessionId tại chỗ — cleanup phải
+ *  chụp snapshot theo id MỚI để phiên mới nối tiếp scrollback cũ. */
+function currentSessionIdOf(paneId: string): string | null {
+  for (const tab of useTabsStore.getState().tabs) {
+    const pane = tab.panes.find((p) => p.id === paneId)
+    if (pane) return pane.sessionId
+  }
+  return null
 }
 
 interface TerminalPaneProps {
@@ -42,6 +48,7 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const findInputRef = useRef<HTMLInputElement>(null)
   const closePane = useTabsStore((s) => s.closePane)
+  const reconnectPane = useTabsStore((s) => s.reconnectPane)
   const themeMode = useSettingsStore((s) => s.theme)
   const hasBackground = useSettingsStore((s) => s.backgroundImage !== null)
   const fontFamily = useSettingsStore((s) => s.termFontFamily)
@@ -226,9 +233,11 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
       mouseEl?.removeEventListener('mouseup', onMouseUp, true)
       mouseEl?.removeEventListener('contextmenu', onContextMenu, true)
       if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
-      // Chỉ chụp buffer khi pane còn sống trong store (đang gộp/tách tab);
+      // Chỉ chụp buffer khi pane còn sống trong store (gộp/tách tab: sessionId giữ nguyên;
+      // reconnect: sessionId ĐÃ đổi → chụp theo id mới để phiên mới viết tiếp buffer cũ);
       // pane đã đóng thì clearTermSession dọn rồi — chụp lại sẽ rò bộ nhớ
-      if (paneStillOpen(pane.sessionId)) saveTermSnapshot(pane.sessionId, serialize.serialize())
+      const liveSessionId = currentSessionIdOf(pane.id)
+      if (liveSessionId) saveTermSnapshot(liveSessionId, serialize.serialize())
       term.dispose()
       termRef.current = null
       fitRef.current = null
@@ -350,12 +359,23 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
             <p className="text-content text-xs">
               {pane.exitReason ?? `exit code ${pane.exitCode ?? '?'}`}
             </p>
-            <button
-              className="bg-hover text-content hover:bg-edge-strong mt-2.5 rounded px-4 py-1 text-xs"
-              onClick={() => closePane(tabId, pane.id)}
-            >
-              {t('common.close')}
-            </button>
+            <div className="mt-2.5 flex items-center justify-center gap-2">
+              {/* Thử lại thủ công sau khi auto-retry 3 lần thất bại — mở phiên mới vào cùng pane */}
+              {pane.origin && (
+                <button
+                  className="bg-accent hover:bg-accent-hover rounded px-4 py-1 text-xs text-white"
+                  onClick={() => void reconnectPane(tabId, pane.id)}
+                >
+                  ↻ {t('terminal.reconnect')}
+                </button>
+              )}
+              <button
+                className="bg-hover text-content hover:bg-edge-strong rounded px-4 py-1 text-xs"
+                onClick={() => closePane(tabId, pane.id)}
+              >
+                {t('common.close')}
+              </button>
+            </div>
           </div>
         </div>
       )}

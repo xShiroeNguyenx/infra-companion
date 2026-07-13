@@ -85,6 +85,9 @@ interface TabsState {
   splitSsh: (hostId: string) => Promise<void>
   closeTab: (id: string) => void
   closePane: (tabId: string, paneId: string) => void
+  /** Mở lại phiên cho pane đã exited (vd mất kết nối sau 3 lần auto-retry) — giữ nguyên pane/layout,
+   *  scrollback cũ được nối tiếp (TerminalPane chụp snapshot theo sessionId MỚI khi remount). */
+  reconnectPane: (tabId: string, paneId: string) => Promise<void>
   setActive: (id: string) => void
   setActivePane: (tabId: string, paneId: string) => void
   toggleBroadcast: (tabId: string) => void
@@ -310,6 +313,69 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         return { ...t, panes, activePaneId }
       })
     }))
+  },
+
+  reconnectPane: async (tabId, paneId) => {
+    const tab = get().tabs.find((t) => t.id === tabId)
+    const pane = tab?.panes.find((p) => p.id === paneId)
+    const origin = pane?.origin
+    // Chỉ pane đã exited và có origin (cách mở lại) — status connecting chặn luôn double-click
+    if (!pane || pane.status !== 'exited' || !origin) return
+    const prev = pane
+    set((state) => ({
+      tabs: state.tabs.map((t) =>
+        t.id !== tabId
+          ? t
+          : { ...t, panes: t.panes.map((p) => (p.id === paneId ? { ...p, status: 'connecting' as const } : p)) }
+      )
+    }))
+    try {
+      const res = await window.infra.terminal.create(reqOf(origin))
+      // Dọn phiên cũ: main đã dọn khi exit (kill chỉ để chắc), termBus xoá hàng đợi/snapshot id cũ
+      window.infra.terminal.kill(prev.sessionId)
+      clearTermSession(prev.sessionId)
+      set((state) => ({
+        tabs: state.tabs.map((t) =>
+          t.id !== tabId
+            ? t
+            : {
+                ...t,
+                panes: t.panes.map((p) =>
+                  p.id !== paneId
+                    ? p
+                    : {
+                        ...p,
+                        sessionId: res.sessionId,
+                        kind: res.kind,
+                        title: res.title,
+                        subtitle: res.subtitle,
+                        status: res.kind === 'local' ? 'connected' : 'connecting',
+                        statusDetail: undefined,
+                        exitCode: undefined,
+                        exitReason: undefined
+                      }
+                )
+              }
+        )
+      }))
+    } catch (error) {
+      // Tạo phiên thất bại (host đã xoá, huỷ nhập password…) → toast + trả lại overlay exited cũ
+      toastError(error)
+      set((state) => ({
+        tabs: state.tabs.map((t) =>
+          t.id !== tabId
+            ? t
+            : {
+                ...t,
+                panes: t.panes.map((p) =>
+                  p.id === paneId
+                    ? { ...p, status: 'exited' as const, exitCode: prev.exitCode, exitReason: prev.exitReason }
+                    : p
+                )
+              }
+        )
+      }))
+    }
   },
 
   setActive: (id) => set({ activeId: id }),

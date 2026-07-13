@@ -100,7 +100,11 @@ export const vi = {
   'panel.close': 'Đóng',
   'panel.minimize': 'Thu nhỏ',
   'panel.restore': 'Mở lại',
-  'panel.dragHint': 'Kéo để di chuyển — kéo góc dưới phải để chỉnh cỡ',
+  'panel.dragHint': 'Kéo để di chuyển — kéo góc dưới phải ◢ để chỉnh cỡ (cả rộng lẫn cao)',
+  'panel.maximize': 'Phóng to gần hết khung',
+  'panel.restoreSize': 'Thu về cỡ mặc định',
+  'md.copy': 'Copy khối này',
+  'md.copied': 'Đã sao chép ✓',
 
   // Tabs / terminal
   'tabs.split': '⊞ Split',
@@ -128,12 +132,14 @@ export const vi = {
   'tabs.openDashboard': 'Mở Dashboard',
   'terminal.findPlaceholder': 'Tìm…',
   'terminal.copied': 'Đã sao chép',
+  'terminal.reconnect': 'Kết nối lại',
   'terminal.explainSelection': 'Giải thích (Ctrl+Shift+E)',
 
   // AI giải thích output (F46)
   'ai.explainTitle': 'AI giải thích',
   'ai.explaining': 'Đang hỏi AI…',
   'ai.retry': 'Thử lại',
+  'ai.copyAll': 'Copy toàn bộ giải thích',
   'ai.notConfigured': 'Chưa cấu hình AI — chọn provider và API key trước.',
   // AI chẩn đoán sự cố (F48)
   'ai.diagnose.title': 'AI chẩn đoán sự cố',
@@ -698,7 +704,11 @@ export const en: Partial<Record<I18nKey, string>> = {
   'panel.close': 'Close',
   'panel.minimize': 'Minimize',
   'panel.restore': 'Restore',
-  'panel.dragHint': 'Drag to move — drag the bottom-right corner to resize',
+  'panel.dragHint': 'Drag to move — drag the bottom-right corner ◢ to resize (width & height)',
+  'panel.maximize': 'Maximize (near full frame)',
+  'panel.restoreSize': 'Restore default size',
+  'md.copy': 'Copy this block',
+  'md.copied': 'Copied ✓',
 
   'tabs.split': '⊞ Split',
   'tabs.splitOn': '⊞ Split ON',
@@ -725,11 +735,13 @@ export const en: Partial<Record<I18nKey, string>> = {
   'tabs.openDashboard': 'Open Dashboard',
   'terminal.findPlaceholder': 'Find…',
   'terminal.copied': 'Copied',
+  'terminal.reconnect': 'Reconnect',
   'terminal.explainSelection': 'Explain (Ctrl+Shift+E)',
 
   'ai.explainTitle': 'AI explain',
   'ai.explaining': 'Asking AI…',
   'ai.retry': 'Retry',
+  'ai.copyAll': 'Copy the whole explanation',
   'ai.notConfigured': 'AI not configured — pick a provider and API key first.',
   // AI troubleshooting agent (F48)
   'ai.diagnose.title': 'AI troubleshooter',
@@ -1274,7 +1286,11 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'panel.close': '閉じる',
   'panel.minimize': '最小化',
   'panel.restore': '元に戻す',
-  'panel.dragHint': 'ドラッグで移動 — 右下をドラッグでサイズ変更',
+  'panel.dragHint': 'ドラッグで移動 — 右下の ◢ をドラッグでサイズ変更（幅・高さ）',
+  'panel.maximize': 'ほぼ全画面に拡大',
+  'panel.restoreSize': '既定サイズに戻す',
+  'md.copy': 'このブロックをコピー',
+  'md.copied': 'コピーしました ✓',
 
   'tabs.split': '⊞ 分割',
   'tabs.splitOn': '⊞ 分割 ON',
@@ -1301,11 +1317,13 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'tabs.openDashboard': 'ダッシュボードを開く',
   'terminal.findPlaceholder': '検索…',
   'terminal.copied': 'コピーしました',
+  'terminal.reconnect': '再接続',
   'terminal.explainSelection': '解説 (Ctrl+Shift+E)',
 
   'ai.explainTitle': 'AI 解説',
   'ai.explaining': 'AI に問い合わせ中…',
   'ai.retry': '再試行',
+  'ai.copyAll': '解説を全文コピー',
   'ai.notConfigured': 'AI が未設定です — プロバイダーと API キーを設定してください。',
   // AI 障害診断 (F48)
   'ai.diagnose.title': 'AI トラブル診断',

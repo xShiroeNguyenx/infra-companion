@@ -1,15 +1,56 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useT } from '../i18n'
 
 /**
  * Render một SUBSET markdown an toàn cho panel plugin → cây React element
  * (KHÔNG dùng dangerouslySetInnerHTML, KHÔNG thêm dependency).
  * Hỗ trợ: heading #/##/###, **đậm**, *nghiêng*, `code`, code block ```, danh sách "- ", link http(s).
+ * Code block có nút 📋 copy (hiện khi hover) — tiện copy nguyên đoạn config/lệnh AI gợi ý.
  * Link chỉ nhận http/https (an toàn) — Electron mở bằng trình duyệt ngoài.
  * Link `cmd:` = nút hành động gọi ngược về plugin sở hữu panel: [nhãn](cmd:command.id?arg)
  * — chỉ hoạt động khi caller truyền onCommand (PluginPanelModal); nơi khác render text thường.
  */
 
 type OnCommand = (commandId: string, arg?: string) => void
+
+/** Khối code ``` kèm nút copy nổi góc trên-phải (hiện khi hover, đổi thành "Đã sao chép ✓" 1.5s). */
+function CodeBlock({ code }: { code: string }) {
+  const t = useT()
+  const [copied, setCopied] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    []
+  )
+  const copy = (): void => {
+    void navigator.clipboard.writeText(code)
+    setCopied(true)
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => setCopied(false), 1500)
+  }
+  return (
+    <div className="group relative my-1">
+      <pre className="overflow-x-auto rounded bg-hover p-2 font-mono text-[11px] text-content">
+        <code>{code}</code>
+      </pre>
+      <button
+        type="button"
+        className={`absolute top-1 right-1 rounded border px-1.5 py-0.5 text-[10px] leading-none transition-opacity ${
+          copied
+            ? 'border-accent text-accent opacity-100'
+            : 'border-edge-strong bg-elevated/90 text-subtle hover:text-content opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+        }`}
+        aria-label={t('md.copy')}
+        title={copied ? t('md.copied') : t('md.copy')}
+        onClick={copy}
+      >
+        {copied ? t('md.copied') : '📋'}
+      </button>
+    </div>
+  )
+}
 
 const INLINE_RE = /\[([^\]]+)\]\(((?:https?:\/\/|cmd:)[^\s)]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`/g
 
@@ -84,11 +125,7 @@ function renderBlocks(md: string, onCommand?: OnCommand): ReactNode[] {
         i++
       }
       i++ // bỏ fence đóng
-      blocks.push(
-        <pre key={bi++} className="my-1 overflow-x-auto rounded bg-hover p-2 font-mono text-[11px] text-content">
-          <code>{code.join('\n')}</code>
-        </pre>
-      )
+      blocks.push(<CodeBlock key={bi++} code={code.join('\n')} />)
       continue
     }
 

@@ -5,6 +5,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.18] — 2026-07-13
+
+### Changed
+
+- **AI Explain panel — long answers no longer clipped at the bottom** — the panel's max height is now computed from its *actual* top position (docked or dragged), so the bottom edge always stays inside the app frame and long explanations scroll instead of running off-screen (previously a panel dragged/docked lower than the default could extend past the window bottom, hiding the tail of the answer).
+- **AI Explain panel — easier widening for long content** — a **⛶ maximize** button in the header grows the panel to near the full frame in one click (❐ restores the default size); the resize grip now allows widths up to almost the full window (was 85 vw) and a subtle **◢ mark** shows where the grip is (Chromium's native grip is invisible on dark themes). The drag-hint tooltip now mentions that the corner resizes both width *and* height.
+
+### Added
+
+- **Copy buttons on AI explanations** — every fenced code block (config snippets, commands…) rendered in the AI Explain panel — and in plugin panels, which share the same mini-markdown renderer — gets a hover **📋 copy** button with a "Copied ✓" confirmation, and the panel header gains a **📋 copy-all** button that copies the whole explanation as markdown.
+- **Manual ↻ Reconnect after a session dies** — when a connection is lost and the 3 automatic retries fail (or a shell exits), the failure overlay now offers a **↻ Reconnect** button next to Close: one click opens a fresh session **into the same pane** — layout, split position, and broadcast membership are kept, and the previous scrollback is carried over so you can still see what happened before the drop. Each click is a full new attempt (with its own 3-retry cycle once connected); if reopening fails (host deleted, password prompt cancelled…) the overlay returns so you can try again.
+
+---
+
 ## [0.1.17] — 2026-07-12
 
 ### Added
