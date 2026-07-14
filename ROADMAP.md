@@ -76,6 +76,7 @@
 - *(Gộp vào F03)*: export kết quả Bulk ra CSV/Markdown ⚡; biến `{{x}}` per-host khi chạy Bulk (biến snippet đơn lẻ ĐÃ có).
 
 ### 3E. Bảo mật & Vault
+- ~~**F53 — Guard lệnh nhạy cảm**~~ — ✅ Đã làm (v0.1.21): whitelist lệnh (mặc định `rm -rf`, `mkfs`, `dd if=`, `shutdown`…), bấm Enter trên lệnh khớp → popup xác nhận trước khi chạy; đọc dòng lệnh thật từ buffer xterm nên bắt được cả lệnh gọi lại bằng ↑, không thêm độ trễ gõ phím, tự bỏ qua trong vim/less/htop (Settings → Bảo vệ lệnh nhạy cảm). *Còn lại (sau): mẫu per-host, đồng bộ whitelist qua vault.*
 - **F41 — TOTP trong vault** ⭐ — lưu seed 2FA mã hoá, tự sinh mã 6 số; login script gặp prompt "Verification code:" thì tự điền (khớp hoàn hảo với engine expect/send F21 sẵn có).
 - **F42 — SSH key rotation wizard** — sinh key mới → đẩy `authorized_keys` loạt host (qua Bulk) → xác minh đăng nhập → gỡ key cũ.
 - **F43 — ssh-copy-id UI** ⚡ — 1 nút đẩy public key lên host đang dùng password.

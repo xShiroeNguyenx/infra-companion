@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, and more.
 
-**Current release: v0.1.20 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.1.21 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -53,6 +53,7 @@
 - **Theme studio** — pick a custom accent and recolor the full UI palette per theme (Settings → Appearance → Custom palette); export / import a theme as JSON
 - **Find in terminal** — Ctrl+F with highlight
 - **Mouse copy & paste** — select then left-click the highlight to copy, right-click to paste (alongside Ctrl+Shift+C / Ctrl+Shift+V)
+- **Sensitive command guard** — pressing Enter on a command that matches your watch-list (`rm -rf`, `mkfs`, `shutdown`… — editable in Settings) pops up a confirmation first; it reads the real command line so it catches ↑-recalled commands, adds no typing latency, and stands down inside vim/less/htop (Settings → Sensitive command guard)
 - **Command Palette** — Ctrl+Shift+P, keyboard-first access to every action
 - **Session logging** — capture raw output (ANSI-stripped) to file
 - **Session recording & replay** — asciinema v2 format; player with play/pause, seek bar, 1×/2×/4×/8× speed; export `.cast` for `asciinema play`
@@ -259,13 +260,14 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.1.20)
+## Known Limitations (v0.1.21)
 
 - Bulk / Monitor / SFTP / Local-forward tunnels through login scripts rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` installed on the gate) and `su` / `sudo` steps are supported; exotic setups that force a TTY password prompt may still fail. Login-script tunnels also need `nc` on the innermost hop
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))
 - Secrets Manager: 1Password, Bitwarden, HashiCorp Vault via CLI (KeePassXC planned)
 - **Remote desktop tunneling** reaches targets via **jump-host chains** (SSH `-J` style); a target reachable only through an interactive **login-script gate** is not yet supported. **RDP** opens the OS client through a tunnel (not embedded); embedded FreeRDP is not planned. VNC needs a real VNC server on the target and network reachability (LAN or SSH tunnel)
 - No team server, cloud import (AWS/GCP…), Docker/K8s browser — see [ROADMAP.md](ROADMAP.md); plugin system is at **v1** (🛒 Marketplace tab installs from a static registry, entries are ed25519-signed; no permission enforcement / output transform yet)
+- The **sensitive command guard** matches by text pattern, not by parsing the shell — it errs toward asking (e.g. `grep reboot` triggers the `reboot` rule) rather than staying silent, since a false prompt is safer than a missed `rm -rf`; tune the list in Settings to taste
 
 ---
 

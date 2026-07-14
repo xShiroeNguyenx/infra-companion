@@ -7,11 +7,31 @@ import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { saveTermSnapshot, subscribeTermData, takeTermSnapshot } from '../../lib/termBus'
+import { matchGuard } from '../../lib/commandGuard'
 import { useTabsStore, type Pane } from '../../stores/tabs'
 import { useAiExplainStore } from '../../stores/aiExplain'
 import { useSettingsStore } from '../../stores/settings'
 import { useT } from '../../i18n'
+import { Button, Modal } from '../../components/ui'
 import { terminalTheme } from './theme'
+
+/**
+ * Đọc lệnh đang gõ tại con trỏ, nối cả các dòng bị wrap (lệnh dài tràn nhiều dòng hiển thị).
+ * Trả '' khi đang ở alt-screen (vim/less/htop…) — không phải prompt shell nên không guard.
+ */
+function readCurrentCommand(term: Terminal): string {
+  const buf = term.buffer.active
+  if (buf.type === 'alternate') return ''
+  const cursorRow = buf.baseY + buf.cursorY
+  let start = cursorRow
+  while (start > 0 && buf.getLine(start)?.isWrapped) start--
+  let text = ''
+  for (let r = start; r <= cursorRow; r++) {
+    // translateToString(false): giữ đủ bề rộng dòng để nối đúng chỗ wrap (không chèn thừa dấu cách)
+    text += buf.getLine(r)?.translateToString(false) ?? ''
+  }
+  return text.replace(/\s+$/, '')
+}
 
 /** sessionId HIỆN TẠI của pane trong store (null = pane đã đóng hẳn).
  *  Tra theo paneId thay vì sessionId: reconnectPane thay sessionId tại chỗ — cleanup phải
@@ -47,6 +67,8 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
   const [findText, setFindText] = useState('')
   const [hasSelection, setHasSelection] = useState(false)
   const [copied, setCopied] = useState(false)
+  /** Lệnh nhạy cảm đang chờ xác nhận (guard đã chặn Enter); null = không có. */
+  const [guardPrompt, setGuardPrompt] = useState<{ command: string; pattern: string } | null>(null)
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const findInputRef = useRef<HTMLInputElement>(null)
   const closePane = useTabsStore((s) => s.closePane)
@@ -256,8 +278,8 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pane.sessionId])
 
-  /** Gửi input: broadcast → mọi pane trong tab; không thì chỉ pane này. */
-  function handleInput(data: string): void {
+  /** Gửi input thô: broadcast → mọi pane trong tab; không thì chỉ pane này. */
+  function sendData(data: string): void {
     const tab = useTabsStore.getState().tabs.find((t) => t.id === tabId)
     if (tab?.broadcast && tab.panes.length > 1) {
       for (const p of tab.panes) {
@@ -266,6 +288,37 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     } else {
       window.infra.terminal.write(pane.sessionId, data)
     }
+  }
+
+  /** Input từ xterm. Guard lệnh nhạy cảm chặn Enter đơn (\r) nếu dòng lệnh khớp whitelist. */
+  function handleInput(data: string): void {
+    if (data === '\r') {
+      const { commandGuardEnabled, commandGuardPatterns } = useSettingsStore.getState()
+      const term = termRef.current
+      if (commandGuardEnabled && term) {
+        const command = readCurrentCommand(term)
+        const matched = command ? matchGuard(command, commandGuardPatterns) : null
+        if (matched) {
+          // Chưa gửi \r — server chưa nhận Enter, lệnh còn nguyên ở prompt để user sửa nếu huỷ
+          setGuardPrompt({ command: command.trim(), pattern: matched })
+          return
+        }
+      }
+    }
+    sendData(data)
+  }
+
+  /** Xác nhận chạy lệnh nhạy cảm: gửi Enter đã bị hoãn rồi trả focus về terminal. */
+  function confirmGuard(): void {
+    setGuardPrompt(null)
+    sendData('\r')
+    termRef.current?.focus()
+  }
+
+  /** Huỷ: không gửi gì, lệnh vẫn ở prompt để user chỉnh; trả focus về terminal. */
+  function cancelGuard(): void {
+    setGuardPrompt(null)
+    termRef.current?.focus()
   }
 
   useEffect(() => {
@@ -349,6 +402,26 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
         <div className="pointer-events-none absolute bottom-3 right-3 z-30 rounded border border-edge-strong bg-elevated/95 px-2.5 py-1 text-xs text-content shadow-lg">
           {t('terminal.copied')}
         </div>
+      )}
+
+      {/* Guard lệnh nhạy cảm: Enter đã bị hoãn, chờ user xác nhận. Nút Huỷ autoFocus →
+          bấm Enter theo phản xạ sẽ HUỶ (an toàn), muốn chạy phải chủ động chọn "Vẫn chạy". */}
+      {guardPrompt && (
+        <Modal title={t('guard.title')} danger onClose={cancelGuard} closeOnBackdrop={false}>
+          <p className="text-muted mb-2 max-w-96 text-xs leading-relaxed">{t('guard.desc')}</p>
+          <div className="border-danger/50 bg-input text-content mb-2 max-w-96 rounded border px-3 py-2 font-mono text-xs break-all">
+            {guardPrompt.command}
+          </div>
+          <p className="text-subtle mb-3 text-[11px]">{t('guard.matched', { pattern: guardPrompt.pattern })}</p>
+          <div className="flex justify-end gap-2">
+            <Button autoFocus onClick={cancelGuard}>
+              {t('guard.cancel')}
+            </Button>
+            <Button variant="danger" onClick={confirmGuard}>
+              {t('guard.run')}
+            </Button>
+          </div>
+        </Modal>
       )}
 
       {/* F46: nút giải thích selection — cùng slot với thanh Tìm, Tìm mở thì nhường chỗ */}

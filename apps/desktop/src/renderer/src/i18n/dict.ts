@@ -610,7 +610,20 @@ export const vi = {
   'settings.termWebglHint': 'Gõ phím & cuộn mượt hơn hẳn. Chỉ tắt nếu gặp lỗi hiển thị (driver GPU cũ) — tắt là quay về render thường.',
   'settings.termFont': 'Font chữ',
   'settings.termFontReset': 'Khôi phục mặc định',
-  'settings.termFontHint': 'Tên font (CSS font-family). Dùng font đã cài trên máy; không có sẽ tự thay bằng font khác.'
+  'settings.termFontHint': 'Tên font (CSS font-family). Dùng font đã cài trên máy; không có sẽ tự thay bằng font khác.',
+
+  // Guard lệnh nhạy cảm
+  'guard.title': 'Xác nhận lệnh nhạy cảm',
+  'guard.desc': 'Lệnh này nằm trong danh sách cần xác nhận. Kiểm tra kỹ trước khi chạy:',
+  'guard.matched': 'Khớp mẫu: {pattern}',
+  'guard.run': 'Vẫn chạy',
+  'guard.cancel': 'Huỷ, để tôi sửa',
+  'settings.cmdGuard': 'Bảo vệ lệnh nhạy cảm',
+  'settings.cmdGuardEnable': 'Hỏi xác nhận trước khi chạy',
+  'settings.cmdGuardHint': 'Khi bấm Enter trên lệnh khớp danh sách dưới đây, hiện popup xác nhận. Tự bỏ qua khi đang trong trình soạn thảo/pager (vim, less…).',
+  'settings.cmdGuardPatterns': 'Danh sách lệnh cần xác nhận (mỗi dòng một mẫu)',
+  'settings.cmdGuardPatternsHint': 'Khớp khi lệnh bắt đầu bằng mẫu (vd: rm -rf). Dùng regex bằng cách bọc trong /…/ (vd: />\\s*/dev/sd/).',
+  'settings.cmdGuardReset': 'Khôi phục mặc định'
 }
 
 export type I18nKey = keyof typeof vi
@@ -1196,7 +1209,20 @@ export const en: Partial<Record<I18nKey, string>> = {
   'settings.termWebglHint': 'Noticeably smoother typing & scrolling. Turn off only if you see rendering glitches (old GPU drivers) — falls back to the regular renderer.',
   'settings.termFont': 'Font family',
   'settings.termFontReset': 'Reset to default',
-  'settings.termFontHint': 'Font family (CSS). Uses a font installed on your machine; falls back if unavailable.'
+  'settings.termFontHint': 'Font family (CSS). Uses a font installed on your machine; falls back if unavailable.',
+
+  // Sensitive command guard
+  'guard.title': 'Confirm sensitive command',
+  'guard.desc': 'This command is on your confirmation list. Double-check before running:',
+  'guard.matched': 'Matched pattern: {pattern}',
+  'guard.run': 'Run anyway',
+  'guard.cancel': 'Cancel, let me edit',
+  'settings.cmdGuard': 'Sensitive command guard',
+  'settings.cmdGuardEnable': 'Ask for confirmation before running',
+  'settings.cmdGuardHint': 'When you press Enter on a command matching the list below, show a confirmation popup. Automatically skipped inside editors/pagers (vim, less…).',
+  'settings.cmdGuardPatterns': 'Commands requiring confirmation (one pattern per line)',
+  'settings.cmdGuardPatternsHint': 'Matches when the command starts with the pattern (e.g. rm -rf). Use a regex by wrapping it in /…/ (e.g. />\\s*/dev/sd/).',
+  'settings.cmdGuardReset': 'Restore defaults'
 }
 
 export const ja: Partial<Record<I18nKey, string>> = {
@@ -1780,7 +1806,20 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'settings.termWebglHint': '入力・スクロールが大幅に滑らかになります。表示の乱れ（古い GPU ドライバー）がある場合のみオフに — 通常レンダラーに戻ります。',
   'settings.termFont': 'フォント',
   'settings.termFontReset': 'デフォルトに戻す',
-  'settings.termFontHint': 'フォント名（CSS font-family）。インストール済みのフォントを使用し、なければ代替表示します。'
+  'settings.termFontHint': 'フォント名（CSS font-family）。インストール済みのフォントを使用し、なければ代替表示します。',
+
+  // 重要コマンドのガード
+  'guard.title': '重要なコマンドの確認',
+  'guard.desc': 'このコマンドは確認リストに含まれています。実行前に再確認してください：',
+  'guard.matched': '一致パターン: {pattern}',
+  'guard.run': 'それでも実行',
+  'guard.cancel': 'キャンセルして修正',
+  'settings.cmdGuard': '重要コマンドのガード',
+  'settings.cmdGuardEnable': '実行前に確認する',
+  'settings.cmdGuardHint': '下のリストに一致するコマンドで Enter を押すと確認ポップアップを表示します。エディタ／ページャ（vim, less…）内では自動的にスキップします。',
+  'settings.cmdGuardPatterns': '確認が必要なコマンド（1行に1パターン）',
+  'settings.cmdGuardPatternsHint': 'コマンドがパターンで始まると一致します（例: rm -rf）。/…/ で囲むと正規表現（例: />\\s*/dev/sd/）。',
+  'settings.cmdGuardReset': 'デフォルトに戻す'
 }
 
 export const dictionaries = { vi, en, ja }

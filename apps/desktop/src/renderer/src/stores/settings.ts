@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { DEFAULT_GUARD_PATTERNS } from '../lib/commandGuard'
 
 export type ThemeMode = 'dark' | 'light'
 export type Language = 'vi' | 'en' | 'ja'
@@ -26,6 +27,8 @@ const TERM_CURSOR_KEY = 'infra.term.cursor'
 const TERM_WEBGL_KEY = 'infra.term.webgl'
 const CUSTOM_COLORS_KEY = 'infra.theme.custom'
 const STARTUP_KEY = 'infra.startup.page'
+const CMD_GUARD_ON_KEY = 'infra.cmdGuard.on'
+const CMD_GUARD_PATTERNS_KEY = 'infra.cmdGuard.patterns'
 
 /** Các biến màu UI cho phép tuỳ biến (accent có control riêng nên không nằm ở đây). */
 export const CUSTOM_PALETTE_VARS = [
@@ -121,6 +124,24 @@ function readTermWebgl(): boolean {
 
 function readStartupPage(): StartupPage {
   return localStorage.getItem(STARTUP_KEY) === 'terminal' ? 'terminal' : 'dashboard'
+}
+
+/** Guard lệnh nhạy cảm — mặc định BẬT; '0' = user đã tắt. */
+function readCommandGuardOn(): boolean {
+  return localStorage.getItem(CMD_GUARD_ON_KEY) !== '0'
+}
+
+/** Whitelist mẫu lệnh cần xác nhận. Khoá vắng (null) → danh sách mặc định; '[]' đã lưu → tôn trọng rỗng. */
+function readCommandGuardPatterns(): string[] {
+  const raw = localStorage.getItem(CMD_GUARD_PATTERNS_KEY)
+  if (raw === null) return [...DEFAULT_GUARD_PATTERNS]
+  try {
+    const arr = JSON.parse(raw) as unknown
+    if (Array.isArray(arr)) return arr.filter((x): x is string => typeof x === 'string')
+  } catch {
+    /* JSON hỏng → mặc định */
+  }
+  return [...DEFAULT_GUARD_PATTERNS]
 }
 
 function readCustomColors(): CustomColors {
@@ -223,6 +244,10 @@ interface SettingsState {
   termWebgl: boolean
   /** Trang mở khi khởi động: dashboard (mặc định) hay terminal local như trước. */
   startupPage: StartupPage
+  /** Guard lệnh nhạy cảm: bấm Enter trên lệnh khớp whitelist → hiện popup xác nhận. */
+  commandGuardEnabled: boolean
+  /** Whitelist mẫu lệnh cần xác nhận (literal theo prefix hoặc regex /…/). */
+  commandGuardPatterns: string[]
   setTheme: (t: ThemeMode) => void
   setLanguage: (l: Language) => void
   setAccentColor: (c: string | null) => void
@@ -238,6 +263,8 @@ interface SettingsState {
   setTermCursor: (c: TermCursor) => void
   setTermWebgl: (on: boolean) => void
   setStartupPage: (p: StartupPage) => void
+  setCommandGuardEnabled: (on: boolean) => void
+  setCommandGuardPatterns: (patterns: string[]) => void
   /** Override màu UI theo base theme hiện tại. */
   customColors: CustomColors
   /** Đặt/gỡ 1 màu cho theme đang chọn (null = gỡ override). */
@@ -266,6 +293,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   termCursor: readTermCursor(),
   termWebgl: readTermWebgl(),
   startupPage: readStartupPage(),
+  commandGuardEnabled: readCommandGuardOn(),
+  commandGuardPatterns: readCommandGuardPatterns(),
   setTheme: (theme) => {
     localStorage.setItem(THEME_KEY, theme)
     applyTheme(theme)
@@ -339,6 +368,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setStartupPage: (page) => {
     localStorage.setItem(STARTUP_KEY, page)
     set({ startupPage: page })
+  },
+  setCommandGuardEnabled: (on) => {
+    localStorage.setItem(CMD_GUARD_ON_KEY, on ? '1' : '0')
+    set({ commandGuardEnabled: on })
+  },
+  setCommandGuardPatterns: (patterns) => {
+    localStorage.setItem(CMD_GUARD_PATTERNS_KEY, JSON.stringify(patterns))
+    set({ commandGuardPatterns: patterns })
   },
   setCustomColor: (varName, hex) => {
     const { theme, customColors } = get()

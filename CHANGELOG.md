@@ -5,6 +5,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.21] — 2026-07-14
+
+### Added
+
+- **Sensitive command guard** — press Enter on a command that matches your watch-list (e.g. `rm -rf`) and a confirmation popup appears *before* it runs. Built for the classic accident: hitting ↑ to recall a command and running the wrong one — so the check reads the actual command line from the terminal (recalled commands are echoed by the server, not reconstructed from keystrokes), which means it catches history-recalled commands too. On by default with a sensible starter list (`rm -rf`, `rm -r`, `sudo rm`, `mkfs`, `dd if=`/`dd of=`, `shutdown`, `reboot`, `poweroff`, `halt`, writing straight to a disk device, the classic fork bomb); edit or clear the list in **Settings → Sensitive command guard**. Patterns match at a command position (literal, e.g. `rm -rf`) or as a regex when wrapped in `/…/`. The Cancel button is focused by default, so a reflexive second Enter cancels rather than running; the guard adds no per-keystroke latency and automatically stands down inside full-screen apps (vim, less, htop) so it never interrupts an editor.
+
+### Changed
+
+- **Settings is now a full screen instead of a small dialog** — the old modal had grown cramped, so Settings opens as a full-window screen with a left-hand category rail (Appearance, Background image, Terminal, Sensitive command guard) and a scrollable content pane, giving each group room to breathe. Everything it did before is unchanged (Esc still closes it); it's just laid out properly now.
+
+---
+
 ## [0.1.20] — 2026-07-13
 
 ### Changed

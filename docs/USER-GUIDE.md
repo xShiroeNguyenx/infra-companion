@@ -155,6 +155,8 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 
 ## 5B. Appearance & background — `⋯` → Settings
 
+Settings opens as a **full-screen page** with a category rail on the left — **Appearance**, **Background image**, **Terminal**, and **Sensitive command guard** — and a scrollable pane on the right. Press **Esc** or the **✕** in the header to close it.
+
 - **Theme**: Dark / Light. **Language**: Tiếng Việt / English / 日本語. Changes apply instantly and persist across launches.
 - **Background image**: set a wallpaper that shows faintly behind the **whole window** (behind both the sidebar and the terminal); chrome (sidebar/tabs/status) becomes translucent to reveal it, while modals/menus stay opaque for readability. Two ways to set it:
   - **Choose image…** — pick a local file.
@@ -187,6 +189,28 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 - Stored **on this machine** (not yet synced); it only references hosts by ID, so any host synced to another machine can be opened there. A deleted host's pane is skipped (a soft error), without blocking the other panes.
 
 **Test**: open web-01, split in web-02, turn on Broadcast → Save as "ST monitor" → close all tabs → Workspaces → Open "ST monitor" → both panes reopen side by side with Broadcast already on.
+
+---
+
+## 5D. Sensitive command guard — `⋯` → Settings → Sensitive command guard
+
+**What it is**: a safety net for destructive commands. When you press **Enter** on a command that matches your watch-list, a confirmation popup appears **before** the command runs. It's aimed at the classic accident — pressing **↑** to recall a command and running the wrong one.
+
+**Why it catches ↑-recalled commands**: it reads the **actual command line from the terminal buffer**, not your keystrokes. When you recall a command with ↑, the client only sends `↑`; the command text is echoed back by the server. Reading the buffer is the only way to know what's really on the line — so history-recalled commands are guarded just like typed ones.
+
+**Defaults** (on out of the box): `rm -rf`, `rm -fr`, `rm -r`, `sudo rm`, `mkfs`, `dd if=`, `dd of=`, `shutdown`, `reboot`, `poweroff`, `halt`, writing straight to a disk device (`… > /dev/sda`), and the classic fork bomb.
+
+**Configure**: Settings → **Sensitive command guard**.
+- Toggle the whole feature on/off.
+- Edit the list — **one pattern per line**. A plain pattern matches when the command **starts with** it at a command position (e.g. `rm -rf` matches `rm -rf build` and `cd /tmp && rm -rf build`, but not `warm -rf`). Wrap a pattern in `/…/` to use a **regex** (e.g. `/>\s*\/dev\/sd/`).
+- **Restore defaults** brings back the starter list.
+
+**Behavior**:
+- The **Cancel** button is focused by default, so a reflexive second **Enter** cancels — you have to deliberately choose **Run anyway** to proceed. Cancel leaves the command sitting at the prompt so you can edit it.
+- It adds **no per-keystroke latency** (the check runs only on Enter) and automatically **stands down inside full-screen apps** (vim, less, htop…) so it never interrupts an editor.
+- It matches by text, not by parsing the shell, so it errs toward asking (e.g. `grep reboot` triggers the `reboot` rule) — a false prompt is safer than a missed `rm -rf`. Trim the list if a pattern is too eager.
+
+**Test**: type `rm -rf /tmp/nothing-here` → press Enter → the confirmation popup appears. Press **↑** to recall it and Enter again → it's still caught. Open `vim` and type `rm -rf` on a line → Enter does **not** trigger it.
 
 ---
 
