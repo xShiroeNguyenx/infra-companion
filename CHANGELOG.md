@@ -5,6 +5,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.22] — 2026-07-15
+
+### Added
+
+- **AI troubleshooter now keeps a history** — every diagnosis session (its symptom, the read-only commands that ran with their output, and the final conclusion) is saved locally when it finishes, stops, or errors. Reopen the **🩺 AI troubleshooter** and past sessions appear under **Diagnosis history**: click one to review it read-only, or delete it. The last 50 sessions are kept; the steps and conclusion are **encrypted with your vault key** at rest (server output can be sensitive), so viewing history requires the vault to be unlocked.
+- **The AI troubleshooter can be minimized** — while the AI is thinking or running a command you no longer have to sit and wait: press the **–** button to drop the window to a small pill (bottom-right) and keep using the rest of the app. The pill shows live status (analyzing / running / **needs your approval** / done) so you know when to click it back open; the session keeps running in the background the whole time.
+- **AI troubleshooter added to the ⋯ menu** — it was previously reachable only from the command palette; it now has its own entry (🩺 AI troubleshooter) in the sidebar tools menu.
+
+### Fixed
+
+- **AI diagnosis conclusion no longer gets cut off mid-sentence** — the final conclusion (root cause + fix steps) is the longest part of a session and, in Vietnamese, consumes 2–3× more tokens than English, so the old fixed 1,500-token cap truncated it right where it mattered most. The diagnose output budget is raised to 4,096 tokens, and for Claude a continuation pass automatically resumes generation whenever a response is cut by the token limit — so conclusions come through complete no matter how long. The higher budget also applies to OpenAI/Gemini/Ollama (Ollama's `num_predict` was previously capped low enough to clip output).
+
+---
+
 ## [0.1.21] — 2026-07-14
 
 ### Added

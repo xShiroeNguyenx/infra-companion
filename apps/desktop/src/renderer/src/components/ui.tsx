@@ -6,7 +6,8 @@ export function Modal({
   children,
   onClose,
   danger = false,
-  closeOnBackdrop = true
+  closeOnBackdrop = true,
+  headerExtra
 }: {
   title: string
   children: ReactNode
@@ -14,6 +15,8 @@ export function Modal({
   danger?: boolean
   /** false cho form dài / prompt bảo mật — misclick backdrop không làm mất dữ liệu đang nhập. */
   closeOnBackdrop?: boolean
+  /** Nút phụ neo bên phải header (vd nút thu nhỏ). */
+  headerExtra?: ReactNode
 }) {
   useEffect(() => {
     if (!onClose) return
@@ -39,11 +42,12 @@ export function Modal({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div
-          className={`shrink-0 border-b px-4 py-2.5 text-sm font-semibold ${
+          className={`flex shrink-0 items-center gap-2 border-b px-4 py-2.5 text-sm font-semibold ${
             danger ? 'border-danger/60 text-danger' : 'border-edge text-content'
           }`}
         >
-          {title}
+          <span className="min-w-0 flex-1 truncate">{title}</span>
+          {headerExtra}
         </div>
         <div className="overflow-y-auto px-4 py-3">{children}</div>
       </div>

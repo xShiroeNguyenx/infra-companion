@@ -6,6 +6,7 @@ import {
   type AiConfigDto,
   type AiConfigInput,
   type AiDiagnoseExecResultDto,
+  type AiDiagnoseSaveInput,
   type AiModeDto
 } from '@infra/shared'
 import { makeHostKeyVerifier, prepareConnection } from './connection'
@@ -68,4 +69,25 @@ export function registerAiIpc(): void {
       }
     }
   )
+
+  // F48 — lịch sử chẩn đoán: lưu/liệt kê/xem/xoá (steps + conclusion mã hoá bằng DEK ở vault).
+  ipcMain.handle(IPC.AI_DIAGNOSE_SAVE, (_e, input: AiDiagnoseSaveInput) => {
+    touchActivity()
+    return getVault().saveDiagnosis(input)
+  })
+
+  ipcMain.handle(IPC.AI_DIAGNOSE_LIST, (_e, limit?: number) => {
+    touchActivity()
+    return getVault().listDiagnoses(limit)
+  })
+
+  ipcMain.handle(IPC.AI_DIAGNOSE_GET, (_e, id: string) => {
+    touchActivity()
+    return getVault().getDiagnosis(id)
+  })
+
+  ipcMain.handle(IPC.AI_DIAGNOSE_DELETE, (_e, id: string) => {
+    touchActivity()
+    getVault().deleteDiagnosis(id)
+  })
 }

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { AiDiagnoseRecordDto } from '@infra/shared'
 import { translate } from '../i18n'
 import { useSettingsStore } from './settings'
 import { errorMessage, useToastsStore } from './toasts'
@@ -36,19 +37,35 @@ export interface DiagnoseSession {
   status: SessionStatus
   conclusion?: string
   error?: string
+  /** Thời điểm phiên được lưu (chỉ có khi đang xem lại từ lịch sử). */
+  createdAt?: number
+  /** Id trong DB nếu phiên này đang được xem lại từ lịch sử (chặn lưu trùng). */
+  savedId?: string
+  /** Đang xem lại lịch sử → chỉ đọc, không chạy tiếp, không lưu lại. */
+  readonly?: boolean
 }
 
 interface AiDiagnoseState {
   session: DiagnoseSession | null
+  history: AiDiagnoseRecordDto[]
   start: (hostId: string, hostLabel: string, symptom: string) => Promise<void>
   approve: () => Promise<void>
   skip: () => Promise<void>
   stop: () => void
   close: () => void
+  /** Nạp danh sách lịch sử chẩn đoán từ vault. */
+  loadHistory: () => Promise<void>
+  /** Mở lại một phiên đã lưu để xem chi tiết (read-only). */
+  openHistory: (id: string) => Promise<void>
+  /** Xoá một phiên khỏi lịch sử. */
+  deleteHistory: (id: string) => Promise<void>
 }
 
-/** Tăng mỗi lần start/stop/close — chặn kết quả async cũ ghi đè phiên mới. */
+/** Tăng mỗi lần start/stop/close/openHistory — chặn kết quả async cũ ghi đè phiên mới. */
 let gen = 0
+
+/** gen đã được lưu vào lịch sử — chặn lưu trùng khi có nhiều transition kết thúc. */
+let savedGen = -1
 
 /** Cắt output giữ đuôi để transcript không phình. */
 function clip(text: string): string {
@@ -92,11 +109,15 @@ export const useAiDiagnoseStore = create<AiDiagnoseState>((set, get) => {
       } else {
         // Không còn lệnh → AI đã kết luận
         set({ session: { ...cur, status: 'done', conclusion: res.text } })
+        finalize(myGen)
       }
     } catch (error) {
       if (myGen !== gen) return
       const cur = get().session
-      if (cur) set({ session: { ...cur, status: 'error', error: errorMessage(error) } })
+      if (cur) {
+        set({ session: { ...cur, status: 'error', error: errorMessage(error) } })
+        finalize(myGen)
+      }
     }
   }
 
@@ -109,8 +130,46 @@ export const useAiDiagnoseStore = create<AiDiagnoseState>((set, get) => {
     set({ session: { ...s, steps } })
   }
 
+  /**
+   * Lưu phiên vào lịch sử khi kết thúc (done/stopped/error). Gọi ở MỌI điểm chuyển sang trạng thái
+   * kết thúc; savedGen chặn lưu trùng khi có nhiều transition trong cùng một phiên. Bỏ qua nếu:
+   * đang xem lại (readonly), phiên rỗng (không bước & không kết luận), hoặc phiên đã cũ (gen đổi).
+   */
+  const finalize = (myGen: number): void => {
+    if (myGen !== gen || savedGen === myGen) return
+    const s = get().session
+    if (!s || s.readonly) return
+    if (s.status !== 'done' && s.status !== 'stopped' && s.status !== 'error') return
+    if (s.steps.length === 0 && !s.conclusion) return
+    savedGen = myGen
+    void window.infra.ai
+      .saveDiagnosis({
+        hostId: s.hostId,
+        hostLabel: s.hostLabel,
+        symptom: s.symptom,
+        status: s.status,
+        steps: s.steps.map((st) => ({
+          reasoning: st.reasoning,
+          command: st.command,
+          status: st.status,
+          blockedReason: st.blockedReason,
+          output: st.output,
+          code: st.code,
+          error: st.error
+        })),
+        conclusion: s.conclusion,
+        error: s.error
+      })
+      .then(() => get().loadHistory())
+      .catch(() => {
+        // Lưu thất bại (vd vault vừa khoá) — cho phép thử lại ở transition sau, không chặn UX.
+        if (savedGen === myGen) savedGen = -1
+      })
+  }
+
   return {
     session: null,
+    history: [],
 
     start: async (hostId, hostLabel, symptom) => {
       const text = symptom.trim()
@@ -156,7 +215,10 @@ export const useAiDiagnoseStore = create<AiDiagnoseState>((set, get) => {
         if (myGen !== gen) return
         patchLastStep((st) => ({ ...st, status: 'error', error: errorMessage(error) }))
         const cur = get().session
-        if (cur) set({ session: { ...cur, status: 'error', error: errorMessage(error) } })
+        if (cur) {
+          set({ session: { ...cur, status: 'error', error: errorMessage(error) } })
+          finalize(myGen)
+        }
       }
     },
 
@@ -173,12 +235,56 @@ export const useAiDiagnoseStore = create<AiDiagnoseState>((set, get) => {
     stop: () => {
       gen++
       const s = get().session
-      if (s) set({ session: { ...s, status: 'stopped' } })
+      if (s) {
+        set({ session: { ...s, status: 'stopped' } })
+        finalize(gen) // gen vừa tăng → lưu phiên vừa dừng dưới gen mới
+      }
     },
 
     close: () => {
       gen++
       set({ session: null })
+    },
+
+    loadHistory: async () => {
+      try {
+        set({ history: await window.infra.ai.listDiagnoses(50) })
+      } catch {
+        // vault có thể vừa khoá — bỏ qua
+      }
+    },
+
+    openHistory: async (id) => {
+      try {
+        const rec = await window.infra.ai.getDiagnosis(id)
+        if (!rec) return
+        gen++ // huỷ mọi async đang chạy trước khi chuyển sang chế độ xem lại
+        set({
+          session: {
+            hostId: rec.hostId,
+            hostLabel: rec.hostLabel,
+            symptom: rec.symptom,
+            steps: rec.steps as DiagnoseStep[],
+            status: rec.status,
+            conclusion: rec.conclusion,
+            error: rec.error,
+            createdAt: rec.createdAt,
+            savedId: rec.id,
+            readonly: true
+          }
+        })
+      } catch (error) {
+        useToastsStore.getState().push(errorMessage(error))
+      }
+    },
+
+    deleteHistory: async (id) => {
+      try {
+        await window.infra.ai.deleteDiagnosis(id)
+        set({ history: get().history.filter((h) => h.id !== id) })
+      } catch (error) {
+        useToastsStore.getState().push(errorMessage(error))
+      }
     }
   }
 })

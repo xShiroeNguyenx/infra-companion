@@ -57,6 +57,18 @@ const SYSTEM_PROMPTS: Record<AiMode, string> = {
 const REQUEST_TIMEOUT_MS = 60_000
 
 /**
+ * Trần token đầu ra theo mode. `diagnose` (đặc biệt là lượt KẾT LUẬN) là văn xuôi dài
+ * — nguyên nhân gốc + nhiều bước khắc phục — và tiếng Việt tốn token gấp 2-3 lần tiếng Anh,
+ * nên 1500 hay bị cắt cụt giữa câu. Nâng riêng cho diagnose (chỉ tính token thực sinh nên
+ * bước ngắn không tốn thêm). Xem thêm continuation cho Claude bên dưới.
+ */
+const MAX_TOKENS_DEFAULT = 1500
+const MAX_TOKENS_DIAGNOSE = 4096
+
+/** Số vòng nối tiếp tối đa (Claude) khi bị cắt do max_tokens — 4×4096 ≈ 16k token, thừa cho kết luận. */
+const MAX_CONTINUATIONS = 4
+
+/**
  * Trợ lý AI đa nhà cung cấp (F09): sinh lệnh từ ngôn ngữ tự nhiên, giải thích lệnh/lỗi.
  * Claude qua SDK chính thức; OpenAI/Ollama qua REST (provider khác — không trộn SDK).
  */
@@ -64,41 +76,63 @@ export class AiService {
   async ask(config: AiRuntimeConfig, req: AiAskRequest): Promise<AiAskResult> {
     const system = SYSTEM_PROMPTS[req.mode]
     const prompt = buildPrompt(req)
-    const text = await this.complete(config, system, prompt)
+    const maxTokens = req.mode === 'diagnose' ? MAX_TOKENS_DIAGNOSE : MAX_TOKENS_DEFAULT
+    const text = await this.complete(config, system, prompt, maxTokens)
     return { text, command: req.mode !== 'explain' ? extractCommand(text) : undefined }
   }
 
-  private complete(config: AiRuntimeConfig, system: string, prompt: string): Promise<string> {
-    if (config.provider === 'claude') return this.askClaude(config, system, prompt)
-    if (config.provider === 'openai') return this.askOpenAi(config, system, prompt)
-    if (config.provider === 'gemini') return this.askGemini(config, system, prompt)
-    return this.askOllama(config, system, prompt)
+  private complete(config: AiRuntimeConfig, system: string, prompt: string, maxTokens: number): Promise<string> {
+    if (config.provider === 'claude') return this.askClaude(config, system, prompt, maxTokens)
+    if (config.provider === 'openai') return this.askOpenAi(config, system, prompt, maxTokens)
+    if (config.provider === 'gemini') return this.askGemini(config, system, prompt, maxTokens)
+    return this.askOllama(config, system, prompt, maxTokens)
   }
 
   // --- Claude (SDK chính thức) ---
-  private async askClaude(config: AiRuntimeConfig, system: string, prompt: string): Promise<string> {
+  private async askClaude(
+    config: AiRuntimeConfig,
+    system: string,
+    prompt: string,
+    maxTokens: number
+  ): Promise<string> {
     if (!config.apiKey) throw new Error('Chưa cấu hình Claude API key')
     const client = new Anthropic({ apiKey: config.apiKey, timeout: REQUEST_TIMEOUT_MS })
-    const response = await client.messages.create({
-      model: config.model || 'claude-opus-4-8',
-      max_tokens: 1500,
-      system,
-      messages: [{ role: 'user', content: prompt }]
-    })
-    return response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('')
-      .trim()
+    const model = config.model || 'claude-opus-4-8'
+    const messages: Anthropic.MessageParam[] = [{ role: 'user', content: prompt }]
+    let full = ''
+    // Nối tiếp nếu bị cắt do max_tokens: đưa phần đã sinh làm lượt "assistant" (prefill) để
+    // model viết TIẾP thay vì bắt đầu lại — nhờ vậy kết luận dài không bao giờ bị cụt.
+    for (let round = 0; round < MAX_CONTINUATIONS; round++) {
+      const response = await client.messages.create({ model, max_tokens: maxTokens, system, messages })
+      const chunk = response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+        .map((b) => b.text)
+        .join('')
+      full += chunk
+      if (response.stop_reason !== 'max_tokens') break
+      // Prefill không được kết thúc bằng khoảng trắng (API sẽ báo lỗi) → cắt đuôi trắng khi gửi lại.
+      const prefill = full.replace(/\s+$/, '')
+      if (!prefill) break // không có gì để nối tiếp
+      if (messages.length === 1) messages.push({ role: 'assistant', content: prefill })
+      else messages[messages.length - 1] = { role: 'assistant', content: prefill }
+    }
+    return full.trim()
   }
 
   // --- OpenAI (REST) ---
-  private async askOpenAi(config: AiRuntimeConfig, system: string, prompt: string): Promise<string> {
+  private async askOpenAi(
+    config: AiRuntimeConfig,
+    system: string,
+    prompt: string,
+    maxTokens: number
+  ): Promise<string> {
     if (!config.apiKey) throw new Error('Chưa cấu hình OpenAI API key')
     const base = config.baseUrl?.replace(/\/$/, '') || 'https://api.openai.com/v1'
     const model = config.model || 'gpt-4o-mini'
     // Model reasoning (o-series, gpt-5…) từ chối max_tokens, bắt buộc max_completion_tokens
-    const tokenParam = /^(o\d|gpt-5)/.test(model) ? { max_completion_tokens: 1500 } : { max_tokens: 1500 }
+    const tokenParam = /^(o\d|gpt-5)/.test(model)
+      ? { max_completion_tokens: maxTokens }
+      : { max_tokens: maxTokens }
     const res = await fetch(`${base}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
@@ -118,7 +152,12 @@ export class AiService {
   }
 
   // --- Gemini (Google Generative Language REST) ---
-  private async askGemini(config: AiRuntimeConfig, system: string, prompt: string): Promise<string> {
+  private async askGemini(
+    config: AiRuntimeConfig,
+    system: string,
+    prompt: string,
+    maxTokens: number
+  ): Promise<string> {
     if (!config.apiKey) throw new Error('Chưa cấu hình Gemini API key')
     const base = config.baseUrl?.replace(/\/$/, '') || 'https://generativelanguage.googleapis.com/v1beta'
     const model = config.model || 'gemini-2.0-flash'
@@ -129,7 +168,7 @@ export class AiService {
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 1500 }
+        generationConfig: { maxOutputTokens: maxTokens }
       })
     })
     if (!res.ok) throw new Error(`Gemini lỗi ${res.status}: ${(await res.text()).slice(0, 200)}`)
@@ -144,7 +183,12 @@ export class AiService {
   }
 
   // --- Ollama (REST, local) ---
-  private async askOllama(config: AiRuntimeConfig, system: string, prompt: string): Promise<string> {
+  private async askOllama(
+    config: AiRuntimeConfig,
+    system: string,
+    prompt: string,
+    maxTokens: number
+  ): Promise<string> {
     const base = config.baseUrl?.replace(/\/$/, '') || 'http://localhost:11434'
     const res = await fetch(`${base}/api/chat`, {
       method: 'POST',
@@ -153,6 +197,8 @@ export class AiService {
       body: JSON.stringify({
         model: config.model || 'llama3.1',
         stream: false,
+        // num_predict = trần token đầu ra (mặc định Ollama có thể rất thấp → kết luận bị cắt)
+        options: { num_predict: maxTokens },
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: prompt }

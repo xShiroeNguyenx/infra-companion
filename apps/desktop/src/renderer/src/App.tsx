@@ -16,6 +16,7 @@ import { MetricsHistoryModal } from './components/MetricsHistoryModal'
 import { SyncModal } from './components/SyncModal'
 import { AiModal } from './components/AiModal'
 import { AiDiagnoseModal } from './components/AiDiagnoseModal'
+import { AiDiagnosePill } from './components/AiDiagnosePill'
 import { RecordingsModal } from './components/RecordingsModal'
 import { SettingsModal } from './components/SettingsModal'
 import { WorkspacesModal } from './components/WorkspacesModal'
@@ -80,6 +81,7 @@ export default function App() {
   // store chung để Sidebar/palette cùng mở — tránh 2 instance modal dẫm chân nhau
   const modal = useUiStore((s) => s.modal)
   const setModal = useUiStore((s) => s.setModal)
+  const minimizeAiDiagnose = useUiStore((s) => s.minimizeAiDiagnose)
   const pluginPanel = usePluginStore((s) => s.panel)
   const monitorActive = useMonitorStore((s) => s.active)
   const historyHostId = useMonitorStore((s) => s.historyHostId)
@@ -294,7 +296,9 @@ export default function App() {
       {modal === 'monitor' && <MonitorModal onClose={() => setModal(null)} />}
       {modal === 'sync' && <SyncModal onClose={() => setModal(null)} />}
       {modal === 'ai' && <AiModal onClose={() => setModal(null)} />}
-      {modal === 'ai-diagnose' && <AiDiagnoseModal onClose={() => setModal(null)} />}
+      {modal === 'ai-diagnose' && (
+        <AiDiagnoseModal onClose={() => setModal(null)} onMinimize={minimizeAiDiagnose} />
+      )}
       {modal === 'recordings' && <RecordingsModal onClose={() => setModal(null)} />}
       {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} />}
       {modal === 'workspaces' && <WorkspacesModal onClose={() => setModal(null)} />}
@@ -317,6 +321,7 @@ export default function App() {
         <PluginPanelModal panel={pluginPanel} onClose={() => usePluginStore.getState().setPanel(null)} />
       )}
       <AiExplainPanel />{/* tự return null khi không có yêu cầu giải thích */}
+      <AiDiagnosePill />{/* pill khi cửa sổ AI chẩn đoán thu nhỏ; tự return null nếu không thu nhỏ */}
 
       {locked && (
         <div className="absolute inset-0 z-[100]">

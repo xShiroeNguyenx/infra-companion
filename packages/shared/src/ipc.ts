@@ -109,6 +109,10 @@ export const IPC = {
   AI_SET_CONFIG: 'ai:set-config',
   AI_ASK: 'ai:ask',
   AI_DIAGNOSE_EXEC: 'ai:diagnose:exec',
+  AI_DIAGNOSE_SAVE: 'ai:diagnose:save',
+  AI_DIAGNOSE_LIST: 'ai:diagnose:list',
+  AI_DIAGNOSE_GET: 'ai:diagnose:get',
+  AI_DIAGNOSE_DELETE: 'ai:diagnose:delete',
 
   SYNC_STATUS: 'sync:status',
   SYNC_PICK_FOLDER: 'sync:pick-folder',

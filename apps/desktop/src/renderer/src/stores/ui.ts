@@ -19,6 +19,16 @@ export type AppModal =
 interface UiState {
   modal: AppModal
   setModal: (m: AppModal) => void
+  /**
+   * F48 — cửa sổ AI chẩn đoán đang thu nhỏ xuống pill (session vẫn chạy nền trong store
+   * aiDiagnose). Tách khỏi `modal` để khi thu nhỏ thì bỏ backdrop (app dùng được) mà
+   * vẫn còn pill để bung lại. Mở lại ('ai-diagnose') tự xoá cờ này.
+   */
+  aiDiagnoseMin: boolean
+  /** Thu nhỏ cửa sổ chẩn đoán: ẩn modal (bỏ backdrop) + hiện pill. */
+  minimizeAiDiagnose: () => void
+  /** Đóng pill (không dừng session — mở lại qua menu/palette vẫn thấy phiên đang chạy). */
+  setAiDiagnoseMin: (v: boolean) => void
   /** Thu gọn cột host bên trái để phóng to vùng làm việc (nhớ qua localStorage). */
   sidebarCollapsed: boolean
   toggleSidebar: () => void
@@ -33,7 +43,11 @@ const SIDEBAR_KEY = 'infra.sidebar.collapsed'
  */
 export const useUiStore = create<UiState>((set) => ({
   modal: null,
-  setModal: (modal) => set({ modal }),
+  // Mở cửa sổ chẩn đoán (từ menu/palette/pill) luôn xoá cờ thu nhỏ để hiện đầy đủ.
+  setModal: (modal) => set(modal === 'ai-diagnose' ? { modal, aiDiagnoseMin: false } : { modal }),
+  aiDiagnoseMin: false,
+  minimizeAiDiagnose: () => set({ modal: null, aiDiagnoseMin: true }),
+  setAiDiagnoseMin: (aiDiagnoseMin) => set({ aiDiagnoseMin }),
   sidebarCollapsed: localStorage.getItem(SIDEBAR_KEY) === '1',
   toggleSidebar: () =>
     set((s) => {

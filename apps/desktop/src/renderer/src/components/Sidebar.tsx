@@ -237,6 +237,7 @@ export function Sidebar() {
               <MenuItem label={t('menu.bulk')} onClick={() => { setMenuOpen(false); openAppModal('bulk') }} />
               <MenuItem label={t('menu.monitor')} onClick={() => { setMenuOpen(false); openAppModal('monitor') }} />
               <MenuItem label={t('menu.ai')} onClick={() => { setMenuOpen(false); openAppModal('ai') }} />
+              <MenuItem label={t('menu.aiDiagnose')} onClick={() => { setMenuOpen(false); openAppModal('ai-diagnose') }} />
               <MenuItem label={t('menu.recordings')} onClick={() => { setMenuOpen(false); openAppModal('recordings') }} />
               <MenuItem label={t('menu.net')} onClick={() => { setMenuOpen(false); openAppModal('net') }} />
               <MenuItem label={t('menu.sync')} onClick={() => { setMenuOpen(false); openAppModal('sync') }} />

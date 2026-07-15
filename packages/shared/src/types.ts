@@ -303,6 +303,49 @@ export interface AiDiagnoseExecResultDto {
   error?: string
 }
 
+/** F48 — trạng thái kết thúc của một phiên chẩn đoán được lưu lại. */
+export type AiDiagnoseStatusDto = 'done' | 'stopped' | 'error'
+
+/** F48 — một bước trong phiên chẩn đoán (mirror của DiagnoseStep ở renderer để lưu/khôi phục). */
+export interface AiDiagnoseStepDto {
+  reasoning: string
+  command: string
+  status: 'proposed' | 'running' | 'done' | 'skipped' | 'blocked' | 'error'
+  blockedReason?: string
+  output?: string
+  code?: number | null
+  error?: string
+}
+
+/** F48 — payload lưu một phiên chẩn đoán vào lịch sử (steps + conclusion mã hoá bằng DEK ở vault). */
+export interface AiDiagnoseSaveInput {
+  hostId: string
+  hostLabel: string
+  symptom: string
+  status: AiDiagnoseStatusDto
+  steps: AiDiagnoseStepDto[]
+  conclusion?: string
+  error?: string
+}
+
+/** F48 — mục danh sách lịch sử chẩn đoán (nhẹ: chỉ metadata + trích kết luận để xem nhanh). */
+export interface AiDiagnoseRecordDto {
+  id: string
+  hostLabel: string
+  symptom: string
+  status: AiDiagnoseStatusDto
+  /** Vài trăm ký tự đầu của kết luận (đã giải mã) để hiển thị preview. */
+  conclusionSnippet: string
+  stepCount: number
+  createdAt: number
+}
+
+/** F48 — chi tiết đầy đủ một phiên chẩn đoán đã lưu (để xem lại read-only). */
+export interface AiDiagnoseDetailDto extends AiDiagnoseSaveInput {
+  id: string
+  createdAt: number
+}
+
 // ---------------------------------------------------------------------------
 // Remote desktop — VNC + RDP (F13)
 // ---------------------------------------------------------------------------
@@ -792,6 +835,14 @@ export interface InfraApi {
     ask(mode: AiModeDto, input: string, context?: string): Promise<AiAskResultDto>
     /** F48 — chạy 1 lệnh chẩn đoán read-only trên host qua kênh exec riêng (enforce guard ở main). */
     diagnoseExec(hostId: string, command: string): Promise<AiDiagnoseExecResultDto>
+    /** F48 — lưu một phiên chẩn đoán đã kết thúc vào lịch sử. Trả về id. */
+    saveDiagnosis(input: AiDiagnoseSaveInput): Promise<string>
+    /** F48 — danh sách lịch sử chẩn đoán (mới nhất trước). */
+    listDiagnoses(limit?: number): Promise<AiDiagnoseRecordDto[]>
+    /** F48 — chi tiết đầy đủ một phiên đã lưu để xem lại. */
+    getDiagnosis(id: string): Promise<AiDiagnoseDetailDto | null>
+    /** F48 — xoá một phiên khỏi lịch sử. */
+    deleteDiagnosis(id: string): Promise<void>
   }
   sync: {
     status(): Promise<SyncStatusDto>

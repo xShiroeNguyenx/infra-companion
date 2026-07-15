@@ -152,7 +152,11 @@ const api: InfraApi = {
     getConfig: () => ipcRenderer.invoke(IPC.AI_GET_CONFIG),
     setConfig: (input) => ipcRenderer.invoke(IPC.AI_SET_CONFIG, input),
     ask: (mode, input, context) => ipcRenderer.invoke(IPC.AI_ASK, mode, input, context),
-    diagnoseExec: (hostId, command) => ipcRenderer.invoke(IPC.AI_DIAGNOSE_EXEC, hostId, command)
+    diagnoseExec: (hostId, command) => ipcRenderer.invoke(IPC.AI_DIAGNOSE_EXEC, hostId, command),
+    saveDiagnosis: (input) => ipcRenderer.invoke(IPC.AI_DIAGNOSE_SAVE, input),
+    listDiagnoses: (limit) => ipcRenderer.invoke(IPC.AI_DIAGNOSE_LIST, limit),
+    getDiagnosis: (id) => ipcRenderer.invoke(IPC.AI_DIAGNOSE_GET, id),
+    deleteDiagnosis: (id) => ipcRenderer.invoke(IPC.AI_DIAGNOSE_DELETE, id)
   },
   sync: {
     status: () => ipcRenderer.invoke(IPC.SYNC_STATUS),

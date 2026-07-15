@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { AiDiagnoseRecordDto } from '@infra/shared'
 import { useT } from '../i18n'
+import { formatTime } from '../lib/paths'
 import { MiniMarkdown } from '../lib/miniMarkdown'
 import { useAiDiagnoseStore, type DiagnoseStep } from '../stores/aiDiagnose'
 import { useDataStore } from '../stores/data'
@@ -8,7 +10,7 @@ import { Button, Field, Modal, Select, TextArea } from './ui'
 
 /** F48 — AI chẩn đoán sự cố: mô tả triệu chứng → AI đề xuất lệnh read-only từng bước,
  *  user duyệt → chạy qua kênh exec riêng → AI đọc output đề xuất tiếp → kết luận. */
-export function AiDiagnoseModal({ onClose }: { onClose: () => void }) {
+export function AiDiagnoseModal({ onClose, onMinimize }: { onClose: () => void; onMinimize: () => void }) {
   const t = useT()
   const session = useAiDiagnoseStore((s) => s.session)
   const start = useAiDiagnoseStore((s) => s.start)
@@ -16,6 +18,15 @@ export function AiDiagnoseModal({ onClose }: { onClose: () => void }) {
   const skip = useAiDiagnoseStore((s) => s.skip)
   const stop = useAiDiagnoseStore((s) => s.stop)
   const reset = useAiDiagnoseStore((s) => s.close)
+  const history = useAiDiagnoseStore((s) => s.history)
+  const loadHistory = useAiDiagnoseStore((s) => s.loadHistory)
+  const openHistory = useAiDiagnoseStore((s) => s.openHistory)
+  const deleteHistory = useAiDiagnoseStore((s) => s.deleteHistory)
+
+  // Nạp lịch sử mỗi lần mở modal (modal mount/unmount theo state)
+  useEffect(() => {
+    void loadHistory()
+  }, [loadHistory])
 
   const hosts = useDataStore((s) => s.hosts).filter((h) => h.protocol === 'ssh')
   const activeHostId = useTabsStore((s) => {
@@ -35,7 +46,22 @@ export function AiDiagnoseModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title={`🩺 ${t('ai.diagnose.title')}`} onClose={onClose} closeOnBackdrop={false}>
+    <Modal
+      title={`🩺 ${t('ai.diagnose.title')}`}
+      onClose={onClose}
+      closeOnBackdrop={false}
+      headerExtra={
+        <button
+          type="button"
+          className="text-subtle hover:text-content shrink-0 px-1 text-lg leading-none"
+          aria-label={t('panel.minimize')}
+          title={t('ai.diagnose.minimizeHint')}
+          onClick={onMinimize}
+        >
+          –
+        </button>
+      }
+    >
       <div className="w-[min(620px,88vw)]">
         {!session ? (
           <>
@@ -64,6 +90,24 @@ export function AiDiagnoseModal({ onClose }: { onClose: () => void }) {
                 {t('ai.diagnose.start')}
               </Button>
             </div>
+
+            {history.length > 0 && (
+              <div className="border-edge mt-4 border-t pt-3">
+                <div className="text-subtle mb-2 text-[11px] font-semibold tracking-wide uppercase">
+                  {t('ai.diagnose.historyTitle')}
+                </div>
+                <div className="max-h-[34vh] space-y-1.5 overflow-y-auto">
+                  {history.map((rec) => (
+                    <HistoryItem
+                      key={rec.id}
+                      rec={rec}
+                      onOpen={() => void openHistory(rec.id)}
+                      onDelete={() => void deleteHistory(rec.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <SessionView
@@ -96,6 +140,12 @@ function SessionView({
 
   return (
     <div className="space-y-3">
+      {session.readonly && (
+        <div className="text-subtle flex items-center justify-between text-[11px]">
+          <span>🕓 {t('ai.diagnose.readonlyView')}</span>
+          {session.createdAt ? <span>{formatTime(session.createdAt)}</span> : null}
+        </div>
+      )}
       <div className="border-edge bg-input rounded border px-3 py-2 text-xs">
         <span className="text-subtle">{session.hostLabel}</span>
         <p className="text-content mt-0.5">{session.symptom}</p>
@@ -140,6 +190,57 @@ function SessionView({
             {t('ai.diagnose.stop')}
           </Button>
         )}
+      </div>
+    </div>
+  )
+}
+
+function HistoryItem({
+  rec,
+  onOpen,
+  onDelete
+}: {
+  rec: AiDiagnoseRecordDto
+  onOpen: () => void
+  onDelete: () => void
+}) {
+  const t = useT()
+  const statusLabel =
+    rec.status === 'done'
+      ? t('ai.diagnose.statusDone')
+      : rec.status === 'stopped'
+        ? t('ai.diagnose.statusStopped')
+        : t('ai.diagnose.statusError')
+  const statusCls =
+    rec.status === 'done' ? 'text-success' : rec.status === 'stopped' ? 'text-subtle' : 'text-danger'
+  return (
+    <div className="border-edge hover:border-edge-strong group rounded border px-2.5 py-2">
+      <div className="flex items-start justify-between gap-2">
+        <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
+          <div className="flex items-center gap-2">
+            <span className="text-content truncate text-xs font-medium">{rec.hostLabel}</span>
+            <span className={`shrink-0 text-[10px] ${statusCls}`}>{statusLabel}</span>
+          </div>
+          <p className="text-subtle mt-0.5 truncate text-[11px]">{rec.symptom}</p>
+          {rec.conclusionSnippet && (
+            <p
+              className="text-muted mt-0.5 text-[10px] leading-snug"
+              style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+            >
+              {rec.conclusionSnippet}…
+            </p>
+          )}
+          <div className="text-subtle mt-1 text-[10px]">{formatTime(rec.createdAt)}</div>
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="text-subtle hover:text-danger shrink-0 rounded px-1 text-xs opacity-0 transition-opacity group-hover:opacity-100"
+          title={t('ai.diagnose.delete')}
+          aria-label={t('ai.diagnose.delete')}
+        >
+          🗑
+        </button>
       </div>
     </div>
   )

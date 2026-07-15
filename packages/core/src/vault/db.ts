@@ -141,6 +141,21 @@ const MIGRATIONS: string[] = [
   // v9 — tmux: bật thì sau login tự "tmux new-session -A" để phiên sống sót khi rớt mạng (resume).
   `
   ALTER TABLE hosts ADD COLUMN tmux INTEGER NOT NULL DEFAULT 0;
+  `,
+  // v10 — F48: lịch sử AI chẩn đoán sự cố. data_enc = JSON {steps, conclusion, error} mã hoá bằng DEK
+  // (output server có thể chứa thông tin nhạy cảm). KHÔNG đưa vào sync — đây là log cục bộ.
+  // host_id để tham chiếu (không FK: host có thể bị xoá mà vẫn muốn giữ lịch sử).
+  `
+  CREATE TABLE diagnoses (
+    id         TEXT PRIMARY KEY,
+    host_id    TEXT,
+    host_label TEXT NOT NULL,
+    symptom    TEXT NOT NULL,
+    status     TEXT NOT NULL,
+    data_enc   TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_diagnoses_time ON diagnoses(created_at DESC);
   `
 ]
 

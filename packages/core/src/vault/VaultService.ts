@@ -3,6 +3,10 @@ import { generateKeyPairSync, randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { utils as sshUtils } from 'ssh2'
 import type {
+  AiDiagnoseDetailDto,
+  AiDiagnoseRecordDto,
+  AiDiagnoseSaveInput,
+  AiDiagnoseStepDto,
   AuthType,
   GroupDto,
   GroupInput,
@@ -726,6 +730,114 @@ export class VaultService {
       .prepare('SELECT id, target, host_id, connected_at FROM history ORDER BY connected_at DESC LIMIT ?')
       .all(limit) as Array<{ id: string; target: string; host_id: string | null; connected_at: number }>
     return rows.map((r) => ({ id: r.id, target: r.target, hostId: r.host_id, connectedAt: r.connected_at }))
+  }
+
+  // -------------------------------------------------------------------------
+  // AI diagnose history (F48) — steps + conclusion MÃ HOÁ bằng DEK trong data_enc.
+  // Giữ tối đa 50 phiên mới nhất. KHÔNG nằm trong sync (log cục bộ).
+  // -------------------------------------------------------------------------
+
+  private static readonly DIAGNOSE_CAP = 50
+  private static readonly DIAGNOSE_SNIPPET_LEN = 200
+
+  saveDiagnosis(input: AiDiagnoseSaveInput): string {
+    const db = this.ensureDb()
+    const dek = this.requireDek()
+    const id = randomUUID()
+    const now = Date.now()
+    const dataEnc = encryptField(
+      dek,
+      JSON.stringify({ steps: input.steps, conclusion: input.conclusion ?? null, error: input.error ?? null })
+    )
+    db.prepare(
+      `INSERT INTO diagnoses (id, host_id, host_label, symptom, status, data_enc, created_at)
+       VALUES (?,?,?,?,?,?,?)`
+    ).run(id, input.hostId || null, input.hostLabel, input.symptom, input.status, dataEnc, now)
+    // Giữ tối đa DIAGNOSE_CAP dòng mới nhất
+    db.prepare(
+      `DELETE FROM diagnoses WHERE id NOT IN (SELECT id FROM diagnoses ORDER BY created_at DESC LIMIT ${VaultService.DIAGNOSE_CAP})`
+    ).run()
+    return id
+  }
+
+  listDiagnoses(limit = VaultService.DIAGNOSE_CAP): AiDiagnoseRecordDto[] {
+    const rows = this.ensureDb()
+      .prepare(
+        'SELECT id, host_label, symptom, status, data_enc, created_at FROM diagnoses ORDER BY created_at DESC LIMIT ?'
+      )
+      .all(limit) as Array<{
+      id: string
+      host_label: string
+      symptom: string
+      status: string
+      data_enc: string
+      created_at: number
+    }>
+    return rows.map((r) => {
+      // Vault khoá → không giải mã được, vẫn trả metadata (snippet rỗng, stepCount 0)
+      const parsed = this.dek ? this.parseDiagnoseData(r.data_enc) : null
+      const conclusion = parsed?.conclusion ?? ''
+      const snippet = conclusion.replace(/\s+/g, ' ').trim().slice(0, VaultService.DIAGNOSE_SNIPPET_LEN)
+      return {
+        id: r.id,
+        hostLabel: r.host_label,
+        symptom: r.symptom,
+        status: r.status as AiDiagnoseRecordDto['status'],
+        conclusionSnippet: snippet,
+        stepCount: parsed?.steps.length ?? 0,
+        createdAt: r.created_at
+      }
+    })
+  }
+
+  getDiagnosis(id: string): AiDiagnoseDetailDto | null {
+    const row = this.ensureDb()
+      .prepare('SELECT id, host_id, host_label, symptom, status, data_enc, created_at FROM diagnoses WHERE id = ?')
+      .get(id) as
+      | {
+          id: string
+          host_id: string | null
+          host_label: string
+          symptom: string
+          status: string
+          data_enc: string
+          created_at: number
+        }
+      | undefined
+    if (!row) return null
+    const parsed = this.parseDiagnoseData(row.data_enc)
+    return {
+      id: row.id,
+      hostId: row.host_id ?? '',
+      hostLabel: row.host_label,
+      symptom: row.symptom,
+      status: row.status as AiDiagnoseDetailDto['status'],
+      steps: parsed?.steps ?? [],
+      conclusion: parsed?.conclusion ?? undefined,
+      error: parsed?.error ?? undefined,
+      createdAt: row.created_at
+    }
+  }
+
+  deleteDiagnosis(id: string): void {
+    this.ensureDb().prepare('DELETE FROM diagnoses WHERE id = ?').run(id)
+  }
+
+  private parseDiagnoseData(
+    enc: string
+  ): { steps: AiDiagnoseStepDto[]; conclusion: string | null; error: string | null } | null {
+    const raw = decryptField(this.requireDek(), enc)
+    if (!raw) return null
+    try {
+      const data = JSON.parse(raw) as {
+        steps?: AiDiagnoseStepDto[]
+        conclusion?: string | null
+        error?: string | null
+      }
+      return { steps: data.steps ?? [], conclusion: data.conclusion ?? null, error: data.error ?? null }
+    } catch {
+      return null
+    }
   }
 
   // -------------------------------------------------------------------------

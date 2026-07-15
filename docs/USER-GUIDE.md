@@ -374,7 +374,11 @@ Purely local, no SSH. Enter a host/IP then:
 
 **What it is**: an **agent mode** for diagnosing a sick server. You describe a symptom; the AI proposes **one read-only diagnostic command at a time** (with a one-line rationale); **you approve each step**; the command runs and the AI reads the output before proposing the next — until it reaches a conclusion and suggested fix.
 
-**Use**: `Ctrl+Shift+P` → **🩺 AI troubleshooter** → pick an SSH host → type the symptom ("web returns 502", "load is high") → **Start**. For each step: **Approve & run** / **Skip** / **Stop**. The conclusion appears at the end; **New diagnosis** resets.
+**Use**: open it from the **⋯ tools menu** (sidebar) → **🩺 AI troubleshooter**, or `Ctrl+Shift+P` → 🩺 → pick an SSH host → type the symptom ("web returns 502", "load is high") → **Start**. For each step: **Approve & run** / **Skip** / **Stop**. The conclusion appears at the end; **New diagnosis** resets.
+
+**Minimize while it works**: the AI can take a while to think or run a command — press the **–** button in the window header to drop it to a small pill (bottom-right) and keep using the rest of the app. The pill shows live status (analyzing / running / **needs your approval** / done); click it to reopen. The session keeps running in the background regardless.
+
+**History**: when a session finishes, stops, or errors it is saved automatically under **Diagnosis history** on the start screen (symptom, the steps that ran with their output, and the conclusion). Click a past session to review it **read-only**, or use 🗑 to delete it. The last 50 are kept, **encrypted with your vault key** (so the vault must be unlocked to read them back).
 
 **Safety** (this is the important part):
 - The commands run over a **separate SSH exec channel** — your open terminal is never touched, and each command's output is captured cleanly (works through jump hosts and login scripts).
