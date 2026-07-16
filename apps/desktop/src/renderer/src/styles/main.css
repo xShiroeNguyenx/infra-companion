@@ -110,12 +110,11 @@ body,
   background-color: var(--term-bg) !important;
 }
 
-/* ── Scrollbar mảnh, tối — thay scrollbar trắng to mặc định của Chromium ── */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--c-edge-strong) transparent;
-}
-
+/* ── Scrollbar tuỳ biến CHỈ bằng ::-webkit-scrollbar (Electron = Chromium) ──────
+   ⚠️ TUYỆT ĐỐI KHÔNG set `scrollbar-width`/`scrollbar-color` ở đây (kể cả trên `*`):
+   Chromium ≥121 sẽ VÔ HIỆU HOÁ toàn bộ ::-webkit-scrollbar-* trên mọi element có 1
+   trong 2 thuộc tính đó → scrollbar về native to (có cả nút mũi tên). Đó chính là
+   lý do scrollbar terminal không bao giờ nhỏ được dù đã đặt width. */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -137,13 +136,33 @@ body,
   background: transparent;
 }
 
-/* Terminal: ẨN hẳn scrollbar (chiếm ngang, gây rối khi split nhiều pane).
-   Vẫn cuộn bằng lăn chuột / PgUp-PgDn bình thường. */
-.xterm-viewport {
-  scrollbar-width: none;
+/* ⚠️ SCROLLBAR TERMINAL — nguyên nhân "thanh to mãi không nhỏ":
+   xterm ≥6 KHÔNG dùng scrollbar native của .xterm-viewport nữa mà là OVERLAY kiểu
+   VS Code: .xterm-scrollable-element > .scrollbar(.vertical/.horizontal) > .slider.
+   Bề rộng mặc định 14px và do JS SET INLINE → mọi rule scrollbar-width/::-webkit-scrollbar
+   trên .xterm-viewport đều VÔ TÁC DỤNG. Phải ép bằng !important (thắng inline style).
+   Màu slider đặt qua theme xterm (scrollbarSlider* trong theme.ts). */
+.xterm .xterm-scrollable-element > .scrollbar.vertical,
+.xterm .xterm-scrollable-element > .scrollbar.vertical > .slider {
+  width: 7px !important;
 }
+.xterm .xterm-scrollable-element > .scrollbar.horizontal,
+.xterm .xterm-scrollable-element > .scrollbar.horizontal > .slider {
+  height: 7px !important;
+}
+.xterm .xterm-scrollable-element > .scrollbar > .slider {
+  border-radius: 4px;
+}
+
+/* Phòng xa: nếu build/cấu hình nào đó vẫn lộ scrollbar native của .xterm-viewport
+   thì cũng giữ mảnh 6px (::-webkit-scrollbar giờ đã ăn vì không còn scrollbar-width). */
 .xterm-viewport::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
+  width: 6px;
+  height: 6px;
+}
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--c-edge-strong) 55%, transparent);
+  border: 0;
+  border-radius: 3px;
+  background-clip: border-box;
 }

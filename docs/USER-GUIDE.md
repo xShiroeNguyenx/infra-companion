@@ -135,7 +135,10 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 | **Add a pane to a tab** | `Ctrl+Shift+D` adds a local pane; the **⊟** icon on a sidebar host opens it into a new pane of the current tab |
 | **Merge tabs ⇄ split** (the **⊞ Split** button) | Click **⊞ Split** in the toolbar: merge **ALL open terminal tabs** into panes within one tab (so Broadcast spans them); click again to split back into separate tabs. Scrollback is preserved across merge/split |
 | **Open a whole group** | The **grid** button on a group header in the sidebar (or the **Open group** command in the Command Palette): opens every host in the group as pre-split panes in one tab — ready for Broadcast |
-| **Resize panes** | **Drag the divider** between panes (whole column/row resizes); **double-click** a divider to reset to equal sizes |
+| **Split layout** | The **▼** next to **⊞ Split ON**: pick **Auto grid** / **Side by side** / **Stacked** / **Main left** / **Main top**. Also in **Settings → Terminal → Split layout** (global default) |
+| **Pane frame** | **Settings → Terminal → Pane frame**: **Compact bar** (status dot + title + ✕) or **Mac style** (rounded corners + a round red close button) |
+| **Command palette** | `Ctrl+Shift+P`, or the **⌘ Commands** button at the right of the tab toolbar |
+| **Resize panes** | **Drag the divider** between panes (whole column/row resizes); **double-click** a divider to reset to equal sizes. For **Main left/top** you drag the main/secondary split |
 | **Broadcast** | The **📡 Broadcast** button or `Ctrl+Shift+B`: type in one pane → it's sent to **ALL panes** in the tab |
 | **Switch tabs** | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
 | **Close tab/pane** | `Ctrl+Shift+W`, or `✕` on the tab/pane, or middle-click the tab |
@@ -171,7 +174,7 @@ Settings opens as a **full-screen page** with a category rail on the left — **
 - **Accent color**: a color picker sets your own accent (primary buttons, selection borders…) on top of the dark/light theme; a Reset button restores the default.
 - **🎨 Custom palette (Theme studio)**: a collapsible section in Settings → Appearance to customize **11 UI colors** (Background, Sidebar/bars, Modals, Inputs, Hover, Borders, Text, Muted text, Danger, Success, Warning). Click a swatch to change it → **applied live**. Overrides are stored **separately per theme** (dark and light), so toggling Dark↔Light stays correct. The **✕** next to a color clears that override; **Reset to default** clears them all.
   - **Export / Import theme**: click **Export / Import theme** → a JSON box shows the current theme (accent + palette). **Copy** to share/back up; paste another JSON and **Apply** to load it. (Stored on this machine, not synced.)
-- **Terminal**: adjust **font size**, **line height**, **cursor style** (block/bar/underline) and **font family** (a CSS font name using an installed font; a ↺ button restores the default). Applies instantly to all panes.
+- **Terminal**: adjust **font size**, **line height**, **cursor style** (block/bar/underline), **font family** (a CSS font name using an installed font; a ↺ button restores the default), **GPU acceleration (WebGL)**, **Split layout** (default arrangement for split panes), and **Pane frame** (Compact bar / Mac style). Applies instantly to all panes.
 
 ---
 

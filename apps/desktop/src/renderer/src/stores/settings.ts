@@ -11,6 +11,24 @@ export type BgFit = 'cover' | 'contain'
 export type TermCursor = 'block' | 'bar' | 'underline'
 /** Trang mở khi khởi động app (sau khi unlock vault). */
 export type StartupPage = 'dashboard' | 'terminal'
+/**
+ * Bố cục sắp xếp các pane khi Split:
+ * - `auto`       — lưới vuông tự động (mặc định, hành vi cũ)
+ * - `columns`    — mọi pane cạnh nhau thành cột dọc (1 hàng)
+ * - `rows`       — mọi pane xếp chồng thành hàng ngang (1 cột)
+ * - `main-left`  — 1 pane chính lớn bên trái, các pane còn lại xếp cột bên phải
+ * - `main-top`   — 1 pane chính lớn bên trên, các pane còn lại thành hàng bên dưới
+ */
+export type PaneLayout = 'auto' | 'columns' | 'rows' | 'main-left' | 'main-top'
+/** Thứ tự hiển thị các layout trong picker (Settings + toolbar). */
+export const PANE_LAYOUTS: PaneLayout[] = ['auto', 'columns', 'rows', 'main-left', 'main-top']
+/**
+ * Kiểu khung (header) của mỗi pane khi Split:
+ * - `bar` — thanh tiêu đề gọn: chấm trạng thái + tên + nút ✕ (mặc định)
+ * - `mac` — kiểu macOS: 3 chấm tròn traffic-light bên trái, chấm đỏ = đóng
+ */
+export type PaneFrame = 'bar' | 'mac'
+export const PANE_FRAMES: PaneFrame[] = ['bar', 'mac']
 
 const THEME_KEY = 'infra.theme'
 const LANG_KEY = 'infra.lang'
@@ -25,6 +43,8 @@ const TERM_SIZE_KEY = 'infra.term.size'
 const TERM_LH_KEY = 'infra.term.lineHeight'
 const TERM_CURSOR_KEY = 'infra.term.cursor'
 const TERM_WEBGL_KEY = 'infra.term.webgl'
+const PANE_LAYOUT_KEY = 'infra.term.paneLayout'
+const PANE_FRAME_KEY = 'infra.term.paneFrame'
 const CUSTOM_COLORS_KEY = 'infra.theme.custom'
 const STARTUP_KEY = 'infra.startup.page'
 const CMD_GUARD_ON_KEY = 'infra.cmdGuard.on'
@@ -120,6 +140,18 @@ function readTermCursor(): TermCursor {
 /** GPU render (WebGL) cho terminal — mặc định BẬT; '0' = user đã tắt (máy có vấn đề GPU). */
 function readTermWebgl(): boolean {
   return localStorage.getItem(TERM_WEBGL_KEY) !== '0'
+}
+
+/** Bố cục pane khi Split — mặc định 'auto' (lưới vuông như cũ). */
+function readPaneLayout(): PaneLayout {
+  const v = localStorage.getItem(PANE_LAYOUT_KEY)
+  return PANE_LAYOUTS.includes(v as PaneLayout) ? (v as PaneLayout) : 'auto'
+}
+
+/** Kiểu khung pane — mặc định 'bar' (thanh tiêu đề như cũ). */
+function readPaneFrame(): PaneFrame {
+  const v = localStorage.getItem(PANE_FRAME_KEY)
+  return PANE_FRAMES.includes(v as PaneFrame) ? (v as PaneFrame) : 'bar'
 }
 
 function readStartupPage(): StartupPage {
@@ -242,6 +274,10 @@ interface SettingsState {
   termCursor: TermCursor
   /** Render terminal bằng GPU (WebGL addon) — gõ/cuộn mượt hơn hẳn DOM renderer. */
   termWebgl: boolean
+  /** Bố cục sắp xếp các pane khi Split. */
+  paneLayout: PaneLayout
+  /** Kiểu khung (header) của mỗi pane khi Split. */
+  paneFrame: PaneFrame
   /** Trang mở khi khởi động: dashboard (mặc định) hay terminal local như trước. */
   startupPage: StartupPage
   /** Guard lệnh nhạy cảm: bấm Enter trên lệnh khớp whitelist → hiện popup xác nhận. */
@@ -262,6 +298,8 @@ interface SettingsState {
   setTermLineHeight: (n: number) => void
   setTermCursor: (c: TermCursor) => void
   setTermWebgl: (on: boolean) => void
+  setPaneLayout: (l: PaneLayout) => void
+  setPaneFrame: (f: PaneFrame) => void
   setStartupPage: (p: StartupPage) => void
   setCommandGuardEnabled: (on: boolean) => void
   setCommandGuardPatterns: (patterns: string[]) => void
@@ -292,6 +330,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   termLineHeight: readTermLineHeight(),
   termCursor: readTermCursor(),
   termWebgl: readTermWebgl(),
+  paneLayout: readPaneLayout(),
+  paneFrame: readPaneFrame(),
   startupPage: readStartupPage(),
   commandGuardEnabled: readCommandGuardOn(),
   commandGuardPatterns: readCommandGuardPatterns(),
@@ -364,6 +404,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setTermWebgl: (on) => {
     localStorage.setItem(TERM_WEBGL_KEY, on ? '1' : '0')
     set({ termWebgl: on })
+  },
+  setPaneLayout: (layout) => {
+    localStorage.setItem(PANE_LAYOUT_KEY, layout)
+    set({ paneLayout: layout })
+  },
+  setPaneFrame: (frame) => {
+    localStorage.setItem(PANE_FRAME_KEY, frame)
+    set({ paneFrame: frame })
   },
   setStartupPage: (page) => {
     localStorage.setItem(STARTUP_KEY, page)

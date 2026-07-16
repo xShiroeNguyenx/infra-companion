@@ -5,6 +5,21 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.23] — 2026-07-16
+
+### Added
+
+- **Split layouts** — when panes are split you can now arrange them five ways instead of only the automatic grid: **Auto grid**, **Side by side** (columns), **Stacked** (rows), **Main left** (one large pane on the left, the rest stacked beside it), and **Main top** (one large pane on top, the rest in a row below). Switch instantly from the **▼** next to the **Split ON** button, or set the default in **Settings → Terminal → Split layout**. Dragging the dividers to resize still works (for the *main* layouts you drag the main/secondary split).
+- **Pane frame styles** — choose how each split pane's header looks in **Settings → Terminal → Pane frame**: **Compact bar** (status dot + title + ✕, the default) or **Mac style** (rounded window corners with a round red close button). 
+- **Command palette button on the terminal toolbar** — the palette was previously reachable only via `Ctrl+Shift+P`, which many people never discover; there's now a **⌘ Commands** button on the toolbar that opens it. The shortcut still works exactly as before.
+
+### Changed
+
+- **The terminal scrollbar is now thin and unobtrusive** — it was stubbornly wide because xterm ≥6 draws its own overlay scrollbar (VS Code style, 14px, sized inline by JS), so the previous CSS never touched the element actually on screen. It's now slimmed to ~7px with a subtle theme-matched thumb that fades when idle. (Root cause of the earlier "the scrollbar won't shrink" was a global `scrollbar-width` rule that silently disabled all custom scrollbar styling in modern Chromium — removed.)
+- **Split-pane headers are a touch smaller** so they take less vertical space, and the **Split ON** button now matches the height of the neighbouring toolbar buttons.
+
+---
+
 ## [0.1.22] — 2026-07-15
 
 ### Added

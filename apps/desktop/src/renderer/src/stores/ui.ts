@@ -32,6 +32,10 @@ interface UiState {
   /** Thu gọn cột host bên trái để phóng to vùng làm việc (nhớ qua localStorage). */
   sidebarCollapsed: boolean
   toggleSidebar: () => void
+  /** Command Palette (Ctrl+Shift+P) — đưa lên store để nút toolbar cũng mở được. */
+  paletteOpen: boolean
+  setPaletteOpen: (v: boolean) => void
+  togglePalette: () => void
 }
 
 const SIDEBAR_KEY = 'infra.sidebar.collapsed'
@@ -58,5 +62,8 @@ export const useUiStore = create<UiState>((set) => ({
         /* localStorage lỗi — chỉ mất persist, vẫn toggle được */
       }
       return { sidebarCollapsed: collapsed }
-    })
+    }),
+  paletteOpen: false,
+  setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+  togglePalette: () => set((s) => ({ paletteOpen: !s.paletteOpen }))
 }))

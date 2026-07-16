@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { StatusBar } from './components/StatusBar'
 import { TabsBar } from './components/TabsBar'
@@ -77,7 +77,10 @@ export default function App() {
   const bgBlur = useSettingsStore((s) => s.backgroundBlur)
   const bgPosition = useSettingsStore((s) => s.backgroundPosition)
   const bgFit = useSettingsStore((s) => s.backgroundFit)
-  const [paletteOpen, setPaletteOpen] = useState(false)
+  // Command Palette lên store chung để nút toolbar (TerminalTabView) cũng mở được
+  const paletteOpen = useUiStore((s) => s.paletteOpen)
+  const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
+  const togglePalette = useUiStore((s) => s.togglePalette)
   // store chung để Sidebar/palette cùng mở — tránh 2 instance modal dẫm chân nhau
   const modal = useUiStore((s) => s.modal)
   const setModal = useUiStore((s) => s.setModal)
@@ -161,7 +164,7 @@ export default function App() {
       if (event.ctrlKey && event.shiftKey && event.code === 'KeyP') {
         event.preventDefault()
         event.stopPropagation()
-        setPaletteOpen((v) => !v)
+        togglePalette()
         return
       }
       if (!event.ctrlKey) return

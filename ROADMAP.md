@@ -97,6 +97,7 @@
 - **Bộ plugin mẫu mới** ⚡ — mỗi mẫu vừa là tính năng vừa là marketing: cert-expiry checker, fail2ban report, backup verifier, MySQL slow-log analyzer (cùng khuôn Access Log Analyzer).
 
 ### 3H. App & QoL
+- ~~**Bố cục chia màn hình (split layout) + kiểu khung pane + nút Command Palette trên toolbar**~~ — ✅ Đã làm (v0.1.23): 5 layout (auto/cột/hàng/chính-trái/chính-trên) chọn qua ▼ cạnh Split ON; kiểu khung Thanh gọn / Mac (bo góc + nút đóng tròn); nút ⌘ mở palette cho người không biết Ctrl+Shift+P; sửa scrollbar terminal mảnh (xterm 6 overlay). *Còn lại (sau): layout/khung per-tab hoặc per-pane; màu tab/pane theo host/group (dưới).*
 - **F53 — Tray + chạy nền** — đóng cửa sổ nhưng tunnel/monitoring vẫn sống trong tray (đi cặp F15 auto-start).
 - **F54 — Deep link `infra-companion://host/<id>`** ⚡ — click link trong wiki/ticket là mở đúng session.
 - **Tab/pane màu theo host/group** ⚡ — production đỏ, staging vàng; đổi màu viền pane khi broadcast (P21 mở rộng).

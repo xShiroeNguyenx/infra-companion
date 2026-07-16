@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useT } from '../i18n'
 import {
+  PANE_FRAMES,
+  PANE_LAYOUTS,
   TERM_FONT_DEFAULT,
   useSettingsStore,
   type BgFit,
   type BgPosition,
   type Language,
+  type PaneFrame,
   type StartupPage,
   type TermCursor,
   type ThemeMode
@@ -13,6 +16,7 @@ import {
 import { useToastsStore } from '../stores/toasts'
 import { DEFAULT_GUARD_PATTERNS } from '../lib/commandGuard'
 import { CustomPaletteSection } from './CustomPaletteSection'
+import { LayoutGlyph } from './LayoutGlyph'
 import { Button, Field, TextArea, TextInput } from './ui'
 
 /** Các nhóm cài đặt hiển thị ở cột điều hướng bên trái của màn hình Settings. */
@@ -56,6 +60,32 @@ function downscaleToDataUrl(file: File): Promise<string> {
   })
 }
 
+/** Ảnh xem trước nhỏ cho từng kiểu khung pane trong picker. */
+function FramePreview({ frame }: { frame: PaneFrame }) {
+  const mac = frame === 'mac'
+  return (
+    <div className={`border-edge-strong bg-app w-full overflow-hidden border ${mac ? 'rounded-lg' : 'rounded'}`}>
+      <div className="bg-panel flex h-4 items-center gap-1 px-1.5">
+        {mac ? (
+          <>
+            {/* Kiểu Mac: nút đóng tròn đỏ bên trái, khung bo góc */}
+            <span className="bg-danger size-1.5 rounded-full" />
+            <span className="text-subtle flex-1 text-center text-[7px] leading-none">web-01</span>
+            <span className="bg-success size-1 rounded-full" />
+          </>
+        ) : (
+          <>
+            <span className="bg-success size-1.5 rounded-full" />
+            <span className="text-subtle flex-1 truncate text-[7px] leading-none">web-01</span>
+            <span className="text-subtle text-[7px] leading-none">✕</span>
+          </>
+        )}
+      </div>
+      <div className="h-5" />
+    </div>
+  )
+}
+
 export function SettingsModal({ onClose }: { onClose: () => void }) {
   const t = useT()
   const {
@@ -72,6 +102,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     termLineHeight,
     termCursor,
     termWebgl,
+    paneLayout,
+    paneFrame,
     startupPage,
     commandGuardEnabled,
     commandGuardPatterns,
@@ -88,6 +120,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     setTermLineHeight,
     setTermCursor,
     setTermWebgl,
+    setPaneLayout,
+    setPaneFrame,
     setStartupPage,
     setCommandGuardEnabled,
     setCommandGuardPatterns
@@ -502,6 +536,46 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                     ))}
                   </div>
                   <p className="text-subtle mt-1 text-[11px]">{t('settings.termWebglHint')}</p>
+                </Field>
+
+                <Field label={t('settings.termLayout')}>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {PANE_LAYOUTS.map((l) => (
+                      <button
+                        key={l}
+                        onClick={() => setPaneLayout(l)}
+                        className={`flex flex-col items-center gap-1 rounded border px-1 py-2 text-[10px] ${
+                          paneLayout === l
+                            ? 'border-accent text-content bg-accent-soft/40'
+                            : 'border-edge text-muted hover:bg-hover'
+                        }`}
+                      >
+                        <LayoutGlyph kind={l} className="size-5" />
+                        <span className="text-center leading-tight">{t(`tabs.layout.${l}`)}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-subtle mt-1 text-[11px]">{t('settings.termLayoutHint')}</p>
+                </Field>
+
+                <Field label={t('settings.paneFrame')}>
+                  <div className="grid grid-cols-2 gap-2">
+                    {PANE_FRAMES.map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setPaneFrame(f)}
+                        className={`flex flex-col items-center gap-1.5 rounded border px-2 py-2 text-[11px] ${
+                          paneFrame === f
+                            ? 'border-accent text-content bg-accent-soft/40'
+                            : 'border-edge text-muted hover:bg-hover'
+                        }`}
+                      >
+                        <FramePreview frame={f} />
+                        <span>{t(`settings.paneFrame.${f}`)}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-subtle mt-1 text-[11px]">{t('settings.paneFrameHint')}</p>
                 </Field>
 
                 <Field label={t('settings.termFont')}>
