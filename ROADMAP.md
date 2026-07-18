@@ -62,6 +62,7 @@
 - *(Mở rộng P47 — sau)*: editor tích hợp trong app (CodeMirror) bên cạnh "mở bằng editor local" đã có.
 
 ### 3C. Ops & Monitoring (bồi lên Monitoring dock v0.1.9)
+- ~~**Monitor tách cửa sổ riêng + chọn host theo workspace/nhóm**~~ — ✅ Đã làm (v0.1.24): nút ⧉ tách dock monitor ra **cửa sổ riêng always-on-top** (vẫn cập nhật khi thu nhỏ app chính, dùng chung luồng sample — không mở SSH thêm; Gộp lại/Dừng từ cả 2 phía); chip **Chọn nhanh** trong modal Monitoring tick cả nhóm/workspace 1 click; grip ◢ resize dock; icon app crop lại lấp đầy khung. *Còn lại (sau): nhớ vị trí/cỡ cửa sổ tách rời qua phiên; mini-mode chỉ hiện bar.*
 - **F32 — Lịch sử metrics + đồ thị** ⭐ — lưu sample vào SQLite, xem đồ thị 1h/24h thay vì chỉ realtime; đi cặp với alert ngưỡng (F04) + kênh báo webhook Slack/Telegram/Discord.
 - **F33 — Process viewer** — panel top-like: list process, sort CPU/RAM, kill có confirm.
 - **F34 — Systemd manager** ⚡ — list service, start/stop/restart, xem `journalctl -u` (thuần exec + parse).

@@ -87,6 +87,7 @@ export default function App() {
   const minimizeAiDiagnose = useUiStore((s) => s.minimizeAiDiagnose)
   const pluginPanel = usePluginStore((s) => s.panel)
   const monitorActive = useMonitorStore((s) => s.active)
+  const monitorDetached = useMonitorStore((s) => s.detached)
   const historyHostId = useMonitorStore((s) => s.historyHostId)
   const pluginCommands = usePluginStore((s) => s.contributions)
   const booted = useRef(false)
@@ -118,6 +119,11 @@ export default function App() {
     const offAlert = window.infra.monitor.onAlert((a) =>
       useToastsStore.getState().push(formatAlertToast(a), a.kind === 'breach' ? 'error' : 'info')
     )
+    const offDetached = window.infra.monitor.onDetachedState((open) => useMonitorStore.getState().setDetached(open))
+    // Dừng từ bất kỳ cửa sổ nào (vd cửa sổ tách rời) → reset store; KHÔNG gọi stopAll lại (tránh vòng lặp)
+    const offStopped = window.infra.monitor.onStopped(() =>
+      useMonitorStore.setState({ active: false, data: {}, detached: false })
+    )
     return () => {
       offLocked()
       offExit()
@@ -128,6 +134,8 @@ export default function App() {
       offNotify()
       offSample()
       offAlert()
+      offDetached()
+      offStopped()
     }
   }, [])
 
@@ -318,7 +326,8 @@ export default function App() {
           onClose={() => useMonitorStore.getState().setHistoryHost(null)}
         />
       )}
-      {monitorActive && <MonitorDock />}
+      {/* Đã tách ra cửa sổ riêng → ẩn hẳn dock trong app (đóng/gộp cửa sổ đó thì hiện lại) */}
+      {monitorActive && !monitorDetached && <MonitorDock />}
       <RdpDock />{/* tự return null khi không có tunnel RDP nào */}
       {pluginPanel && (
         <PluginPanelModal panel={pluginPanel} onClose={() => usePluginStore.getState().setPanel(null)} />

@@ -1,5 +1,6 @@
-import { app, BrowserWindow, nativeImage, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeImage, shell } from 'electron'
 import { join } from 'node:path'
+import { IPC } from '@infra/shared'
 import { registerUpdaterIpc } from './ipc/updater'
 import { registerAiIpc } from './ipc/ai'
 import { registerBulkIpc } from './ipc/bulk'
@@ -94,13 +95,79 @@ function createWindow(): BrowserWindow {
     if (url !== win.webContents.getURL()) event.preventDefault()
   })
 
-  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
-    void win.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+  loadRenderer(win)
 
   return win
+}
+
+/** Nạp renderer (dev: URL Vite, prod: file). hash → route trong renderer (vd 'monitor' cho cửa sổ tách rời). */
+function loadRenderer(win: BrowserWindow, hash?: string): void {
+  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
+    void win.loadURL(process.env['ELECTRON_RENDERER_URL'] + (hash ? `#${hash}` : ''))
+  } else {
+    void win.loadFile(join(__dirname, '../renderer/index.html'), hash ? { hash } : undefined)
+  }
+}
+
+// ── Cửa sổ monitor tách rời (F04): nhỏ, không khung, always-on-top; sống cả khi app chính thu nhỏ.
+//    Nhận sample qua cùng luồng broadcast của MonitorService (main), không tự mở SSH riêng.
+let mainWin: BrowserWindow | null = null
+let detachedMonitorWin: BrowserWindow | null = null
+let detachedMonitorHosts: Array<{ id: string; label: string }> = []
+
+function notifyDetachedState(open: boolean): void {
+  if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send(IPC.MONITOR_DETACHED_STATE, open)
+}
+
+function openDetachedMonitor(hosts: Array<{ id: string; label: string }>): void {
+  detachedMonitorHosts = hosts
+  if (detachedMonitorWin && !detachedMonitorWin.isDestroyed()) {
+    detachedMonitorWin.focus()
+    return
+  }
+  const iconPath = windowIconPath()
+  const win = new BrowserWindow({
+    width: 320,
+    height: 440,
+    minWidth: 220,
+    minHeight: 150,
+    frame: false,
+    resizable: true,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    title: 'Monitor — Infra Companion',
+    backgroundColor: '#0b0e14',
+    ...(iconPath ? { icon: iconPath } : {}),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  })
+  win.setAlwaysOnTop(true, 'floating') // nổi trên cả cửa sổ toàn màn hình của app khác
+  win.setMenuBarVisibility(false)
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https:') || url.startsWith('http:')) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  loadRenderer(win, 'monitor')
+  detachedMonitorWin = win
+  notifyDetachedState(true)
+  win.on('closed', () => {
+    detachedMonitorWin = null
+    notifyDetachedState(false)
+  })
+}
+
+function registerDetachedMonitorIpc(): void {
+  ipcMain.handle(IPC.MONITOR_OPEN_DETACHED, (_e, hosts: Array<{ id: string; label: string }>) =>
+    openDetachedMonitor(hosts)
+  )
+  ipcMain.on(IPC.MONITOR_CLOSE_DETACHED, () => detachedMonitorWin?.close())
+  ipcMain.handle(IPC.MONITOR_DETACHED_INIT, () => ({ hosts: detachedMonitorHosts }))
+  // Dừng theo dõi (từ bất kỳ cửa sổ nào) → đóng luôn cửa sổ tách rời cho khỏi hiển thị dữ liệu chết
+  ipcMain.on(IPC.MONITOR_STOP_ALL, () => detachedMonitorWin?.close())
 }
 
 // AUMID custom: (1) bản đóng gói cần khớp appId đã cài để Windows toast (alert F04) hoạt động;
@@ -127,12 +194,19 @@ let disposePlugins: (() => void) | null = null
 
 void app.whenReady().then(() => {
   const win = createWindow()
+  mainWin = win
   registerUpdaterIpc(win)
+  registerDetachedMonitorIpc()
+  // Đóng app chính → đóng luôn cửa sổ monitor tách rời (thu nhỏ thì KHÔNG — đó là mục đích của tính năng)
+  win.on('closed', () => {
+    mainWin = null
+    detachedMonitorWin?.close()
+  })
   // Plugin host: cần cửa sổ để gửi event panel/notify; bridge để observe/gửi output terminal
-  disposePlugins = registerPluginsIpc(() => BrowserWindow.getAllWindows()[0] ?? null, terminal.bridge)
+  disposePlugins = registerPluginsIpc(() => mainWin ?? BrowserWindow.getAllWindows()[0] ?? null, terminal.bridge)
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) mainWin = createWindow()
   })
 })
 

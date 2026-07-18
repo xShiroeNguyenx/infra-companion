@@ -307,6 +307,12 @@ Connect to a **graphical desktop**, tunneling through your SSH jump hosts when n
 
 **Use**: pick hosts → **Start monitoring** → the picker closes and a compact dashboard **docks to the top-right corner** — one card per host. The dock is translucent (hover to focus) and doesn't block anything: keep working in the terminal, open other modals, switch tabs — monitoring continues until you press **Stop** on the dock. Press **–** to minimize it to a `📊` pill at the bottom-right (polling continues; the pill's dot shows the worst host state). Re-opening `⋯ → Monitoring` pre-ticks the hosts being watched; **Start** replaces the watched set.
 
+**Quick select by workspace or group**: in the picker, above the host list, **Quick select** chips let you tick a whole **group** or a saved 🗂 **workspace** (all of its SSH hosts) in one click instead of ticking hosts one by one — click a chip again to untick that set. A chip highlights when its whole set is currently selected.
+
+**Resize the dock**: drag the **◢** grip in the dock's bottom-right corner to make it wider/taller (drag the header to move it).
+
+**Pop it out into its own window (📌 always-on-top)**: press **⧉** in the dock header to detach the monitor into a **separate, always-on-top window** that stays visible **even when you minimize or hide the main app** — handy on a second monitor or while you work in another program. It shows the same live metrics (no extra SSH connections), and the in-app dock hides while it's open so there's only one monitor on screen. Drag its header to move it, drag edges to resize; **⧉ Merge back** brings the in-app dock back and **■ Stop** ends monitoring. Closing the main app (not minimizing) also closes the pop-out.
+
 **Reading a card** (top to bottom):
 - **Load** — classic load average (1/5/15 min) with a bar normalized per CPU (uncapped: 300-400% is real on busy servers).
 - **CPU** — *real* CPU busy % (computed from `/proc/stat` deltas between polls; appears from the 2nd poll).

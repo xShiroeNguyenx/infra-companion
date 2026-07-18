@@ -17,16 +17,20 @@ interface MonitorStoreState {
   data: Record<string, HostMonitor>
   /** Host đang mở modal lịch sử metrics (F32) — null = đóng. */
   historyHostId: string | null
+  /** Có cửa sổ monitor TÁCH RỜI đang mở → dock trong app thu gọn lại (đồng bộ từ main qua onDetachedState). */
+  detached: boolean
   start: (hosts: { id: string; label: string }[]) => Promise<void>
   stop: () => void
   applySample: (sample: MetricSampleDto) => void
   setHistoryHost: (hostId: string | null) => void
+  setDetached: (detached: boolean) => void
 }
 
 export const useMonitorStore = create<MonitorStoreState>((set) => ({
   active: false,
   data: {},
   historyHostId: null,
+  detached: false,
   start: async (hosts) => {
     // stopAll trước: start backend dedupe theo hostId nên gọi lại = THAY tập host
     // đang theo dõi, không cộng dồn với tập cũ
@@ -39,7 +43,7 @@ export const useMonitorStore = create<MonitorStoreState>((set) => ({
   },
   stop: () => {
     window.infra.monitor.stopAll()
-    set({ active: false, data: {} })
+    set({ active: false, data: {}, detached: false })
   },
   applySample: (sample) =>
     set((prev) => {
@@ -49,5 +53,6 @@ export const useMonitorStore = create<MonitorStoreState>((set) => ({
         sample.load1 !== null ? [...cur.loadHistory, sample.load1].slice(-HISTORY) : cur.loadHistory
       return { data: { ...prev.data, [sample.hostId]: { ...cur, sample, loadHistory } } }
     }),
-  setHistoryHost: (hostId) => set({ historyHostId: hostId })
+  setHistoryHost: (hostId) => set({ historyHostId: hostId }),
+  setDetached: (detached) => set({ detached })
 }))

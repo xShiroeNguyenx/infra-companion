@@ -817,6 +817,18 @@ export interface InfraApi {
     start(hosts: { id: string; label: string }[]): Promise<void>
     stop(hostId: string): void
     stopAll(): void
+    /** Tham gia nhận sample mà KHÔNG khởi động lại SSH (cửa sổ tách rời) — main replay sample gần nhất. */
+    subscribe(): void
+    /** Monitoring bị dừng (từ bất kỳ cửa sổ nào) → mọi cửa sổ reset store. */
+    onStopped(cb: () => void): () => void
+    /** Mở cửa sổ monitor tách rời (always-on-top, sống cả khi thu nhỏ app chính). */
+    openDetached(hosts: { id: string; label: string }[]): Promise<void>
+    /** Đóng cửa sổ monitor tách rời (gộp lại về dock). */
+    closeDetached(): void
+    /** Cửa sổ tách rời gọi lúc khởi tạo để lấy danh sách host đang theo dõi. */
+    detachedInit(): Promise<{ hosts: { id: string; label: string }[] }>
+    /** App chính lắng nghe: true = đang có cửa sổ tách rời, false = đã đóng. */
+    onDetachedState(cb: (open: boolean) => void): () => void
     onSample(cb: (s: MetricSampleDto) => void): () => void
     /** Cảnh báo ngưỡng breach/recover (F04). */
     onAlert(cb: (a: MonitorAlertDto) => void): () => void

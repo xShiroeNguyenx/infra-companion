@@ -19,8 +19,17 @@ export function registerMonitorIpc(): () => void {
   const service = new MonitorService()
   // Set thay vì 1 biến — biến đơn bị ghi đè khi có 2 cửa sổ/2 nơi cùng start
   const subscribers = new Set<WebContents>()
+  // Sample mới nhất mỗi host — replay ngay cho subscriber mới (vd cửa sổ tách rời) để không phải chờ poll kế
+  const lastSamples = new Map<string, import('@infra/shared').MetricSampleDto>()
   // Label host ghi lúc START (renderer gửi kèm) — dựng thông báo/webhook không cần vault (có thể đang khoá)
   const labels = new Map<string, string>()
+
+  /** Thêm 1 WebContents vào tập nhận sample (idempotent) + tự gỡ khi cửa sổ đóng. */
+  const addSubscriber = (sender: WebContents): void => {
+    if (subscribers.has(sender)) return
+    subscribers.add(sender)
+    sender.once('destroyed', () => subscribers.delete(sender))
+  }
   let settings = readMonitorSettings()
   const engine = new AlertEngine(toRules(settings))
   // Lazy: chỉ mở metrics.db khi thật sự cần (start monitor / xem lịch sử)
@@ -52,6 +61,7 @@ export function registerMonitorIpc(): () => void {
   }
 
   service.on('sample', (sample) => {
+    lastSamples.set(sample.hostId, sample)
     for (const subscriber of subscribers) {
       if (!subscriber.isDestroyed()) subscriber.send(IPC.MONITOR_SAMPLE, sample)
     }
@@ -59,13 +69,17 @@ export function registerMonitorIpc(): () => void {
     for (const alert of engine.onSample(sample)) dispatch(alert) // F04
   })
 
+  // Cửa sổ tách rời chỉ NHẬN sample (không tự start SSH): join tập subscriber + replay sample gần nhất
+  ipcMain.on(IPC.MONITOR_SUBSCRIBE, (event) => {
+    addSubscriber(event.sender)
+    for (const sample of lastSamples.values()) {
+      if (!event.sender.isDestroyed()) event.sender.send(IPC.MONITOR_SAMPLE, sample)
+    }
+  })
+
   ipcMain.handle(IPC.MONITOR_START, async (event, hosts: Array<{ id: string; label: string }>) => {
     touchActivity()
-    if (!subscribers.has(event.sender)) {
-      const sender = event.sender
-      subscribers.add(sender)
-      sender.once('destroyed', () => subscribers.delete(sender))
-    }
+    addSubscriber(event.sender)
     const verify = makeHostKeyVerifier(event.sender)
     for (const host of hosts) {
       labels.set(host.id, host.label)
@@ -110,12 +124,21 @@ export function registerMonitorIpc(): () => void {
     engine.removeHost(hostId) // không emit recover — dừng ≠ hồi phục
     metrics?.flushHost(hostId)
     labels.delete(hostId)
+    lastSamples.delete(hostId)
   })
-  ipcMain.on(IPC.MONITOR_STOP_ALL, () => {
+  ipcMain.on(IPC.MONITOR_STOP_ALL, (event) => {
     service.stopAll()
     engine.clear()
     metrics?.flushAll()
     labels.clear()
+    lastSamples.clear()
+    // Báo các cửa sổ KHÁC reset store (vd bấm Dừng từ cửa sổ tách rời → dock chính reset).
+    // KHÔNG dội về sender: sender tự quản store của nó — stop() đã tự reset, còn start()
+    // gọi stopAll chỉ để THAY tập host; dội về sẽ đè active:true vừa set → monitor "chết"
+    // cho tới khi restart app (bug đã dính).
+    for (const subscriber of subscribers) {
+      if (subscriber !== event.sender && !subscriber.isDestroyed()) subscriber.send(IPC.MONITOR_STOPPED)
+    }
   })
 
   // Lịch sử metrics — lazy-open để xem được cả khi chưa start monitoring phiên này

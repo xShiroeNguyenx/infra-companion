@@ -99,6 +99,13 @@ export const IPC = {
   MONITOR_STOP_ALL: 'monitor:stop-all',
   MONITOR_SAMPLE: 'monitor:sample',
   MONITOR_ALERT: 'monitor:alert',
+  // Cửa sổ chỉ-nhận-sample (không tự start SSH) — dùng cho cửa sổ monitor tách rời
+  MONITOR_SUBSCRIBE: 'monitor:subscribe',
+  MONITOR_STOPPED: 'monitor:stopped',
+  MONITOR_OPEN_DETACHED: 'monitor:open-detached',
+  MONITOR_CLOSE_DETACHED: 'monitor:close-detached',
+  MONITOR_DETACHED_INIT: 'monitor:detached-init',
+  MONITOR_DETACHED_STATE: 'monitor:detached-state',
   MONITOR_GET_SETTINGS: 'monitor:get-settings',
   MONITOR_SET_SETTINGS: 'monitor:set-settings',
   MONITOR_TEST_WEBHOOK: 'monitor:test-webhook',

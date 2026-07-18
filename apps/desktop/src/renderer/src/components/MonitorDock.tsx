@@ -21,12 +21,19 @@ export function MonitorDock() {
   const { panelRef, pos, headerHandlers } = useDraggablePanel()
   const monitors = Object.values(data)
 
+  const detach = (): void => {
+    void window.infra.monitor.openDetached(monitors.map((m) => ({ id: m.hostId, label: m.label })))
+  }
+
   if (minimized) {
     const anyError = monitors.some((m) => m.sample && !m.sample.ok)
     const anyPending = monitors.some((m) => !m.sample)
     const dot = anyError ? 'bg-danger' : anyPending ? 'bg-warning animate-pulse' : 'bg-success'
     return (
       <div
+        // width/height auto: xoá kích thước inline mà CSS `resize` của panel để lại (React tái dùng
+        // cùng DOM node khi đổi panel↔pill) → pill không bị phình thành ô tròn to
+        style={{ width: 'auto', height: 'auto' }}
         className="bg-elevated/95 border-edge-strong absolute right-3 bottom-8 z-30 flex max-w-[280px] cursor-pointer items-center gap-2 rounded-full border py-1.5 pr-3 pl-3 opacity-75 shadow-2xl transition-opacity duration-150 hover:opacity-100"
         title={t('panel.restore')}
         onClick={() => setMinimized(false)}
@@ -56,6 +63,14 @@ export function MonitorDock() {
         <div className="flex shrink-0 items-center gap-1">
           <button
             className="text-subtle hover:text-content px-1 text-sm leading-none"
+            aria-label={t('panel.detach')}
+            title={t('panel.detach')}
+            onClick={detach}
+          >
+            ⧉
+          </button>
+          <button
+            className="text-subtle hover:text-content px-1 text-sm leading-none"
             aria-label={t('panel.minimize')}
             title={t('panel.minimize')}
             onClick={() => setMinimized(true)}
@@ -75,11 +90,18 @@ export function MonitorDock() {
           <MonitorCard key={m.hostId} monitor={m} />
         ))}
       </div>
+      {/* Gợi ý kéo chỉnh cỡ: grip ◢ góc dưới-phải; pointer-events-none để không chặn grip resize gốc của trình duyệt */}
+      <span
+        aria-hidden
+        className="text-subtle/60 pointer-events-none absolute right-0.5 bottom-0.5 text-[10px] leading-none"
+      >
+        ◢
+      </span>
     </div>
   )
 }
 
-function MonitorCard({ monitor }: { monitor: HostMonitor }) {
+export function MonitorCard({ monitor }: { monitor: HostMonitor }) {
   const t = useT()
   const s = monitor.sample
   const [showHistory, setShowHistory] = useState(false)

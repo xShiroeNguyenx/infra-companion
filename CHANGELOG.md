@@ -5,6 +5,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.24] — 2026-07-18
+
+### Added
+
+- **Pop the monitor panel out into its own window** — the dashboard monitor now has a **⧉ pop-out** button in its header. It opens a small, always-on-top window that keeps showing your hosts' live metrics **even when the main app is minimized** or hidden behind other windows. While popped out, the in-app dock hides so there's only one monitor on screen; move and resize the window freely, **⧉ Merge back** returns it to the in-app dock, and **■ Stop** ends monitoring from either place. It draws from the same monitoring session — no extra SSH connections are opened.
+- **Pick hosts to monitor by workspace or group** — the **⚠ Monitoring** dialog has new **Quick select** chips: click a group or a saved 🗂 workspace to tick all of its SSH hosts in one go (click again to untick them), instead of hunting through the host list one by one.
+
+### Changed
+
+- **The app icon now fills its frame** — the logo mark used to sit small in the middle with a lot of empty space around it, so it looked tiny in the taskbar and title bar. It has been recropped to fill the icon and now reads clearly at every size.
+- **The monitor panel is easier to resize** — a visible **◢** grip in the bottom-right corner makes it obvious you can drag the panel larger or smaller (both width and height).
+
+---
+
 ## [0.1.23] — 2026-07-16
 
 ### Added
