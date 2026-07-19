@@ -36,6 +36,9 @@ export const vi = {
   // Menu công cụ
   'menu.bulk': '⚡ Bulk Execution',
   'menu.monitor': '📊 Monitoring',
+  'menu.watcher': '📡 Theo dõi uptime (chấm xanh/đỏ)',
+  'menu.processes': '⚙ Tiến trình (top)',
+  'menu.services': '🧰 Services (systemd)',
   'menu.ai': '🤖 Trợ lý AI',
   'menu.aiDiagnose': '🩺 AI chẩn đoán sự cố',
   'menu.recordings': '⏯ Bản ghi phiên',
@@ -45,6 +48,34 @@ export const vi = {
   'menu.tunnels': '⇄ Tunnels',
   'menu.createGroup': '🗂 Tạo group',
   'menu.workspaces': '🪟 Workspaces',
+
+  // F39 — uptime watcher nền
+  'watcher.up': 'đang online ({ms}ms)',
+  'watcher.down': 'không kết nối được (TCP)',
+
+  // F33 — process viewer
+  'procs.title': '⚙ Tiến trình (top)',
+  'procs.chooseHost': '— chọn host —',
+  'procs.filterPh': 'Lọc theo tên lệnh / user / PID…',
+  'procs.auto': 'Tự làm mới 5s',
+  'procs.kill': 'Kill (TERM)',
+  'procs.kill9': 'Kill -9 (KILL — ép chết)',
+  'procs.killConfirm': 'Gửi SIG{signal} cho PID {pid} ({cmd})?',
+  'procs.empty': 'Không có kết quả',
+  'procs.pickFirst': 'Chọn host để xem tiến trình',
+  'procs.note': 'Chạy ps qua kênh exec riêng (không đụng terminal đang mở, xuyên login-script như Bulk). Kill tiến trình của user khác cần quyền tương ứng trên server. Linux only.',
+
+  // F34 — systemd manager
+  'svc.title': '🧰 Services (systemd)',
+  'svc.filterPh': 'Lọc theo tên service / mô tả…',
+  'svc.state': 'Trạng thái',
+  'svc.desc': 'Mô tả',
+  'svc.start': 'Start',
+  'svc.stop': 'Stop',
+  'svc.restart': 'Restart',
+  'svc.logs': 'Xem log (journalctl)',
+  'svc.actionConfirm': 'Chạy systemctl {action} {unit}?',
+  'svc.note': 'systemctl/journalctl chạy qua kênh exec riêng. start/stop/restart thường cần quyền root — không đủ quyền thì lỗi của systemctl hiện nguyên văn. Server không dùng systemd (init cũ) không hỗ trợ.',
 
   // Workspaces (lưu/mở lại bố cục tab)
   'ws.title': 'Workspaces — lưu & mở lại bố cục',
@@ -339,6 +370,12 @@ export const vi = {
   'host.tmux': 'Tmux — tự khôi phục phiên khi rớt mạng',
   'host.tmuxTip': 'Sau login tự chạy: tmux new-session -A -s ic-main',
   'host.tmuxHint': 'Cần cài tmux trên server. Khi rớt mạng + kết nối lại (hoặc mở lại host sau này), phiên tmux trên server vẫn sống nên tiếp tục đúng chỗ. Lưu ý: startup snippet chạy ở shell ngoài tmux.',
+  'host.totp': 'TOTP 2FA (Google Authenticator)',
+  'host.totpPh': 'Dán secret base32 (JBSWY3DP…)',
+  'host.totpKeep': 'Đã lưu — nhập để thay, bỏ trống giữ nguyên',
+  'host.totpClear': 'Xoá seed',
+  'host.totpHint': 'Lưu mã hoá trong vault. Trong login script, dùng {{totp}} ở ô "gửi" — app thay bằng mã 6 số TƯƠI đúng lúc gửi (vd bước expect "Verification code:" → gửi {{totp}}).',
+  'host.errTotp': 'TOTP secret không hợp lệ — cần chuỗi base32 (A–Z, 2–7), tối thiểu 8 ký tự',
   'host.loginScript': 'Login script (tự gõ lệnh sau khi login — vd su rồi ssh tiếp)',
   'host.expectPh': 'chờ chuỗi…',
   'host.expectTip': 'Chờ chuỗi này xuất hiện trong output rồi mới gửi (vd "assword", "$"). Trống = gửi sau 0.8s',
@@ -546,6 +583,8 @@ export const vi = {
   'group.defaultAuth': 'Xác thực mặc định',
   'group.env': 'Biến môi trường (KEY=VALUE, mỗi dòng một biến)',
   'group.startup': 'Startup snippet (chạy sau khi login)',
+  'group.color': 'Màu nhận diện',
+  'group.colorHint': 'Tô sọc màu lên tab / header pane / sidebar của host trong group — vd production đỏ, staging vàng để không gõ nhầm server.',
   'group.delete': 'Xoá group',
   'group.deleteMsg': 'Xoá group "{name}"? Host bên trong không bị xoá nhưng sẽ mất cấu hình kế thừa (username/auth/env mặc định).',
 
@@ -684,6 +723,9 @@ export const en: Partial<Record<I18nKey, string>> = {
 
   'menu.bulk': '⚡ Bulk Execution',
   'menu.monitor': '📊 Monitoring',
+  'menu.watcher': '📡 Uptime watcher (green/red dots)',
+  'menu.processes': '⚙ Processes (top)',
+  'menu.services': '🧰 Services (systemd)',
   'menu.ai': '🤖 AI Assistant',
   'menu.aiDiagnose': '🩺 AI troubleshooter',
   'menu.recordings': '⏯ Recordings',
@@ -693,6 +735,34 @@ export const en: Partial<Record<I18nKey, string>> = {
   'menu.tunnels': '⇄ Tunnels',
   'menu.createGroup': '🗂 Create group',
   'menu.workspaces': '🪟 Workspaces',
+
+  // F39 — background uptime watcher
+  'watcher.up': 'online ({ms}ms)',
+  'watcher.down': 'unreachable (TCP)',
+
+  // F33 — process viewer
+  'procs.title': '⚙ Processes (top)',
+  'procs.chooseHost': '— choose a host —',
+  'procs.filterPh': 'Filter by command / user / PID…',
+  'procs.auto': 'Auto-refresh 5s',
+  'procs.kill': 'Kill (TERM)',
+  'procs.kill9': 'Kill -9 (KILL — force)',
+  'procs.killConfirm': 'Send SIG{signal} to PID {pid} ({cmd})?',
+  'procs.empty': 'No results',
+  'procs.pickFirst': 'Choose a host to view processes',
+  'procs.note': 'Runs ps over a dedicated exec channel (does not touch open terminals, traverses login scripts like Bulk). Killing another user\'s process requires matching privileges on the server. Linux only.',
+
+  // F34 — systemd manager
+  'svc.title': '🧰 Services (systemd)',
+  'svc.filterPh': 'Filter by service name / description…',
+  'svc.state': 'State',
+  'svc.desc': 'Description',
+  'svc.start': 'Start',
+  'svc.stop': 'Stop',
+  'svc.restart': 'Restart',
+  'svc.logs': 'View logs (journalctl)',
+  'svc.actionConfirm': 'Run systemctl {action} {unit}?',
+  'svc.note': 'systemctl/journalctl run over a dedicated exec channel. start/stop/restart usually require root — without it, systemctl\'s error is shown verbatim. Servers without systemd are not supported.',
 
   // Workspaces (save/restore tab layout)
   'ws.title': 'Workspaces — save & restore layouts',
@@ -977,6 +1047,12 @@ export const en: Partial<Record<I18nKey, string>> = {
   'host.tmux': 'Tmux — auto-resume session on disconnect',
   'host.tmuxTip': 'After login runs: tmux new-session -A -s ic-main',
   'host.tmuxHint': 'Requires tmux on the server. After a drop + reconnect (or reopening the host later), the server-side tmux session is still alive so you resume where you left off. Note: the startup snippet runs in the outer shell, not inside tmux.',
+  'host.totp': 'TOTP 2FA (Google Authenticator)',
+  'host.totpPh': 'Paste the base32 secret (JBSWY3DP…)',
+  'host.totpKeep': 'Saved — type to replace, leave empty to keep',
+  'host.totpClear': 'Remove seed',
+  'host.totpHint': 'Stored encrypted in the vault. In the login script, put {{totp}} in a "send" field — the app substitutes a FRESH 6-digit code at send time (e.g. step expect "Verification code:" → send {{totp}}).',
+  'host.errTotp': 'Invalid TOTP secret — expected base32 (A–Z, 2–7), at least 8 characters',
   'host.loginScript': 'Login script (auto type after login — e.g. su then ssh again)',
   'host.expectPh': 'expect string…',
   'host.expectTip': 'Wait for this string in the output before sending (e.g. "assword", "$"). Empty = send after 0.8s',
@@ -1175,6 +1251,8 @@ export const en: Partial<Record<I18nKey, string>> = {
   'group.defaultAuth': 'Default authentication',
   'group.env': 'Environment variables (KEY=VALUE, one per line)',
   'group.startup': 'Startup snippet (runs after login)',
+  'group.color': 'Accent color',
+  'group.colorHint': 'Paints a color stripe on tabs / pane headers / sidebar rows of hosts in this group — e.g. production red, staging yellow, so you never type into the wrong server.',
   'group.delete': 'Delete group',
   'group.deleteMsg': 'Delete group "{name}"? Hosts inside are not deleted but lose their inherited config (default username/auth/env).',
 
@@ -1318,6 +1396,37 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'menu.tunnels': '⇄ トンネル',
   'menu.createGroup': '🗂 グループ作成',
   'menu.workspaces': '🪟 ワークスペース',
+  'menu.watcher': '📡 死活監視（緑/赤ドット）',
+  'menu.processes': '⚙ プロセス（top）',
+  'menu.services': '🧰 サービス（systemd）',
+
+  // F39 — 死活監視
+  'watcher.up': 'オンライン（{ms}ms）',
+  'watcher.down': '接続不可（TCP）',
+
+  // F33 — プロセスビューア
+  'procs.title': '⚙ プロセス（top）',
+  'procs.chooseHost': '— ホストを選択 —',
+  'procs.filterPh': 'コマンド / ユーザー / PID で絞り込み…',
+  'procs.auto': '5秒ごとに自動更新',
+  'procs.kill': 'Kill（TERM）',
+  'procs.kill9': 'Kill -9（KILL — 強制）',
+  'procs.killConfirm': 'PID {pid}（{cmd}）に SIG{signal} を送信しますか？',
+  'procs.empty': '結果なし',
+  'procs.pickFirst': 'ホストを選択するとプロセスが表示されます',
+  'procs.note': '専用 exec チャネルで ps を実行（開いているターミナルに影響なし、Bulk と同様にログインスクリプトを通過）。他ユーザーのプロセス kill にはサーバー側の権限が必要。Linux のみ。',
+
+  // F34 — systemd マネージャ
+  'svc.title': '🧰 サービス（systemd）',
+  'svc.filterPh': 'サービス名 / 説明で絞り込み…',
+  'svc.state': '状態',
+  'svc.desc': '説明',
+  'svc.start': '起動',
+  'svc.stop': '停止',
+  'svc.restart': '再起動',
+  'svc.logs': 'ログを見る（journalctl）',
+  'svc.actionConfirm': 'systemctl {action} {unit} を実行しますか？',
+  'svc.note': 'systemctl/journalctl は専用 exec チャネルで実行。start/stop/restart は通常 root 権限が必要 — 権限がない場合は systemctl のエラーがそのまま表示されます。systemd 非採用サーバーは非対応。',
 
   // Workspaces
   'ws.title': 'ワークスペース — レイアウトの保存と復元',
@@ -1602,6 +1711,12 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'host.tmux': 'Tmux — 切断時にセッションを自動復元',
   'host.tmuxTip': 'ログイン後に実行: tmux new-session -A -s ic-main',
   'host.tmuxHint': 'サーバーに tmux が必要です。切断＋再接続（または後でホストを開き直したとき）でもサーバー側の tmux セッションが生きているので続きから再開できます。注意: startup スニペットは tmux 外のシェルで実行されます。',
+  'host.totp': 'TOTP 2FA（Google Authenticator）',
+  'host.totpPh': 'base32 シークレットを貼り付け（JBSWY3DP…）',
+  'host.totpKeep': '保存済み — 入力で置換、空欄で維持',
+  'host.totpClear': 'シードを削除',
+  'host.totpHint': 'ボルトに暗号化して保存。ログインスクリプトの「送信」欄に {{totp}} を書くと、送信の瞬間に新しい6桁コードへ置換されます（例: expect "Verification code:" → send {{totp}}）。',
+  'host.errTotp': 'TOTP シークレットが不正 — base32（A–Z, 2–7）8文字以上が必要',
   'host.loginScript': 'ログインスクリプト（ログイン後に自動入力 — 例: su の後 ssh）',
   'host.expectPh': '待機文字列…',
   'host.expectTip': 'この文字列が出力に現れてから送信（例 "assword"、"$"）。空欄=0.8秒後に送信',
@@ -1800,6 +1915,8 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'group.defaultAuth': '既定の認証',
   'group.env': '環境変数（KEY=VALUE、1行に1つ）',
   'group.startup': 'スタートアップスニペット（ログイン後に実行）',
+  'group.color': '識別カラー',
+  'group.colorHint': 'グループ内ホストのタブ / ペインヘッダ / サイドバーに色ストライプを表示 — 例: 本番は赤、ステージングは黄。サーバーの打ち間違い防止に。',
   'group.delete': 'グループを削除',
   'group.deleteMsg': 'グループ「{name}」を削除しますか？内部のホストは削除されませんが、継承設定（既定のユーザー名/認証/環境変数）を失います。',
 

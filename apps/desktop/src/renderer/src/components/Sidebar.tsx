@@ -4,6 +4,7 @@ import { useDataStore } from '../stores/data'
 import { useTabsStore } from '../stores/tabs'
 import { useToastsStore } from '../stores/toasts'
 import { useRdpStore } from '../stores/rdp'
+import { useWatcherStore } from '../stores/watcher'
 import { useFavoritesStore } from '../stores/favorites'
 import { useUiStore, type AppModal } from '../stores/ui'
 import { GroupEditorModal } from './GroupEditorModal'
@@ -29,6 +30,8 @@ export function Sidebar() {
   const { openSsh, openQuick, openSshGroup } = useTabsStore()
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
+  const watcherEnabled = useWatcherStore((s) => s.enabled)
+  const setWatcherEnabled = useWatcherStore((s) => s.setEnabled)
   const favIds = useFavoritesStore((s) => s.ids)
   const [query, setQuery] = useState('')
   const [modal, setModal] = useState<OpenModal>(null)
@@ -156,7 +159,13 @@ export function Sidebar() {
               </span>
             </div>
             {favHosts.map((host) => (
-              <HostRow key={`fav-${host.id}`} host={host} onEdit={openHostEditor} onNotes={openNotes} />
+              <HostRow
+                key={`fav-${host.id}`}
+                host={host}
+                color={groups.find((g) => g.id === host.groupId)?.color ?? null}
+                onEdit={openHostEditor}
+                onNotes={openNotes}
+              />
             ))}
           </div>
         )}
@@ -164,6 +173,10 @@ export function Sidebar() {
         {sections.map((section) => (
           <div key={section.group?.id ?? '__ungrouped__'} className="mb-2">
             <div className="group/header flex items-center px-1 py-1">
+              {/* Chấm màu nhận diện group (đặt trong group editor) */}
+              {section.group?.color && (
+                <span className="mr-1.5 size-2 shrink-0 rounded-full" style={{ backgroundColor: section.group.color }} />
+              )}
               <span className="text-subtle flex-1 text-[10px] font-semibold tracking-wider uppercase">
                 {section.group?.name ?? (groups.length > 0 ? t('sidebar.other') : t('sidebar.global'))}
               </span>
@@ -187,7 +200,13 @@ export function Sidebar() {
               )}
             </div>
             {section.hosts.map((host) => (
-              <HostRow key={host.id} host={host} onEdit={openHostEditor} onNotes={openNotes} />
+              <HostRow
+                key={host.id}
+                host={host}
+                color={section.group?.color ?? null}
+                onEdit={openHostEditor}
+                onNotes={openNotes}
+              />
             ))}
           </div>
         ))}
@@ -236,6 +255,13 @@ export function Sidebar() {
               <MenuItem label={t('menu.workspaces')} onClick={() => { setMenuOpen(false); openAppModal('workspaces') }} />
               <MenuItem label={t('menu.bulk')} onClick={() => { setMenuOpen(false); openAppModal('bulk') }} />
               <MenuItem label={t('menu.monitor')} onClick={() => { setMenuOpen(false); openAppModal('monitor') }} />
+              {/* F39: toggle watcher nền — ✓ khi đang bật (chấm xanh/đỏ cạnh host) */}
+              <MenuItem
+                label={`${watcherEnabled ? '✓ ' : ''}${t('menu.watcher')}`}
+                onClick={() => { setMenuOpen(false); setWatcherEnabled(!watcherEnabled) }}
+              />
+              <MenuItem label={t('menu.processes')} onClick={() => { setMenuOpen(false); openAppModal('processes') }} />
+              <MenuItem label={t('menu.services')} onClick={() => { setMenuOpen(false); openAppModal('services') }} />
               <MenuItem label={t('menu.ai')} onClick={() => { setMenuOpen(false); openAppModal('ai') }} />
               <MenuItem label={t('menu.aiDiagnose')} onClick={() => { setMenuOpen(false); openAppModal('ai-diagnose') }} />
               <MenuItem label={t('menu.recordings')} onClick={() => { setMenuOpen(false); openAppModal('recordings') }} />
@@ -286,10 +312,13 @@ function MenuItem({ label, onClick }: { label: string; onClick: () => void }) {
 /** Một dòng host trong sidebar (dùng chung cho mục Yêu thích lẫn các group). */
 function HostRow({
   host,
+  color,
   onEdit,
   onNotes
 }: {
   host: HostDto
+  /** Màu nhận diện group (viền trái) — null = không tô. */
+  color?: string | null
   onEdit: (host: HostDto, duplicate?: boolean) => void
   onNotes: (host: HostDto) => void
 }) {
@@ -301,19 +330,30 @@ function HostRow({
   const openRdp = useRdpStore((s) => s.open)
   const favorite = useFavoritesStore((s) => s.ids.includes(host.id))
   const toggleFav = useFavoritesStore((s) => s.toggle)
+  // F39: trạng thái watcher nền (chấm xanh/đỏ) — undefined khi watcher tắt/chưa check
+  const watch = useWatcherStore((s) => s.statuses[host.id])
   const isRemoteDesktop = host.protocol === 'vnc' || host.protocol === 'rdp'
   const openHost = (): void => {
     if (host.protocol === 'vnc') void openVnc(host.id)
     else if (host.protocol === 'rdp') void openRdp(host.id)
     else void openSsh(host.id)
   }
+  const dotClass =
+    watch === undefined
+      ? 'bg-subtle group-hover:bg-success'
+      : watch.ok
+        ? 'bg-success'
+        : 'bg-danger'
   return (
     <div
       className="group hover:bg-hover flex cursor-pointer items-center gap-2 rounded px-2 py-1.5"
+      style={color ? { boxShadow: `inset 2px 0 0 ${color}` } : undefined}
       onClick={openHost}
-      title={`${host.username ?? '(group)'}@${host.hostname}:${host.port}${host.jumpChain?.length ? ` (qua ${host.jumpChain.length} jump)` : ''}`}
+      title={`${host.username ?? '(group)'}@${host.hostname}:${host.port}${host.jumpChain?.length ? ` (qua ${host.jumpChain.length} jump)` : ''}${
+        watch ? `\n${watch.ok ? `✓ ${t('watcher.up', { ms: watch.latencyMs ?? 0 })}` : `✗ ${t('watcher.down')}`}` : ''
+      }`}
     >
-      <span className="bg-subtle size-1.5 shrink-0 rounded-full group-hover:bg-success" />
+      <span className={`size-1.5 shrink-0 rounded-full ${dotClass}`} />
       <div className="min-w-0 flex-1">
         <div className="text-content truncate text-xs">
           {host.label}

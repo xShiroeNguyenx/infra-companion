@@ -21,7 +21,8 @@ import {
   type TerminalStatusEvent,
   type TransferEvent,
   type TunnelRuleInput,
-  type TunnelStateDto
+  type TunnelStateDto,
+  type WatcherStatusDto
 } from '@infra/shared'
 
 function subscribe<T>(channel: string, cb: (payload: T) => void): () => void {
@@ -153,6 +154,18 @@ const api: InfraApi = {
     testWebhook: (url) => ipcRenderer.invoke(IPC.MONITOR_TEST_WEBHOOK, url),
     queryHistory: (hostId, fromTs, toTs, res) => ipcRenderer.invoke(IPC.METRICS_QUERY, hostId, fromTs, toTs, res),
     historyHosts: () => ipcRenderer.invoke(IPC.METRICS_HOSTS)
+  },
+  watcher: {
+    start: (targets) => ipcRenderer.send(IPC.WATCHER_START, targets),
+    stop: () => ipcRenderer.send(IPC.WATCHER_STOP),
+    onStatus: (cb) => subscribe<WatcherStatusDto[]>(IPC.WATCHER_STATUS, cb)
+  },
+  hostTools: {
+    listProcesses: (hostId, sortBy) => ipcRenderer.invoke(IPC.HTOOLS_PROCS, hostId, sortBy),
+    killProcess: (hostId, pid, signal) => ipcRenderer.invoke(IPC.HTOOLS_KILL, hostId, pid, signal),
+    listServices: (hostId) => ipcRenderer.invoke(IPC.HTOOLS_SERVICES, hostId),
+    serviceAction: (hostId, unit, action) => ipcRenderer.invoke(IPC.HTOOLS_SERVICE_ACTION, hostId, unit, action),
+    serviceLogs: (hostId, unit) => ipcRenderer.invoke(IPC.HTOOLS_SERVICE_LOGS, hostId, unit)
   },
   ai: {
     getConfig: () => ipcRenderer.invoke(IPC.AI_GET_CONFIG),

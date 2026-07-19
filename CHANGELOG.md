@@ -5,6 +5,23 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.25] — 2026-07-19
+
+### Added
+
+- **TOTP 2FA autofill in login scripts** — hosts that ask for a Google Authenticator code on login can now log in hands-free: paste the account's **base32 TOTP secret** into the host editor (stored encrypted in the vault; it never leaves the main process), then use the **`{{totp}}`** token in a login-script *send* field (e.g. expect `Verification code:` → send `{{totp}}`). The app substitutes a **fresh 6-digit code at the moment the step is sent**, so slow multi-hop chains don't hand over an expired code. RFC 6238-compatible (verified against the RFC test vectors).
+- **Group colors on tabs, panes and the sidebar** — give a group an accent color in the group editor (production red, staging yellow, …) and every host in it gets a colored stripe on its **tab**, its **split-pane header** and its **sidebar row** — one glance tells you which terminal is production before you type into it.
+- **Background uptime watcher** — toggle **📡 Uptime watcher** in the sidebar ⋯ menu and the app TCP-checks every saved host once a minute **without opening any session**: a green/red dot next to each host in the sidebar shows reachability (hover for latency). Turns off cleanly; state is remembered.
+- **Process viewer (top)** — **⚙ Processes** in the ⋯ menu / command palette: pick a host and get a live `top`-style table (CPU%, MEM%, RSS, runtime, command) over a dedicated exec channel — no terminal tab needed, login-script hosts work like Bulk. Sort by CPU or RAM, filter, optional 5s auto-refresh, and **kill** (TERM or force -9) with a confirmation.
+- **Services manager (systemd)** — **🧰 Services** in the ⋯ menu / palette: list every systemd service on a host with its state, **start / stop / restart** with confirmation (root may be required — systemctl's own error is shown if not), and read the last 120 lines of **journalctl** for any unit right in the window.
+
+### Notes
+
+- The vault schema migrates automatically (v11: encrypted TOTP seed per host + group color). Synced vaults carry both fields; older app versions simply ignore them.
+- `{{totp}}` substitution applies to interactive terminal sessions. Exec-channel features (Bulk/Monitoring/SFTP) don't substitute it — OTP prompts don't appear on those paths in practice.
+
+---
+
 ## [0.1.24] — 2026-07-18
 
 ### Added

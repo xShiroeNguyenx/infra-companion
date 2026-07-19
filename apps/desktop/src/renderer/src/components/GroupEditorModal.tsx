@@ -5,6 +5,9 @@ import { Button, ConfirmModal, Field, Modal, Select, TextArea, TextInput } from 
 import { envToText, textToEnv } from '../lib/env'
 import { useT } from '../i18n'
 
+/** Bảng màu nhận diện group — tô tab/pane/sidebar của host bên trong (production đỏ, staging vàng…). */
+const GROUP_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#a855f7', '#ec4899']
+
 /** Editor group + các field cấu hình mà hosts bên trong kế thừa (P22). */
 export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; onClose: () => void }) {
   const t = useT()
@@ -15,6 +18,7 @@ export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; o
   const [keyId, setKeyId] = useState(group?.keyId ?? '')
   const [envText, setEnvText] = useState(envToText(group?.env ?? null))
   const [startupSnippetId, setStartupSnippetId] = useState(group?.startupSnippetId ?? '')
+  const [color, setColor] = useState<string | null>(group?.color ?? null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -31,7 +35,8 @@ export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; o
       authType: authType || null,
       keyId: authType === 'key' ? keyId : null,
       env: textToEnv(envText),
-      startupSnippetId: startupSnippetId || null
+      startupSnippetId: startupSnippetId || null,
+      color
     })
     setBusy(false)
     if (saved) onClose()
@@ -47,6 +52,34 @@ export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; o
       >
         <Field label={t('group.name')}>
           <TextInput autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+
+        {/* Màu nhận diện: tô tab/pane/sidebar của host trong group — chống gõ nhầm production */}
+        <Field label={t('group.color')}>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              title={t('common.none')}
+              onClick={() => setColor(null)}
+              className={`border-edge-strong text-subtle flex size-6 items-center justify-center rounded-full border text-[10px] ${
+                color === null ? 'ring-accent ring-2 ring-offset-1 ring-offset-transparent' : ''
+              }`}
+            >
+              ✕
+            </button>
+            {GROUP_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setColor(c)}
+                className={`size-6 rounded-full border border-black/20 ${
+                  color === c ? 'ring-accent ring-2 ring-offset-1 ring-offset-transparent' : ''
+                }`}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+          <p className="text-subtle mt-1 text-[10px] leading-relaxed">{t('group.colorHint')}</p>
         </Field>
 
         <p className="text-subtle mb-2 text-[11px] leading-relaxed">{t('group.inheritNote')}</p>

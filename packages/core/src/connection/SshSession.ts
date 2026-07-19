@@ -1,6 +1,7 @@
 import { StringDecoder } from 'node:string_decoder'
 import type { ClientChannel } from 'ssh2'
 import type { LoginStep } from '@infra/shared'
+import { applyTotpToken } from '../secrets/totp'
 import { establishChain, type ChainEndpoint } from './establish'
 import type { HostKeyVerifier, SessionSink, TerminalSession } from './types'
 
@@ -14,6 +15,9 @@ export interface SshSessionOptions {
   startupScript?: string
   /** Login script expect/send (vd su → ssh lồng nhau). Secret đã được resolve thành giá trị thật. */
   loginSteps?: LoginStep[]
+  /** F41: TOTP seed (base32) — bước login script chứa {{totp}} được thay bằng mã TƯƠI lúc gửi
+   *  (mã sống 30s; thay lúc prepare có thể hết hạn khi chain nhiều hop nối chậm). */
+  totpSecret?: string
   /** Bật: sau login tự `tmux new-session -A` để phiên sống sót/khôi phục khi rớt mạng. */
   tmux?: boolean
   verifyHostKey: HostKeyVerifier
@@ -161,7 +165,8 @@ export class SshSession implements TerminalSession {
     const sendCurrent = (): void => {
       if (finished) return
       const step = steps[index]!
-      stream.write(step.send + '\n')
+      // {{totp}} → mã 2FA tươi ngay lúc gửi (host có lưu TOTP seed — F41)
+      stream.write(applyTotpToken(step.send, this.options.totpSecret) + '\n')
       index += 1
       tail = ''
       armNext()

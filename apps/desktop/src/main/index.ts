@@ -7,6 +7,8 @@ import { registerBulkIpc } from './ipc/bulk'
 import { registerDataIpc } from './ipc/data'
 import { registerImportIpc } from './ipc/import'
 import { registerMonitorIpc } from './ipc/monitor'
+import { registerWatcherIpc } from './ipc/watcher'
+import { registerHostToolsIpc } from './ipc/hostTools'
 import { registerNetToolsIpc } from './ipc/nettools'
 import { registerSyncIpc } from './ipc/sync'
 import { registerPromptIpc } from './ipc/prompts'
@@ -185,6 +187,8 @@ registerNetToolsIpc()
 registerSyncIpc()
 registerMarketplaceIpc()
 const disposeMonitor = registerMonitorIpc()
+const disposeWatcher = registerWatcherIpc()
+registerHostToolsIpc()
 const terminal = registerTerminalIpc()
 const disposeSftp = registerSftpIpc()
 const disposeVnc = registerVncIpc()
@@ -222,5 +226,6 @@ app.on('before-quit', () => {
   disposeRdp()
   disposeTunnels()
   disposeMonitor()
+  disposeWatcher()
   getVault().lock()
 })

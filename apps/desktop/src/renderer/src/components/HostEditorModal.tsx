@@ -51,6 +51,10 @@ export function HostEditorModal({
   const [agentForward, setAgentForward] = useState(host?.agentForward ?? false)
   const [tmux, setTmux] = useState(host?.tmux ?? false)
   const [loginSteps, setLoginSteps] = useState<LoginStep[]>(host?.loginSteps ?? [])
+  // F41 TOTP: seed thật không bao giờ về renderer — input trống + hasTotp = giữ nguyên
+  const [totpSecret, setTotpSecret] = useState('')
+  const [clearTotp, setClearTotp] = useState(false)
+  const hasTotp = isEdit && (host?.hasTotp ?? false)
   const [showAdvanced, setShowAdvanced] = useState(
     Boolean(
       host &&
@@ -59,6 +63,7 @@ export function HostEditorModal({
           host.startupSnippetId ||
           host.agentForward ||
           host.tmux ||
+          host.hasTotp ||
           host.loginSteps?.length)
     )
   )
@@ -95,6 +100,10 @@ export function HostEditorModal({
     }
     if (isSsh && authType === 'key' && !keyId) return setError(t('host.errKey'))
     if (isSsh && authType === 'secret' && !secretRef.trim()) return setError(t('host.errSecret'))
+    // TOTP seed: chuẩn hoá (bỏ space/gạch/=, viết hoa) rồi validate base32 — duplicate tối giản
+    // từ core (import @infra/core vào renderer kéo ssh2 vỡ bundle)
+    const normalizedTotp = totpSecret.replace(/[\s-]/g, '').replace(/=+$/, '').toUpperCase()
+    if (isSsh && normalizedTotp && !/^[A-Z2-7]{8,}$/.test(normalizedTotp)) return setError(t('host.errTotp'))
 
     setBusy(true)
     let finalGroupId: string | null = groupId || null
@@ -129,6 +138,8 @@ export function HostEditorModal({
       agentForward: sshOnly ? agentForward : false,
       tmux: sshOnly ? tmux : false,
       notes: notes.trim() || null,
+      // undefined = giữ nguyên seed cũ; null = xoá; string = đặt mới (đã chuẩn hoá base32)
+      totpSecret: sshOnly ? (clearTotp ? null : normalizedTotp || undefined) : null,
       loginSteps: sshOnly && loginSteps.filter((s) => s.send || s.secret).length > 0 ? loginSteps : null
     }
     const ok = await saveHost(input)
@@ -441,6 +452,28 @@ export function HostEditorModal({
               {t('host.tmux')}
             </label>
             <p className="mb-2.5 -mt-0.5 ml-6 text-[10px] leading-relaxed text-subtle">{t('host.tmuxHint')}</p>
+
+            {/* F41 — TOTP seed 2FA: seed thật không rời main; login script điền mã bằng token {{totp}} */}
+            <Field label={t('host.totp')}>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <TextInput
+                    type="password"
+                    value={totpSecret}
+                    disabled={clearTotp}
+                    onChange={(e) => setTotpSecret(e.target.value)}
+                    placeholder={hasTotp ? t('host.totpKeep') : t('host.totpPh')}
+                  />
+                  {hasTotp && (
+                    <label className="flex shrink-0 items-center gap-1 text-[10px] text-subtle select-none">
+                      <input type="checkbox" checked={clearTotp} onChange={(e) => setClearTotp(e.target.checked)} />
+                      {t('host.totpClear')}
+                    </label>
+                  )}
+                </div>
+                <p className="mt-1 text-[10px] leading-relaxed text-subtle">{t('host.totpHint')}</p>
+              </div>
+            </Field>
 
             <Field label={t('host.loginScript')}>
               <div>

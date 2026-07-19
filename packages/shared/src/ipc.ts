@@ -112,6 +112,18 @@ export const IPC = {
   METRICS_QUERY: 'metrics:query',
   METRICS_HOSTS: 'metrics:hosts',
 
+  // F39 — uptime/port watcher nền: check TCP cả fleet định kỳ, không mở session
+  WATCHER_START: 'watcher:start',
+  WATCHER_STOP: 'watcher:stop',
+  WATCHER_STATUS: 'watcher:status',
+
+  // F33/F34 — công cụ host qua kênh exec riêng (process viewer + systemd manager)
+  HTOOLS_PROCS: 'htools:procs',
+  HTOOLS_KILL: 'htools:kill',
+  HTOOLS_SERVICES: 'htools:services',
+  HTOOLS_SERVICE_ACTION: 'htools:service-action',
+  HTOOLS_SERVICE_LOGS: 'htools:service-logs',
+
   AI_GET_CONFIG: 'ai:get-config',
   AI_SET_CONFIG: 'ai:set-config',
   AI_ASK: 'ai:ask',

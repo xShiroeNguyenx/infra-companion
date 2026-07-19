@@ -44,6 +44,8 @@ export interface GroupDto {
   env: Record<string, string> | null
   startupSnippetId: string | null
   jumpChain: string[] | null
+  /** Màu nhận diện (hex) — tô tab/pane/sidebar của host trong group (vd production đỏ). null = không màu. */
+  color: string | null
 }
 
 export interface GroupInput {
@@ -56,6 +58,7 @@ export interface GroupInput {
   env?: Record<string, string> | null
   startupSnippetId?: string | null
   jumpChain?: string[] | null
+  color?: string | null
 }
 
 /**
@@ -85,6 +88,8 @@ export interface HostDto {
   tmux: boolean
   /** Ghi chú Markdown (đã giải mã khi vault mở) — null nếu trống. */
   notes: string | null
+  /** F41: đã lưu TOTP seed (seed thật không rời main — login script dùng token {{totp}}). */
+  hasTotp: boolean
   /** Bước secret có send='' (giá trị thật không rời main process). */
   loginSteps: LoginStep[] | null
 }
@@ -110,6 +115,8 @@ export interface HostInput {
   tmux?: boolean
   /** Ghi chú: undefined = giữ nguyên, null/'' = xoá, string = đặt mới. */
   notes?: string | null
+  /** F41 TOTP seed (base32): undefined = giữ nguyên, null/'' = xoá, string = đặt mới. */
+  totpSecret?: string | null
   /** Bước secret với send='' = giữ nguyên giá trị cũ (merge theo vị trí). */
   loginSteps?: LoginStep[] | null
 }
@@ -692,6 +699,71 @@ export interface MarketplaceInstallResultDto {
   error: string | null
 }
 
+// ---------------------------------------------------------------------------
+// F39 — Uptime/port watcher nền
+// ---------------------------------------------------------------------------
+
+/** 1 host cần watch: TCP connect tới host:port (best-effort — host sau gate có thể không tới thẳng). */
+export interface WatcherTargetDto {
+  hostId: string
+  host: string
+  port: number
+}
+
+export interface WatcherStatusDto {
+  hostId: string
+  ok: boolean
+  /** ms tới khi TCP mở được — null khi fail. */
+  latencyMs: number | null
+  ts: number
+}
+
+// ---------------------------------------------------------------------------
+// F33/F34 — Process viewer + Systemd manager (qua kênh exec riêng, Linux)
+// ---------------------------------------------------------------------------
+
+export interface ProcessInfoDto {
+  pid: number
+  user: string
+  /** %CPU / %MEM từ ps (1 chữ số thập phân). */
+  cpuPct: number
+  memPct: number
+  rssKb: number
+  /** etime của ps: [[dd-]hh:]mm:ss. */
+  elapsed: string
+  command: string
+}
+
+export interface ProcListResultDto {
+  ok: boolean
+  processes: ProcessInfoDto[]
+  error?: string
+}
+
+export interface ServiceInfoDto {
+  unit: string
+  /** active/inactive/failed… (cột ACTIVE của systemctl). */
+  active: string
+  /** running/dead/exited… (cột SUB). */
+  sub: string
+  description: string
+}
+
+export interface ServiceListResultDto {
+  ok: boolean
+  services: ServiceInfoDto[]
+  error?: string
+}
+
+export type ServiceActionDto = 'start' | 'stop' | 'restart'
+
+export interface HostExecResultDto {
+  ok: boolean
+  stdout: string
+  stderr: string
+  error?: string
+}
+
 export interface InfraApi {
   vault: {
     status(): Promise<VaultStatus>
@@ -840,6 +912,25 @@ export interface InfraApi {
     queryHistory(hostId: string, fromTs: number, toTs: number, res: 1 | 10): Promise<MetricHistoryPointDto[]>
     /** Các host từng được monitor (còn dữ liệu lịch sử), mới nhất trước — cho mục Dashboard. */
     historyHosts(): Promise<MetricHistoryHostDto[]>
+  }
+  /** F39 — watcher nền: check TCP host:port định kỳ, chấm xanh/đỏ ở sidebar. */
+  watcher: {
+    /** Đặt danh sách host cần watch (thay tập cũ) + chạy sweep ngay. Gọi lại khi hosts đổi. */
+    start(targets: WatcherTargetDto[]): void
+    stop(): void
+    /** Kết quả mỗi sweep (mảng đủ các target). */
+    onStatus(cb: (statuses: WatcherStatusDto[]) => void): () => void
+  }
+  /** F33/F34 — công cụ host (process viewer + systemd manager) qua kênh exec riêng. */
+  hostTools: {
+    listProcesses(hostId: string, sortBy: 'cpu' | 'mem'): Promise<ProcListResultDto>
+    /** Gửi signal cho PID (TERM trước, KILL khi cứng đầu). */
+    killProcess(hostId: string, pid: number, signal: 'TERM' | 'KILL'): Promise<HostExecResultDto>
+    listServices(hostId: string): Promise<ServiceListResultDto>
+    /** systemctl start/stop/restart — có thể cần quyền root trên server. */
+    serviceAction(hostId: string, unit: string, action: ServiceActionDto): Promise<HostExecResultDto>
+    /** journalctl -u <unit> (120 dòng cuối). */
+    serviceLogs(hostId: string, unit: string): Promise<HostExecResultDto>
   }
   ai: {
     getConfig(): Promise<AiConfigDto | null>

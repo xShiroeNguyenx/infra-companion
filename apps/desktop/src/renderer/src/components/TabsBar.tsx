@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ShellProfile, SnippetDto } from '@infra/shared'
 import { useDataStore } from '../stores/data'
 import { useTabsStore, type AppTab } from '../stores/tabs'
+import { tabColor } from '../lib/groupColor'
 import { RunSnippetModal } from './RunSnippetModal'
 import { useT } from '../i18n'
 
@@ -36,6 +37,9 @@ export function TabsBar() {
   const t = useT()
   const { tabs, activeId, openLocal, showDashboard, closeTab, setActive } = useTabsStore()
   const snippets = useDataStore((s) => s.snippets)
+  // Màu group (production đỏ…) — sọc trên đầu tab của host thuộc group có màu
+  const hosts = useDataStore((s) => s.hosts)
+  const groups = useDataStore((s) => s.groups)
   const [menuOpen, setMenuOpen] = useState(false)
   const [snippetMenuOpen, setSnippetMenuOpen] = useState(false)
   const [runSnippet, setRunSnippet] = useState<SnippetDto | null>(null)
@@ -85,7 +89,9 @@ export function TabsBar() {
         </button>
       </div>
       <div className="flex flex-1 items-stretch gap-px overflow-x-auto">
-        {tabs.map((tab) => (
+        {tabs.map((tab) => {
+          const color = tabColor(tab, hosts, groups)
+          return (
           <div
             key={tab.id}
             role="tab"
@@ -95,6 +101,8 @@ export function TabsBar() {
                 ? 'bg-app text-content'
                 : 'text-muted hover:bg-hover hover:text-content'
             }`}
+            // Sọc màu group trên đầu tab — nhận diện production/staging thoáng qua
+            style={color ? { boxShadow: `inset 0 2px 0 ${color}` } : undefined}
             onClick={() => setActive(tab.id)}
             onAuxClick={(e) => {
               if (e.button === 1) closeTab(tab.id) // middle click đóng tab
@@ -119,7 +127,8 @@ export function TabsBar() {
               </svg>
             </button>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       <div className="relative flex items-center" ref={snippetMenuRef}>

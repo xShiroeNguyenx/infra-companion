@@ -101,6 +101,8 @@ export interface ResolvedConnection {
   tmux: boolean
   /** Login script với giá trị secret THẬT — chỉ dùng trong main process. */
   loginSteps: LoginStep[]
+  /** F41: TOTP seed (base32) đã giải mã — SshSession thay token {{totp}} bằng mã tươi lúc gửi. */
+  totpSecret?: string
 }
 
 export class VaultService {
@@ -192,7 +194,7 @@ export class VaultService {
     if (input.id) {
       db.prepare(
         `UPDATE groups SET name=?, parent_id=?, username=?, auth_type=?, key_id=?, env_enc=?,
-         startup_snippet_id=?, jump_chain=?, updated_at=? WHERE id=?`
+         startup_snippet_id=?, jump_chain=?, color=?, updated_at=? WHERE id=?`
       ).run(
         input.name,
         input.parentId ?? null,
@@ -202,13 +204,14 @@ export class VaultService {
         envEnc,
         input.startupSnippetId ?? null,
         jumpChain,
+        input.color ?? null,
         now,
         id
       )
     } else {
       db.prepare(
         `INSERT INTO groups (id, parent_id, name, username, auth_type, key_id, env_enc,
-         startup_snippet_id, jump_chain, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+         startup_snippet_id, jump_chain, color, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
       ).run(
         id,
         input.parentId ?? null,
@@ -219,6 +222,7 @@ export class VaultService {
         envEnc,
         input.startupSnippetId ?? null,
         jumpChain,
+        input.color ?? null,
         now,
         now
       )
@@ -274,9 +278,9 @@ export class VaultService {
 
     if (input.id) {
       const existing = db
-        .prepare('SELECT password_enc, login_script_enc, notes_enc FROM hosts WHERE id = ?')
+        .prepare('SELECT password_enc, login_script_enc, notes_enc, totp_enc FROM hosts WHERE id = ?')
         .get(input.id) as
-        | { password_enc: string | null; login_script_enc: string | null; notes_enc: string | null }
+        | { password_enc: string | null; login_script_enc: string | null; notes_enc: string | null; totp_enc: string | null }
         | undefined
       if (!existing) throw new Error('Host không tồn tại')
       let passwordEnc = existing.password_enc
@@ -290,10 +294,17 @@ export class VaultService {
       // notes: undefined = giữ nguyên; null/'' = xoá; string = đặt mới
       const notesEnc =
         input.notes === undefined ? existing.notes_enc : input.notes ? encryptField(dek, input.notes) : null
+      // totpSecret (F41): cùng semantics notes — seed là secret 2FA nên mã hoá DEK
+      const totpEnc =
+        input.totpSecret === undefined
+          ? existing.totp_enc
+          : input.totpSecret
+            ? encryptField(dek, input.totpSecret)
+            : null
       db.prepare(
         `UPDATE hosts SET group_id=?, label=?, protocol=?, hostname=?, port=?, username=?, auth_type=?,
          password_enc=?, key_id=?, secret_ref=?, favorite=?, jump_chain=?, env_enc=?, startup_snippet_id=?,
-         agent_forward=?, tmux=?, login_script_enc=?, notes_enc=?, updated_at=? WHERE id=?`
+         agent_forward=?, tmux=?, login_script_enc=?, notes_enc=?, totp_enc=?, updated_at=? WHERE id=?`
       ).run(
         input.groupId ?? null,
         input.label,
@@ -313,6 +324,7 @@ export class VaultService {
         input.tmux ? 1 : 0,
         loginScriptEnc,
         notesEnc,
+        totpEnc,
         now,
         input.id
       )
@@ -323,8 +335,8 @@ export class VaultService {
     db.prepare(
       `INSERT INTO hosts (id, group_id, label, protocol, hostname, port, username, auth_type, password_enc,
        key_id, secret_ref, favorite, jump_chain, env_enc, startup_snippet_id, agent_forward, tmux,
-       login_script_enc, notes_enc, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+       login_script_enc, notes_enc, totp_enc, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).run(
       id,
       input.groupId ?? null,
@@ -345,6 +357,7 @@ export class VaultService {
       input.tmux ? 1 : 0,
       this.encodeLoginSteps(dek, input.loginSteps ?? null, null),
       input.notes ? encryptField(dek, input.notes) : null,
+      input.totpSecret ? encryptField(dek, input.totpSecret) : null,
       now,
       now
     )
@@ -424,7 +437,8 @@ export class VaultService {
       startupScript,
       agentForward: row.agent_forward === 1,
       tmux: row.tmux === 1,
-      loginSteps: this.decodeLoginSteps(dek, row.login_script_enc)
+      loginSteps: this.decodeLoginSteps(dek, row.login_script_enc),
+      totpSecret: row.totp_enc ? (decryptField(dek, row.totp_enc) ?? undefined) : undefined
     }
   }
 
@@ -912,10 +926,12 @@ export class VaultService {
         env_plain: dec(r.env_enc),
         login_script_plain: dec(r.login_script_enc),
         notes_plain: dec(r.notes_enc),
+        totp_plain: dec(r.totp_enc),
         password_enc: undefined,
         env_enc: undefined,
         login_script_enc: undefined,
-        notes_enc: undefined
+        notes_enc: undefined,
+        totp_enc: undefined
       })),
       snippets: all('SELECT * FROM snippets'),
       tunnels: all('SELECT * FROM tunnels'),
@@ -974,9 +990,10 @@ export class VaultService {
       }
 
       for (const g of remote.groups) {
-        upsertRow('groups', 'id', 'updated_at', { ...g, env_enc: enc(g.env_plain as string) }, [
+        // Snapshot từ máy cũ (trước v11) không có 'color' → null
+        upsertRow('groups', 'id', 'updated_at', { ...g, env_enc: enc(g.env_plain as string), color: g.color ?? null }, [
           'id', 'parent_id', 'name', 'sort_order', 'username', 'auth_type', 'key_id', 'env_enc',
-          'startup_snippet_id', 'jump_chain', 'created_at', 'updated_at'
+          'startup_snippet_id', 'jump_chain', 'color', 'created_at', 'updated_at'
         ])
       }
       for (const k of remote.keys) {
@@ -995,12 +1012,13 @@ export class VaultService {
             env_enc: enc(h.env_plain as string),
             login_script_enc: enc(h.login_script_plain as string),
             notes_enc: enc(h.notes_plain as string),
+            totp_enc: enc(h.totp_plain as string),
             // Snapshot từ máy cũ (trước v9) không có 'tmux' → mặc định 0 (cột NOT NULL)
             tmux: h.tmux ?? 0
           },
           ['id', 'group_id', 'label', 'protocol', 'hostname', 'port', 'username', 'auth_type', 'password_enc',
            'key_id', 'secret_ref', 'favorite', 'jump_chain', 'env_enc', 'startup_snippet_id', 'agent_forward',
-           'tmux', 'login_script_enc', 'notes_enc', 'last_connected_at', 'created_at', 'updated_at']
+           'tmux', 'login_script_enc', 'notes_enc', 'totp_enc', 'last_connected_at', 'created_at', 'updated_at']
         )
       }
       for (const s of remote.snippets) {
@@ -1086,7 +1104,8 @@ export class VaultService {
       keyId: row.key_id,
       env: this.dek ? nullIfEmpty(this.decryptEnv(this.dek, row.env_enc)) : null,
       startupSnippetId: row.startup_snippet_id,
-      jumpChain: row.jump_chain ? (JSON.parse(row.jump_chain) as string[]) : null
+      jumpChain: row.jump_chain ? (JSON.parse(row.jump_chain) as string[]) : null,
+      color: row.color ?? null
     }
   }
 
@@ -1111,6 +1130,7 @@ export class VaultService {
       agentForward: row.agent_forward === 1,
       tmux: row.tmux === 1,
       notes: this.dek && row.notes_enc ? (decryptField(this.dek, row.notes_enc) ?? null) : null,
+      hasTotp: row.totp_enc !== null,
       loginSteps: this.dek ? maskLoginSteps(this.decodeLoginSteps(this.dek, row.login_script_enc)) : null
     }
   }
@@ -1145,6 +1165,7 @@ interface GroupRow {
   env_enc: string | null
   startup_snippet_id: string | null
   jump_chain: string | null
+  color: string | null
 }
 
 interface HostRow {
@@ -1168,6 +1189,7 @@ interface HostRow {
   tmux: number
   login_script_enc: string | null
   notes_enc: string | null
+  totp_enc: string | null
 }
 
 interface KeyRow {

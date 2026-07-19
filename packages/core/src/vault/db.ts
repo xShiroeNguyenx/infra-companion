@@ -156,6 +156,12 @@ const MIGRATIONS: string[] = [
     created_at INTEGER NOT NULL
   );
   CREATE INDEX idx_diagnoses_time ON diagnoses(created_at DESC);
+  `,
+  // v11 — F41 TOTP seed per-host (mã hoá — là secret 2FA) + màu group (tab/pane màu theo group:
+  // production đỏ, staging vàng… chống gõ nhầm server).
+  `
+  ALTER TABLE hosts ADD COLUMN totp_enc TEXT;
+  ALTER TABLE groups ADD COLUMN color TEXT;
   `
 ]
 

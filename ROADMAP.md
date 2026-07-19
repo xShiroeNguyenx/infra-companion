@@ -64,13 +64,13 @@
 ### 3C. Ops & Monitoring (bồi lên Monitoring dock v0.1.9)
 - ~~**Monitor tách cửa sổ riêng + chọn host theo workspace/nhóm**~~ — ✅ Đã làm (v0.1.24): nút ⧉ tách dock monitor ra **cửa sổ riêng always-on-top** (vẫn cập nhật khi thu nhỏ app chính, dùng chung luồng sample — không mở SSH thêm; Gộp lại/Dừng từ cả 2 phía); chip **Chọn nhanh** trong modal Monitoring tick cả nhóm/workspace 1 click; grip ◢ resize dock; icon app crop lại lấp đầy khung. *Còn lại (sau): nhớ vị trí/cỡ cửa sổ tách rời qua phiên; mini-mode chỉ hiện bar.*
 - **F32 — Lịch sử metrics + đồ thị** ⭐ — lưu sample vào SQLite, xem đồ thị 1h/24h thay vì chỉ realtime; đi cặp với alert ngưỡng (F04) + kênh báo webhook Slack/Telegram/Discord.
-- **F33 — Process viewer** — panel top-like: list process, sort CPU/RAM, kill có confirm.
-- **F34 — Systemd manager** ⚡ — list service, start/stop/restart, xem `journalctl -u` (thuần exec + parse).
+- ~~**F33 — Process viewer**~~ — ✅ Đã làm (v0.1.25): modal ⚙ Tiến trình (menu ⋯ / palette) — bảng top-like qua kênh exec riêng (xuyên login-script), sort CPU/RAM, filter, tự làm mới 5s, kill TERM/-9 có confirm.
+- ~~**F34 — Systemd manager**~~ — ✅ Đã làm (v0.1.25): modal 🧰 Services — list toàn bộ service + trạng thái, start/stop/restart có confirm (cần root thì hiện lỗi systemctl nguyên văn), xem journalctl 120 dòng ngay trong modal.
 - **F35 — Cron manager** ⚡ — đọc/sửa crontab qua UI, diễn giải lịch chạy human-readable.
 - **F36 — Disk usage explorer** — drill-down thư mục nào ăn dung lượng (chạy `du` qua exec, UI kiểu ncdu).
 - **F37 — Package updates checker** ⚡ — quét `apt/yum list updates` trên cả fleet (bồi lên Bulk), bảng "máy nào cần vá gì".
 - **F38 — Security audit nhanh** ⚡ — 1 nút chạy bộ check: failed logins (`lastb`), port đang mở, fail2ban status, cert TLS sắp hết hạn → báo cáo; **hợp làm plugin mẫu thứ 4** cùng khuôn Access Log Analyzer.
-- **F39 — Uptime/port watcher nền** — ping/check port định kỳ cả fleet không cần mở session; chấm xanh/đỏ cạnh host trong sidebar.
+- ~~**F39 — Uptime/port watcher nền**~~ — ✅ Đã làm (v0.1.25): toggle 📡 trong menu ⋯ — TCP check cả fleet mỗi 60s không mở session, chấm xanh/đỏ + latency cạnh host trong sidebar; host sau login-script gate check ở địa chỉ gate (best-effort). *Còn lại (sau): ngưỡng cảnh báo khi host down (nối vào AlertEngine), lịch sử uptime.*
 
 ### 3D. Tự động hoá & Bulk nâng cao
 - **F40 — Scheduled jobs** — chạy snippet/bulk theo lịch (vd check backup mỗi sáng), lưu kết quả từng lần, báo khi fail.
@@ -78,7 +78,7 @@
 
 ### 3E. Bảo mật & Vault
 - ~~**F53 — Guard lệnh nhạy cảm**~~ — ✅ Đã làm (v0.1.21): whitelist lệnh (mặc định `rm -rf`, `mkfs`, `dd if=`, `shutdown`…), bấm Enter trên lệnh khớp → popup xác nhận trước khi chạy; đọc dòng lệnh thật từ buffer xterm nên bắt được cả lệnh gọi lại bằng ↑, không thêm độ trễ gõ phím, tự bỏ qua trong vim/less/htop (Settings → Bảo vệ lệnh nhạy cảm). *Còn lại (sau): mẫu per-host, đồng bộ whitelist qua vault.*
-- **F41 — TOTP trong vault** ⭐ — lưu seed 2FA mã hoá, tự sinh mã 6 số; login script gặp prompt "Verification code:" thì tự điền (khớp hoàn hảo với engine expect/send F21 sẵn có).
+- ~~**F41 — TOTP trong vault**~~ ⭐ — ✅ Đã làm (v0.1.25): seed base32 lưu mã hoá per-host (migration v11), login script dùng token `{{totp}}` ở ô gửi → thay bằng mã 6 số TƯƠI đúng lúc gửi (RFC 6238, verify bằng test vector chuẩn). *Còn lại (sau): nút hiện mã hiện tại trong editor; {{totp}} cho đường exec.*
 - **F42 — SSH key rotation wizard** — sinh key mới → đẩy `authorized_keys` loạt host (qua Bulk) → xác minh đăng nhập → gỡ key cũ.
 - **F43 — ssh-copy-id UI** ⚡ — 1 nút đẩy public key lên host đang dùng password.
 - **F44 — Known-hosts manager** ⚡ — UI xem/xoá/pin fingerprint đã TOFU (P19 mở rộng).
@@ -101,15 +101,16 @@
 - ~~**Bố cục chia màn hình (split layout) + kiểu khung pane + nút Command Palette trên toolbar**~~ — ✅ Đã làm (v0.1.23): 5 layout (auto/cột/hàng/chính-trái/chính-trên) chọn qua ▼ cạnh Split ON; kiểu khung Thanh gọn / Mac (bo góc + nút đóng tròn); nút ⌘ mở palette cho người không biết Ctrl+Shift+P; sửa scrollbar terminal mảnh (xterm 6 overlay). *Còn lại (sau): layout/khung per-tab hoặc per-pane; màu tab/pane theo host/group (dưới).*
 - **F53 — Tray + chạy nền** — đóng cửa sổ nhưng tunnel/monitoring vẫn sống trong tray (đi cặp F15 auto-start).
 - **F54 — Deep link `infra-companion://host/<id>`** ⚡ — click link trong wiki/ticket là mở đúng session.
-- **Tab/pane màu theo host/group** ⚡ — production đỏ, staging vàng; đổi màu viền pane khi broadcast (P21 mở rộng).
-- **Dọn schema** ⚡ — migration v10 xoá bảng chết `vpn_profiles` + cột `hosts.vpn_profile_id` (giữ đúng thứ tự migration, xem ghi chú VPN trong handoff).
+- ~~**Tab/pane màu theo group**~~ ⚡ — ✅ Đã làm (v0.1.25): group editor có bảng màu nhận diện (8 màu + không màu) → sọc màu trên tab, header pane split và sidebar row của host trong group. *Còn lại (sau): màu per-host override; đổi màu viền pane khi broadcast.*
+- **Dọn schema** ⚡ — migration MỚI xoá bảng chết `vpn_profiles` + cột `hosts.vpn_profile_id` (giữ đúng thứ tự migration — v10 đã dùng cho `diagnoses`, v11 cho totp/color; xem ghi chú VPN trong handoff).
 
 ### 🎯 Gợi ý 5 mục làm trước
-1. **F41 TOTP trong vault** — khớp login-script sẵn có, Termius có mà ta chưa có.
-2. **F04 alert ngưỡng + F32 lịch sử metrics** — nối tiếp tự nhiên của Monitoring dock v0.1.9.
-3. **F46 AI giải thích output đang chọn** — rẻ nhất trong nhóm AI, tái dùng dock panel.
-4. **P46 SFTP transfer queue** (+ P45 remote↔remote) — parity còn thiếu rõ nhất.
-5. **F23 Shell integration OSC 133** — tính năng "vượt Termius" thật sự, nền cho nhiều thứ sau.
+*(F41/F04/F32/F46 trong danh sách cũ đã xong — cập nhật 2026-07-19)*
+1. **F53 Tray + chạy nền** (+F15 tunnel auto-start) — nối tiếp monitor pop-out v0.1.24: đóng cửa sổ mà monitoring/watcher/tunnel vẫn sống trong tray.
+2. **P46 SFTP transfer queue** (+ P45 remote↔remote) — parity còn thiếu rõ nhất.
+3. **F23 Shell integration OSC 133** — tính năng "vượt Termius" thật sự, nền cho nhiều thứ sau.
+4. **Mobile connect (hướng web-gateway)** — desktop làm relay, mobile mở PWA xterm.js qua LAN/tailnet; làm SAU tray (desktop chạy nền 24/7 là tiền đề).
+5. **F40 Scheduled jobs** — chạy snippet/bulk theo lịch, báo khi fail.
 
 ---
 

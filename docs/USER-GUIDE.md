@@ -100,6 +100,11 @@ Type `user@host` or `user@host:port` directly into the sidebar search → Enter 
   - One-step login script: wait for `$` → send `ssh deploy@web-01`.
   - On connect → the app SSHes into the gate then types `ssh web-01` → you land directly. Re-runs on auto-reconnect too.
 
+### TOTP 2FA autofill (`{{totp}}`) — hands-free verification codes
+- Host asks for a **Google Authenticator code** on login? Edit host → **Advanced** → **TOTP 2FA** → paste the account's **base32 secret** (the string behind the QR code; encrypted in the vault, never sent to the UI).
+- In the login script, add a step: wait for `Verification code:` (or whatever the prompt says) → send **`{{totp}}`**. The app replaces the token with a **fresh 6-digit code at the exact moment the step is sent** — safe even on slow multi-hop chains.
+- RFC 6238 compatible (Google Authenticator / FreeOTP / server-side `google-authenticator` PAM). Applies to interactive terminal sessions; Bulk/Monitoring/SFTP exec paths leave the token untouched.
+
 ### tmux — auto-resume the session on network drops (per-host)
 - Edit host → **Advanced** → tick **"tmux — auto-resume session on drop"**. After login the app runs `tmux new-session -A -s ic-main`.
 - Network drops → the app reconnects → **re-attaches** the still-running tmux session on the server (running commands/server-side scrollback intact). Even if the app gave up after 3 retries, **reopening the host** re-attaches it.
@@ -331,6 +336,18 @@ Connect to a **graphical desktop**, tunneling through your SSH jump hosts when n
 **Troubleshooting**: if a card says metrics can't be parsed, the message includes the remote error (e.g. `Permission denied`, `sshpass: command not found`) — that tells you which hop failed. CPU/net/steal need a second poll (~6s) before they appear.
 
 **Test**: pick web-01 + web-02 → Start → see each machine's own numbers; set RAM threshold to 5 → red toast + Windows notification within ~9s; press 📈 after a few minutes for charts.
+
+---
+
+## 11B. Uptime watcher · Processes · Services
+
+**📡 Uptime watcher** (`⋯` → *Uptime watcher*): toggle it on and the app **TCP-checks every saved host once a minute without opening any session** — a green/red dot next to each host in the sidebar shows reachability (hover for latency). State is remembered across restarts; toggle again to turn off. Best-effort: a host behind a login-script gate is checked at its **gate address**, which still tells you "the gate is alive".
+
+**⚙ Processes** (`⋯` → *Processes*, or the command palette): pick a host → a live `top`-style table (PID, user, CPU%, MEM%, RSS, runtime, command) fetched over a **dedicated exec channel** — your open terminals are never touched, and login-script hosts work like Bulk. Sort by **CPU/RAM**, filter by command/user/PID, tick **auto-refresh 5s**, and hover a row to **kill** (✕ = TERM; `-9` = force KILL) with a confirmation. Killing another user's process requires matching privileges on the server. Linux only.
+
+**🧰 Services** (`⋯` → *Services*): pick a host → every systemd service with its state (green = running, red = failed). Hover a row for **▶ start / ⏹ stop / ↻ restart** (each confirms first — these usually need root; without it systemctl's own error is shown verbatim) and **📜 logs** which opens the unit's last 120 `journalctl` lines right in the window. Servers without systemd aren't supported.
+
+**Group colors** (bonus for busy fleets): edit a group → **Accent color** → pick a swatch (production red, staging yellow…). Every host in the group gets a color stripe on its **sidebar row**, its **tab** and its **split-pane header** — so you always know which terminal is production before you type.
 
 ---
 

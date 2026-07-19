@@ -147,6 +147,7 @@ export function registerTerminalIpc(): { dispose: () => void; bridge: TerminalBr
             agentForward: prepared.agentForward,
             tmux: prepared.tmux,
             loginSteps: prepared.loginSteps,
+            totpSecret: prepared.totpSecret,
             verifyHostKey
           },
           req.cols,

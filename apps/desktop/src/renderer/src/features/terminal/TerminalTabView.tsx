@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useDataStore } from '../../stores/data'
 import { useTabsStore, type AppTab } from '../../stores/tabs'
 import { useToastsStore } from '../../stores/toasts'
 import { useUiStore } from '../../stores/ui'
 import { useSettingsStore, PANE_LAYOUTS, type PaneLayout } from '../../stores/settings'
+import { hostColor, paneHostId } from '../../lib/groupColor'
 import { useT } from '../../i18n'
 import { LayoutGlyph } from '../../components/LayoutGlyph'
 import { TerminalPane } from './TerminalPane'
@@ -114,6 +116,9 @@ function gridSpec(layout: PaneLayout, count: number): GridSpec {
 export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean }) {
   const t = useT()
   const { tabs, setActivePane, closePane, toggleBroadcast, mergeTabs, unmergeTab } = useTabsStore()
+  // Màu group (production đỏ…) — sọc màu trên header pane theo host của pane
+  const hosts = useDataStore((s) => s.hosts)
+  const groups = useDataStore((s) => s.groups)
   // Có ảnh nền: nền pane/grid trong suốt để lộ ảnh phía sau terminal
   const hasBackground = useSettingsStore((s) => s.backgroundImage !== null)
   const paneLayout = useSettingsStore((s) => s.paneLayout)
@@ -350,6 +355,8 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
       >
         {tab.panes.map((pane, i) => {
           const isActive = pane.id === tab.activePaneId
+          // Màu group (production đỏ…) — sọc trái trên header pane khi split nhiều host
+          const color = hostColor(paneHostId(pane), hosts, groups)
           return (
             <div
               key={pane.id}
@@ -364,6 +371,7 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
                   className={`flex h-5 shrink-0 items-center gap-1.5 px-2 text-[10px] ${
                     isActive ? 'bg-hover text-content' : 'bg-panel text-subtle'
                   }`}
+                  style={color ? { boxShadow: `inset 3px 0 0 ${color}` } : undefined}
                 >
                   <span className={`size-1.5 shrink-0 rounded-full ${statusDot(pane.status)}`} />
                   <span className="min-w-0 flex-1 truncate" title={pane.subtitle ?? pane.title}>
@@ -386,6 +394,7 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
                   className={`flex h-5 shrink-0 items-center gap-2 px-2 text-[10px] ${
                     isActive ? 'bg-hover text-content' : 'bg-panel text-subtle'
                   }`}
+                  style={color ? { boxShadow: `inset 0 2px 0 ${color}` } : undefined}
                 >
                   {/* Nút đóng kiểu macOS: chấm tròn đỏ, hover hiện ✕ */}
                   <button

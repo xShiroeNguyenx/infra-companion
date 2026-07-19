@@ -65,6 +65,8 @@ export interface PreparedConnection {
   tmux: boolean
   /** Login script với secret đầy đủ (đã hỏi user nếu chưa lưu). */
   loginSteps: LoginStep[]
+  /** F41: TOTP seed — SshSession thay token {{totp}} trong login script bằng mã tươi lúc gửi. */
+  totpSecret?: string
   title: string
   subtitle: string
   historyTarget: string
@@ -104,6 +106,7 @@ export async function prepareConnection(sender: WebContents, hostId: string): Pr
     agentForward: resolved.agentForward,
     tmux: resolved.tmux,
     loginSteps,
+    totpSecret: resolved.totpSecret,
     title: target.label,
     subtitle: `${target.username}@${target.host}:${target.port}`,
     historyTarget: `${target.username}@${target.host}:${target.port}`

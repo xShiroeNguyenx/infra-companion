@@ -14,6 +14,8 @@ export type AppModal =
   | 'settings'
   | 'workspaces'
   | 'plugins'
+  | 'processes'
+  | 'services'
   | null
 
 interface UiState {

@@ -37,7 +37,10 @@ import { useToastsStore } from './stores/toasts'
 import { useUiStore } from './stores/ui'
 import { usePluginStore } from './stores/plugins'
 import { useMonitorStore } from './stores/monitor'
+import { useWatcherStore } from './stores/watcher'
 import { useVaultStore } from './stores/vault'
+import { ProcessesModal } from './components/ProcessesModal'
+import { ServicesModal } from './components/ServicesModal'
 
 /** Toast cảnh báo monitoring — chạy ngoài component (trong subscribe) nên đọc ngôn ngữ từ store. */
 function formatAlertToast(a: import('@infra/shared').MonitorAlertDto): string {
@@ -90,8 +93,20 @@ export default function App() {
   const monitorDetached = useMonitorStore((s) => s.detached)
   const historyHostId = useMonitorStore((s) => s.historyHostId)
   const pluginCommands = usePluginStore((s) => s.contributions)
+  const watcherEnabled = useWatcherStore((s) => s.enabled)
+  const allHosts = useDataStore((s) => s.hosts)
   const booted = useRef(false)
   const openedInitialTab = useRef(false)
+
+  // F39: đồng bộ danh sách host cần watch sang main mỗi khi bật/tắt hoặc hosts đổi.
+  // serial loại (hostname = COM port, không phải TCP); tắt thì store đã gọi watcher.stop().
+  useEffect(() => {
+    if (!watcherEnabled) return
+    const targets = allHosts
+      .filter((h) => h.protocol !== 'serial')
+      .map((h) => ({ hostId: h.id, host: h.hostname, port: h.port }))
+    if (targets.length > 0) window.infra.watcher.start(targets)
+  }, [watcherEnabled, allHosts])
 
   useEffect(() => {
     // refresh chỉ chạy 1 lần; listener thì subscribe/unsubscribe theo vòng đời effect
@@ -124,7 +139,10 @@ export default function App() {
     const offStopped = window.infra.monitor.onStopped(() =>
       useMonitorStore.setState({ active: false, data: {}, detached: false })
     )
+    // F39: kết quả sweep watcher nền → chấm xanh/đỏ ở sidebar
+    const offWatcher = window.infra.watcher.onStatus((list) => useWatcherStore.getState().applyStatuses(list))
     return () => {
+      offWatcher()
       offLocked()
       offExit()
       offStatus()
@@ -229,6 +247,8 @@ export default function App() {
     { id: 'open-workspaces', label: t('menu.workspaces'), run: () => setModal('workspaces') },
     { id: 'open-bulk', label: t('menu.bulk'), run: () => setModal('bulk') },
     { id: 'open-monitor', label: t('menu.monitor'), run: () => setModal('monitor') },
+    { id: 'open-processes', label: t('menu.processes'), run: () => setModal('processes') },
+    { id: 'open-services', label: t('menu.services'), run: () => setModal('services') },
     { id: 'open-net', label: t('menu.net'), run: () => setModal('net') },
     { id: 'open-ai', label: t('menu.ai'), run: () => setModal('ai') },
     { id: 'open-ai-diagnose', label: `🩺 ${t('ai.diagnose.title')}`, run: () => setModal('ai-diagnose') },
@@ -314,6 +334,8 @@ export default function App() {
       {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} />}
       {modal === 'workspaces' && <WorkspacesModal onClose={() => setModal(null)} />}
       {modal === 'plugins' && <PluginsModal onClose={() => setModal(null)} />}
+      {modal === 'processes' && <ProcessesModal onClose={() => setModal(null)} />}
+      {modal === 'services' && <ServicesModal onClose={() => setModal(null)} />}
       {historyHostId && (
         <MetricsHistoryModal
           hostId={historyHostId}
