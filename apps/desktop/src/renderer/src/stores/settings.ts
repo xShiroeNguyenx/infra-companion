@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { DEFAULT_GUARD_PATTERNS } from '../lib/commandGuard'
+import { DEFAULT_SHORTCUTS, SHORTCUT_ACTIONS, isValidShortcut, type ShortcutAction } from '../lib/shortcuts'
 
 export type ThemeMode = 'dark' | 'light'
 export type Language = 'vi' | 'en' | 'ja'
@@ -49,6 +50,7 @@ const CUSTOM_COLORS_KEY = 'infra.theme.custom'
 const STARTUP_KEY = 'infra.startup.page'
 const CMD_GUARD_ON_KEY = 'infra.cmdGuard.on'
 const CMD_GUARD_PATTERNS_KEY = 'infra.cmdGuard.patterns'
+const SHORTCUTS_KEY = 'infra.term.shortcuts'
 
 /** Các biến màu UI cho phép tuỳ biến (accent có control riêng nên không nằm ở đây). */
 export const CUSTOM_PALETTE_VARS = [
@@ -176,6 +178,21 @@ function readCommandGuardPatterns(): string[] {
   return [...DEFAULT_GUARD_PATTERNS]
 }
 
+/** Phím tắt terminal — trộn giá trị đã lưu (nếu hợp lệ) lên mặc định; khoá vắng → mặc định. */
+function readShortcuts(): Record<ShortcutAction, string> {
+  const out = { ...DEFAULT_SHORTCUTS }
+  try {
+    const raw = JSON.parse(localStorage.getItem(SHORTCUTS_KEY) || '{}') as Record<string, unknown>
+    for (const action of SHORTCUT_ACTIONS) {
+      const v = raw[action]
+      if (typeof v === 'string' && isValidShortcut(v)) out[action] = v
+    }
+  } catch {
+    /* JSON hỏng → mặc định */
+  }
+  return out
+}
+
 function readCustomColors(): CustomColors {
   const out: CustomColors = { dark: {}, light: {} }
   try {
@@ -284,6 +301,8 @@ interface SettingsState {
   commandGuardEnabled: boolean
   /** Whitelist mẫu lệnh cần xác nhận (literal theo prefix hoặc regex /…/). */
   commandGuardPatterns: string[]
+  /** Phím tắt terminal tuỳ biến (copy/paste/find/explain) — chuỗi combo "Ctrl+Shift+V". */
+  shortcuts: Record<ShortcutAction, string>
   setTheme: (t: ThemeMode) => void
   setLanguage: (l: Language) => void
   setAccentColor: (c: string | null) => void
@@ -303,6 +322,10 @@ interface SettingsState {
   setStartupPage: (p: StartupPage) => void
   setCommandGuardEnabled: (on: boolean) => void
   setCommandGuardPatterns: (patterns: string[]) => void
+  /** Gán 1 phím tắt (combo đã chuẩn hoá). */
+  setShortcut: (action: ShortcutAction, combo: string) => void
+  /** Trả mọi phím tắt về mặc định. */
+  resetShortcuts: () => void
   /** Override màu UI theo base theme hiện tại. */
   customColors: CustomColors
   /** Đặt/gỡ 1 màu cho theme đang chọn (null = gỡ override). */
@@ -335,6 +358,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   startupPage: readStartupPage(),
   commandGuardEnabled: readCommandGuardOn(),
   commandGuardPatterns: readCommandGuardPatterns(),
+  shortcuts: readShortcuts(),
   setTheme: (theme) => {
     localStorage.setItem(THEME_KEY, theme)
     applyTheme(theme)
@@ -424,6 +448,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setCommandGuardPatterns: (patterns) => {
     localStorage.setItem(CMD_GUARD_PATTERNS_KEY, JSON.stringify(patterns))
     set({ commandGuardPatterns: patterns })
+  },
+  setShortcut: (action, combo) =>
+    set((s) => {
+      const next = { ...s.shortcuts, [action]: combo }
+      localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(next))
+      return { shortcuts: next }
+    }),
+  resetShortcuts: () => {
+    localStorage.removeItem(SHORTCUTS_KEY)
+    set({ shortcuts: { ...DEFAULT_SHORTCUTS } })
   },
   setCustomColor: (varName, hex) => {
     const { theme, customColors } = get()

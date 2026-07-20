@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, and more.
 
-**Current release: v0.1.26 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.1.27 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -57,6 +57,7 @@
 - **Theme studio** — pick a custom accent and recolor the full UI palette per theme (Settings → Appearance → Custom palette); export / import a theme as JSON
 - **Find in terminal** — Ctrl+F with highlight
 - **Mouse copy & paste** — select then left-click the highlight to copy, right-click to paste (alongside Ctrl+Shift+C / Ctrl+Shift+V)
+- **Customizable shortcuts** — rebind Copy / Paste / Find / AI-explain in Settings → ⌨ Keyboard shortcuts; changes apply live to open terminals
 - **Sensitive command guard** — pressing Enter on a command that matches your watch-list (`rm -rf`, `mkfs`, `shutdown`… — editable in Settings) pops up a confirmation first; it reads the real command line so it catches ↑-recalled commands, adds no typing latency, and stands down inside vim/less/htop (Settings → Sensitive command guard)
 - **Command Palette** — Ctrl+Shift+P, keyboard-first access to every action
 - **Session logging** — capture raw output (ANSI-stripped) to file
@@ -72,7 +73,7 @@
 - **Encrypted vault** — master password → argon2id → AES-256-GCM field-level encryption; all secrets (passwords, private keys, env vars) are encrypted at rest
 - **Auto-lock** after 15 minutes idle; lock overlay preserves scrollback
 - **Remember on this machine** — unlocks via Windows DPAPI / macOS Keychain (no master password prompt on relaunch)
-- **Groups with inheritance** — set default username / auth / key / env / startup snippet at group level; individual hosts can override
+- **Groups with inheritance** — set default username / auth / key / env / startup snippet at group level; individual hosts can override; rename or delete any group from its sidebar header (empty groups included — deleting a group moves its hosts to *Ungrouped*, never deletes them)
 - **SSH Keys** — generate ed25519, import OpenSSH/PEM/PuTTY; private keys never leave main process in plaintext
 - **Snippets** — parameterized commands (`{{variable}}`), run across multiple sessions at once
 - **Notes per host** — encrypted Markdown note per host (purpose, handoff info, app passwords); quick-view from the sidebar, synced with the host
@@ -265,7 +266,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.1.26)
+## Known Limitations (v0.1.27)
 
 - Bulk / Monitor / SFTP / Local-forward tunnels through login scripts rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` installed on the gate) and `su` / `sudo` steps are supported; exotic setups that force a TTY password prompt may still fail. Login-script tunnels also need `nc` on the innermost hop
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))

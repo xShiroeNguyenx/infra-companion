@@ -5,6 +5,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.27] — 2026-07-20
+
+### Added
+
+- **Customizable keyboard shortcuts** — a new **⌨ Keyboard shortcuts** tab in Settings lets you rebind the terminal shortcuts: **Copy selection**, **Paste**, **Find**, and **AI explain selection**. Click a shortcut, press the new combo (must include Ctrl/Alt/Meta, or be an F-key), and it applies immediately to open terminals — no restart. Esc cancels recording, a ⚠ flags conflicts, and one button resets all to defaults (Ctrl+Shift+C / V / E, Ctrl+F). Right-click paste keeps working regardless.
+
+### Fixed
+
+- **Empty groups can now be renamed and deleted** — groups with no hosts were hidden from the sidebar entirely, so once you created one you were stuck with it. Empty groups now show up (when you're not searching) with a subtle "no hosts yet" hint, and every group header gained a **trash button** for quick deletion (with confirmation). Deleting a group never deletes its hosts — they move to *Ungrouped*.
+
+---
+
 ## [0.1.26] — 2026-07-20
 
 ### Added

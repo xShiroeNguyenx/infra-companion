@@ -15,12 +15,13 @@ import {
 } from '../stores/settings'
 import { useToastsStore } from '../stores/toasts'
 import { DEFAULT_GUARD_PATTERNS } from '../lib/commandGuard'
+import { SHORTCUT_ACTIONS, eventToCombo, isValidShortcut, type ShortcutAction } from '../lib/shortcuts'
 import { CustomPaletteSection } from './CustomPaletteSection'
 import { LayoutGlyph } from './LayoutGlyph'
 import { Button, Field, TextArea, TextInput } from './ui'
 
 /** Các nhóm cài đặt hiển thị ở cột điều hướng bên trái của màn hình Settings. */
-type SettingsSection = 'appearance' | 'background' | 'terminal' | 'guard'
+type SettingsSection = 'appearance' | 'background' | 'terminal' | 'shortcuts' | 'guard'
 
 /** Cạnh tối đa khi nén ảnh nền — đủ nét cho màn 4K, đủ nhỏ để vừa localStorage. */
 const MAX_DIM = 2560
@@ -124,7 +125,10 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     setPaneFrame,
     setStartupPage,
     setCommandGuardEnabled,
-    setCommandGuardPatterns
+    setCommandGuardPatterns,
+    shortcuts,
+    setShortcut,
+    resetShortcuts
   } = useSettingsStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const push = useToastsStore((s) => s.push)
@@ -133,6 +137,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const [section, setSection] = useState<SettingsSection>('appearance')
   // Text thô của whitelist (mỗi dòng 1 mẫu) — giữ tách store để user gõ dòng trống tạm thời được
   const [guardText, setGuardText] = useState(commandGuardPatterns.join('\n'))
+  // Đang "ghi" phím tắt cho action nào (null = không ghi) + lỗi combo không hợp lệ
+  const [recording, setRecording] = useState<ShortcutAction | null>(null)
+  const [scError, setScError] = useState<string | null>(null)
 
   // Esc để đóng màn hình (trước dùng Modal lo việc này)
   useEffect(() => {
@@ -144,6 +151,31 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  // Ghi phím tắt: bắt keydown pha CAPTURE (chạy trước Esc-đóng-modal + trước xterm) → chuẩn hoá
+  // combo. Esc = huỷ ghi (stopPropagation nên KHÔNG đóng Settings). Modifier đơn → chờ phím chính.
+  useEffect(() => {
+    if (!recording) return
+    const onKey = (e: KeyboardEvent): void => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.key === 'Escape') {
+        setRecording(null)
+        return
+      }
+      const combo = eventToCombo(e)
+      if (!combo) return // mới bấm Ctrl/Shift… chờ phím chính
+      if (!isValidShortcut(combo)) {
+        setScError(t('settings.scInvalid'))
+        return
+      }
+      setScError(null)
+      setShortcut(recording, combo)
+      setRecording(null)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [recording, setShortcut, t])
 
   const applyGuardText = (text: string): void => {
     setGuardText(text)
@@ -219,6 +251,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     { id: 'appearance', label: t('settings.appearance'), icon: '🎨' },
     { id: 'background', label: t('settings.background'), icon: '🖼️' },
     { id: 'terminal', label: t('settings.terminal'), icon: '▮' },
+    { id: 'shortcuts', label: t('settings.shortcuts'), icon: '⌨' },
     { id: 'guard', label: t('settings.cmdGuard'), icon: '🛡️' }
   ]
   const activeLabel = navItems.find((n) => n.id === section)?.label ?? ''
@@ -596,6 +629,54 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                   </div>
                   <p className="text-subtle mt-1 text-[10px] leading-relaxed">{t('settings.termFontHint')}</p>
                 </Field>
+              </>
+            )}
+
+            {section === 'shortcuts' && (
+              <>
+                <p className="text-subtle mb-3 text-[11px] leading-relaxed">{t('settings.shortcutsHint')}</p>
+                <div className="space-y-2">
+                  {SHORTCUT_ACTIONS.map((action) => {
+                    const dup = SHORTCUT_ACTIONS.some((a) => a !== action && shortcuts[a] === shortcuts[action])
+                    return (
+                      <div key={action} className="flex items-center gap-3">
+                        <span className="text-content flex-1 text-sm">{t(`settings.sc.${action}`)}</span>
+                        {dup && recording !== action && (
+                          <span className="text-warning text-xs" title={t('settings.scConflict')}>
+                            ⚠
+                          </span>
+                        )}
+                        <button
+                          onClick={() => {
+                            setScError(null)
+                            setRecording(recording === action ? null : action)
+                          }}
+                          className={`min-w-36 rounded border px-2 py-1.5 text-center font-mono text-xs ${
+                            recording === action
+                              ? 'border-accent text-accent bg-accent-soft/40 animate-pulse'
+                              : 'border-edge-strong text-content hover:bg-hover'
+                          }`}
+                        >
+                          {recording === action ? t('settings.scPress') : shortcuts[action]}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+                {scError && <p className="text-danger mt-2 text-xs">{scError}</p>}
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <p className="text-subtle text-[10px] leading-relaxed">{t('settings.scNote')}</p>
+                  <Button
+                    onClick={() => {
+                      setRecording(null)
+                      setScError(null)
+                      resetShortcuts()
+                    }}
+                    className="shrink-0 !py-1 !text-xs"
+                  >
+                    {t('settings.scResetAll')}
+                  </Button>
+                </div>
               </>
             )}
 

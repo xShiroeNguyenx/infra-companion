@@ -8,6 +8,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { saveTermSnapshot, subscribeTermData, takeTermSnapshot } from '../../lib/termBus'
 import { matchGuard } from '../../lib/commandGuard'
+import { matchesCombo } from '../../lib/shortcuts'
 import { useTabsStore, type Pane } from '../../stores/tabs'
 import { useAiExplainStore } from '../../stores/aiExplain'
 import { useSettingsStore } from '../../stores/settings'
@@ -117,12 +118,14 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
 
     term.attachCustomKeyEventHandler((event) => {
       if (event.type !== 'keydown') return true
-      if (event.ctrlKey && event.shiftKey && event.code === 'KeyC') {
+      // Phím tắt tuỳ biến — đọc LIVE từ store nên đổi trong Settings ăn ngay (không cần remount)
+      const sc = useSettingsStore.getState().shortcuts
+      if (matchesCombo(event, sc.copy)) {
         const selection = term.getSelection()
         if (selection) void navigator.clipboard.writeText(selection)
         return false
       }
-      if (event.ctrlKey && event.shiftKey && event.code === 'KeyV') {
+      if (matchesCombo(event, sc.paste)) {
         void navigator.clipboard.readText().then((text) => {
           // paste() của xterm (không phải handleInput thô): chuẩn hoá \r\n & \n → \r — clipboard
           // Windows mang \r\n, gửi thô thì vim/nano tính CR và LF là 2 lần xuống dòng → chèn thêm
@@ -132,13 +135,13 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
         })
         return false
       }
-      if (event.ctrlKey && !event.shiftKey && event.code === 'KeyF') {
+      if (matchesCombo(event, sc.find)) {
         setFindOpen(true)
         setTimeout(() => findInputRef.current?.focus(), 0)
         return false
       }
       // F46: AI giải thích đoạn output đang bôi chọn
-      if (event.ctrlKey && event.shiftKey && event.code === 'KeyE') {
+      if (matchesCombo(event, sc.explain)) {
         const selection = term.getSelection().trim()
         if (selection) void useAiExplainStore.getState().explain(selection)
         return false

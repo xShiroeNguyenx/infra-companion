@@ -10,7 +10,7 @@ import { useUiStore, type AppModal } from '../stores/ui'
 import { GroupEditorModal } from './GroupEditorModal'
 import { HostEditorModal } from './HostEditorModal'
 import { NotesModal } from './NotesModal'
-import { Button } from './ui'
+import { Button, ConfirmModal } from './ui'
 import { useT } from '../i18n'
 
 const QUICK_PATTERN = /^[^@\s]+@[^@\s]+$/
@@ -26,7 +26,7 @@ type OpenModal =
 /** Cột trái: Quick Connect / tìm kiếm, hosts theo group, lịch sử, menu công cụ. */
 export function Sidebar() {
   const t = useT()
-  const { hosts, groups, history, refreshAll } = useDataStore()
+  const { hosts, groups, history, refreshAll, deleteGroup } = useDataStore()
   const { openSsh, openQuick, openSshGroup } = useTabsStore()
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
@@ -35,6 +35,7 @@ export function Sidebar() {
   const favIds = useFavoritesStore((s) => s.ids)
   const [query, setQuery] = useState('')
   const [modal, setModal] = useState<OpenModal>(null)
+  const [deletingGroup, setDeletingGroup] = useState<GroupDto | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -67,15 +68,18 @@ export function Sidebar() {
       list.push(host)
       byGroup.set(host.groupId, list)
     }
+    // Khi KHÔNG tìm kiếm: hiện cả group RỖNG (để đổi tên/xoá được — trước đây group không host
+    // bị ẩn hoàn toàn nên kẹt luôn). Khi đang tìm kiếm thì chỉ hiện group có host khớp cho gọn.
+    const showEmpty = !query.trim()
     const result: Array<{ group: GroupDto | null; hosts: HostDto[] }> = []
     for (const group of groups) {
-      const list = byGroup.get(group.id)
-      if (list?.length) result.push({ group, hosts: list })
+      const list = byGroup.get(group.id) ?? []
+      if (list.length || showEmpty) result.push({ group, hosts: list })
     }
     const ungrouped = byGroup.get(null)
     if (ungrouped?.length) result.push({ group: null, hosts: ungrouped })
     return result
-  }, [filtered, groups])
+  }, [filtered, groups, query])
 
   // Host đã ghim (tôn trọng cả ô tìm kiếm); hiện ở mục "Yêu thích" đầu danh sách.
   const favHosts = useMemo(() => filtered.filter((h) => favIds.includes(h.id)), [filtered, favIds])
@@ -198,16 +202,29 @@ export function Sidebar() {
                   <PencilIcon />
                 </button>
               )}
+              {section.group && (
+                <button
+                  className="text-subtle hover:bg-hover hover:text-danger rounded p-0.5 opacity-0 group-hover/header:opacity-100"
+                  title={t('sidebar.deleteGroup')}
+                  onClick={() => setDeletingGroup(section.group)}
+                >
+                  <TrashIcon />
+                </button>
+              )}
             </div>
-            {section.hosts.map((host) => (
-              <HostRow
-                key={host.id}
-                host={host}
-                color={section.group?.color ?? null}
-                onEdit={openHostEditor}
-                onNotes={openNotes}
-              />
-            ))}
+            {section.group && section.hosts.length === 0 ? (
+              <p className="text-subtle px-2 py-1 text-[10px] italic">{t('sidebar.groupEmpty')}</p>
+            ) : (
+              section.hosts.map((host) => (
+                <HostRow
+                  key={host.id}
+                  host={host}
+                  color={section.group?.color ?? null}
+                  onEdit={openHostEditor}
+                  onNotes={openNotes}
+                />
+              ))
+            )}
           </div>
         ))}
 
@@ -291,7 +308,34 @@ export function Sidebar() {
           onClose={() => setModal(null)}
         />
       )}
+      {deletingGroup && (
+        <ConfirmModal
+          title={t('group.delete')}
+          message={
+            <>
+              {t('group.deleteMsg', { name: deletingGroup.name })}
+              {hosts.some((h) => h.groupId === deletingGroup.id) && (
+                <span className="text-warning mt-2 block text-xs">{t('group.deleteHostsNote')}</span>
+              )}
+            </>
+          }
+          onConfirm={() => {
+            const g = deletingGroup
+            setDeletingGroup(null)
+            void deleteGroup(g.id)
+          }}
+          onCancel={() => setDeletingGroup(null)}
+        />
+      )}
     </div>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
+      <path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L12 4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }
 
