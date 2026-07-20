@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, and more.
 
-**Current release: v0.1.25 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.1.26 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -44,7 +44,8 @@
 - **xterm.js** with WebGL renderer — smooth even at high throughput (`yes`, large `cat`)
 - **Multi-tab** with Ctrl+Shift+T / middle-click close
 - **Split panes** — side-by-side sessions, Ctrl+Shift+D
-- **Merge tabs ⇄ split panes** — the Split button combines all open tabs into one tab's panes (so Broadcast spans them) and toggles back; scrollback is preserved across merge/split
+- **Merge tabs ⇄ split panes** — the Split button opens a menu to combine **all** open tabs *or* **only the tabs you pick** into one tab's panes (so Broadcast spans them) and toggles back; scrollback is preserved across merge/split
+- **Reorder panes & pick the main window** — each split pane header has a **⋮** menu: *Set as main window* (promote any pane to the large slot in main-left / main-top) plus move left/up and right/down
 - **Split layouts** — arrange panes as auto grid, side-by-side columns, stacked rows, main-left, or main-top; switch from the **▼** next to Split ON or set the default in Settings → Terminal
 - **Pane frame styles** — Compact bar (default) or Mac style (rounded corners + round red close button), in Settings → Terminal
 - **Command palette button** — a toolbar button opens the palette for people who don't know the `Ctrl+Shift+P` shortcut
@@ -99,6 +100,7 @@
 - Grid output view — enable **"Group by output"** to instantly spot divergent machines (flagged yellow)
 - Cancel mid-run; closing the modal also cancels (connections are truly terminated)
 - Works through login-script hosts — command runs on the **inner** machine, not the gate
+- **Compare config across 2 hosts** — 🔍 Compare (⋯ menu): read the same file on two servers over a dedicated exec channel and get a side-by-side, line-by-line diff (added / removed / changed) — perfect for spotting config drift; works through login-script hosts too
 
 ### Monitoring Dashboard
 - Per-host cards: load sparkline + Load / **real CPU%** / RAM / Disk bars, uptime
@@ -263,7 +265,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.1.25)
+## Known Limitations (v0.1.26)
 
 - Bulk / Monitor / SFTP / Local-forward tunnels through login scripts rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` installed on the gate) and `su` / `sudo` steps are supported; exotic setups that force a TTY password prompt may still fail. Login-script tunnels also need `nc` on the innermost hop
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))

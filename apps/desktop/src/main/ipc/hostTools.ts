@@ -15,6 +15,14 @@ import { touchActivity } from './vault'
 /** Tên unit systemd hợp lệ — chặn injection vào lệnh shell (không shq vì tên unit đơn giản). */
 const UNIT_PATTERN = /^[A-Za-z0-9@._:\\-]+$/
 
+/** Bọc chuỗi trong nháy đơn cho shell — đường dẫn file người dùng nhập có thể chứa ký tự đặc biệt. */
+function shq(s: string): string {
+  return `'${s.replaceAll("'", `'\\''`)}'`
+}
+
+/** Trần đọc file: 1MB — đủ cho config, tránh nuốt cả file log khổng lồ. */
+const READ_FILE_MAX_BYTES = 1_048_576
+
 /** Chạy 1 lệnh trên host qua kênh exec riêng (login-script aware) — dùng chung F33/F34. */
 async function runOnHost(
   event: IpcMainInvokeEvent,
@@ -114,5 +122,21 @@ export function registerHostToolsIpc(): void {
   ipcMain.handle(IPC.HTOOLS_SERVICE_LOGS, async (event, hostId: string, unit: string): Promise<HostExecResultDto> => {
     if (!UNIT_PATTERN.test(unit)) return { ok: false, stdout: '', stderr: '', error: 'Tên service không hợp lệ' }
     return toExecDto(await runOnHost(event, hostId, `journalctl -u ${unit} -n 120 --no-pager 2>&1 | tail -n 120`))
+  })
+
+  // F49 — đọc nội dung file để so sánh config. `test -f` chặn thư mục/thiết bị; `head -c` cắt trần
+  // để không nuốt cả file log lớn. Đường dẫn shq nên an toàn với ký tự đặc biệt/khoảng trắng.
+  ipcMain.handle(IPC.HTOOLS_READ_FILE, async (event, hostId: string, path: string): Promise<HostExecResultDto> => {
+    const p = (path ?? '').trim()
+    if (!p) return { ok: false, stdout: '', stderr: '', error: 'Chưa nhập đường dẫn file' }
+    const q = shq(p)
+    const cmd = `if [ -f ${q} ]; then head -c ${READ_FILE_MAX_BYTES} -- ${q}; else echo "__NOFILE__" 1>&2; fi`
+    const res = await runOnHost(event, hostId, cmd)
+    if (res.status === 'error') return { ok: false, stdout: '', stderr: '', error: res.error }
+    if (res.stderr.includes('__NOFILE__'))
+      return { ok: false, stdout: '', stderr: '', error: `Không tìm thấy file (hoặc không phải file thường): ${p}` }
+    if ((res.code ?? 0) !== 0 && !res.stdout)
+      return { ok: false, stdout: '', stderr: res.stderr, error: res.stderr.trim() || 'Không đọc được file' }
+    return { ok: true, stdout: res.stdout, stderr: res.stderr }
   })
 }

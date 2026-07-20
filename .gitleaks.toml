@@ -1,0 +1,23 @@
+# Cấu hình gitleaks — GIỮ NGUYÊN toàn bộ ruleset mặc định, chỉ thêm allowlist cho các
+# FALSE POSITIVE đã xác minh: chuỗi "-----BEGIN OPENSSH PRIVATE KEY-----" xuất hiện trong
+# mã nguồn CHỈ như header định dạng PEM / chữ gợi ý ô nhập (placeholder) — KHÔNG bao giờ
+# là key material thật. Key thật chỉ tồn tại trong vault mã hoá lúc runtime (không nằm
+# trong repo) và còn được GitHub Push Protection chặn ở lớp thứ hai.
+#
+# Vì rule `private-key` của gitleaks bắt marker "-----BEGIN...PRIVATE KEY-----" bất kể
+# phía sau có key thật hay không, 3 vị trí dưới đây bị báo nhầm. Allowlist theo đường dẫn
+# để không phải tắt cả rule (các file/commit khác vẫn được quét đầy đủ).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "PEM header dùng làm template định dạng / placeholder UI — không phải private key thật"
+paths = [
+  # Serializer OpenSSH key (tính năng tạo SSH key): dựng header PEM động từ key material tạo runtime
+  '''packages/core/src/vault/sshKeyFormat\.ts''',
+  # Smoke test keygen: sinh key ed25519 ngẫu nhiên lúc chạy rồi serialize để kiểm tra roundtrip
+  '''apps/desktop/scripts/smoke-runtime\.cjs''',
+  # Modal nhập key: placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" trong ô textarea
+  '''apps/desktop/src/renderer/src/components/KeysModal\.tsx''',
+]

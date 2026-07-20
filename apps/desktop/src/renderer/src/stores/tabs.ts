@@ -68,8 +68,14 @@ interface TabsState {
   activeId: string | null
   /** Gộp mọi tab terminal thành pane trong tab này (1 toolbar, broadcast dùng chung). */
   mergeTabs: (tabId: string) => void
+  /** Gộp CHỌN LỌC: chỉ gộp các tab terminal trong `tabIds` (luôn gồm tab đích) vào tab đích. */
+  mergeTabsSelected: (tabId: string, tabIds: string[]) => void
   /** Tách mỗi pane của tab thành 1 tab riêng (đảo của mergeTabs). */
   unmergeTab: (tabId: string) => void
+  /** Đổi vị trí 1 pane trong tab (delta -1 = sang trái/lên, +1 = sang phải/xuống). */
+  movePane: (tabId: string, paneId: string, delta: -1 | 1) => void
+  /** Đưa 1 pane lên đầu danh sách — thành "cửa sổ chính" ở layout main-left/main-top. */
+  setMainPane: (tabId: string, paneId: string) => void
   openLocal: (profileId?: string) => Promise<void>
   openSsh: (hostId: string) => Promise<void>
   /** Mở nhiều host cùng lúc: mỗi host 1 pane trong CÙNG 1 tab mới (chia màn hình sẵn). */
@@ -144,6 +150,23 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       const panes = terminals.flatMap((t) => t.panes)
       const tabs = state.tabs
         .filter((t) => t.kind !== 'terminal' || t.id === tabId)
+        .map((t) => (t.id === tabId ? { ...t, panes } : t))
+      return { tabs, activeId: tabId }
+    }),
+
+  mergeTabsSelected: (tabId, tabIds) =>
+    set((state) => {
+      const target = state.tabs.find((t) => t.id === tabId)
+      if (target?.kind !== 'terminal') return {}
+      const ids = new Set(tabIds)
+      ids.add(tabId) // tab đích luôn nằm trong nhóm gộp
+      // Các tab terminal được chọn, giữ thứ tự trên thanh tab
+      const chosen = state.tabs.filter((t) => t.kind === 'terminal' && ids.has(t.id))
+      if (chosen.length < 2) return {} // không đủ để gộp
+      const panes = chosen.flatMap((t) => t.panes)
+      const tabs = state.tabs
+        // Giữ lại: tab không phải terminal, tab terminal KHÔNG chọn, và chính tab đích
+        .filter((t) => t.kind !== 'terminal' || !ids.has(t.id) || t.id === tabId)
         .map((t) => (t.id === tabId ? { ...t, panes } : t))
       return { tabs, activeId: tabId }
     }),
@@ -383,6 +406,33 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   setActivePane: (tabId, paneId) =>
     set((state) => ({
       tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, activePaneId: paneId } : t))
+    })),
+
+  movePane: (tabId, paneId, delta) =>
+    set((state) => ({
+      tabs: state.tabs.map((t) => {
+        if (t.id !== tabId) return t
+        const idx = t.panes.findIndex((p) => p.id === paneId)
+        const to = idx + delta
+        if (idx < 0 || to < 0 || to >= t.panes.length) return t
+        const panes = [...t.panes]
+        const [moved] = panes.splice(idx, 1)
+        panes.splice(to, 0, moved!)
+        return { ...t, panes }
+      })
+    })),
+
+  setMainPane: (tabId, paneId) =>
+    set((state) => ({
+      tabs: state.tabs.map((t) => {
+        if (t.id !== tabId) return t
+        const idx = t.panes.findIndex((p) => p.id === paneId)
+        if (idx <= 0) return t // đã là pane đầu → không cần đổi
+        const panes = [...t.panes]
+        const [moved] = panes.splice(idx, 1)
+        panes.unshift(moved!)
+        return { ...t, panes }
+      })
     })),
 
   toggleBroadcast: (tabId) =>

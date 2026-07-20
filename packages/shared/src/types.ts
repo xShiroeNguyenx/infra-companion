@@ -931,6 +931,8 @@ export interface InfraApi {
     serviceAction(hostId: string, unit: string, action: ServiceActionDto): Promise<HostExecResultDto>
     /** journalctl -u <unit> (120 dòng cuối). */
     serviceLogs(hostId: string, unit: string): Promise<HostExecResultDto>
+    /** F49 — đọc nội dung 1 file trên host (stdout = nội dung), cắt ở ~1MB. Cho tính năng so sánh config. */
+    readFile(hostId: string, path: string): Promise<HostExecResultDto>
   }
   ai: {
     getConfig(): Promise<AiConfigDto | null>

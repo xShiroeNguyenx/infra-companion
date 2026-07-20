@@ -123,6 +123,8 @@ export const IPC = {
   HTOOLS_SERVICES: 'htools:services',
   HTOOLS_SERVICE_ACTION: 'htools:service-action',
   HTOOLS_SERVICE_LOGS: 'htools:service-logs',
+  // F49 — đọc nội dung 1 file trên host qua kênh exec riêng (cho tính năng so sánh config)
+  HTOOLS_READ_FILE: 'htools:read-file',
 
   AI_GET_CONFIG: 'ai:get-config',
   AI_SET_CONFIG: 'ai:set-config',

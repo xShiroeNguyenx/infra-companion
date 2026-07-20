@@ -165,7 +165,8 @@ const api: InfraApi = {
     killProcess: (hostId, pid, signal) => ipcRenderer.invoke(IPC.HTOOLS_KILL, hostId, pid, signal),
     listServices: (hostId) => ipcRenderer.invoke(IPC.HTOOLS_SERVICES, hostId),
     serviceAction: (hostId, unit, action) => ipcRenderer.invoke(IPC.HTOOLS_SERVICE_ACTION, hostId, unit, action),
-    serviceLogs: (hostId, unit) => ipcRenderer.invoke(IPC.HTOOLS_SERVICE_LOGS, hostId, unit)
+    serviceLogs: (hostId, unit) => ipcRenderer.invoke(IPC.HTOOLS_SERVICE_LOGS, hostId, unit),
+    readFile: (hostId, path) => ipcRenderer.invoke(IPC.HTOOLS_READ_FILE, hostId, path)
   },
   ai: {
     getConfig: () => ipcRenderer.invoke(IPC.AI_GET_CONFIG),

@@ -115,7 +115,8 @@ function gridSpec(layout: PaneLayout, count: number): GridSpec {
 /** Render các pane của 1 tab terminal dạng lưới + thanh công cụ pane (split, broadcast, log). */
 export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean }) {
   const t = useT()
-  const { tabs, setActivePane, closePane, toggleBroadcast, mergeTabs, unmergeTab } = useTabsStore()
+  const { tabs, setActivePane, closePane, toggleBroadcast, mergeTabs, mergeTabsSelected, unmergeTab, movePane, setMainPane } =
+    useTabsStore()
   // Màu group (production đỏ…) — sọc màu trên header pane theo host của pane
   const hosts = useDataStore((s) => s.hosts)
   const groups = useDataStore((s) => s.groups)
@@ -129,6 +130,12 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
   const [recording, setRecording] = useState<Set<string>>(new Set())
   // Dropdown chọn bố cục (chỉ mở được khi Split ON) — gắn cạnh nút Split, không chiếm chỗ toolbar
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
+  // Menu Split (khi 1 pane): gộp tất cả / chọn tab để gộp
+  const [splitMenuOpen, setSplitMenuOpen] = useState(false)
+  const [mergeSel, setMergeSel] = useState<Set<string>>(new Set())
+  // Menu ⋮ trên header pane (đổi vị trí / đặt làm chính) — fixed theo toạ độ nút để không bị
+  // frame mac (overflow-hidden) cắt mất; lưu id pane + vị trí neo menu
+  const [paneMenu, setPaneMenu] = useState<{ id: string; x: number; y: number } | null>(null)
   const splitRef = useRef<HTMLDivElement>(null)
   const count = tab.panes.length
   const spec = gridSpec(paneLayout, count)
@@ -136,6 +143,17 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
   // Còn tab terminal khác để gộp vào tab này không (Split = gộp tab thành pane)
   const canMerge = tabs.filter((t) => t.kind === 'terminal').length > 1
   const activePane = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
+  // Các tab terminal có thể gộp (cho picker Split) — nhãn theo host pane đầu, kèm +n nếu đã có nhiều pane
+  const termTabs = tabs.filter((tt) => tt.kind === 'terminal')
+  const tabLabel = (tt: AppTab): string => {
+    const base = tt.panes[0]?.title ?? 'terminal'
+    return tt.panes.length > 1 ? `${base} +${tt.panes.length - 1}` : base
+  }
+  const openPaneMenu = (e: ReactMouseEvent, paneId: string): void => {
+    e.stopPropagation()
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setPaneMenu((cur) => (cur?.id === paneId ? null : { id: paneId, x: r.right, y: r.bottom }))
+  }
   const activeLogging = activePane ? logging.has(activePane.sessionId) : false
   const activeRecording = activePane ? recording.has(activePane.sessionId) : false
 
@@ -180,14 +198,18 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
     setRowFr(s.defRow)
   }, [paneLayout, count])
 
-  // Đóng dropdown layout khi bấm ra ngoài hoặc nhấn Esc
+  // Đóng dropdown layout/Split khi bấm ra ngoài hoặc nhấn Esc (cùng anchor splitRef)
   useEffect(() => {
-    if (!layoutMenuOpen) return
+    if (!layoutMenuOpen && !splitMenuOpen) return
+    const close = (): void => {
+      setLayoutMenuOpen(false)
+      setSplitMenuOpen(false)
+    }
     const onDown = (e: MouseEvent): void => {
-      if (splitRef.current && !splitRef.current.contains(e.target as Node)) setLayoutMenuOpen(false)
+      if (splitRef.current && !splitRef.current.contains(e.target as Node)) close()
     }
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setLayoutMenuOpen(false)
+      if (e.key === 'Escape') close()
     }
     window.addEventListener('mousedown', onDown)
     window.addEventListener('keydown', onKey)
@@ -195,7 +217,7 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
       window.removeEventListener('mousedown', onDown)
       window.removeEventListener('keydown', onKey)
     }
-  }, [layoutMenuOpen])
+  }, [layoutMenuOpen, splitMenuOpen])
 
   const startDrag = (e: ReactMouseEvent, index: number, axis: 'col' | 'row'): void => {
     e.preventDefault()
@@ -278,14 +300,80 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
             )}
           </div>
         ) : (
-          <button
-            className="border-edge-strong text-muted hover:bg-hover hover:text-content rounded border px-1.5 py-0.5 disabled:opacity-40"
-            title={t('tabs.splitTip')}
-            disabled={!canMerge}
-            onClick={() => mergeTabs(tab.id)}
-          >
-            {t('tabs.split')}
-          </button>
+          // Split (1 pane): mở menu chọn gộp tất cả HAY chọn lọc tab để gộp
+          <div ref={splitRef} className="relative flex items-center">
+            <button
+              className="border-edge-strong text-muted hover:bg-hover hover:text-content flex items-center gap-0.5 rounded border px-1.5 py-0.5 disabled:opacity-40"
+              title={t('tabs.splitTip')}
+              disabled={!canMerge}
+              aria-expanded={splitMenuOpen}
+              onClick={() => {
+                setMergeSel(new Set())
+                setSplitMenuOpen((v) => !v)
+              }}
+            >
+              {t('tabs.split')}
+              <span className="text-[7px] leading-none">▼</span>
+            </button>
+            {splitMenuOpen && (
+              <div className="border-edge-strong bg-elevated absolute top-full left-0 z-30 mt-1 w-60 rounded border py-1 shadow-lg">
+                <button
+                  className="text-content hover:bg-hover w-full px-2 py-1.5 text-left"
+                  onClick={() => {
+                    mergeTabs(tab.id)
+                    setSplitMenuOpen(false)
+                  }}
+                >
+                  {t('tabs.mergeAll', { n: termTabs.length })}
+                </button>
+                <div className="border-edge my-1 border-t" />
+                <div className="text-subtle px-2 pb-1 text-[10px]">{t('tabs.mergePick')}</div>
+                <div className="max-h-52 overflow-y-auto">
+                  {termTabs.map((tt) => {
+                    const isSelf = tt.id === tab.id
+                    return (
+                      <label
+                        key={tt.id}
+                        className={`flex items-center gap-2 px-2 py-1 ${
+                          isSelf ? 'text-subtle' : 'text-content hover:bg-hover cursor-pointer'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelf || mergeSel.has(tt.id)}
+                          disabled={isSelf}
+                          onChange={(e) =>
+                            setMergeSel((prev) => {
+                              const next = new Set(prev)
+                              if (e.target.checked) next.add(tt.id)
+                              else next.delete(tt.id)
+                              return next
+                            })
+                          }
+                        />
+                        <span className="min-w-0 flex-1 truncate">
+                          {tabLabel(tt)}
+                          {isSelf ? ` ${t('tabs.mergeThis')}` : ''}
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+                <div className="border-edge mt-1 border-t px-2 pt-1.5">
+                  <button
+                    className="bg-accent hover:bg-accent-hover w-full rounded px-2 py-1 text-white disabled:opacity-40"
+                    disabled={mergeSel.size === 0}
+                    onClick={() => {
+                      mergeTabsSelected(tab.id, [...mergeSel])
+                      setSplitMenuOpen(false)
+                    }}
+                  >
+                    {t('tabs.mergeSelected', { n: mergeSel.size + 1 })}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
         <button
           className={`rounded border px-1.5 py-0.5 ${
@@ -379,6 +467,13 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
                   </span>
                   <button
                     className="text-subtle hover:bg-edge-strong hover:text-content rounded px-1 leading-none"
+                    title={t('tabs.paneMenu')}
+                    onClick={(e) => openPaneMenu(e, pane.id)}
+                  >
+                    ⋮
+                  </button>
+                  <button
+                    className="text-subtle hover:bg-edge-strong hover:text-content rounded px-1 leading-none"
                     title={t('tabs.closePane')}
                     onClick={(e) => {
                       e.stopPropagation()
@@ -410,6 +505,13 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
                   <span className="min-w-0 flex-1 truncate text-center" title={pane.subtitle ?? pane.title}>
                     {pane.title}
                   </span>
+                  <button
+                    className="text-subtle hover:bg-edge-strong hover:text-content rounded px-1 leading-none"
+                    title={t('tabs.paneMenu')}
+                    onClick={(e) => openPaneMenu(e, pane.id)}
+                  >
+                    ⋮
+                  </button>
                   {/* Chấm trạng thái nhỏ bên phải để vẫn biết đang kết nối/rớt */}
                   <span className={`size-1.5 shrink-0 rounded-full ${statusDot(pane.status)}`} />
                 </div>
@@ -452,6 +554,54 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
           />
         )}
       </div>
+
+      {/* Menu ⋮ của pane: đổi vị trí / đặt làm cửa sổ chính. fixed theo toạ độ nút + backdrop đóng */}
+      {paneMenu &&
+        (() => {
+          const idx = tab.panes.findIndex((p) => p.id === paneMenu.id)
+          if (idx < 0) return null
+          const close = (): void => setPaneMenu(null)
+          return (
+            <>
+              <div className="fixed inset-0 z-40" onMouseDown={close} />
+              <div
+                className="border-edge-strong bg-elevated fixed z-50 w-48 -translate-x-full rounded border py-1 text-[11px] shadow-lg"
+                style={{ left: paneMenu.x, top: paneMenu.y + 2 }}
+              >
+                <button
+                  className="text-content hover:bg-hover flex w-full items-center gap-2 px-2 py-1.5 text-left disabled:opacity-40"
+                  disabled={idx === 0}
+                  onClick={() => {
+                    setMainPane(tab.id, paneMenu.id)
+                    close()
+                  }}
+                >
+                  ★ {t('tabs.makeMain')}
+                </button>
+                <button
+                  className="text-content hover:bg-hover flex w-full items-center gap-2 px-2 py-1.5 text-left disabled:opacity-40"
+                  disabled={idx === 0}
+                  onClick={() => {
+                    movePane(tab.id, paneMenu.id, -1)
+                    close()
+                  }}
+                >
+                  ◀ {t('tabs.moveLeft')}
+                </button>
+                <button
+                  className="text-content hover:bg-hover flex w-full items-center gap-2 px-2 py-1.5 text-left disabled:opacity-40"
+                  disabled={idx === count - 1}
+                  onClick={() => {
+                    movePane(tab.id, paneMenu.id, 1)
+                    close()
+                  }}
+                >
+                  ▶ {t('tabs.moveRight')}
+                </button>
+              </div>
+            </>
+          )
+        })()}
     </div>
   )
 }

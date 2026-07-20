@@ -16,6 +16,7 @@ export type AppModal =
   | 'plugins'
   | 'processes'
   | 'services'
+  | 'compare'
   | null
 
 interface UiState {

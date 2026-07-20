@@ -5,6 +5,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.26] — 2026-07-20
+
+### Added
+
+- **Compare config across 2 hosts** — new **🔍 Compare config** in the ⋯ menu: pick two SSH hosts and a file path (by default the *same* path on both sides — the common case of the same config on many servers) and get a **side-by-side, line-by-line diff** with added / removed / changed lines highlighted, line numbers on each side, and a `+ / − / ~` summary. File contents are read over a **dedicated exec channel** (`cat`, capped at 1 MB, `test -f` guards against directories) — it never touches an open terminal and works through login-script hosts like Bulk/Processes.
+- **Split: merge all *or* pick tabs** — the **Split** button now opens a small menu instead of always grabbing every open terminal: choose **Merge all** (old behavior) or tick **only the tabs you want** to combine into one split view. Splitting back and re-splitting no longer sweeps in servers you didn't want.
+- **Reorder panes & choose the main window** — every split pane header gains a **⋮ menu** with **Set as main window** (promote any pane to the large slot in the *main-left* / *main-top* layouts — previously stuck on whichever pane happened to be first) plus **Move left/up** and **Move right/down** to rearrange panes freely.
+
+### Notes
+
+- No vault/schema migration in this release — these are UI/tooling additions only.
+
+---
+
 ## [0.1.25] — 2026-07-19
 
 ### Added

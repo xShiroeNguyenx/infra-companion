@@ -41,6 +41,7 @@ import { useWatcherStore } from './stores/watcher'
 import { useVaultStore } from './stores/vault'
 import { ProcessesModal } from './components/ProcessesModal'
 import { ServicesModal } from './components/ServicesModal'
+import { CompareModal } from './components/CompareModal'
 
 /** Toast cảnh báo monitoring — chạy ngoài component (trong subscribe) nên đọc ngôn ngữ từ store. */
 function formatAlertToast(a: import('@infra/shared').MonitorAlertDto): string {
@@ -336,6 +337,7 @@ export default function App() {
       {modal === 'plugins' && <PluginsModal onClose={() => setModal(null)} />}
       {modal === 'processes' && <ProcessesModal onClose={() => setModal(null)} />}
       {modal === 'services' && <ServicesModal onClose={() => setModal(null)} />}
+      {modal === 'compare' && <CompareModal onClose={() => setModal(null)} />}
       {historyHostId && (
         <MetricsHistoryModal
           hostId={historyHostId}
