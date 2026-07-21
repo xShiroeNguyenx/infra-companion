@@ -5,6 +5,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.29] — 2026-07-21
+
+### Fixed
+
+- **SSH "Key + Password" auth now actually completes the login** — the 2-factor method added in v0.1.28 presented the key but never sent the password against servers that require `publickey` **then** a password: the underlying SSH library walked its authentication methods once in a fixed order (`password` before `publickey`) and gave up right after the key's partial success, so the password was never sent a second time. The app now forces the correct order (key first, then password) and also answers a **PAM keyboard-interactive** password prompt — the usual case on RHEL / AlmaLinux — so `AuthenticationMethods publickey,password` (and `publickey,keyboard-interactive`) now logs in just like it does in PuTTY / OpenSSH.
+
+---
+
 ## [0.1.28] — 2026-07-21
 
 ### Added

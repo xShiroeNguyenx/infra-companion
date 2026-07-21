@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Duplex } from 'node:stream'
-import { Client } from 'ssh2'
+import { Client, type AuthenticationType } from 'ssh2'
 import type { HostKeyVerifier } from './types'
 
 /** Một đầu kết nối trong chuỗi (hop hoặc target). */
@@ -96,6 +96,18 @@ function connectOne(
       resolve()
     })
     const useAgent = endpoint.useAgent || agentForward
+    // MFA key+password (AuthenticationMethods publickey,password|keyboard-interactive):
+    // ssh2 mặc định xếp 'password' TRƯỚC 'publickey' và duyệt danh sách MỘT LẦN (bỏ qua
+    // partial-success). Với server đòi publickey trước, chuỗi mặc định là none→password(fail)→
+    // publickey(partial success, giờ cần password)→HẾT → "All authentication methods failed"
+    // (password không bao giờ được gửi lần 2). Ép thứ tự publickey→password; nhiều server PAM
+    // hỏi password bước 2 qua keyboard-interactive nên bật tryKeyboard + trả lời bằng password đã lưu.
+    const keyAndPassword = endpoint.privateKey !== undefined && endpoint.password !== undefined
+    if (keyAndPassword) {
+      client.on('keyboard-interactive', (_name, _instructions, _lang, prompts, finish) => {
+        finish(prompts.map(() => endpoint.password ?? ''))
+      })
+    }
     client.connect({
       host: endpoint.host,
       port: endpoint.port,
@@ -106,6 +118,13 @@ function connectOne(
       passphrase: endpoint.passphrase,
       agent: useAgent ? agentPath() : undefined,
       agentForward: agentForward && Boolean(agentPath()),
+      // Chỉ ép authHandler cho MFA key+password — auth thường giữ nguyên hành vi mặc định ssh2
+      ...(keyAndPassword
+        ? {
+            tryKeyboard: true,
+            authHandler: ['publickey', 'password', 'keyboard-interactive'] as AuthenticationType[]
+          }
+        : {}),
       readyTimeout: 20_000,
       keepaliveInterval: 15_000,
       keepaliveCountMax: 3,
