@@ -61,11 +61,12 @@ pnpm test     # Core tests: crypto / sync merge / ssh_config parser (merge needs
 - **Notes**: the host editor has a **Notes** field (Markdown, **encrypted** in the vault) — record the server's purpose, handoff info, app passwords… Hosts with a note show a **📝** button in the sidebar for a quick read-only view; synced with the host.
 - **Favorite hosts**: hover a host → click **⭐** to pin it. Pinned hosts appear in a **★ Favorites** section at the very top of the sidebar for quick access (still filtered by the search box). Click ⭐ again to unpin. Stored **on this machine** (not synced). *Test: pin a host → it shows under ★ Favorites at the top; it persists across app restarts.*
 
-### Authentication — 6 methods
+### Authentication — 7 methods
 | Method | When to use |
 |--------|-------------|
 | **Password** | Type a password; leave empty = prompt on every connect |
 | **SSH Key** | Pick a key imported/generated in the Keys panel |
+| **SSH Key + Password** | 2-factor login — the server requires *both* a key **and** an account password (`AuthenticationMethods publickey,password`). Pick a key and enter the password (leave it blank to be prompted at connect). Reuses the group's key when inherited. |
 | **SSH Agent (OS)** | Use the Windows/OpenSSH agent or Pageant (incl. FIDO2 sk-keys) |
 | **Secret manager** | Fetch the password from 1Password/Bitwarden/Vault at connect time (see §14B) |
 | **No authentication** | Server lets you straight in (auth none / empty password) |
@@ -148,7 +149,7 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 | **Switch tabs** | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
 | **Close tab/pane** | `Ctrl+Shift+W`, or `✕` on the tab/pane, or middle-click the tab |
 | **Find in terminal** | `Ctrl+F` |
-| **Copy / Paste** | `Ctrl+Shift+C` / `Ctrl+Shift+V` |
+| **Copy / Paste** | `Ctrl+Shift+C` / `Ctrl+Shift+V` — **rebind in Settings → ⌨ Keyboard shortcuts**. Pasting goes through the bound combo or right-click only; plain `Ctrl+V` no longer auto-pastes (standard terminal behavior) |
 | **Copy with the mouse** | Select text → **left-click inside the highlight** = copy (a *"Copied"* toast confirms) |
 | **Paste with the mouse** | **Right-click** anywhere in the terminal = paste the clipboard at the cursor (respects Broadcast) |
 | **Wheel prints `65;53;18M…` garbage?** | A remote program left xterm **mouse reporting** on (or an escape sequence sneaked in while `cat`/`tail`-ing a log). Type `reset` in that shell to clear it; holding **Shift** while scrolling always bypasses mouse reporting |
@@ -265,6 +266,8 @@ Settings opens as a **full-screen page** with a category rail on the left — **
 | **L (Local)** | A port on your machine → through SSH → destination (e.g. reach a remote DB as if local) |
 | **R (Remote)** | A port on the server → back to your machine |
 | **D (Dynamic)** | A local SOCKS5 proxy — browse the web through the server |
+
+**Name your tunnels**: the tunnel editor has an optional **Name** field — give each rule a friendly label (e.g. *"Prod DB"*, *"Staging Grafana"*) so a long list stays readable. The list shows the name on top and the actual route (`:port → host:port`) underneath, so you always see where a named tunnel goes. Leave the name blank and it falls back to the route as before.
 
 **Test SOCKS5**: + Tunnel → host `gate-01`, type **Dynamic**, bind `1080` → **Start** (green dot) → set SOCKS5 `127.0.0.1:1080` in your browser → traffic goes through the gate.
 **Test Local**: type L, bind `13306`, dest `127.0.0.1:3306` → connect MySQL to `127.0.0.1:13306`.
@@ -569,7 +572,7 @@ New connection protocols (pluggable SessionKind) · permission enforcement + con
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Switch tabs |
 | `Ctrl+F` | Find in terminal |
 | `Ctrl+Shift+E` | AI-explain the selected terminal output |
-| `Ctrl+Shift+C` / `Ctrl+Shift+V` | Copy / Paste |
+| `Ctrl+Shift+C` / `Ctrl+Shift+V` | Copy / Paste (customizable in **Settings → ⌨ Keyboard shortcuts**) |
 | Left-click inside a selection | Copy the highlighted text |
 | Right-click in the terminal | Paste the clipboard at the cursor |
 | `Esc` | Close the open modal |

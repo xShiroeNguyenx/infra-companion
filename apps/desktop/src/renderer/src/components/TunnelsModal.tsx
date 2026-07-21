@@ -11,12 +11,17 @@ const TYPE_KEY: Record<TunnelType, I18nKey> = {
   D: 'tunnel.typeD'
 }
 
+/** Mô tả route (port đi đâu) — dùng làm nhãn mặc định khi user không đặt tên riêng. */
+const routeOf = (r: Pick<TunnelRuleDto, 'type' | 'bindPort' | 'destHost' | 'destPort'>): string =>
+  r.type === 'D' ? `SOCKS5 :${r.bindPort}` : `:${r.bindPort} → ${r.destHost}:${r.destPort}`
+
 /** Tunnel Dashboard: danh sách rule + trạng thái runtime + form thêm rule. */
 export function TunnelsModal({ onClose }: { onClose: () => void }) {
   const t = useT()
   const { hosts, tunnels, tunnelStates, saveTunnel, deleteTunnel, startTunnel, stopTunnel } = useDataStore()
   const [mode, setMode] = useState<'list' | 'add'>('list')
   const [hostId, setHostId] = useState('')
+  const [name, setName] = useState('')
   const [type, setType] = useState<TunnelType>('L')
   const [bindPort, setBindPort] = useState('')
   const [destHost, setDestHost] = useState('127.0.0.1')
@@ -31,6 +36,7 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
   const openAdd = (): void => {
     setEditingId(null)
     setHostId('')
+    setName('')
     setType('L')
     setBindPort('')
     setDestHost('127.0.0.1')
@@ -42,6 +48,8 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
   const openEdit = (rule: TunnelRuleDto): void => {
     setEditingId(rule.id)
     setHostId(rule.hostId)
+    // Nhãn tự-sinh (== route) coi như CHƯA đặt tên → để trống ô tên (tunnel cũ mở ra sạch)
+    setName(rule.label && rule.label !== routeOf(rule) ? rule.label : '')
     setType(rule.type)
     setBindPort(String(rule.bindPort))
     setDestHost(rule.destHost ?? '127.0.0.1')
@@ -68,7 +76,8 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
       bindPort: bind,
       destHost: type === 'D' ? null : destHost.trim(),
       destPort: type === 'D' ? null : dest,
-      label: type === 'D' ? `SOCKS5 :${bind}` : `:${bind} → ${destHost}:${destPort}`
+      // Tên do user đặt; trống → nhãn tự-sinh theo route (khớp routeOf để openEdit nhận là "chưa đặt tên")
+      label: name.trim() || (type === 'D' ? `SOCKS5 :${bind}` : `:${bind} → ${destHost.trim()}:${dest}`)
     })
     if (ok) {
       // Sửa tunnel đang chạy → dừng để lần Chạy sau áp cấu hình mới (rule đang chạy giữ cấu hình cũ)
@@ -94,6 +103,9 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
               const state = tunnelStates[rule.id]?.status ?? 'stopped'
               const detail = tunnelStates[rule.id]?.detail
               const running = state === 'active' || state === 'starting'
+              const route = routeOf(rule)
+              // Có tên riêng (khác route tự-sinh) → hiện route kèm ở dòng phụ để vẫn biết đi đâu
+              const named = Boolean(rule.label) && rule.label !== route
               return (
                 <div
                   key={rule.id}
@@ -112,10 +124,14 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
                   />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-xs text-content">
-                      [{rule.type}] {rule.label || `:${rule.bindPort}`}
+                      [{rule.type}] {rule.label || route}
                     </div>
-                    <div className={`truncate text-[10px] ${detail ? 'text-danger' : 'text-subtle'}`} title={detail}>
+                    <div
+                      className={`truncate text-[10px] ${detail ? 'text-danger' : 'text-subtle'}`}
+                      title={detail ?? `${hostLabel(rule.hostId)} · ${route}`}
+                    >
                       {hostLabel(rule.hostId)}
+                      {named ? ` · ${route}` : ''}
                       {detail ? ` — ${detail}` : ''}
                     </div>
                   </div>
@@ -175,6 +191,9 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
           <div className="text-content mb-2 text-xs font-semibold">
             {editingId ? t('tunnel.editTitle') : t('tunnel.new')}
           </div>
+          <Field label={t('tunnel.name')}>
+            <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder={t('tunnel.namePh')} />
+          </Field>
           <Field label={t('tunnel.viaHost')}>
             <Select value={hostId} onChange={(e) => setHostId(e.target.value)} autoFocus>
               <option value="">{t('tunnel.chooseHost')}</option>

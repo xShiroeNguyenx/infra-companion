@@ -5,6 +5,19 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.28] — 2026-07-21
+
+### Added
+
+- **SSH "Key + Password" auth (2-factor)** — a new authentication method for servers that require *both* a public key **and** an account password in the same login (OpenSSH `AuthenticationMethods publickey,password`). Pick **SSH Key + Password** in the host (or group) editor, choose the key, and enter the password; the app presents the key first and answers the password prompt when the server asks for it. Leave the password blank to be prompted at connect time. No vault migration — it reuses the existing key/password fields.
+- **Name your tunnels** — the tunnel editor now has an optional **Name** field, so a long list of port-forwards stays readable (e.g. *"Prod DB"*, *"Staging Grafana"*). The list shows the name on top with the actual route (`:port → host:port`) underneath, so you always see where a named tunnel points. Leave it blank and it falls back to the route description as before — no migration needed.
+
+### Fixed
+
+- **Paste no longer fires twice or ignores your custom shortcut** — the terminal's built-in browser paste ran *on top of* the customizable Paste shortcut, so Ctrl+Shift+V pasted twice and kept pasting even after you rebound Paste to a different key. The native paste is now suppressed and pasting goes through a single path: your bound shortcut (default Ctrl+Shift+V) or right-click. As a result, plain Ctrl+V no longer auto-pastes unless you bind Paste to it — matching standard terminal behavior.
+
+---
+
 ## [0.1.27] — 2026-07-20
 
 ### Added

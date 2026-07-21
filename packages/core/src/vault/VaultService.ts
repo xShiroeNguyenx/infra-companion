@@ -483,6 +483,17 @@ export class VaultService {
       const material = this.getKeyMaterial(keyId)
       endpoint.privateKey = material.privateKey
       endpoint.passphrase = material.passphrase
+    } else if (authType === 'key+password') {
+      // MFA: server bắt buộc CẢ publickey LẪN password (AuthenticationMethods publickey,password).
+      // ssh2 trình key trước → server báo partial-success → gửi tiếp password; cả hai đúng mới vào.
+      const keyId = row.key_id ?? chain.map((g) => g.key_id).find(Boolean) ?? null
+      if (!keyId) throw new Error(`Host "${row.label}" dùng auth key+password nhưng chưa chọn key`)
+      const material = this.getKeyMaterial(keyId)
+      endpoint.privateKey = material.privateKey
+      endpoint.passphrase = material.passphrase
+      // password lưu ngay trên host (group không có cột password) — thiếu thì hỏi user lúc nối
+      if (row.password_enc) endpoint.password = decryptField(dek, row.password_enc) ?? undefined
+      endpoint.needsPassword = endpoint.password === undefined
     }
     // authType=agent: không cần secret — dùng OS ssh-agent
 

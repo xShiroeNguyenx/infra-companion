@@ -249,6 +249,16 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
       })
     }
 
+    // Chặn paste GỐC của trình duyệt mà xterm tự nghe trên textarea nội bộ (Ctrl+V, Ctrl+Shift+V,
+    // Shift+Insert, menu Edit…). Nếu để nguyên: (1) phím tắt paste tuỳ biến gọi term.paste() sẽ dán
+    // CHỒNG lên paste gốc → double-paste; (2) Ctrl+Shift+V vẫn dán KỂ CẢ khi user đã đổi phím (paste gốc
+    // không phụ thuộc phím đã gán). Bắt ở pha capture trên term.element (tổ tiên của textarea) nên chặn
+    // trước listener của xterm. Dán giờ CHỈ qua phím tắt tuỳ biến + chuột phải — cả hai đều gọi term.paste().
+    const onNativePaste = (ev: ClipboardEvent): void => {
+      ev.preventDefault()
+      ev.stopImmediatePropagation()
+    }
+    mouseEl?.addEventListener('paste', onNativePaste, true)
     mouseEl?.addEventListener('mousedown', onMouseDown, true)
     mouseEl?.addEventListener('mouseup', onMouseUp, true)
     mouseEl?.addEventListener('contextmenu', onContextMenu, true)
@@ -263,6 +273,7 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
       resizeDisposable.dispose()
       selectionDisposable.dispose()
       resizeObserver.disconnect()
+      mouseEl?.removeEventListener('paste', onNativePaste, true)
       mouseEl?.removeEventListener('mousedown', onMouseDown, true)
       mouseEl?.removeEventListener('mouseup', onMouseUp, true)
       mouseEl?.removeEventListener('contextmenu', onContextMenu, true)

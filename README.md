@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, and more.
 
-**Current release: v0.1.27 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.1.28 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -28,7 +28,7 @@
 ## Features
 
 ### SSH & Connections
-- **SSH** with password, SSH key (ed25519 / RSA / ECDSA), SSH agent (OpenSSH / Pageant), and **Secrets Manager** auth
+- **SSH** with password, SSH key (ed25519 / RSA / ECDSA), **key + password (2-factor)**, SSH agent (OpenSSH / Pageant), and **Secrets Manager** auth
 - **Jump host chain** — multi-hop ProxyJump (equivalent to `ssh -J hop1,hop2 target`)
 - **Login script (expect/send)** — automate `su → ssh` or nested SSH sequences with per-step encrypted secrets; runs on auto-reconnect too
 - **Auto-reconnect** (3 retries, status shown in terminal)

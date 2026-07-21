@@ -76,6 +76,9 @@ export function HostEditorModal({
   const isSsh = protocol === 'ssh'
   const isSerial = protocol === 'serial'
   const isRemoteDesktop = protocol === 'vnc' || protocol === 'rdp'
+  // key+password = MFA (server đòi cả key lẫn password) → dùng CHUNG cả 2 field key + password
+  const usesKey = authType === 'key' || authType === 'key+password'
+  const usesPassword = authType === 'password' || authType === 'key+password'
 
   // Nạp danh sách cổng serial khi chọn protocol serial
   useEffect(() => {
@@ -98,7 +101,7 @@ export function HostEditorModal({
     } else if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65_535) {
       return setError(t('host.errPort'))
     }
-    if (isSsh && authType === 'key' && !keyId) return setError(t('host.errKey'))
+    if (isSsh && usesKey && !keyId) return setError(t('host.errKey'))
     if (isSsh && authType === 'secret' && !secretRef.trim()) return setError(t('host.errSecret'))
     // TOTP seed: chuẩn hoá (bỏ space/gạch/=, viết hoa) rồi validate base32 — duplicate tối giản
     // từ core (import @infra/core vào renderer kéo ssh2 vỡ bundle)
@@ -127,7 +130,7 @@ export function HostEditorModal({
       port: portNum,
       username: isSsh || protocol === 'rdp' ? username.trim() || null : null,
       authType: sshOnly ? authType || null : null,
-      keyId: sshOnly && authType === 'key' ? keyId : null,
+      keyId: sshOnly && usesKey ? keyId : null,
       secretRef: sshOnly && authType === 'secret' ? secretRef.trim() : null,
       // undefined = giữ nguyên password cũ; null = xoá; string = đặt mới
       password: sshOnly ? (clearPassword ? null : password ? password : undefined) : null,
@@ -244,6 +247,7 @@ export function HostEditorModal({
               <option value="">{t('host.inheritGroup')}</option>
               <option value="password">{t('host.authPassword')}</option>
               <option value="key">{t('auth.key')}</option>
+              <option value="key+password">{t('auth.keyPassword')}</option>
               <option value="agent">{t('auth.agent')}</option>
               <option value="secret">{t('host.authSecret')}</option>
               <option value="none">{t('auth.none')}</option>
@@ -261,7 +265,24 @@ export function HostEditorModal({
           </Field>
         )}
 
-        {isSsh && authType === 'password' && (
+        {isSsh && authType === 'key+password' && (
+          <p className="mb-2.5 -mt-1 text-[10px] leading-relaxed text-subtle">{t('host.keyPwHint')}</p>
+        )}
+
+        {isSsh && usesKey && (
+          <Field label={t('host.sshKey')}>
+            <Select value={keyId} onChange={(e) => setKeyId(e.target.value)}>
+              <option value="">{t('auth.chooseKey')}</option>
+              {keys.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.label} ({k.keyType})
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+
+        {isSsh && usesPassword && (
           <>
             <Field label={isEdit && host?.hasPassword ? t('host.pwKeep') : t('host.pwAsk')}>
               <TextInput
@@ -290,19 +311,6 @@ export function HostEditorModal({
               </label>
             )}
           </>
-        )}
-
-        {isSsh && authType === 'key' && (
-          <Field label={t('host.sshKey')}>
-            <Select value={keyId} onChange={(e) => setKeyId(e.target.value)}>
-              <option value="">{t('auth.chooseKey')}</option>
-              {keys.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.label} ({k.keyType})
-                </option>
-              ))}
-            </Select>
-          </Field>
         )}
 
         <Field label={t('host.group')}>

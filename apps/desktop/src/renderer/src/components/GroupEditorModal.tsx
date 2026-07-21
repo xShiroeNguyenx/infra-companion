@@ -22,18 +22,20 @@ export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; o
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // key+password = MFA: group chỉ kế thừa KEY; password lấy ở host (group không có cột password)
+  const usesKey = authType === 'key' || authType === 'key+password'
 
   const submit = async (): Promise<void> => {
     setError(null)
     if (!name.trim()) return setError(t('group.errName'))
-    if (authType === 'key' && !keyId) return setError(t('group.errKey'))
+    if (usesKey && !keyId) return setError(t('group.errKey'))
     setBusy(true)
     const saved = await saveGroup({
       id: group?.id,
       name: name.trim(),
       username: username.trim() || null,
       authType: authType || null,
-      keyId: authType === 'key' ? keyId : null,
+      keyId: usesKey ? keyId : null,
       env: textToEnv(envText),
       startupSnippetId: startupSnippetId || null,
       color
@@ -93,12 +95,13 @@ export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; o
             <option value="">{t('common.notSet')}</option>
             <option value="password">{t('auth.passwordAsk')}</option>
             <option value="key">{t('auth.key')}</option>
+            <option value="key+password">{t('auth.keyPassword')}</option>
             <option value="agent">{t('auth.agent')}</option>
             <option value="none">{t('auth.none')}</option>
           </Select>
         </Field>
 
-        {authType === 'key' && (
+        {usesKey && (
           <Field label={t('auth.key')}>
             <Select value={keyId} onChange={(e) => setKeyId(e.target.value)}>
               <option value="">{t('auth.chooseKey')}</option>

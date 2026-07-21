@@ -26,8 +26,9 @@ export interface VaultStatus {
 // Hosts / Groups / Keys / Snippets / History
 // ---------------------------------------------------------------------------
 
-/** 'none' = server cho vào không cần xác thực. 'secret' = lấy password từ secret manager (op/bw/vault). */
-export type AuthType = 'password' | 'key' | 'agent' | 'none' | 'secret'
+/** 'none' = server cho vào không cần xác thực. 'secret' = lấy password từ secret manager (op/bw/vault).
+ *  'key+password' = MFA: server bắt buộc CẢ publickey LẪN password (AuthenticationMethods publickey,password). */
+export type AuthType = 'password' | 'key' | 'agent' | 'none' | 'secret' | 'key+password'
 
 /** Giao thức của host. serial: hostname = COM port, port = baud rate.
  *  vnc/rdp (F13): remote desktop — hostname:port của máy đích, có thể xuyên jump host. */
