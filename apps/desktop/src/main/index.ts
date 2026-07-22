@@ -174,8 +174,14 @@ function registerDetachedMonitorIpc(): void {
 
 // AUMID custom: (1) bản đóng gói cần khớp appId đã cài để Windows toast (alert F04) hoạt động;
 // (2) trong DEV, AUMID custom TÁCH taskbar button khỏi nhóm electron.exe → Windows dùng window
-// icon (.ico đã setIcon) thay vì icon atom của electron.exe. Nên đặt cho CẢ dev lẫn packaged.
-if (process.platform === 'win32') app.setAppUserModelId('com.nguyenkhanh.infracompanion')
+// icon (.ico đã setIcon) thay vì icon atom của electron.exe.
+// QUAN TRỌNG: dev PHẢI dùng AUMID KHÁC bản đóng gói. Nếu dùng chung, lỡ pin bản dev vào
+// Start Menu sẽ tạo shortcut "Electron" (trỏ node_modules/electron.exe) mang cùng AUMID với
+// bản cài → Windows lẫn định danh: nút taskbar bản cài hiện tên/icon "Electron" và pin ra
+// welcome screen. Tách AUMID dev để bản cài luôn giữ định danh sạch của riêng nó.
+if (process.platform === 'win32') {
+  app.setAppUserModelId(isDev ? 'com.nguyenkhanh.infracompanion.dev' : 'com.nguyenkhanh.infracompanion')
+}
 
 registerPromptIpc()
 registerVaultIpc()

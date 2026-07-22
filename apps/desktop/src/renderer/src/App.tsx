@@ -12,6 +12,7 @@ import { BulkRunModal } from './components/BulkRunModal'
 import { NetToolboxModal } from './components/NetToolboxModal'
 import { MonitorModal } from './components/MonitorModal'
 import { MonitorDock } from './components/MonitorDock'
+import { MonitorTabView } from './components/MonitorTabView'
 import { MetricsHistoryModal } from './components/MetricsHistoryModal'
 import { SyncModal } from './components/SyncModal'
 import { AiModal } from './components/AiModal'
@@ -248,6 +249,7 @@ export default function App() {
     { id: 'open-workspaces', label: t('menu.workspaces'), run: () => setModal('workspaces') },
     { id: 'open-bulk', label: t('menu.bulk'), run: () => setModal('bulk') },
     { id: 'open-monitor', label: t('menu.monitor'), run: () => setModal('monitor') },
+    { id: 'open-monitor-tab', label: `📊 ${t('monitor.openInTab')}`, run: () => useTabsStore.getState().openMonitorTab() },
     { id: 'open-processes', label: t('menu.processes'), run: () => setModal('processes') },
     { id: 'open-services', label: t('menu.services'), run: () => setModal('services') },
     { id: 'open-net', label: t('menu.net'), run: () => setModal('net') },
@@ -310,6 +312,7 @@ export default function App() {
               {tabs.map((tab) => {
                 if (tab.kind === 'sftp') return <SftpView key={tab.id} tab={tab} active={tab.id === activeId} />
                 if (tab.kind === 'vnc') return <VncView key={tab.id} tab={tab} active={tab.id === activeId} />
+                if (tab.kind === 'monitor') return <MonitorTabView key={tab.id} tab={tab} active={tab.id === activeId} />
                 return <TerminalTabView key={tab.id} tab={tab} active={tab.id === activeId} />
               })}
             </div>
@@ -350,8 +353,9 @@ export default function App() {
           onClose={() => useMonitorStore.getState().setHistoryHost(null)}
         />
       )}
-      {/* Đã tách ra cửa sổ riêng → ẩn hẳn dock trong app (đóng/gộp cửa sổ đó thì hiện lại) */}
-      {monitorActive && !monitorDetached && <MonitorDock />}
+      {/* Ẩn dock góc phải khi: (a) đã tách ra cửa sổ riêng, HOẶC (b) đang mở Monitoring trong tab
+          (nút – trong tab đóng tab → dock hiện lại → chuyển qua lại giữa tab và dock). */}
+      {monitorActive && !monitorDetached && !tabs.some((t) => t.kind === 'monitor') && <MonitorDock />}
       <RdpDock />{/* tự return null khi không có tunnel RDP nào */}
       {pluginPanel && (
         <PluginPanelModal panel={pluginPanel} onClose={() => usePluginStore.getState().setPanel(null)} />

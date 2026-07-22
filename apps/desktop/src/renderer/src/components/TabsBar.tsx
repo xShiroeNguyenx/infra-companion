@@ -6,10 +6,11 @@ import { tabColor } from '../lib/groupColor'
 import { RunSnippetModal } from './RunSnippetModal'
 import { useT } from '../i18n'
 
-/** Tiêu đề tab: SFTP → sftpTitle; vnc → vncTitle; terminal → pane active (hoặc "N panes"). */
+/** Tiêu đề tab: SFTP → sftpTitle; vnc → vncTitle; monitor → 'Monitoring'; terminal → pane active. */
 function tabTitle(tab: AppTab): string {
   if (tab.kind === 'sftp') return tab.sftpTitle ?? 'SFTP'
   if (tab.kind === 'vnc') return tab.vncTitle ?? 'VNC'
+  if (tab.kind === 'monitor') return 'Monitoring'
   const active = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
   if (tab.panes.length > 1) return `${active?.title ?? 'terminal'} +${tab.panes.length - 1}`
   return active?.title ?? 'terminal'
@@ -18,13 +19,14 @@ function tabTitle(tab: AppTab): string {
 function tabSubtitle(tab: AppTab): string | undefined {
   if (tab.kind === 'sftp') return tab.sftpTitle
   if (tab.kind === 'vnc') return tab.vncTitle
+  if (tab.kind === 'monitor') return 'Monitoring'
   const active = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
   return active?.subtitle
 }
 
-/** Chấm trạng thái: terminal lấy theo pane active; sftp/vnc luôn xanh. */
+/** Chấm trạng thái: terminal lấy theo pane active; sftp/vnc/monitor luôn xanh. */
 function statusDotClass(tab: AppTab): string {
-  if (tab.kind === 'sftp' || tab.kind === 'vnc') return 'bg-success'
+  if (tab.kind === 'sftp' || tab.kind === 'vnc' || tab.kind === 'monitor') return 'bg-success'
   const active = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
   const status = active?.status ?? 'connecting'
   if (status === 'connected') return 'bg-success'
@@ -112,6 +114,7 @@ export function TabsBar() {
             <span className={`size-1.5 shrink-0 rounded-full ${statusDotClass(tab)}`} />
             {tab.kind === 'sftp' && <span className="text-subtle shrink-0">📁</span>}
             {tab.kind === 'vnc' && <span className="text-subtle shrink-0">🖥️</span>}
+            {tab.kind === 'monitor' && <span className="text-subtle shrink-0">📊</span>}
             {tab.broadcast && <span className="text-warning shrink-0" title="Broadcast ON">📡</span>}
             <span className="truncate">{tabTitle(tab)}</span>
             <button

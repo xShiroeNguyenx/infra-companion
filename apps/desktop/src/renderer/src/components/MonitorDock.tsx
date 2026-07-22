@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { MetricHistoryPointDto } from '@infra/shared'
 import { useMonitorStore, type HostMonitor } from '../stores/monitor'
 import { usePluginStore } from '../stores/plugins'
+import { useTabsStore } from '../stores/tabs'
 import { useT } from '../i18n'
 import { useDraggablePanel } from '../lib/useDraggablePanel'
 import { MetricChart } from './MetricsHistoryModal'
@@ -24,6 +25,8 @@ export function MonitorDock() {
   const detach = (): void => {
     void window.infra.monitor.openDetached(monitors.map((m) => ({ id: m.hostId, label: m.label })))
   }
+
+  const openTab = (): void => useTabsStore.getState().openMonitorTab()
 
   if (minimized) {
     const anyError = monitors.some((m) => m.sample && !m.sample.ok)
@@ -61,6 +64,14 @@ export function MonitorDock() {
       >
         <span className="text-subtle truncate text-[11px]">{t('monitor.watching', { n: monitors.length })}</span>
         <div className="flex shrink-0 items-center gap-1">
+          <button
+            className="text-subtle hover:text-content px-1 text-sm leading-none"
+            aria-label={t('monitor.openInTab')}
+            title={t('monitor.openInTab')}
+            onClick={openTab}
+          >
+            ⊞
+          </button>
           <button
             className="text-subtle hover:text-content px-1 text-sm leading-none"
             aria-label={t('panel.detach')}
@@ -101,38 +112,40 @@ export function MonitorDock() {
   )
 }
 
-export function MonitorCard({ monitor }: { monitor: HostMonitor }) {
+export function MonitorCard({ monitor, large }: { monitor: HostMonitor; large?: boolean }) {
   const t = useT()
   const s = monitor.sample
   const [showHistory, setShowHistory] = useState(false)
+  // Tab riêng dùng large: card/chart/chữ to hơn cho dễ đọc (dock góc phải giữ cỡ gọn).
+  const sub = large ? 'text-[11px]' : 'text-[10px]'
   return (
-    <div className="rounded border border-edge bg-input p-3">
+    <div className={`rounded border border-edge bg-input ${large ? 'p-4' : 'p-3'}`}>
       <div className="mb-2 flex items-center gap-2">
-        <span className={`size-1.5 rounded-full ${!s ? 'bg-warning animate-pulse' : s.ok ? 'bg-success' : 'bg-danger'}`} />
-        <span className="min-w-0 flex-1 truncate text-xs font-medium text-content">{monitor.label}</span>
-        {s?.uptimeSec != null && <span className="text-[10px] text-subtle">up {formatUptime(s.uptimeSec)}</span>}
+        <span className={`${large ? 'size-2' : 'size-1.5'} rounded-full ${!s ? 'bg-warning animate-pulse' : s.ok ? 'bg-success' : 'bg-danger'}`} />
+        <span className={`min-w-0 flex-1 truncate font-medium text-content ${large ? 'text-sm' : 'text-xs'}`}>{monitor.label}</span>
+        {s?.uptimeSec != null && <span className={`text-subtle ${large ? 'text-xs' : 'text-[10px]'}`}>up {formatUptime(s.uptimeSec)}</span>}
         <button
-          className={`shrink-0 leading-none ${showHistory ? 'text-content' : 'text-subtle hover:text-content'}`}
+          className={`shrink-0 leading-none ${large ? 'text-base' : ''} ${showHistory ? 'text-content' : 'text-subtle hover:text-content'}`}
           title={t('monitor.historyInline')}
           onClick={() => setShowHistory(!showHistory)}
         >
           📈
         </button>
       </div>
-      {!s && <p className="text-[11px] text-subtle">{t('monitor.connecting')}</p>}
-      {s && !s.ok && <p className="text-[11px] text-danger">{s.error}</p>}
+      {!s && <p className={`text-subtle ${large ? 'text-sm' : 'text-[11px]'}`}>{t('monitor.connecting')}</p>}
+      {s && !s.ok && <p className={`text-danger ${large ? 'text-sm' : 'text-[11px]'}`}>{s.error}</p>}
       {s?.ok && (
-        <div className="space-y-1.5">
-          <Sparkline values={monitor.loadHistory} cpuCount={s.cpuCount} />
-          <Bar label={`Load ${s.loadText ?? ''}`} pct={loadPct(s.load1, s.cpuCount)} tip={t('monitor.tip.load')} />
+        <div className={large ? 'space-y-2' : 'space-y-1.5'}>
+          <Sparkline values={monitor.loadHistory} cpuCount={s.cpuCount} big={large} />
+          <Bar label={`Load ${s.loadText ?? ''}`} pct={loadPct(s.load1, s.cpuCount)} tip={t('monitor.tip.load')} big={large} />
           {/* CPU thật từ /proc/stat (null ở poll đầu) — phân biệt thiếu CPU / nghẽn I/O / bị steal */}
-          {s.cpuPct !== null && <Bar label="CPU" pct={s.cpuPct} tip={t('monitor.tip.cpu')} />}
-          <Bar label="RAM" pct={s.memUsedPct} tip={t('monitor.tip.ram')} />
-          <Bar label={`Disk ${s.diskMount ?? '/'}`} pct={s.diskUsedPct} tip={t('monitor.tip.disk')} />
+          {s.cpuPct !== null && <Bar label="CPU" pct={s.cpuPct} tip={t('monitor.tip.cpu')} big={large} />}
+          <Bar label="RAM" pct={s.memUsedPct} tip={t('monitor.tip.ram')} big={large} />
+          <Bar label={`Disk ${s.diskMount ?? '/'}`} pct={s.diskUsedPct} tip={t('monitor.tip.disk')} big={large} />
           {/* Dòng chẩn đoán CPU: ai đang ăn (us/sy), nghẽn đĩa (wa), bị hypervisor trộm (st).
               Mỗi thông số có tooltip giải thích — hover để đọc. */}
           {s.cpuUserPct !== null && (
-            <div className="text-subtle border-edge/70 mt-1 flex flex-wrap gap-x-2 border-t pt-1.5 text-[10px]">
+            <div className={`text-subtle border-edge/70 mt-1 flex flex-wrap gap-x-2 border-t pt-1.5 ${sub}`}>
               <span className="cursor-help" title={t('monitor.tip.us')}>us {s.cpuUserPct}</span>
               <span className="cursor-help" title={t('monitor.tip.sy')}>sy {s.cpuSystemPct ?? '—'}</span>
               <span
@@ -156,7 +169,7 @@ export function MonitorCard({ monitor }: { monitor: HostMonitor }) {
             </div>
           )}
           {(s.netRxKbps !== null || s.tcpConns !== null || s.topProc) && (
-            <div className="text-muted flex flex-wrap items-center gap-x-2 text-[10px]">
+            <div className={`text-muted flex flex-wrap items-center gap-x-2 ${sub}`}>
               {s.netRxKbps !== null && (
                 <span className="cursor-help" title={t('monitor.tip.net')}>
                   ↓{fmtRate(s.netRxKbps)} ↑{fmtRate(s.netTxKbps ?? 0)}
@@ -175,7 +188,7 @@ export function MonitorCard({ monitor }: { monitor: HostMonitor }) {
           )}
           {/* Uptime service (httpd/java/nginx…) — khác uptime server: service restart là thấy ngay ở đây */}
           {s.services && s.services.length > 0 && (
-            <div className="text-subtle flex cursor-help flex-wrap gap-x-2 text-[10px]" title={t('monitor.tip.svc')}>
+            <div className={`text-subtle flex cursor-help flex-wrap gap-x-2 ${sub}`} title={t('monitor.tip.svc')}>
               {s.services.map((svc) => (
                 <span key={svc.name}>
                   ⟳ {svc.name} {formatUptime(svc.uptimeSec)}
@@ -241,28 +254,29 @@ function fmtRate(kbps: number): string {
   return `${kbps} Kb/s`
 }
 
-function Bar({ label, pct, tip }: { label: string; pct: number | null; tip?: string }) {
+function Bar({ label, pct, tip, big }: { label: string; pct: number | null; tip?: string; big?: boolean }) {
   const value = pct ?? 0
   const color = value > 90 ? 'bg-danger' : value > 70 ? 'bg-warning' : 'bg-success'
   return (
-    <div className={`flex items-center gap-2 text-[10px] ${tip ? 'cursor-help' : ''}`} title={tip}>
-      <span className="w-24 shrink-0 truncate text-subtle">{label}</span>
-      <div className="h-1.5 flex-1 overflow-hidden rounded bg-hover">
+    <div className={`flex items-center gap-2 ${big ? 'text-xs' : 'text-[10px]'} ${tip ? 'cursor-help' : ''}`} title={tip}>
+      <span className={`${big ? 'w-28' : 'w-24'} shrink-0 truncate text-subtle`}>{label}</span>
+      <div className={`${big ? 'h-2.5' : 'h-1.5'} flex-1 overflow-hidden rounded bg-hover`}>
         <div className={`h-full ${color}`} style={{ width: `${Math.min(100, value)}%` }} />
       </div>
-      <span className="w-8 shrink-0 text-right text-muted">{pct === null ? '—' : `${value}%`}</span>
+      <span className={`${big ? 'w-10' : 'w-8'} shrink-0 text-right text-muted`}>{pct === null ? '—' : `${value}%`}</span>
     </div>
   )
 }
 
-function Sparkline({ values, cpuCount }: { values: number[]; cpuCount: number | null }) {
-  if (values.length < 2) return <div className="h-8" />
+function Sparkline({ values, cpuCount, big }: { values: number[]; cpuCount: number | null; big?: boolean }) {
+  const h = big ? 'h-20' : 'h-8'
+  if (values.length < 2) return <div className={h} />
   const max = Math.max(...values, cpuCount ?? 1)
   const points = values
     .map((v, i) => `${(i / (values.length - 1)) * 100},${30 - (v / max) * 28}`)
     .join(' ')
   return (
-    <svg viewBox="0 0 100 30" preserveAspectRatio="none" className="h-8 w-full">
+    <svg viewBox="0 0 100 30" preserveAspectRatio="none" className={`${h} w-full`}>
       <polyline points={points} fill="none" stroke="#7aa2f7" strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
     </svg>
   )

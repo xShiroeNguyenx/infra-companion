@@ -5,6 +5,22 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.30] — 2026-07-22
+
+### Added
+
+- **Open Monitoring in its own tab** — besides the floating dock and the detached always-on-top window, you can now open the monitoring dashboard as a **full tab**, just like a server tab. Use **⊞ Open in tab** in the monitor config dialog, click **⊞** on the dock header, or run it from the Command Palette. Its **charts and text are noticeably larger** in a multi-column grid, so a wall of hosts is easy to read at a glance. Opening the tab **hides the floating right-side dock** (no more duplicate view), and the tab has a **minimize (–) button** that switches back to the dock — so you can flip between tab and dock at will. It reads the same live data in every mode.
+
+### Changed
+
+- **Shorter tool-menu labels** — the ⋯ tool menu dropped the parenthetical descriptions that cluttered each row: *"Uptime watcher (green/red dots)" → "Uptime watcher"*, *"Processes (top)" → "Processes"*, *"Services (systemd)" → "Services"*, *"Compare config (2 hosts)" → "Compare config"*, *"Sync (E2EE)" → "Sync"*. The feature screens themselves keep their descriptive titles.
+
+### Fixed
+
+- **Installed app no longer borrows the "Electron" name/icon on the taskbar** — the packaged app and the dev build shared one Windows AppUserModelID, so if you ever pinned the dev build once, Windows tied that identity to `electron.exe` and the installed app's taskbar button then showed the Electron name/icon and pinning it reopened the Electron welcome screen. The dev build now uses a separate AppUserModelID (`…​.dev`), so the installed app always keeps its own clean identity. (One-time cleanup on an already-affected machine: remove the stray *Electron* Start-menu shortcut and restart Explorer.)
+
+---
+
 ## [0.1.29] — 2026-07-21
 
 ### Fixed

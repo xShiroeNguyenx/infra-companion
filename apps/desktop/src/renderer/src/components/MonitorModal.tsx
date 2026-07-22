@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { MonitorSettingsDto, MonitorThresholdsDto } from '@infra/shared'
 import { useDataStore } from '../stores/data'
 import { useMonitorStore } from '../stores/monitor'
+import { useTabsStore } from '../stores/tabs'
 import { useToastsStore } from '../stores/toasts'
 import { useWorkspacesStore, type Workspace } from '../stores/workspaces'
 import { Button, Modal } from './ui'
@@ -152,6 +153,16 @@ export function MonitorModal({ onClose }: { onClose: () => void }) {
     await useMonitorStore.getState().start(picked)
   }
 
+  /** Bắt đầu theo dõi VÀ mở thành 1 tab riêng (thay vì dock góc phải) — chart/chữ to, dễ xem. */
+  const startInTab = async (): Promise<void> => {
+    if (selected.size === 0) return
+    const picked = hosts.filter((h) => selected.has(h.id)).map((h) => ({ id: h.id, label: h.label }))
+    await persist()
+    onClose()
+    useTabsStore.getState().openMonitorTab()
+    await useMonitorStore.getState().start(picked)
+  }
+
   const selectedHosts = hosts.filter((h) => selected.has(h.id))
 
   return (
@@ -294,6 +305,9 @@ export function MonitorModal({ onClose }: { onClose: () => void }) {
           {settings && (
             <Button onClick={() => void save()}>{t('monitor.saveThresholds')}</Button>
           )}
+          <Button disabled={selected.size === 0} onClick={() => void startInTab()}>
+            {t('monitor.startInTab')}
+          </Button>
           <Button variant="primary" disabled={selected.size === 0} onClick={() => void start()}>
             {t('monitor.start', { n: selected.size })}
           </Button>

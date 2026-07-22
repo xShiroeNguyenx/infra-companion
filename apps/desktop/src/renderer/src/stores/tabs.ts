@@ -28,7 +28,7 @@ export interface Pane {
   origin?: PaneOrigin
 }
 
-export type TabKind = 'terminal' | 'sftp' | 'vnc'
+export type TabKind = 'terminal' | 'sftp' | 'vnc' | 'monitor'
 
 export interface AppTab {
   id: string
@@ -86,6 +86,9 @@ interface TabsState {
   openVnc: (hostId: string) => Promise<void>
   /** Hiện trang Dashboard (home) — KHÔNG phải tab: activeId=null là đang ở home, chọn tab để quay lại. */
   showDashboard: () => void
+  /** Mở Monitoring thành 1 tab riêng (như tab server) — chỉ 1 tab monitor duy nhất; đã có thì focus lại.
+   *  Tab này đọc dữ liệu real-time từ useMonitorStore (chung với dock/cửa sổ tách rời). */
+  openMonitorTab: () => void
   /** Mở thêm pane trong tab đang active (split). opener tạo phiên. */
   splitLocal: (profileId?: string) => Promise<void>
   splitSsh: (hostId: string) => Promise<void>
@@ -274,6 +277,20 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   showDashboard: () => set({ activeId: null }),
 
+  openMonitorTab: () =>
+    set((state) => {
+      const existing = state.tabs.find((t) => t.kind === 'monitor')
+      if (existing) return { activeId: existing.id }
+      const tab: AppTab = {
+        id: newTabId(),
+        kind: 'monitor',
+        panes: [],
+        activePaneId: null,
+        broadcast: false
+      }
+      return { tabs: [...state.tabs, tab], activeId: tab.id }
+    }),
+
   splitLocal: async (profileId) => {
     const tab = get().activeTab()
     if (!tab || tab.kind !== 'terminal') return get().openLocal(profileId)
@@ -303,12 +320,13 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       if (tab.sftpSessionId) window.infra.sftp.close(tab.sftpSessionId)
     } else if (tab.kind === 'vnc') {
       if (tab.vncSessionId) window.infra.vnc.close(tab.vncSessionId)
-    } else {
+    } else if (tab.kind === 'terminal') {
       for (const pane of tab.panes) {
         window.infra.terminal.kill(pane.sessionId)
         clearTermSession(pane.sessionId)
       }
     }
+    // kind 'monitor': không có phiên nào để dọn (đọc chung useMonitorStore) — chỉ gỡ tab
     set((state) => {
       const index = state.tabs.findIndex((t) => t.id === id)
       const tabs = state.tabs.filter((t) => t.id !== id)
