@@ -5,6 +5,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.31] — 2026-07-22
+
+### Fixed
+
+- **Port-forward tunnels through a login-script host now connect (native `direct-tcpip` preferred over `nc`)** — when the tunnel's via-host had a login script (su / sudo / nested `ssh`), the app forced *every* forwarded connection through `nc <dest> <port>` running inside the shell. For a concrete destination address (e.g. a database IP), that path is both unnecessary and fragile — pushing a binary protocol like MySQL through a shell/su pipeline corrupts the stream, so clients failed at *"reading initial communication packet"* even though the tunnel showed green. A login script affects the interactive shell, **not** the SSH transport, so a native forward from the via-host works exactly like `ssh -J` / other SSH clients. The app now prefers native `direct-tcpip` whenever the destination is a concrete address, and only falls back to the `nc`-in-shell path if that native forward is refused (destinations reachable only after a nested `ssh` inside the login script). Loopback destinations (`localhost` / `127.0.0.1`) with a login script still use `nc`, since there they mean the deep host's localhost.
+- **Tunnel forward failures are no longer swallowed silently** — a local-forward tunnel that couldn't reach its destination stayed green while every connection died with no explanation. The real reason (e.g. *"administratively prohibited"*, missing `nc`, destination refused) is now surfaced in the tunnel's status detail.
+
+---
+
 ## [0.1.30] — 2026-07-22
 
 ### Added

@@ -121,67 +121,109 @@ export class TunnelService extends EventEmitter<TunnelServiceEvents> {
     const { rule } = tunnel
     if (!rule.destHost || !rule.destPort) return Promise.reject(new Error('Tunnel local thiếu đích'))
 
-    // Via host vào bằng login-script (máy đích chỉ ssh được trong shell, không nhận `-J`):
-    // forwardOut sẽ thất bại → thay bằng `nc dest port` chạy trên máy TRONG CÙNG qua exec
-    // (nested ssh do deriveExecFromLoginSteps dựng, y như Bulk/Monitor). Yêu cầu `nc` ở đầu cuối.
-    if (tunnel.loginSteps && tunnel.loginSteps.length > 0) {
-      if (!/^[A-Za-z0-9.-]+$/.test(rule.destHost)) {
-        return Promise.reject(new Error('Địa chỉ đích không hợp lệ cho tunnel qua login-script'))
-      }
-      // In marker NGAY TRƯỚC khi exec nc: mọi rác (MOTD/banner/prompt của các hop ssh chạy qua
-      // shell) đứng TRƯỚC marker → phía client cắt bỏ tới hết marker rồi mới coi phần sau là luồng
-      // binary sạch của DB. (SFTP-over-exec không cần vì dùng subsystem, còn nc chạy qua shell.)
-      const marker = `ICTUN${randomBytes(9).toString('hex')}`
-      const inner = `printf %s ${marker}; exec nc ${rule.destHost} ${rule.destPort}`
-      // deriveStreamExecFromLoginSteps: GIỮ stdin (`… | cat | …`) qua bước su/sudo — tunnel 2 chiều
-      // cần byte client gửi lên vẫn tới nc (feedOneShot của Bulk/Monitor sẽ cắt stdin → gãy auth).
-      const execCmd = deriveStreamExecFromLoginSteps(tunnel.loginSteps, inner) ?? inner
-      const markerBuf = Buffer.from(marker)
-      return this.listen(tunnel, (socket) => {
-        client.exec(execCmd, (error, stream) => {
-          if (error) {
-            socket.destroy()
-            return
-          }
-          // Gom stderr để lộ lỗi thật (sshpass thiếu, Permission denied, nc not found…) khi
-          // kết nối chết mà CHƯA từng thấy marker (nested ssh/nc fail → luồng rỗng).
-          let stderrBuf = ''
-          stream.stderr.on('data', (d: Buffer) => {
-            if (stderrBuf.length < 2_000) stderrBuf += d.toString('utf8')
-          })
-          const stripper = new StripUntilMarker(markerBuf)
-          const onFail = (): void => {
-            if (!stripper.matched && stderrBuf.trim()) {
-              this.setState(tunnel, tunnel.status, `Tunnel login-script lỗi: ${stderrBuf.trim().slice(-300)}`)
-            }
-            socket.destroy()
-          }
-          socket.pipe(stream) // client → nc stdin (raw)
-          stream.pipe(stripper).pipe(socket) // nc stdout → cắt rác tới marker → client
-          stream.on('error', () => socket.destroy())
-          stripper.on('error', onFail)
-          socket.on('error', () => stream.destroy())
-          stream.on('close', onFail)
-        })
-      })
+    const hasLogin = (tunnel.loginSteps?.length ?? 0) > 0
+    // Đích loopback + login-script: 'localhost' nghĩa là localhost của máy SÂU (sau ssh lồng trong
+    // script) → direct-tcpip từ endpoint SSH sẽ trỏ SAI máy → BẮT BUỘC đi nc.
+    const destIsLoopback = /^(localhost|127\.0\.0\.1|::1)$/i.test(rule.destHost)
+    // nc chỉ chạy được khi dest là hostname/IP đơn giản (bọc an toàn vào lệnh shell).
+    const canNc = hasLogin && /^[A-Za-z0-9.-]+$/.test(rule.destHost)
+
+    if (hasLogin && destIsLoopback) {
+      if (!canNc) return Promise.reject(new Error('Địa chỉ đích không hợp lệ cho tunnel qua login-script'))
+      return this.listen(tunnel, (socket) => this.forwardViaLoginScript(tunnel, client, socket))
     }
 
-    return this.listen(tunnel, (socket) => {
-      client.forwardOut(
-        socket.remoteAddress ?? '127.0.0.1',
-        socket.remotePort ?? 0,
-        rule.destHost!,
-        rule.destPort!,
-        (error, stream) => {
-          if (error) {
-            socket.destroy()
+    // Đích là ĐỊA CHỈ CỤ THỂ: login-script chỉ ảnh hưởng SHELL, KHÔNG ảnh hưởng transport SSH →
+    // direct-tcpip (forwardOut) từ endpoint tới được đích như `ssh -J` (đúng cách các client khác
+    // làm). Ưu tiên native (kênh nhị phân sạch — nc qua shell dễ hỏng protocol MySQL); chỉ khi
+    // forwardOut lỗi mới fallback nc (đích thật sự chỉ vào được sau ssh lồng trong login-script).
+    return this.listen(tunnel, (socket) =>
+      this.forwardNative(
+        tunnel,
+        client,
+        socket,
+        canNc ? () => this.forwardViaLoginScript(tunnel, client, socket) : undefined
+      )
+    )
+  }
+
+  /** Native direct-tcpip (forwardOut). onFallback (nếu có) chạy khi forwardOut lỗi — đích chỉ vào
+   *  được sau ssh lồng trong login-script → thử lại qua nc TRÊN CÙNG socket (an toàn: client MySQL
+   *  chưa gửi byte nào vì server nói trước, socket đang paused nên byte tới sau vẫn được buffer). */
+  private forwardNative(
+    tunnel: ActiveTunnel,
+    client: Client,
+    socket: net.Socket,
+    onFallback?: () => void
+  ): void {
+    const { rule } = tunnel
+    client.forwardOut(
+      socket.remoteAddress ?? '127.0.0.1',
+      socket.remotePort ?? 0,
+      rule.destHost!,
+      rule.destPort!,
+      (error, stream) => {
+        if (error) {
+          if (onFallback) {
+            onFallback() // via-host không tự với tới đích → thử đường login-script/nc
             return
           }
-          socket.pipe(stream).pipe(socket)
-          stream.on('error', () => socket.destroy())
-          socket.on('error', () => stream.destroy())
+          // forwardOut lỗi = sshd via-host từ chối mở direct-tcpip (AllowTcpForwarding no /
+          // PermitOpen), hoặc via-host không route được tới đích. Hiện lỗi thật thay vì nuốt im.
+          this.setState(tunnel, tunnel.status, `Không mở được kết nối tới ${rule.destHost}:${rule.destPort} — ${error.message}`)
+          socket.destroy()
+          return
         }
-      )
+        socket.pipe(stream).pipe(socket)
+        stream.on('error', (streamErr: Error) => {
+          this.setState(tunnel, tunnel.status, `Kết nối tới ${rule.destHost}:${rule.destPort} lỗi: ${streamErr.message}`)
+          socket.destroy()
+        })
+        socket.on('error', () => stream.destroy())
+      }
+    )
+  }
+
+  /** Forward qua `nc dest port` chạy trên máy TRONG CÙNG (dựng bởi login-script), cho đích chỉ vào
+   *  được bằng ssh trong shell (không nhận -J). Cần `nc` ở đầu cuối. Marker cắt rác MOTD/banner. */
+  private forwardViaLoginScript(tunnel: ActiveTunnel, client: Client, socket: net.Socket): void {
+    const { rule } = tunnel
+    // In marker NGAY TRƯỚC khi exec nc: mọi rác (MOTD/banner/prompt các hop ssh chạy qua shell)
+    // đứng TRƯỚC marker → client cắt bỏ tới hết marker rồi mới coi phần sau là luồng binary sạch.
+    const marker = `ICTUN${randomBytes(9).toString('hex')}`
+    const inner = `printf %s ${marker}; exec nc ${rule.destHost} ${rule.destPort}`
+    // deriveStreamExecFromLoginSteps: GIỮ stdin (`… | cat | …`) qua bước su/sudo — tunnel 2 chiều
+    // cần byte client gửi lên vẫn tới nc (feedOneShot của Bulk/Monitor sẽ cắt stdin → gãy auth).
+    const execCmd = deriveStreamExecFromLoginSteps(tunnel.loginSteps ?? [], inner) ?? inner
+    const markerBuf = Buffer.from(marker)
+    client.exec(execCmd, (error, stream) => {
+      if (error) {
+        socket.destroy()
+        return
+      }
+      // Gom stderr để lộ lỗi thật (sshpass thiếu, Permission denied, nc not found…) khi kết nối
+      // chết mà CHƯA từng thấy marker (nested ssh/nc fail → luồng rỗng).
+      let stderrBuf = ''
+      stream.stderr.on('data', (d: Buffer) => {
+        if (stderrBuf.length < 2_000) stderrBuf += d.toString('utf8')
+      })
+      const stripper = new StripUntilMarker(markerBuf)
+      const onFail = (): void => {
+        // Chưa thấy marker = luồng chết TRƯỚC khi nc chạy (hop ssh/su lỗi, thiếu nc, đích từ chối).
+        if (!stripper.matched) {
+          const why = stderrBuf.trim()
+            ? stderrBuf.trim().slice(-300)
+            : `luồng đóng sớm — kiểm tra 'nc' trên máy trong cùng + đích ${rule.destHost}:${rule.destPort} có mở`
+          this.setState(tunnel, tunnel.status, `Tunnel login-script lỗi: ${why}`)
+        }
+        socket.destroy()
+      }
+      socket.pipe(stream) // client → nc stdin (raw)
+      stream.pipe(stripper).pipe(socket) // nc stdout → cắt rác tới marker → client
+      stream.on('error', () => socket.destroy())
+      stripper.on('error', onFail)
+      socket.on('error', () => stream.destroy())
+      stream.on('close', onFail)
     })
   }
 
