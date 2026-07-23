@@ -4,22 +4,9 @@ import { useDataStore } from '../stores/data'
 import { useMonitorStore } from '../stores/monitor'
 import { useTabsStore } from '../stores/tabs'
 import { useToastsStore } from '../stores/toasts'
-import { useWorkspacesStore, type Workspace } from '../stores/workspaces'
+import { QuickChip, useQuickPickChips } from './quickPick'
 import { Button, Modal } from './ui'
 import { useT } from '../i18n'
-
-/** Các hostId (SSH) mà 1 workspace tham chiếu — gom từ pane terminal kind='host' + tab sftp. */
-function workspaceHostIds(ws: Workspace, sshHostIds: Set<string>): string[] {
-  const ids = new Set<string>()
-  for (const tab of ws.tabs) {
-    if (tab.kind === 'terminal') {
-      for (const pane of tab.panes) if (pane.kind === 'host' && sshHostIds.has(pane.hostId)) ids.add(pane.hostId)
-    } else if (tab.kind === 'sftp') {
-      if (sshHostIds.has(tab.hostId)) ids.add(tab.hostId)
-    }
-  }
-  return [...ids]
-}
 
 const INPUT_CLS =
   'border-edge bg-input text-content placeholder-subtle focus:border-accent w-16 rounded border px-2 py-1 text-xs outline-none'
@@ -51,31 +38,13 @@ export function MonitorModal({ onClose }: { onClose: () => void }) {
   const t = useT()
   const push = useToastsStore((s) => s.push)
   const allHosts = useDataStore((s) => s.hosts)
-  const groups = useDataStore((s) => s.groups)
-  const workspaces = useWorkspacesStore((s) => s.workspaces)
   const hosts = useMemo(() => allHosts.filter((h) => h.protocol === 'ssh'), [allHosts])
   // Đang theo dõi dở → tick sẵn tập host đó, sửa rồi start lại là THAY tập cũ
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(Object.keys(useMonitorStore.getState().data))
   )
 
-  const sshHostIds = useMemo(() => new Set(hosts.map((h) => h.id)), [hosts])
-  // Chip chọn nhanh theo NHÓM: nhóm có ≥1 host SSH
-  const groupChips = useMemo(
-    () =>
-      groups
-        .map((g) => ({ id: g.id, name: g.name, hostIds: hosts.filter((h) => h.groupId === g.id).map((h) => h.id) }))
-        .filter((g) => g.hostIds.length > 0),
-    [groups, hosts]
-  )
-  // Chip chọn nhanh theo WORKSPACE: workspace tham chiếu ≥1 host SSH đã lưu
-  const wsChips = useMemo(
-    () =>
-      workspaces
-        .map((ws) => ({ id: ws.id, name: ws.name, hostIds: workspaceHostIds(ws, sshHostIds) }))
-        .filter((ws) => ws.hostIds.length > 0),
-    [workspaces, sshHostIds]
-  )
+  const { groupChips, wsChips } = useQuickPickChips(hosts)
 
   /** Chọn nhanh 1 nhóm/workspace: đã chọn hết → bỏ chọn cả cụm; chưa → thêm cả cụm. */
   const toggleMany = (ids: string[]): void => {
@@ -317,33 +286,3 @@ export function MonitorModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-/** Chip chọn nhanh 1 cụm host (nhóm/workspace). active = cả cụm đang được chọn. */
-function QuickChip({
-  label,
-  count,
-  active,
-  title,
-  onClick
-}: {
-  label: string
-  count: number
-  active: boolean
-  title?: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className={`flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] ${
-        active
-          ? 'border-accent/50 bg-accent-soft/50 text-accent-fg'
-          : 'border-edge bg-input text-muted hover:bg-hover hover:text-content'
-      }`}
-    >
-      <span className="max-w-32 truncate">{label}</span>
-      <span className={active ? 'text-accent-fg/70' : 'text-subtle'}>· {count}</span>
-    </button>
-  )
-}

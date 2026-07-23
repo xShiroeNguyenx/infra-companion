@@ -28,7 +28,7 @@ export interface Pane {
   origin?: PaneOrigin
 }
 
-export type TabKind = 'terminal' | 'sftp' | 'vnc' | 'monitor'
+export type TabKind = 'terminal' | 'sftp' | 'vnc' | 'monitor' | 'compare'
 
 export interface AppTab {
   id: string
@@ -89,6 +89,8 @@ interface TabsState {
   /** Mở Monitoring thành 1 tab riêng (như tab server) — chỉ 1 tab monitor duy nhất; đã có thì focus lại.
    *  Tab này đọc dữ liệu real-time từ useMonitorStore (chung với dock/cửa sổ tách rời). */
   openMonitorTab: () => void
+  /** Mở So sánh config thành 1 tab riêng (chỉ 1 tab compare duy nhất; đã có thì focus lại). */
+  openCompareTab: () => void
   /** Mở thêm pane trong tab đang active (split). opener tạo phiên. */
   splitLocal: (profileId?: string) => Promise<void>
   splitSsh: (hostId: string) => Promise<void>
@@ -284,6 +286,20 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       const tab: AppTab = {
         id: newTabId(),
         kind: 'monitor',
+        panes: [],
+        activePaneId: null,
+        broadcast: false
+      }
+      return { tabs: [...state.tabs, tab], activeId: tab.id }
+    }),
+
+  openCompareTab: () =>
+    set((state) => {
+      const existing = state.tabs.find((t) => t.kind === 'compare')
+      if (existing) return { activeId: existing.id }
+      const tab: AppTab = {
+        id: newTabId(),
+        kind: 'compare',
         panes: [],
         activePaneId: null,
         broadcast: false

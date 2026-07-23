@@ -13,6 +13,7 @@ import { NetToolboxModal } from './components/NetToolboxModal'
 import { MonitorModal } from './components/MonitorModal'
 import { MonitorDock } from './components/MonitorDock'
 import { MonitorTabView } from './components/MonitorTabView'
+import { CompareTabView } from './components/CompareTabView'
 import { MetricsHistoryModal } from './components/MetricsHistoryModal'
 import { SyncModal } from './components/SyncModal'
 import { AiModal } from './components/AiModal'
@@ -252,6 +253,8 @@ export default function App() {
     { id: 'open-monitor-tab', label: `📊 ${t('monitor.openInTab')}`, run: () => useTabsStore.getState().openMonitorTab() },
     { id: 'open-processes', label: t('menu.processes'), run: () => setModal('processes') },
     { id: 'open-services', label: t('menu.services'), run: () => setModal('services') },
+    { id: 'open-compare', label: t('menu.compare'), run: () => setModal('compare') },
+    { id: 'open-compare-tab', label: `🔍 ${t('compare.openInTab')}`, run: () => useTabsStore.getState().openCompareTab() },
     { id: 'open-net', label: t('menu.net'), run: () => setModal('net') },
     { id: 'open-ai', label: t('menu.ai'), run: () => setModal('ai') },
     { id: 'open-ai-diagnose', label: `🩺 ${t('ai.diagnose.title')}`, run: () => setModal('ai-diagnose') },
@@ -313,6 +316,7 @@ export default function App() {
                 if (tab.kind === 'sftp') return <SftpView key={tab.id} tab={tab} active={tab.id === activeId} />
                 if (tab.kind === 'vnc') return <VncView key={tab.id} tab={tab} active={tab.id === activeId} />
                 if (tab.kind === 'monitor') return <MonitorTabView key={tab.id} tab={tab} active={tab.id === activeId} />
+                if (tab.kind === 'compare') return <CompareTabView key={tab.id} active={tab.id === activeId} />
                 return <TerminalTabView key={tab.id} tab={tab} active={tab.id === activeId} />
               })}
             </div>

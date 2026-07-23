@@ -5,6 +5,7 @@ import {
   PANE_LAYOUTS,
   TERM_FONT_DEFAULT,
   useSettingsStore,
+  type CommandAlias,
   type BgFit,
   type BgPosition,
   type Language,
@@ -21,7 +22,7 @@ import { LayoutGlyph } from './LayoutGlyph'
 import { Button, Field, TextArea, TextInput } from './ui'
 
 /** Các nhóm cài đặt hiển thị ở cột điều hướng bên trái của màn hình Settings. */
-type SettingsSection = 'appearance' | 'background' | 'terminal' | 'shortcuts' | 'guard'
+type SettingsSection = 'appearance' | 'background' | 'terminal' | 'autocomplete' | 'shortcuts' | 'guard'
 
 /** Cạnh tối đa khi nén ảnh nền — đủ nét cho màn 4K, đủ nhỏ để vừa localStorage. */
 const MAX_DIM = 2560
@@ -128,8 +129,17 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     setCommandGuardPatterns,
     shortcuts,
     setShortcut,
-    resetShortcuts
+    resetShortcuts,
+    autoCompleteEnabled,
+    commandAliases,
+    setAutoCompleteEnabled,
+    setCommandAliases
   } = useSettingsStore()
+
+  const updateAlias = (i: number, patch: Partial<CommandAlias>): void =>
+    setCommandAliases(commandAliases.map((a, idx) => (idx === i ? { ...a, ...patch } : a)))
+  const removeAlias = (i: number): void => setCommandAliases(commandAliases.filter((_, idx) => idx !== i))
+  const addAlias = (): void => setCommandAliases([...commandAliases, { trigger: '', command: '' }])
   const fileRef = useRef<HTMLInputElement>(null)
   const push = useToastsStore((s) => s.push)
   const [bgUrl, setBgUrl] = useState('')
@@ -251,6 +261,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     { id: 'appearance', label: t('settings.appearance'), icon: '🎨' },
     { id: 'background', label: t('settings.background'), icon: '🖼️' },
     { id: 'terminal', label: t('settings.terminal'), icon: '▮' },
+    { id: 'autocomplete', label: t('settings.autocomplete'), icon: '⌥' },
     { id: 'shortcuts', label: t('settings.shortcuts'), icon: '⌨' },
     { id: 'guard', label: t('settings.cmdGuard'), icon: '🛡️' }
   ]
@@ -629,6 +640,77 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                   </div>
                   <p className="text-subtle mt-1 text-[10px] leading-relaxed">{t('settings.termFontHint')}</p>
                 </Field>
+              </>
+            )}
+
+            {section === 'autocomplete' && (
+              <>
+                <p className="text-subtle mb-3 text-[11px] leading-relaxed">{t('settings.autocompleteHint')}</p>
+                <Field label={t('settings.autocompleteEnable')}>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([true, false] as const).map((on) => (
+                      <button
+                        key={String(on)}
+                        onClick={() => setAutoCompleteEnabled(on)}
+                        className={`rounded border px-2 py-2 text-sm ${
+                          autoCompleteEnabled === on
+                            ? 'border-accent text-content bg-accent-soft/40'
+                            : 'border-edge text-muted hover:bg-hover'
+                        }`}
+                      >
+                        {on ? t('plugins.enable') : t('plugins.disable')}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+
+                <div className="mt-3 space-y-2">
+                  <div className="text-subtle grid grid-cols-[7rem_1fr_auto] gap-2 px-1 text-[10px] font-semibold tracking-wide uppercase">
+                    <span>{t('settings.aliasTrigger')}</span>
+                    <span>{t('settings.aliasCommand')}</span>
+                    <span />
+                  </div>
+                  {commandAliases.map((alias, i) => (
+                    <div key={i} className="grid grid-cols-[7rem_1fr_auto] items-start gap-2">
+                      <TextInput
+                        value={alias.trigger}
+                        onChange={(e) => updateAlias(i, { trigger: e.target.value })}
+                        placeholder={t('settings.aliasTriggerPh')}
+                        className="!font-mono !text-xs"
+                      />
+                      <div className="flex flex-col gap-1">
+                        <TextInput
+                          value={alias.command}
+                          onChange={(e) => updateAlias(i, { command: e.target.value })}
+                          placeholder={t('settings.aliasCommandPh')}
+                          className="!font-mono !text-xs"
+                        />
+                        <TextInput
+                          value={alias.note ?? ''}
+                          onChange={(e) => updateAlias(i, { note: e.target.value })}
+                          placeholder={t('settings.aliasNotePh')}
+                          className="!text-[11px]"
+                        />
+                      </div>
+                      <button
+                        onClick={() => removeAlias(i)}
+                        className="border-edge text-subtle hover:text-danger hover:border-danger/50 rounded border px-2 py-1.5 text-sm"
+                        title={t('settings.aliasRemove')}
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  ))}
+                  {commandAliases.length === 0 && (
+                    <p className="text-subtle py-2 text-center text-xs">{t('settings.aliasEmpty')}</p>
+                  )}
+                  <button
+                    onClick={addAlias}
+                    className="border-edge text-muted hover:bg-hover w-full rounded border border-dashed px-2 py-1.5 text-xs"
+                  >
+                    + {t('settings.aliasAdd')}
+                  </button>
+                </div>
               </>
             )}
 

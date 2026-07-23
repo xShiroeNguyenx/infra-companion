@@ -5,6 +5,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.32] — 2026-07-23
+
+### Added
+
+- **Terminal auto-complete for your own commands** — define abbreviations (trigger → full command) under **Settings → Auto-complete**, then typing the first few characters of one in any SSH/local terminal pops up an **IDE-style suggestion dropdown** next to the cursor. **↑/↓** to pick, **Tab** (or **Enter** on a picked item) to insert the full command, **Esc** to dismiss. Perfect for long commands the shell can't Tab-complete — `docker compose …`, `kubectl …`, `systemctl …` one-liners, etc. Aliases are stored on this machine and the whole feature can be toggled off.
+- **Compare config across many servers at once** — the config-compare tool now takes **any number of hosts** (not just two) and offers **three views you choose before diffing**: **Baseline** (one server as reference; every other shows how many lines differ + a side-by-side diff), **Group** (servers with identical content are grouped, and differing groups diff against the largest), and **Columns** (all servers side by side with differing lines highlighted, plus an "only differing lines" toggle). Pick hosts fast with **quick-pick chips by group or workspace**, and re-use a path from the **recent-paths history**. It can also open in its **own tab** now (**⊞ Open in tab**, or the Command Palette), not just the popup.
+
+---
+
 ## [0.1.31] — 2026-07-22
 
 ### Fixed

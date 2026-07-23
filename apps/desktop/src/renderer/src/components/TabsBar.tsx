@@ -11,6 +11,7 @@ function tabTitle(tab: AppTab): string {
   if (tab.kind === 'sftp') return tab.sftpTitle ?? 'SFTP'
   if (tab.kind === 'vnc') return tab.vncTitle ?? 'VNC'
   if (tab.kind === 'monitor') return 'Monitoring'
+  if (tab.kind === 'compare') return 'Compare'
   const active = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
   if (tab.panes.length > 1) return `${active?.title ?? 'terminal'} +${tab.panes.length - 1}`
   return active?.title ?? 'terminal'
@@ -20,13 +21,14 @@ function tabSubtitle(tab: AppTab): string | undefined {
   if (tab.kind === 'sftp') return tab.sftpTitle
   if (tab.kind === 'vnc') return tab.vncTitle
   if (tab.kind === 'monitor') return 'Monitoring'
+  if (tab.kind === 'compare') return 'Compare'
   const active = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
   return active?.subtitle
 }
 
 /** Chấm trạng thái: terminal lấy theo pane active; sftp/vnc/monitor luôn xanh. */
 function statusDotClass(tab: AppTab): string {
-  if (tab.kind === 'sftp' || tab.kind === 'vnc' || tab.kind === 'monitor') return 'bg-success'
+  if (tab.kind === 'sftp' || tab.kind === 'vnc' || tab.kind === 'monitor' || tab.kind === 'compare') return 'bg-success'
   const active = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
   const status = active?.status ?? 'connecting'
   if (status === 'connected') return 'bg-success'
@@ -115,6 +117,7 @@ export function TabsBar() {
             {tab.kind === 'sftp' && <span className="text-subtle shrink-0">📁</span>}
             {tab.kind === 'vnc' && <span className="text-subtle shrink-0">🖥️</span>}
             {tab.kind === 'monitor' && <span className="text-subtle shrink-0">📊</span>}
+            {tab.kind === 'compare' && <span className="text-subtle shrink-0">🔍</span>}
             {tab.broadcast && <span className="text-warning shrink-0" title="Broadcast ON">📡</span>}
             <span className="truncate">{tabTitle(tab)}</span>
             <button

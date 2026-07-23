@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { SearchAddon } from '@xterm/addon-search'
@@ -11,7 +12,7 @@ import { matchGuard } from '../../lib/commandGuard'
 import { matchesCombo } from '../../lib/shortcuts'
 import { useTabsStore, type Pane } from '../../stores/tabs'
 import { useAiExplainStore } from '../../stores/aiExplain'
-import { useSettingsStore } from '../../stores/settings'
+import { useSettingsStore, type CommandAlias } from '../../stores/settings'
 import { useT } from '../../i18n'
 import { Button, Modal } from '../../components/ui'
 import { terminalTheme } from './theme'
@@ -32,6 +33,35 @@ function readCurrentCommand(term: Terminal): string {
     text += buf.getLine(r)?.translateToString(false) ?? ''
   }
   return text.replace(/\s+$/, '')
+}
+
+/**
+ * Từ đang gõ NGAY TRƯỚC con trỏ (cho auto-complete). Trả '' khi ký tự trước con trỏ là khoảng
+ * trắng (đã kết thúc 1 từ) hoặc đang ở alt-screen (vim/less). KHÔNG trim để biết ranh giới từ.
+ */
+function tokenBeforeCursor(term: Terminal): string {
+  const buf = term.buffer.active
+  if (buf.type === 'alternate') return ''
+  const cursorRow = buf.baseY + buf.cursorY
+  let start = cursorRow
+  while (start > 0 && buf.getLine(start)?.isWrapped) start--
+  let text = ''
+  for (let r = start; r < cursorRow; r++) text += buf.getLine(r)?.translateToString(false) ?? ''
+  const cur = buf.getLine(cursorRow)?.translateToString(false) ?? ''
+  text += cur.slice(0, buf.cursorX)
+  if (text === '' || /\s$/.test(text)) return ''
+  return /(\S+)$/.exec(text)?.[1] ?? ''
+}
+
+/** Trạng thái dropdown auto-complete (toạ độ fixed để portal ra document.body, tránh overflow cắt). */
+interface SuggestState {
+  items: CommandAlias[]
+  /** -1 = chưa chọn tường minh → Enter cho qua (submit); Tab vẫn chèn mục đầu. */
+  index: number
+  left: number
+  top: number
+  bottom: number
+  above: boolean
 }
 
 /** sessionId HIỆN TẠI của pane trong store (null = pane đã đóng hẳn).
@@ -70,6 +100,10 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
   const [copied, setCopied] = useState(false)
   /** Lệnh nhạy cảm đang chờ xác nhận (guard đã chặn Enter); null = không có. */
   const [guardPrompt, setGuardPrompt] = useState<{ command: string; pattern: string } | null>(null)
+  const [suggest, setSuggest] = useState<SuggestState | null>(null)
+  const suggestRef = useRef<SuggestState | null>(null)
+  const paneActiveRef = useRef(paneActive)
+  const suggestRafRef = useRef<number | null>(null)
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const findInputRef = useRef<HTMLInputElement>(null)
   const closePane = useTabsStore((s) => s.closePane)
@@ -118,6 +152,31 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
 
     term.attachCustomKeyEventHandler((event) => {
       if (event.type !== 'keydown') return true
+      // Auto-complete: dropdown đang mở → ưu tiên phím điều hướng/chèn (↑↓ chọn, Tab/Enter chèn, Esc bỏ).
+      const sug = suggestRef.current
+      if (sug && sug.items.length > 0) {
+        if (event.key === 'Escape') {
+          setSuggest(null)
+          return false
+        }
+        if (event.key === 'ArrowDown') {
+          setSuggest({ ...sug, index: Math.min(sug.index + 1, sug.items.length - 1) })
+          return false
+        }
+        if (event.key === 'ArrowUp') {
+          setSuggest({ ...sug, index: sug.index <= 0 ? sug.items.length - 1 : sug.index - 1 })
+          return false
+        }
+        if (event.key === 'Tab') {
+          acceptSuggestion(sug.items[Math.max(sug.index, 0)]!)
+          return false
+        }
+        // Enter chỉ chèn khi user đã chọn tường minh bằng mũi tên; chưa chọn thì cho qua để chạy lệnh.
+        if (event.key === 'Enter' && sug.index >= 0) {
+          acceptSuggestion(sug.items[sug.index]!)
+          return false
+        }
+      }
       // Phím tắt tuỳ biến — đọc LIVE từ store nên đổi trong Settings ăn ngay (không cần remount)
       const sc = useSettingsStore.getState().shortcuts
       if (matchesCombo(event, sc.copy)) {
@@ -171,6 +230,55 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     const selectionDisposable = term.onSelectionChange(() =>
       setHasSelection(term.getSelection().trim().length > 0)
     )
+
+    // Auto-complete: mỗi khi con trỏ dịch (gõ/echo về), tính lại gợi ý — rAF gộp nhiều lần liên tiếp.
+    const computeSuggest = (): void => {
+      const st = useSettingsStore.getState()
+      if (!st.autoCompleteEnabled || st.commandAliases.length === 0 || !paneActiveRef.current) {
+        setSuggest(null)
+        return
+      }
+      const token = tokenBeforeCursor(term)
+      if (token.length < 1) {
+        setSuggest(null)
+        return
+      }
+      const low = token.toLowerCase()
+      const items = st.commandAliases
+        .filter((a) => a.trigger && a.trigger.toLowerCase().startsWith(low))
+        .slice(0, 8)
+      if (items.length === 0) {
+        setSuggest(null)
+        return
+      }
+      const screen = host.querySelector('.xterm-screen') as HTMLElement | null
+      if (!screen) {
+        setSuggest(null)
+        return
+      }
+      const rect = screen.getBoundingClientRect()
+      const buf = term.buffer.active
+      const cellW = rect.width / term.cols
+      const cellH = rect.height / term.rows
+      const cursorLineTop = rect.top + buf.cursorY * cellH
+      const belowY = cursorLineTop + cellH
+      setSuggest({
+        items,
+        index: -1,
+        left: Math.max(8, Math.min(rect.left + buf.cursorX * cellW, window.innerWidth - 340)),
+        top: belowY,
+        bottom: window.innerHeight - cursorLineTop,
+        above: belowY + 240 > window.innerHeight
+      })
+    }
+    const scheduleSuggest = (): void => {
+      if (suggestRafRef.current !== null) cancelAnimationFrame(suggestRafRef.current)
+      suggestRafRef.current = requestAnimationFrame(() => {
+        suggestRafRef.current = null
+        computeSuggest()
+      })
+    }
+    const cursorMoveDisposable = term.onCursorMove(scheduleSuggest)
 
     const resizeObserver = new ResizeObserver(() => {
       if (host.offsetParent !== null) fit.fit()
@@ -272,6 +380,8 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
       dataDisposable.dispose()
       resizeDisposable.dispose()
       selectionDisposable.dispose()
+      cursorMoveDisposable.dispose()
+      if (suggestRafRef.current !== null) cancelAnimationFrame(suggestRafRef.current)
       resizeObserver.disconnect()
       mouseEl?.removeEventListener('paste', onNativePaste, true)
       mouseEl?.removeEventListener('mousedown', onMouseDown, true)
@@ -302,6 +412,17 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     } else {
       window.infra.terminal.write(pane.sessionId, data)
     }
+  }
+
+  /** Chèn alias: xoá từ đang gõ (DEL 0x7f = xoá lùi trong readline) rồi gõ lệnh đầy đủ (CHƯA Enter). */
+  function acceptSuggestion(alias: CommandAlias): void {
+    const term = termRef.current
+    if (!term) return
+    const token = tokenBeforeCursor(term)
+    if (token.length > 0) sendData('\x7f'.repeat(token.length))
+    sendData(alias.command)
+    setSuggest(null)
+    term.focus()
   }
 
   /** Input từ xterm. Guard lệnh nhạy cảm chặn Enter đơn (\r) nếu dòng lệnh khớp whitelist. */
@@ -343,6 +464,15 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     })
     return () => cancelAnimationFrame(frame)
   }, [tabVisible, paneActive])
+
+  // Đồng bộ ref cho key handler (đọc LIVE trong closure gắn 1 lần) + đóng gợi ý khi pane mất focus.
+  useEffect(() => {
+    suggestRef.current = suggest
+  }, [suggest])
+  useEffect(() => {
+    paneActiveRef.current = paneActive
+    if (!paneActive) setSuggest(null)
+  }, [paneActive])
 
   // GPU render (WebGL): nạp/gỡ addon theo setting — áp LIVE cho terminal đang mở
   // (gỡ addon là xterm tự quay về DOM renderer). Deps có pane.sessionId để terminal
@@ -417,6 +547,39 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
           {t('terminal.copied')}
         </div>
       )}
+
+      {/* Auto-complete dropdown: portal ra body + fixed để không bị overflow-hidden của pane cắt.
+          Xổ lên (above) khi con trỏ ở nửa dưới màn hình. */}
+      {suggest &&
+        suggest.items.length > 0 &&
+        createPortal(
+          <div
+            className="border-edge-strong bg-elevated fixed z-[200] max-h-60 w-80 overflow-y-auto rounded-md border py-1 text-xs shadow-2xl"
+            style={suggest.above ? { left: suggest.left, bottom: suggest.bottom } : { left: suggest.left, top: suggest.top }}
+          >
+            {suggest.items.map((a, i) => (
+              <button
+                key={i}
+                // onMouseDown + preventDefault: chèn TRƯỚC khi terminal mất focus
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  acceptSuggestion(a)
+                }}
+                className={`block w-full px-2.5 py-1 text-left ${
+                  i === suggest.index ? 'bg-accent-soft/60 text-accent-fg' : 'text-content hover:bg-hover'
+                }`}
+              >
+                <div className="flex items-baseline gap-2">
+                  <span className="shrink-0 font-mono font-semibold">{a.trigger}</span>
+                  <span className="text-subtle min-w-0 flex-1 truncate font-mono">{a.command}</span>
+                </div>
+                {a.note && <div className="text-subtle truncate text-[10px]">{a.note}</div>}
+              </button>
+            ))}
+            <div className="text-subtle border-edge/60 mt-1 border-t px-2.5 pt-1 text-[10px]">{t('terminal.acHint')}</div>
+          </div>,
+          document.body
+        )}
 
       {/* Guard lệnh nhạy cảm: Enter đã bị hoãn, chờ user xác nhận. Nút Huỷ autoFocus →
           bấm Enter theo phản xạ sẽ HUỶ (an toàn), muốn chạy phải chủ động chọn "Vẫn chạy". */}

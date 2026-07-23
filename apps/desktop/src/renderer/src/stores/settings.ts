@@ -31,6 +31,13 @@ export const PANE_LAYOUTS: PaneLayout[] = ['auto', 'columns', 'rows', 'main-left
 export type PaneFrame = 'bar' | 'mac'
 export const PANE_FRAMES: PaneFrame[] = ['bar', 'mac']
 
+/** Một mục auto-complete: gõ `trigger` ở terminal → gợi ý chèn `command` đầy đủ. */
+export interface CommandAlias {
+  trigger: string
+  command: string
+  note?: string
+}
+
 const THEME_KEY = 'infra.theme'
 const LANG_KEY = 'infra.lang'
 const ACCENT_KEY = 'infra.accent'
@@ -51,6 +58,8 @@ const STARTUP_KEY = 'infra.startup.page'
 const CMD_GUARD_ON_KEY = 'infra.cmdGuard.on'
 const CMD_GUARD_PATTERNS_KEY = 'infra.cmdGuard.patterns'
 const SHORTCUTS_KEY = 'infra.term.shortcuts'
+const AUTOCOMPLETE_ON_KEY = 'infra.term.autocomplete'
+const ALIASES_KEY = 'infra.term.aliases'
 
 /** Các biến màu UI cho phép tuỳ biến (accent có control riêng nên không nằm ở đây). */
 export const CUSTOM_PALETTE_VARS = [
@@ -193,6 +202,30 @@ function readShortcuts(): Record<ShortcutAction, string> {
   return out
 }
 
+/** Auto-complete dropdown trong terminal — mặc định BẬT; '0' = user đã tắt. */
+function readAutoComplete(): boolean {
+  return localStorage.getItem(AUTOCOMPLETE_ON_KEY) !== '0'
+}
+
+/** Danh sách từ tắt → lệnh (localStorage, per-máy). Bỏ mục thiếu trigger/command. */
+function readCommandAliases(): CommandAlias[] {
+  try {
+    const arr = JSON.parse(localStorage.getItem(ALIASES_KEY) || '[]') as unknown
+    if (!Array.isArray(arr)) return []
+    return arr
+      .filter(
+        (x): x is CommandAlias =>
+          !!x &&
+          typeof x === 'object' &&
+          typeof (x as CommandAlias).trigger === 'string' &&
+          typeof (x as CommandAlias).command === 'string'
+      )
+      .map((x) => ({ trigger: x.trigger, command: x.command, ...(typeof x.note === 'string' ? { note: x.note } : {}) }))
+  } catch {
+    return []
+  }
+}
+
 function readCustomColors(): CustomColors {
   const out: CustomColors = { dark: {}, light: {} }
   try {
@@ -303,6 +336,10 @@ interface SettingsState {
   commandGuardPatterns: string[]
   /** Phím tắt terminal tuỳ biến (copy/paste/find/explain) — chuỗi combo "Ctrl+Shift+V". */
   shortcuts: Record<ShortcutAction, string>
+  /** Auto-complete: gõ từ tắt ở terminal → dropdown gợi ý lệnh đầy đủ. */
+  autoCompleteEnabled: boolean
+  /** Danh sách từ tắt → lệnh cho auto-complete (per-máy). */
+  commandAliases: CommandAlias[]
   setTheme: (t: ThemeMode) => void
   setLanguage: (l: Language) => void
   setAccentColor: (c: string | null) => void
@@ -326,6 +363,9 @@ interface SettingsState {
   setShortcut: (action: ShortcutAction, combo: string) => void
   /** Trả mọi phím tắt về mặc định. */
   resetShortcuts: () => void
+  setAutoCompleteEnabled: (on: boolean) => void
+  /** Thay toàn bộ danh sách alias (Settings quản lý mảng, lưu localStorage). */
+  setCommandAliases: (list: CommandAlias[]) => void
   /** Override màu UI theo base theme hiện tại. */
   customColors: CustomColors
   /** Đặt/gỡ 1 màu cho theme đang chọn (null = gỡ override). */
@@ -359,6 +399,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   commandGuardEnabled: readCommandGuardOn(),
   commandGuardPatterns: readCommandGuardPatterns(),
   shortcuts: readShortcuts(),
+  autoCompleteEnabled: readAutoComplete(),
+  commandAliases: readCommandAliases(),
   setTheme: (theme) => {
     localStorage.setItem(THEME_KEY, theme)
     applyTheme(theme)
@@ -458,6 +500,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   resetShortcuts: () => {
     localStorage.removeItem(SHORTCUTS_KEY)
     set({ shortcuts: { ...DEFAULT_SHORTCUTS } })
+  },
+  setAutoCompleteEnabled: (on) => {
+    localStorage.setItem(AUTOCOMPLETE_ON_KEY, on ? '1' : '0')
+    set({ autoCompleteEnabled: on })
+  },
+  setCommandAliases: (list) => {
+    // Lưu nguyên mảng (kể cả dòng đang nhập dở) — terminal tự bỏ qua mục trigger rỗng khi khớp.
+    localStorage.setItem(ALIASES_KEY, JSON.stringify(list))
+    set({ commandAliases: list })
   },
   setCustomColor: (varName, hex) => {
     const { theme, customColors } = get()
