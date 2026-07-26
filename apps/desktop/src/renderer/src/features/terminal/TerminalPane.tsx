@@ -155,25 +155,20 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
       // Auto-complete: dropdown đang mở → ưu tiên phím điều hướng/chèn (↑↓ chọn, Tab/Enter chèn, Esc bỏ).
       const sug = suggestRef.current
       if (sug && sug.items.length > 0) {
-        if (event.key === 'Escape') {
-          setSuggest(null)
-          return false
-        }
-        if (event.key === 'ArrowDown') {
-          setSuggest({ ...sug, index: Math.min(sug.index + 1, sug.items.length - 1) })
-          return false
-        }
-        if (event.key === 'ArrowUp') {
-          setSuggest({ ...sug, index: sug.index <= 0 ? sug.items.length - 1 : sug.index - 1 })
-          return false
-        }
-        if (event.key === 'Tab') {
-          acceptSuggestion(sug.items[Math.max(sug.index, 0)]!)
-          return false
-        }
-        // Enter chỉ chèn khi user đã chọn tường minh bằng mũi tên; chưa chọn thì cho qua để chạy lệnh.
-        if (event.key === 'Enter' && sug.index >= 0) {
-          acceptSuggestion(sug.items[sug.index]!)
+        const k = event.key
+        // Enter chỉ CHÈN khi user đã chọn tường minh bằng mũi tên (index>=0); chưa chọn thì cho qua để chạy lệnh.
+        const handled = k === 'Escape' || k === 'ArrowDown' || k === 'ArrowUp' || k === 'Tab' || (k === 'Enter' && sug.index >= 0)
+        if (handled) {
+          // BẮT BUỘC preventDefault: attachCustomKeyEventHandler trả false chỉ ngăn xterm xử lý,
+          // KHÔNG chặn hành vi mặc định của trình duyệt → Tab sẽ nhảy focus (sang nút khoá vault →
+          // Enter kế tiếp khoá màn hình), mũi tên cuộn trang. Chặn tại đây để giữ focus ở terminal.
+          event.preventDefault()
+          event.stopPropagation()
+          if (k === 'Escape') setSuggest(null)
+          else if (k === 'ArrowDown') setSuggest({ ...sug, index: Math.min(sug.index + 1, sug.items.length - 1) })
+          else if (k === 'ArrowUp') setSuggest({ ...sug, index: sug.index <= 0 ? sug.items.length - 1 : sug.index - 1 })
+          else if (k === 'Tab') acceptSuggestion(sug.items[Math.max(sug.index, 0)]!)
+          else if (k === 'Enter') acceptSuggestion(sug.items[sug.index]!)
           return false
         }
       }

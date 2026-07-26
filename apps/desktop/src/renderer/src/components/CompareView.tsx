@@ -408,7 +408,13 @@ function ColumnsView({
     return { rows: out, total: max }
   }, [ok, diffOnly])
 
-  const gridCols = `4rem repeat(${ok.length}, minmax(12rem, 1fr))`
+  // ≤5 cột: nhét vừa hết bề ngang màn hình (cột co đều `minmax(0,1fr)`, dòng dài tự wrap) → CHỈ
+  // cuộn DỌC, không cuộn ngang. >5 cột: giữ bề rộng tối thiểu mỗi cột + cho cuộn ngang (nếu ép vừa
+  // hết thì quá hẹp không đọc được).
+  const fitAll = ok.length <= 5
+  const gridCols = fitAll
+    ? `3rem repeat(${ok.length}, minmax(0, 1fr))`
+    : `3.5rem repeat(${ok.length}, minmax(11rem, 1fr))`
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -422,8 +428,12 @@ function ColumnsView({
           <span className="text-danger text-[10px]">{t('compare.readFailed', { n: errored.length })}</span>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto font-mono text-[11px] leading-relaxed">
-        <div style={{ display: 'grid', gridTemplateColumns: gridCols, minWidth: 'max-content' }}>
+      <div
+        className={`min-h-0 flex-1 overflow-y-auto font-mono text-[11px] leading-relaxed ${
+          fitAll ? 'overflow-x-hidden' : 'overflow-x-auto'
+        }`}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: gridCols, ...(fitAll ? {} : { minWidth: 'max-content' }) }}>
           {/* header */}
           <div className="bg-panel text-subtle border-edge sticky top-0 z-10 border-b border-r px-2 py-1 text-[10px]">#</div>
           {ok.map((r) => (

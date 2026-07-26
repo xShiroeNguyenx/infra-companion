@@ -5,6 +5,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.33] — 2026-07-26
+
+### Fixed
+
+- **Terminal auto-complete no longer steals focus / locks the screen** — with the suggestion dropdown open, pressing **Tab** to insert a command also moved keyboard focus off the terminal (onto the lock-vault button), so the next **Enter** locked the app instead of running the command. The dropdown's navigation keys (Tab / Enter / ↑ / ↓ / Esc) now suppress the browser's default behaviour, so focus stays in the terminal and Enter runs the command you just inserted.
+- **Compare "Columns" view fits all servers on screen (up to 5)** — comparing configs across servers in the Columns view previously forced a horizontal scroll, so you could only see one column at a time. With **5 servers or fewer**, all columns now share the width and stay visible side by side; long lines wrap and you scroll **vertically** (rows stay aligned by line number for easy comparison). With more than 5 servers it keeps a minimum column width and scrolls horizontally.
+
+---
+
 ## [0.1.32] — 2026-07-23
 
 ### Added
