@@ -1,12 +1,54 @@
 import { randomBytes } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import * as net from 'node:net'
-import { Transform, type TransformCallback } from 'node:stream'
+import { Transform, type Duplex, type TransformCallback } from 'node:stream'
 import type { Client } from 'ssh2'
 import type { TunnelRuleDto, TunnelStateDto, TunnelStatus } from '@infra/shared'
 import { establishChain, type ChainEndpoint } from './establish'
-import { deriveStreamExecFromLoginSteps, type LoginStepLike } from './loginScript'
+import {
+  deriveStreamExecFromLoginSteps,
+  loginScriptEntersAnotherHost,
+  type LoginStepLike
+} from './loginScript'
 import type { HostKeyVerifier } from './types'
+
+/** Đích chỉ được nhúng vào lệnh shell (`nc`) khi là hostname/IP đơn giản — chặn shell injection. */
+const SHELL_SAFE_HOST = /^[A-Za-z0-9.:-]+$/
+const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|::1)$/i
+/** Trần đệm byte client giữ để phát lại khi đổi đường (nc chết → direct-tcpip). */
+const REPLAY_CAP_BYTES = 256 * 1024
+/** direct-tcpip không xác nhận trong khoảng này = coi như treo (firewall drop SYN). */
+const NATIVE_OPEN_TIMEOUT_MS = 15_000
+
+/** Đường đi của một tunnel L. */
+export type LocalForwardRoute =
+  /** direct-tcpip từ endpoint SSH (kênh nhị phân sạch, nhanh nhất). */
+  | 'native'
+  /** `nc` chạy trên máy SÂU của login script — không có đường lui. */
+  | 'script'
+  /** `nc` trên máy SÂU trước, hỏng thì thử direct-tcpip từ endpoint SSH. */
+  | 'script-then-native'
+
+/**
+ * Chọn đường đi cho tunnel L — mấu chốt là ĐÍCH ĐƯỢC HIỂU THEO MÁY NÀO.
+ *
+ * Login script có hop `ssh` (vd gate `133.x` → `ssh jpap06`) thì máy user thấy trong terminal là
+ * máy SÂU, và địa chỉ đích user nhập (vd `192.168.1.71:3306`) là địa chỉ theo mạng của máy sâu đó.
+ * direct-tcpip lại luôn xuất phát từ ENDPOINT SSH (gate): dải riêng như 192.168.x.x rất dễ tồn tại
+ * ở CẢ HAI mạng nên gate có thể mở nhầm sang máy khác, hoặc bị firewall drop gói SYN — sshd chỉ xác
+ * nhận kênh SAU khi connect() xong nên kênh treo im, tunnel vẫn xanh còn client DB chờ tới timeout
+ * ("reading initial communication packet"). Vì vậy có hop ssh → đi `nc` trên máy sâu TRƯỚC, chỉ khi
+ * đường đó chết mới thử direct-tcpip (ca đích chỉ gate với tới được, đã sửa ở v0.1.31).
+ */
+export function chooseLocalForwardRoute(destHost: string, loginSteps: LoginStepLike[]): LocalForwardRoute {
+  // Không login script, hoặc script chỉ su/sudo → máy sâu CHÍNH LÀ endpoint SSH → native.
+  if (!loginScriptEntersAnotherHost(loginSteps)) return 'native'
+  // Đích không nhúng an toàn vào lệnh shell được → chỉ còn đường native.
+  if (!SHELL_SAFE_HOST.test(destHost)) return 'native'
+  // Loopback = localhost của MÁY SÂU: direct-tcpip trỏ sang máy khác hẳn → cấm fallback.
+  if (LOOPBACK_HOST.test(destHost)) return 'script'
+  return 'script-then-native'
+}
 
 export interface TunnelConnectionConfig {
   chain: ChainEndpoint[]
@@ -121,72 +163,95 @@ export class TunnelService extends EventEmitter<TunnelServiceEvents> {
     const { rule } = tunnel
     if (!rule.destHost || !rule.destPort) return Promise.reject(new Error('Tunnel local thiếu đích'))
 
-    const hasLogin = (tunnel.loginSteps?.length ?? 0) > 0
-    // Đích loopback + login-script: 'localhost' nghĩa là localhost của máy SÂU (sau ssh lồng trong
-    // script) → direct-tcpip từ endpoint SSH sẽ trỏ SAI máy → BẮT BUỘC đi nc.
-    const destIsLoopback = /^(localhost|127\.0\.0\.1|::1)$/i.test(rule.destHost)
-    // nc chỉ chạy được khi dest là hostname/IP đơn giản (bọc an toàn vào lệnh shell).
-    const canNc = hasLogin && /^[A-Za-z0-9.-]+$/.test(rule.destHost)
-
-    if (hasLogin && destIsLoopback) {
-      if (!canNc) return Promise.reject(new Error('Địa chỉ đích không hợp lệ cho tunnel qua login-script'))
-      return this.listen(tunnel, (socket) => this.forwardViaLoginScript(tunnel, client, socket))
+    const route = chooseLocalForwardRoute(rule.destHost, tunnel.loginSteps ?? [])
+    if (route === 'native') {
+      return this.listen(tunnel, (socket) => this.forwardNative(tunnel, client, socket))
     }
-
-    // Đích là ĐỊA CHỈ CỤ THỂ: login-script chỉ ảnh hưởng SHELL, KHÔNG ảnh hưởng transport SSH →
-    // direct-tcpip (forwardOut) từ endpoint tới được đích như `ssh -J` (đúng cách các client khác
-    // làm). Ưu tiên native (kênh nhị phân sạch — nc qua shell dễ hỏng protocol MySQL); chỉ khi
-    // forwardOut lỗi mới fallback nc (đích thật sự chỉ vào được sau ssh lồng trong login-script).
-    return this.listen(tunnel, (socket) =>
-      this.forwardNative(
+    return this.listen(tunnel, (socket) => {
+      // Relay giữ bản sao byte client gửi lên để phát lại nguyên vẹn nếu phải đổi sang native.
+      const relay = new UpstreamRelay(socket)
+      this.forwardViaLoginScript(
         tunnel,
         client,
         socket,
-        canNc ? () => this.forwardViaLoginScript(tunnel, client, socket) : undefined
+        relay,
+        route === 'script-then-native'
+          ? () => this.forwardNative(tunnel, client, socket, relay)
+          : undefined
       )
-    )
+    })
   }
 
-  /** Native direct-tcpip (forwardOut). onFallback (nếu có) chạy khi forwardOut lỗi — đích chỉ vào
-   *  được sau ssh lồng trong login-script → thử lại qua nc TRÊN CÙNG socket (an toàn: client MySQL
-   *  chưa gửi byte nào vì server nói trước, socket đang paused nên byte tới sau vẫn được buffer). */
+  /** Native direct-tcpip (forwardOut) từ endpoint SSH — kênh nhị phân sạch, không qua shell.
+   *  relay (nếu có) là đường lui từ nc: byte client đã gửi được phát lại vào kênh mới. */
   private forwardNative(
     tunnel: ActiveTunnel,
     client: Client,
     socket: net.Socket,
-    onFallback?: () => void
+    relay?: UpstreamRelay
   ): void {
     const { rule } = tunnel
+    const dest = `${rule.destHost}:${rule.destPort}`
+    let settled = false
+    // sshd chỉ xác nhận kênh SAU khi connect() tới đích xong; firewall drop gói SYN → connect()
+    // treo tới TCP timeout của OS (hàng phút) và ssh2 KHÔNG có timeout riêng → callback không bao
+    // giờ chạy, client DB ngồi chờ không một byte. Tự cắt + báo lỗi thay vì treo im.
+    const openTimer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      this.setState(tunnel, tunnel.status, `Không mở được kết nối tới ${dest} — quá ${NATIVE_OPEN_TIMEOUT_MS / 1000}s không phản hồi (firewall chặn giữa đường?)`)
+      socket.destroy()
+    }, NATIVE_OPEN_TIMEOUT_MS)
+    // Client bỏ đi trong lúc chờ mở kênh → dừng đồng hồ, đừng báo "firewall chặn" oan
+    socket.once('close', () => {
+      if (settled) return
+      settled = true
+      clearTimeout(openTimer)
+    })
+
     client.forwardOut(
       socket.remoteAddress ?? '127.0.0.1',
       socket.remotePort ?? 0,
       rule.destHost!,
       rule.destPort!,
       (error, stream) => {
+        clearTimeout(openTimer)
+        if (settled) {
+          stream?.destroy() // đã báo treo trước đó → kênh về muộn thì bỏ
+          return
+        }
+        settled = true
         if (error) {
-          if (onFallback) {
-            onFallback() // via-host không tự với tới đích → thử đường login-script/nc
-            return
-          }
           // forwardOut lỗi = sshd via-host từ chối mở direct-tcpip (AllowTcpForwarding no /
           // PermitOpen), hoặc via-host không route được tới đích. Hiện lỗi thật thay vì nuốt im.
-          this.setState(tunnel, tunnel.status, `Không mở được kết nối tới ${rule.destHost}:${rule.destPort} — ${error.message}`)
+          this.setState(tunnel, tunnel.status, `Không mở được kết nối tới ${dest} — ${error.message}`)
           socket.destroy()
           return
         }
-        socket.pipe(stream).pipe(socket)
+        if (relay) relay.attach(stream)
+        else socket.pipe(stream)
+        stream.pipe(socket)
         stream.on('error', (streamErr: Error) => {
-          this.setState(tunnel, tunnel.status, `Kết nối tới ${rule.destHost}:${rule.destPort} lỗi: ${streamErr.message}`)
+          this.setState(tunnel, tunnel.status, `Kết nối tới ${dest} lỗi: ${streamErr.message}`)
           socket.destroy()
         })
         socket.on('error', () => stream.destroy())
+        // Client cắt ngang (destroy, không FIN) → đóng kênh, tránh rò kênh SSH tới khi dừng tunnel
+        socket.on('close', () => stream.destroy())
       }
     )
   }
 
-  /** Forward qua `nc dest port` chạy trên máy TRONG CÙNG (dựng bởi login-script), cho đích chỉ vào
-   *  được bằng ssh trong shell (không nhận -J). Cần `nc` ở đầu cuối. Marker cắt rác MOTD/banner. */
-  private forwardViaLoginScript(tunnel: ActiveTunnel, client: Client, socket: net.Socket): void {
+  /** Forward qua `nc dest port` chạy trên máy TRONG CÙNG (dựng bởi login-script) — đích được hiểu
+   *  theo mạng của máy đó. Cần `nc` ở đầu cuối. Marker cắt rác MOTD/banner. onFallback (nếu có)
+   *  chạy khi đường này chết mà CHƯA nhận được byte nào từ đích. */
+  private forwardViaLoginScript(
+    tunnel: ActiveTunnel,
+    client: Client,
+    socket: net.Socket,
+    relay: UpstreamRelay,
+    onFallback?: () => void
+  ): void {
     const { rule } = tunnel
     // In marker NGAY TRƯỚC khi exec nc: mọi rác (MOTD/banner/prompt các hop ssh chạy qua shell)
     // đứng TRƯỚC marker → client cắt bỏ tới hết marker rồi mới coi phần sau là luồng binary sạch.
@@ -196,34 +261,74 @@ export class TunnelService extends EventEmitter<TunnelServiceEvents> {
     // cần byte client gửi lên vẫn tới nc (feedOneShot của Bulk/Monitor sẽ cắt stdin → gãy auth).
     const execCmd = deriveStreamExecFromLoginSteps(tunnel.loginSteps ?? [], inner) ?? inner
     const markerBuf = Buffer.from(marker)
+    const dest = `${rule.destHost}:${rule.destPort}`
     client.exec(execCmd, (error, stream) => {
       if (error) {
+        if (onFallback) {
+          onFallback()
+          return
+        }
+        this.setState(tunnel, tunnel.status, `Không mở được kênh exec cho tunnel: ${error.message}`)
         socket.destroy()
         return
       }
-      // Gom stderr để lộ lỗi thật (sshpass thiếu, Permission denied, nc not found…) khi kết nối
-      // chết mà CHƯA từng thấy marker (nested ssh/nc fail → luồng rỗng).
+      if (socket.destroyed) {
+        stream.destroy() // client bỏ đi trong lúc dựng kênh → đừng để nc chạy mồ côi
+        return
+      }
+      // Gom stderr để lộ lỗi thật (sshpass thiếu, Permission denied, nc not found, nc: connect
+      // refused…) khi kết nối chết mà chưa nhận được byte nào của đích.
       let stderrBuf = ''
       stream.stderr.on('data', (d: Buffer) => {
         if (stderrBuf.length < 2_000) stderrBuf += d.toString('utf8')
       })
       const stripper = new StripUntilMarker(markerBuf)
-      const onFail = (): void => {
-        // Chưa thấy marker = luồng chết TRƯỚC khi nc chạy (hop ssh/su lỗi, thiếu nc, đích từ chối).
-        if (!stripper.matched) {
-          const why = stderrBuf.trim()
-            ? stderrBuf.trim().slice(-300)
-            : `luồng đóng sớm — kiểm tra 'nc' trên máy trong cùng + đích ${rule.destHost}:${rule.destPort} có mở`
-          this.setState(tunnel, tunnel.status, `Tunnel login-script lỗi: ${why}`)
+      let delivered = 0
+      let settled = false
+      const finish = (fatal: boolean): void => {
+        if (settled) return
+        settled = true
+        if (delivered > 0) {
+          // Đường đã sống rồi mới đóng → kết thúc bình thường (pipe đã end socket khi luồng end).
+          if (fatal) socket.destroy()
+          else socket.end()
+          return
         }
+        // Chưa một byte nào từ đích. Lưu ý marker được in TRƯỚC khi exec nc, nên "thấy marker"
+        // KHÔNG có nghĩa nc nối được — nc không nối được cũng cho luồng rỗng y hệt.
+        stream.destroy() // giải phóng kênh exec (ca marker-lỗi: luồng còn sống)
+        if (onFallback && relay.replayable) {
+          relay.detach()
+          stripper.unpipe(socket)
+          onFallback() // đích có thể chỉ endpoint SSH với tới được → thử direct-tcpip
+          return
+        }
+        const why = stderrBuf.trim()
+          ? stderrBuf.trim().slice(-300)
+          : stripper.matched
+            ? `'nc' trên máy trong cùng không nối được tới ${dest}`
+            : `luồng đóng sớm — kiểm tra 'nc' trên máy trong cùng + đích ${dest} có mở`
+        this.setState(tunnel, tunnel.status, `Tunnel login-script lỗi: ${why}`)
         socket.destroy()
       }
-      socket.pipe(stream) // client → nc stdin (raw)
-      stream.pipe(stripper).pipe(socket) // nc stdout → cắt rác tới marker → client
-      stream.on('error', () => socket.destroy())
-      stripper.on('error', onFail)
+      relay.attach(stream) // client → nc stdin (raw, có giữ bản sao để phát lại)
+      stripper.on('data', (chunk: Buffer) => {
+        delivered += chunk.length
+        relay.confirm() // đích đã nói → đường sống, thôi giữ bản sao
+      })
+      // { end: false }: luồng nc kết thúc KHÔNG được tự đóng chiều ghi của socket — nếu nc chết
+      // sớm ta còn phải đổi sang direct-tcpip trên chính socket này (socket.end() sẽ khiến client
+      // đóng nốt chiều còn lại, đường mới có mở cũng không gửi được gì). finish() tự đóng khi cần.
+      stream.pipe(stripper).pipe(socket, { end: false }) // nc stdout → cắt rác tới marker → client
+      stream.on('error', () => finish(true))
+      stripper.on('error', () => finish(false))
       socket.on('error', () => stream.destroy())
-      stream.on('close', onFail)
+      // Client cắt ngang (destroy, không FIN) → đóng kênh exec, tránh rò kênh + tiến trình nc
+      socket.on('close', () => stream.destroy())
+      // 'end' (nc/hop ssh thoát) tới TRƯỚC 'close' → phát hiện đường chết sớm hơn; đăng ký SAU
+      // pipe để stripper đã flush xong, `delivered` chắc chắn đúng.
+      stream.on('end', () => finish(false))
+      stream.on('close', () => finish(false))
     })
   }
 
@@ -310,6 +415,63 @@ export class TunnelService extends EventEmitter<TunnelServiceEvents> {
     tunnel.status = status
     tunnel.detail = detail
     this.emit('state', { ruleId: tunnel.rule.id, status, detail })
+  }
+}
+
+/**
+ * Cầu nối chiều client → tunnel, GIỮ bản sao byte đầu luồng để phát lại khi phải đổi đường
+ * (nc trên máy sâu chết → direct-tcpip từ endpoint SSH).
+ *
+ * MySQL/PostgreSQL server nói trước nên lúc đổi đường thường chưa có byte nào của client; nhưng
+ * protocol client-nói-trước (HTTP, Redis…) thì có — phát lại giữ cho việc đổi đường trong suốt
+ * với client. Quá REPLAY_CAP_BYTES thì bỏ bản sao (replayable = false) và không đổi đường nữa.
+ */
+class UpstreamRelay {
+  private target: Duplex | null = null
+  private replay: Buffer[] = []
+  private buffered = 0
+  private confirmed = false
+  private ended = false
+
+  constructor(private readonly socket: net.Socket) {
+    socket.on('data', (chunk: Buffer) => {
+      if (!this.confirmed) {
+        this.buffered += chunk.length
+        if (this.buffered <= REPLAY_CAP_BYTES) this.replay.push(chunk)
+        else this.replay = []
+      }
+      if (this.target && !this.target.write(chunk)) socket.pause()
+    })
+    socket.on('end', () => {
+      this.ended = true
+      this.target?.end()
+    })
+  }
+
+  /** Còn đủ bản sao để đổi đường mà không mất byte nào? */
+  get replayable(): boolean {
+    return !this.confirmed && this.buffered <= REPLAY_CAP_BYTES
+  }
+
+  /** Nối vào đích mới: xả bản sao đã đệm trước, rồi luồng chảy tiếp. */
+  attach(target: Duplex): void {
+    this.target = target
+    target.on('drain', () => {
+      if (this.target === target) this.socket.resume()
+    })
+    for (const chunk of this.replay) target.write(chunk)
+    if (this.ended) target.end()
+  }
+
+  detach(): void {
+    this.target = null
+  }
+
+  /** Đích đã trả byte về → đường sống, khỏi giữ bản sao. */
+  confirm(): void {
+    if (this.confirmed) return
+    this.confirmed = true
+    this.replay = []
   }
 }
 

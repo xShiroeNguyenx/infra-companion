@@ -53,6 +53,17 @@ function extractSudoUser(sudoArgs: string): string | null {
 }
 
 /**
+ * Login script có đưa phiên sang MÁY KHÁC không (tồn tại hop `ssh`)?
+ *
+ * Quan trọng với tunnel: nếu có, máy user THẤY trong terminal (máy sâu) KHÁC máy đầu cuối của
+ * kết nối SSH (gate) → địa chỉ đích user nhập phải được hiểu THEO MÁY SÂU, không phải theo gate.
+ * Chỉ có su/sudo (không ssh) thì máy sâu chính là endpoint SSH.
+ */
+export function loginScriptEntersAnotherHost(steps: LoginStepLike[]): boolean {
+  return parseLoginActions(steps).some((action) => action.kind === 'ssh')
+}
+
+/**
  * Chuyển login steps thành danh sách actions theo đúng thứ tự.
  * Secret step ngay sau ssh/su/sudo được tiêu thụ làm password của step đó.
  */

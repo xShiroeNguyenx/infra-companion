@@ -5,6 +5,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.34] — 2026-07-28
+
+### Fixed
+
+- **Tunnels through a login-script host reach the right machine again (regression from v0.1.31)** — when the via-host's login script `ssh`-es into another machine (you land on a gate, the script runs `ssh app-06`), the destination you typed is an address **on the inner machine's network**. v0.1.31 started sending every concrete destination out as a native `direct-tcpip` channel from the **SSH endpoint** (the gate) instead: private ranges like `192.168.1.x` usually exist on both sides, so the gate either opened the connection to a completely different box or had its SYN dropped by a firewall. sshd only confirms the channel *after* its `connect()` returns, so a dropped SYN left the channel hanging with no error — the tunnel stayed green while the DB client sat waiting for a greeting that never arrived (*"Lost connection to server at 'handshake: reading initial communication packet'"*). Local forwards through a login script with a nested `ssh` now go through **`nc` on the inner machine first** (as they did up to v0.1.30), and only switch to a native forward if that path dies before the destination has said anything — so the v0.1.31 case (destination reachable only from the gate) still works, automatically. Login scripts with only `su`/`sudo`, and hosts without a login script, keep taking the native path.
+- **Switching route mid-connection is invisible to the client** — anything the client already sent is replayed byte-for-byte into the new channel, so client-speaks-first protocols survive the switch too.
+- **A `direct-tcpip` that never gets confirmed no longer hangs the client** — if the SSH endpoint doesn't confirm the forwarded channel within 15 s (typically a firewall silently dropping packets on the way to the destination), the connection is dropped and the tunnel shows *"no response — firewall in the way?"* instead of leaving the client to time out on its own.
+- **`nc` that can't reach the destination is now reported** — the marker is printed *before* `nc` runs, so "marker seen" never meant the destination was reachable; a `nc` that fails to connect used to produce the same silent empty stream. Its stderr (or an explicit "couldn't reach *dest*") now lands in the tunnel's status detail.
+
+---
+
 ## [0.1.33] — 2026-07-26
 
 ### Fixed
