@@ -26,9 +26,16 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
     status: (id, status, detail) => this.emit('status', id, status, detail)
   }
 
-  createLocal(profile: ShellProfile, cols: number, rows: number, cwd?: string): string {
+  createLocal(
+    profile: ShellProfile,
+    cols: number,
+    rows: number,
+    cwd?: string,
+    /** Biến môi trường đè lên env kế thừa (terminal của site local dev cần php trong PATH). */
+    env?: Record<string, string>
+  ): string {
     const id = randomUUID()
-    this.sessions.set(id, new LocalSession(id, profile, cols, rows, this.sink, cwd))
+    this.sessions.set(id, new LocalSession(id, profile, cols, rows, this.sink, cwd, env))
     return id
   }
 

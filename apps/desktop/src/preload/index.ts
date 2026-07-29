@@ -8,6 +8,10 @@ import {
   type InfraApi,
   type KeyImportInput,
   type ContributedCommandDto,
+  type LdRuntimeProgressDto,
+  type LdServiceDto,
+  type LdSiteEventDto,
+  type LdSiteInputDto,
   type MetricSampleDto,
   type MonitorAlertDto,
   type PasswordQuestion,
@@ -167,6 +171,54 @@ const api: InfraApi = {
     serviceAction: (hostId, unit, action) => ipcRenderer.invoke(IPC.HTOOLS_SERVICE_ACTION, hostId, unit, action),
     serviceLogs: (hostId, unit) => ipcRenderer.invoke(IPC.HTOOLS_SERVICE_LOGS, hostId, unit),
     readFile: (hostId, path) => ipcRenderer.invoke(IPC.HTOOLS_READ_FILE, hostId, path)
+  },
+  localdev: {
+    enabled: () => ipcRenderer.invoke(IPC.LOCALDEV_ENABLED),
+    health: () => ipcRenderer.invoke(IPC.LOCALDEV_HEALTH),
+    openFolder: (what, siteId) => ipcRenderer.invoke(IPC.LOCALDEV_OPEN_FOLDER, what, siteId),
+
+    runtimeCatalog: () => ipcRenderer.invoke(IPC.LOCALDEV_RUNTIME_CATALOG),
+    runtimeInstall: (id, fromFile) => ipcRenderer.invoke(IPC.LOCALDEV_RUNTIME_INSTALL, id, fromFile),
+    runtimeCancel: (id) => ipcRenderer.send(IPC.LOCALDEV_RUNTIME_CANCEL, id),
+    runtimeRemove: (id) => ipcRenderer.invoke(IPC.LOCALDEV_RUNTIME_REMOVE, id),
+    onRuntimeProgress: (cb) => subscribe<LdRuntimeProgressDto>(IPC.LOCALDEV_RUNTIME_PROGRESS, cb),
+
+    services: () => ipcRenderer.invoke(IPC.LOCALDEV_SERVICES),
+    serviceAction: (id, action) => ipcRenderer.invoke(IPC.LOCALDEV_SERVICE_ACTION, id, action),
+    stopAll: () => ipcRenderer.invoke(IPC.LOCALDEV_STOP_ALL),
+    onServiceEvent: (cb) => subscribe<LdServiceDto>(IPC.LOCALDEV_SERVICE_EVENT, cb),
+
+    sites: () => ipcRenderer.invoke(IPC.LOCALDEV_SITES),
+    siteSave: (input: LdSiteInputDto) => ipcRenderer.invoke(IPC.LOCALDEV_SITE_SAVE, input),
+    siteDelete: (id, removeFiles) => ipcRenderer.invoke(IPC.LOCALDEV_SITE_DELETE, id, removeFiles),
+    siteOpen: (id) => ipcRenderer.send(IPC.LOCALDEV_SITE_OPEN, id),
+    sitePickFolder: () => ipcRenderer.invoke(IPC.LOCALDEV_SITE_PICK_FOLDER),
+    siteShellEnv: (id) => ipcRenderer.invoke(IPC.LOCALDEV_SITE_SHELL_ENV, id),
+    onSiteEvent: (cb) => subscribe<LdSiteEventDto>(IPC.LOCALDEV_SITE_EVENT, cb),
+
+    dbStatus: () => ipcRenderer.invoke(IPC.LOCALDEV_DB_STATUS),
+    dbProvision: (siteId) => ipcRenderer.invoke(IPC.LOCALDEV_DB_PROVISION, siteId),
+    dbDump: (siteId) => ipcRenderer.invoke(IPC.LOCALDEV_DB_DUMP, siteId),
+    dbImport: (siteId) => ipcRenderer.invoke(IPC.LOCALDEV_DB_IMPORT, siteId),
+    dbList: () => ipcRenderer.invoke(IPC.LOCALDEV_DB_LIST),
+    dbAdminer: (siteId) => ipcRenderer.invoke(IPC.LOCALDEV_DB_ADMINER, siteId),
+    dbPhpMyAdmin: (siteId) => ipcRenderer.invoke(IPC.LOCALDEV_DB_PMA, siteId),
+    siteWpConfigRead: (siteId) => ipcRenderer.invoke(IPC.LOCALDEV_SITE_WP_CONFIG_READ, siteId),
+    siteWpConfigWrite: (siteId) => ipcRenderer.invoke(IPC.LOCALDEV_SITE_WP_CONFIG, siteId),
+
+    logTail: (siteId, which) => ipcRenderer.invoke(IPC.LOCALDEV_LOG_TAIL, siteId, which),
+    settingsGet: () => ipcRenderer.invoke(IPC.LOCALDEV_SETTINGS_GET),
+    settingsSet: (s) => ipcRenderer.invoke(IPC.LOCALDEV_SETTINGS_SET, s)
+  },
+  hostmap: {
+    state: () => ipcRenderer.invoke(IPC.HOSTMAP_STATE),
+    saveGroup: (input) => ipcRenderer.invoke(IPC.HOSTMAP_SAVE_GROUP, input),
+    deleteGroup: (id) => ipcRenderer.invoke(IPC.HOSTMAP_DELETE_GROUP, id),
+    setActive: (groupId, targetId) => ipcRenderer.invoke(IPC.HOSTMAP_SET_ACTIVE, groupId, targetId),
+    open: (groupId, opts) => ipcRenderer.invoke(IPC.HOSTMAP_OPEN, groupId, opts),
+    openAll: (groupId, browserId) => ipcRenderer.invoke(IPC.HOSTMAP_OPEN_ALL, groupId, browserId),
+    curlCommand: (groupId, targetId) => ipcRenderer.invoke(IPC.HOSTMAP_CURL, groupId, targetId),
+    clearProfiles: (groupId) => ipcRenderer.invoke(IPC.HOSTMAP_CLEAR_PROFILES, groupId)
   },
   ai: {
     getConfig: () => ipcRenderer.invoke(IPC.AI_GET_CONFIG),

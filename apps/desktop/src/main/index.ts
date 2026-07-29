@@ -17,6 +17,8 @@ import { registerVncIpc } from './ipc/vnc'
 import { registerRdpIpc } from './ipc/rdp'
 import { registerTerminalIpc } from './ipc/terminal'
 import { registerTunnelsIpc } from './ipc/tunnels'
+import { registerLocalDevIpc } from './ipc/localdev'
+import { registerHostMapIpc } from './ipc/hostmap'
 import { registerPluginsIpc } from './ipc/plugins'
 import { registerMarketplaceIpc } from './ipc/marketplace'
 import { getVault, registerVaultIpc } from './ipc/vault'
@@ -200,6 +202,8 @@ const disposeSftp = registerSftpIpc()
 const disposeVnc = registerVncIpc()
 const disposeRdp = registerRdpIpc()
 const disposeTunnels = registerTunnelsIpc()
+const localDev = registerLocalDevIpc()
+registerHostMapIpc()
 let disposePlugins: (() => void) | null = null
 
 void app.whenReady().then(() => {
@@ -215,6 +219,10 @@ void app.whenReady().then(() => {
   // Plugin host: cần cửa sổ để gửi event panel/notify; bridge để observe/gửi output terminal
   disposePlugins = registerPluginsIpc(() => mainWin ?? BrowserWindow.getAllWindows()[0] ?? null, terminal.bridge)
 
+  // Local dev: dọn tiến trình (nginx/php-cgi) còn sót từ lần chạy trước — phải chạy SAU
+  // whenReady vì cần userData, và TRƯỚC khi user kịp bấm start bất cứ gì.
+  void localDev.initIfEnabled()
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) mainWin = createWindow()
   })
@@ -224,7 +232,19 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', () => {
+/** Trần cứng cho phần dọn BẤT ĐỒNG BỘ khi quit: bấm X mà app treo lâu là lỗi nghiêm trọng
+ *  hơn việc tắt service không đàng hoàng. */
+const QUIT_GRACE_MS = 8_000
+let quitting = false
+
+app.on('before-quit', (event) => {
+  // Lần gọi thứ 2 (do app.exit bên dưới) phải đi thẳng, nếu không sẽ lặp vô hạn.
+  if (quitting) return
+  quitting = true
+  // Giữ app sống đủ lâu để dừng stack local dev (MariaDB shutdown đàng hoàng mất vài giây;
+  // kill cứng = mất điện giữa transaction → InnoDB crash recovery lần sau).
+  event.preventDefault()
+
   disposePlugins?.()
   terminal.dispose()
   disposeSftp()
@@ -233,5 +253,16 @@ app.on('before-quit', () => {
   disposeTunnels()
   disposeMonitor()
   disposeWatcher()
-  getVault().lock()
+
+  void Promise.race([
+    localDev.dispose(),
+    new Promise((resolve) => setTimeout(resolve, QUIT_GRACE_MS))
+  ]).finally(() => {
+    getVault().lock() // lock cuối cùng, giữ đúng thứ tự cũ
+    // Gọi app.quit() (KHÔNG phải app.exit): lần này cờ `quitting` cho đi thẳng nên chuỗi quit
+    // chạy bình thường và các event 'will-quit'/'quit' VẪN được phát.
+    // ⚠️ app.exit(0) sẽ bỏ qua chúng → electron-updater (autoInstallOnAppQuit = true, xem
+    // ipc/updater.ts) sẽ KHÔNG cài bản update đã tải khi user thoát app.
+    app.quit()
+  })
 })

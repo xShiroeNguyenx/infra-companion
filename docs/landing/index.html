@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b0e14" />
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <title>Infra Companion — a modern SSH client that does more</title>
-<meta name="description" content="Infra Companion is a local-first desktop SSH client: jump hosts, login scripts, multi-pane broadcast, bulk exec, monitoring, E2EE sync, AI, and a plugin system." />
+<meta name="description" content="Infra Companion is a local-first desktop SSH client: jump hosts, login scripts, multi-pane broadcast, bulk exec, monitoring, E2EE sync, AI, a plugin system, and a self-managed local PHP/WordPress dev stack." />
 <style>
   :root {
     --app: #0b0e14; --panel: #0e121b; --elevated: #161b27; --card: #11151f;
@@ -236,12 +236,12 @@
   <div class="wrap">
     <span class="eyebrow"><span class="dot"></span> Open-source · Local-first · Windows · macOS · Linux</span>
     <h1>The SSH client that<br><span class="grad">does a whole lot more.</span></h1>
-    <p class="lead">Infra Companion is a modern, local-first desktop SSH client — everything you love about Termius, plus <b>broadcast</b>, <b>bulk execution</b>, <b>agentless monitoring</b>, <b>zero-knowledge sync</b>, an <b>AI assistant</b>, and a <b>plugin system</b>.</p>
+    <p class="lead">Infra Companion is a modern, local-first desktop SSH client — everything you love about Termius, plus <b>broadcast</b>, <b>bulk execution</b>, <b>agentless monitoring</b>, <b>zero-knowledge sync</b>, an <b>AI assistant</b>, a <b>plugin system</b>, and now a <b>local PHP/WordPress dev stack</b>.</p>
     <div class="hero-cta">
       <a class="btn primary" href="https://github.com/xShiroeNguyenx/infra-companion/releases/latest" target="_blank" rel="noreferrer">↓ Download for Windows · macOS · Linux</a>
       <a class="btn" href="#features">Explore features</a>
     </div>
-    <p class="hero-note">Free &amp; open-source · <code>v0.1.34</code> · Grab an installer from <a href="https://github.com/xShiroeNguyenx/infra-companion/releases/latest" target="_blank" rel="noreferrer" style="color:var(--accent)">Releases</a> — or build from source: <code>git clone https://github.com/xShiroeNguyenx/infra-companion &amp;&amp; pnpm install &amp;&amp; pnpm dev</code></p>
+    <p class="hero-note">Free &amp; open-source · <code>v0.2.0</code> · Grab an installer from <a href="https://github.com/xShiroeNguyenx/infra-companion/releases/latest" target="_blank" rel="noreferrer" style="color:var(--accent)">Releases</a> — or build from source: <code>git clone https://github.com/xShiroeNguyenx/infra-companion &amp;&amp; pnpm install &amp;&amp; pnpm dev</code></p>
 
     <!-- terminal mock: broadcast across two panes -->
     <div class="term reveal" id="hero-term">
@@ -293,6 +293,8 @@
       <div class="card reveal"><div class="ic">🎨</div><h3>Theme studio<span class="tag">NEW</span></h3><p>Recolor the full UI palette per theme and export / import themes as JSON.</p></div>
       <div class="card reveal"><div class="ic">⭐</div><h3>Favorite hosts<span class="tag">NEW</span></h3><p>Pin the hosts you use most to a Favorites section at the top of the sidebar.</p></div>
       <div class="card reveal"><div class="ic">🖱️</div><h3>Mouse copy / paste</h3><p>Select then left-click the highlight to copy; right-click to paste — alongside the usual shortcuts.</p></div>
+      <div class="card reveal"><div class="ic">🧱</div><h3>Local dev stack<span class="tag">NEW</span></h3><p>Run your PHP / WordPress sites locally instead of Laragon or XAMPP: the app downloads and supervises its own PHP, Nginx and MariaDB, serves sites at <span class="accent">*.localhost</span> with no hosts file and no admin rights, and provisions a database per site.</p></div>
+      <div class="card reveal"><div class="ic">🎯</div><h3>Domain → server<span class="tag">NEW</span></h3><p>Test one machine in a load-balanced cluster without editing your hosts file: a browser window with a <b>DNS override scoped to that window</b> — HTTPS still validates, and you can open every server side by side.</p></div>
     </div>
   </div>
 </section>

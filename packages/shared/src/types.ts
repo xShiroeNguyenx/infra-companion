@@ -575,6 +575,11 @@ export interface TerminalCreateRequest {
   /** kind=ssh: Quick Connect "user@host[:port]" — không cần host lưu sẵn. */
   quickTarget?: string
   cwd?: string
+  /**
+   * kind=local: biến môi trường ĐÈ LÊN env kế thừa (vd đưa php/wp vào PATH khi mở terminal
+   * tại thư mục site local dev). Chỉ đè các khoá được truyền, không thay cả env.
+   */
+  env?: Record<string, string>
 }
 
 export interface TerminalCreateResponse {
@@ -765,6 +770,268 @@ export interface HostExecResultDto {
   error?: string
 }
 
+// ── Local dev stack (Laragon/LocalWP-style) ─────────────────────────────────────
+// App tự tải PHP/MariaDB/Nginx portable về userData, tự sinh config, tự supervise process.
+// Mọi thứ chạy trên MÁY LOCAL (không SSH). Dữ liệu site nằm ngoài vault (localdev.db) vì
+// vault auto-lock 15' còn supervisor phải đọc config liên tục — xem plan §quyết-định 7.
+
+export type LdRuntimeKindDto = 'php' | 'mariadb' | 'nginx' | 'tool'
+
+/** 1 runtime trong catalog: có thể đã cài hoặc chưa. */
+export interface LdRuntimeDto {
+  id: string
+  kind: LdRuntimeKindDto
+  version: string
+  label: string
+  sizeBytes: number
+  installed: boolean
+  /** 'ok' = đã smoke-test chạy được; 'broken' = cài xong nhưng exe không chạy (thiếu VC++…). */
+  state: 'not-installed' | 'installing' | 'ok' | 'broken'
+  /** Bản đã hết security support — UI hiện cảnh báo. */
+  eol?: boolean
+  note?: string
+  error?: string
+}
+
+export type LdDownloadPhaseDto = 'download' | 'verify' | 'extract' | 'verify-exe' | 'done' | 'error'
+
+export interface LdRuntimeProgressDto {
+  id: string
+  phase: LdDownloadPhaseDto
+  receivedBytes: number
+  totalBytes: number | null
+  percent: number
+  error?: string
+}
+
+export type LdServiceStateDto =
+  | 'stopped'
+  | 'starting'
+  | 'running'
+  | 'stopping'
+  | 'crashed'
+  | 'restarting'
+  | 'unhealthy'
+  | 'missing-runtime'
+
+export interface LdServiceDto {
+  id: string
+  groupId: string
+  label: string
+  state: LdServiceStateDto
+  pid: number | null
+  ports: number[]
+  since: number | null
+  restarts: number
+  lastError: string | null
+  runtimeId: string | null
+}
+
+export type LdServiceActionDto = 'start' | 'stop' | 'restart' | 'reload'
+
+/** Trạng thái 1 site local. `createdByApp=false` ⇒ app KHÔNG BAO GIỜ xoá file của site đó. */
+export interface LdSiteDto {
+  id: string
+  name: string
+  slug: string
+  /** Domain chính, vd 'myshop.localhost' (mặc định) hoặc 'myshop.test' (cần hosts entry). */
+  domain: string
+  /** Thư mục gốc site (chứa app/, logs/, conf/). */
+  rootPath: string
+  /** Thư mục web (docroot) — nơi nginx trỏ tới. */
+  docRoot: string
+  phpVersion: string | null
+  httpPort: number
+  https: boolean
+  kind: 'static' | 'php' | 'wordpress'
+  status: 'creating' | 'ready' | 'error'
+  createdByApp: boolean
+  lastError: string | null
+  /**
+   * Database riêng của site (null = chưa cấp). `dbPass` để thô LÀ CÓ Ý: `wp-config.php` trên
+   * đĩa vốn đã chứa đúng password này, nên che ở đây chỉ là an ninh giả. UI vẫn ẩn mặc định
+   * để không lộ khi user share màn hình.
+   */
+  dbName: string | null
+  dbUser: string | null
+  dbPass: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+export interface LdSiteInputDto {
+  id?: string
+  name: string
+  /** Bỏ trống → suy ra từ name. */
+  domain?: string
+  /** Trỏ vào folder có sẵn (M1) — bắt buộc ở bản hiện tại. */
+  rootPath: string
+  /** Bỏ trống → chính rootPath. */
+  docRoot?: string
+  phpVersion?: string | null
+  https?: boolean
+}
+
+/** Trạng thái tổng thể để UI hiện 1 chấm màu + Doctor panel. */
+export interface LdHealthDto {
+  /** Thư mục gốc đang dùng (cấu hình được, có thể ở ổ khác). */
+  root: string
+  runtimesInstalled: number
+  servicesRunning: number
+  sites: number
+  /** Orphan đã dọn lúc app khởi động (báo cho user biết, không im lặng). */
+  reaped: number
+  warnings: string[]
+}
+
+export interface LdSettingsDto {
+  /** Toggle tổng — mặc định TẮT với user hiện có; tắt thì ẩn hoàn toàn khỏi UI. */
+  enabled: boolean
+  /** Gốc lưu runtime + site (mặc định userData; cho đổi sang ổ khác). */
+  root: string
+  /** Dải port cấp cho web server. */
+  httpPortFrom: number
+  httpPortTo: number
+  /** Số worker php-cgi = số request PHP đồng thời tối đa (Windows không có php-fpm). */
+  phpPoolSize: number
+  /** Tự khởi động stack khi mở app (mặc định TẮT — tiết kiệm 300-500MB RAM). */
+  autoStart: boolean
+}
+
+export type LdSitePhaseDto = 'validate' | 'scaffold' | 'vhost' | 'reload' | 'done' | 'error'
+
+export interface LdSiteEventDto {
+  siteId: string
+  phase: LdSitePhaseDto
+  percent: number
+  message: string
+  line?: string
+  level?: 'info' | 'warn' | 'error'
+}
+
+/** Trạng thái MariaDB do app quản — UI dùng để biết hiện nút nào. */
+export interface LdDbStatusDto {
+  /** Đã cài runtime MariaDB? */
+  installed: boolean
+  /** Service đang chạy? */
+  running: boolean
+  /** Chấp nhận kết nối bằng credential ta đang giữ? */
+  ready: boolean
+  port: number | null
+  host: string
+  /** Lý do chưa dùng được, đã sẵn sàng hiện cho user. */
+  error?: string
+}
+
+/** wp-config.php của site đang trỏ vào DB nào — để UI cảnh báo khi lệch với DB đã cấp. */
+export interface LdWpConfigDto {
+  /** Site có file wp-config.php không (site không phải WordPress thì không). */
+  exists: boolean
+  path?: string
+  dbName?: string
+  dbUser?: string
+  dbHost?: string
+  /** Giá trị trong file khớp với DB app đã cấp cho site? false ⇒ hiện nút "Cắm vào wp-config". */
+  matches?: boolean
+  /** Số bảng trong DB app đã cấp — 0 nghĩa là DB rỗng, cần nhập dump. */
+  tables?: number
+  error?: string
+}
+
+/** Thông tin kết nối DB của 1 site — đủ để dán vào Navicat/wp-config.php. */
+export interface LdDbCredsDto {
+  ok: boolean
+  dbName?: string
+  dbUser?: string
+  dbPass?: string
+  host?: string
+  port?: number
+  error?: string
+}
+
+export type LdLogSourceDto = 'nginx-access' | 'nginx-error' | 'php-error' | 'wp-debug'
+
+export interface LdLogTailDto {
+  ok: boolean
+  text: string
+  error?: string
+}
+
+/** cwd + env để mở terminal tại thư mục site với php/wp/mysql sẵn trong PATH. */
+export interface LdShellEnvDto {
+  ok: boolean
+  cwd: string
+  env: Record<string, string>
+  title: string
+  error?: string
+}
+
+export interface LdResultDto {
+  ok: boolean
+  error?: string
+}
+
+// ── HostMap: domain → IP chỉ định, không sửa file hosts, không cần admin ─────────────────
+
+/** 1 server đích trong cụm (vd 5 con load balance). */
+export interface HostMapTargetDto {
+  id: string
+  label: string
+  ip: string
+}
+
+export interface HostMapGroupDto {
+  id: string
+  name: string
+  /** Domain hoặc pattern `*.webike.net`. */
+  patterns: string[]
+  targets: HostMapTargetDto[]
+  /** Server đang chọn (null = chưa chọn ⇒ chưa mở được). */
+  activeTargetId: string | null
+  /** URL mở khi bấm Mở; null ⇒ suy ra `https://<domain đầu tiên>/`. */
+  url: string | null
+  /** Browser ưu tiên cho group này (id từ `HostMapStateDto.browsers`); null ⇒ lấy cái đầu. */
+  browserId: string | null
+}
+
+/** Input lưu group — `id` trống = tạo mới. */
+export interface HostMapGroupInput {
+  id?: string
+  name: string
+  patterns: string[]
+  targets: HostMapTargetDto[]
+  activeTargetId: string | null
+  url: string | null
+  browserId: string | null
+}
+
+export interface HostMapBrowserDto {
+  id: string
+  name: string
+  exe: string
+}
+
+export interface HostMapStateDto {
+  groups: HostMapGroupDto[]
+  /** Browser Chromium tìm thấy trên máy. Rỗng ⇒ UI phải nói rõ vì sao không mở được. */
+  browsers: HostMapBrowserDto[]
+  /** Tổng dung lượng profile browser app đã sinh (byte) — để user biết khi nào nên dọn. */
+  profilesBytes: number
+}
+
+export interface HostMapOpenDto {
+  ok: boolean
+  /** Số cửa sổ đã mở (openAll). */
+  opened?: number
+  error?: string
+}
+
+export interface HostMapCurlDto {
+  ok: boolean
+  command?: string
+  error?: string
+}
+
 export interface InfraApi {
   vault: {
     status(): Promise<VaultStatus>
@@ -934,6 +1201,93 @@ export interface InfraApi {
     serviceLogs(hostId: string, unit: string): Promise<HostExecResultDto>
     /** F49 — đọc nội dung 1 file trên host (stdout = nội dung), cắt ở ~1MB. Cho tính năng so sánh config. */
     readFile(hostId: string, path: string): Promise<HostExecResultDto>
+  }
+  /**
+   * Local dev stack — chạy trên MÁY LOCAL, không SSH. App tự tải runtime (PHP/MariaDB/Nginx)
+   * về userData và tự supervise process. Mặc định TẮT (settings.enabled=false).
+   */
+  localdev: {
+    /** Nhanh: tính năng có đang bật không (gate mọi entry point UI, tránh gọi cả bộ khi tắt). */
+    enabled(): Promise<boolean>
+    health(): Promise<LdHealthDto>
+    /**
+     * Mở thư mục bằng file explorer. `what='site'` cần `siteId` — main tự tra đường dẫn từ
+     * store (renderer KHÔNG được truyền path tuỳ ý vào shell.openPath).
+     */
+    openFolder(what: 'root' | 'runtimes' | 'conf' | 'logs' | 'certs' | 'sites' | 'site', siteId?: string): void
+
+    runtimeCatalog(): Promise<LdRuntimeDto[]>
+    /** `fromFile=true`: chọn file đã tải sẵn thay vì tải qua mạng (khi AV/mạng công ty chặn). */
+    runtimeInstall(id: string, fromFile?: boolean): Promise<LdResultDto>
+    runtimeCancel(id: string): void
+    runtimeRemove(id: string): Promise<LdResultDto>
+    onRuntimeProgress(cb: (p: LdRuntimeProgressDto) => void): () => void
+
+    services(): Promise<LdServiceDto[]>
+    serviceAction(id: string, action: LdServiceActionDto): Promise<LdResultDto>
+    /** Dừng MỌI service local — escape hatch khi có process kẹt (cũng có trong palette). */
+    stopAll(): Promise<LdResultDto>
+    onServiceEvent(cb: (s: LdServiceDto) => void): () => void
+
+    sites(): Promise<LdSiteDto[]>
+    siteSave(input: LdSiteInputDto): Promise<LdSiteDto>
+    /** removeFiles=true mới xoá file trên đĩa (mặc định chỉ bỏ khỏi danh sách). */
+    siteDelete(id: string, removeFiles: boolean): Promise<LdResultDto>
+    siteOpen(id: string): void
+    /** Hộp thoại chọn thư mục (main mở dialog) — null nếu user huỷ. */
+    sitePickFolder(): Promise<string | null>
+    /** cwd+env để renderer mở tab terminal tại site (renderer không tự dựng path runtime). */
+    siteShellEnv(id: string): Promise<LdShellEnvDto>
+    onSiteEvent(cb: (e: LdSiteEventDto) => void): () => void
+
+    /** MariaDB do app quản: đã cài / đang chạy / nhận kết nối được chưa. */
+    dbStatus(): Promise<LdDbStatusDto>
+    /**
+     * Cấp (hoặc lấy lại) database + user riêng cho site. Idempotent: site đã có DB thì trả
+     * đúng credential cũ chứ không tạo DB mới — `wp-config.php` đang trỏ vào cái cũ.
+     */
+    dbProvision(siteId: string): Promise<LdDbCredsDto>
+    /** Dump DB của site ra file .sql (mở hộp thoại chọn nơi lưu). */
+    dbDump(siteId: string): Promise<LdResultDto>
+    /**
+     * Nạp 1 file .sql vào DB của site (mở hộp thoại chọn file) — đường mang dữ liệu từ
+     * XAMPP/Laragon/prod sang. Dừng ở câu lỗi đầu tiên thay vì nhập nửa vời.
+     */
+    dbImport(siteId: string): Promise<LdResultDto>
+    /** Danh sách database người dùng (bỏ schema hệ thống). */
+    dbList(): Promise<string[]>
+    /** Mở Adminer trong browser (công cụ DB nhẹ). `siteId` để chọn sẵn DB của site đó. */
+    dbAdminer(siteId?: string): Promise<LdResultDto>
+    /** Mở phpMyAdmin trong browser — cùng vai trò Adminer. `siteId` để chọn sẵn DB của site đó. */
+    dbPhpMyAdmin(siteId?: string): Promise<LdResultDto>
+
+    /** wp-config.php của site đang trỏ vào DB nào + DB app cấp có dữ liệu chưa. */
+    siteWpConfigRead(siteId: string): Promise<LdWpConfigDto>
+    /** Ghi credential DB của site vào wp-config.php (backup file cũ vào trash/ trước). */
+    siteWpConfigWrite(siteId: string): Promise<LdResultDto>
+
+    /** Đọc N KB CUỐI của log (khác hostTools.readFile lấy đầu file). */
+    logTail(siteId: string, which: LdLogSourceDto): Promise<LdLogTailDto>
+    settingsGet(): Promise<LdSettingsDto>
+    settingsSet(s: Partial<LdSettingsDto>): Promise<LdSettingsDto>
+  }
+  /**
+   * HostMap — test 1 server cụ thể trong cụm load balance mà KHÔNG sửa file hosts và KHÔNG cần
+   * quyền admin: app mở browser Chromium với `--host-resolver-rules` (ghi đè DNS trong đúng
+   * cửa sổ đó, certificate vẫn khớp vì hostname không đổi).
+   */
+  hostmap: {
+    state(): Promise<HostMapStateDto>
+    saveGroup(input: HostMapGroupInput): Promise<HostMapStateDto>
+    deleteGroup(id: string): Promise<HostMapStateDto>
+    /** Đổi server đang trỏ tới (thao tác chính, dùng nhiều nhất). */
+    setActive(groupId: string, targetId: string): Promise<HostMapStateDto>
+    open(groupId: string, opts?: { targetId?: string; browserId?: string }): Promise<HostMapOpenDto>
+    /** Mỗi target 1 cửa sổ, mở song song — so sánh cả cụm cùng lúc. */
+    openAll(groupId: string, browserId?: string): Promise<HostMapOpenDto>
+    curlCommand(groupId: string, targetId?: string): Promise<HostMapCurlDto>
+    /** Xoá profile browser đã sinh cho group (hoặc tất cả nếu bỏ trống). */
+    clearProfiles(groupId?: string): Promise<HostMapOpenDto>
   }
   ai: {
     getConfig(): Promise<AiConfigDto | null>

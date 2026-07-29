@@ -5,6 +5,7 @@ import { useTabsStore } from '../stores/tabs'
 import { useToastsStore } from '../stores/toasts'
 import { useRdpStore } from '../stores/rdp'
 import { useWatcherStore } from '../stores/watcher'
+import { useLocaldevStore } from '../stores/localdev'
 import { useFavoritesStore } from '../stores/favorites'
 import { useUiStore, type AppModal } from '../stores/ui'
 import { GroupEditorModal } from './GroupEditorModal'
@@ -32,6 +33,7 @@ export function Sidebar() {
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
   const watcherEnabled = useWatcherStore((s) => s.enabled)
   const setWatcherEnabled = useWatcherStore((s) => s.setEnabled)
+  const localdevEnabled = useLocaldevStore((s) => s.enabled)
   const favIds = useFavoritesStore((s) => s.ids)
   const [query, setQuery] = useState('')
   const [modal, setModal] = useState<OpenModal>(null)
@@ -280,6 +282,7 @@ export function Sidebar() {
               <MenuItem label={t('menu.processes')} onClick={() => { setMenuOpen(false); openAppModal('processes') }} />
               <MenuItem label={t('menu.services')} onClick={() => { setMenuOpen(false); openAppModal('services') }} />
               <MenuItem label={t('menu.compare')} onClick={() => { setMenuOpen(false); openAppModal('compare') }} />
+              <MenuItem label={t('menu.hostmap')} onClick={() => { setMenuOpen(false); openAppModal('hostmap') }} />
               <MenuItem label={t('menu.ai')} onClick={() => { setMenuOpen(false); openAppModal('ai') }} />
               <MenuItem label={t('menu.aiDiagnose')} onClick={() => { setMenuOpen(false); openAppModal('ai-diagnose') }} />
               <MenuItem label={t('menu.recordings')} onClick={() => { setMenuOpen(false); openAppModal('recordings') }} />
@@ -290,6 +293,17 @@ export function Sidebar() {
               <MenuItem label={t('menu.plugins')} onClick={() => { setMenuOpen(false); openAppModal('plugins') }} />
               <MenuItem label={t('menu.createGroup')} onClick={() => { setMenuOpen(false); setModal({ kind: 'group', group: null }) }} />
               <MenuItem label={t('menu.import')} onClick={() => void runImport()} />
+              {/* Local dev là "khu vực sản phẩm khác" (môi trường dev local, không phải SSH) nên
+                  tách bằng separator; và CHỈ hiện khi user đã bật ở Cài đặt → Local dev. */}
+              {localdevEnabled && (
+                <>
+                  <div className="border-edge my-1 border-t" />
+                  <MenuItem
+                    label={t('menu.localdev')}
+                    onClick={() => { setMenuOpen(false); useTabsStore.getState().openLocaldevTab() }}
+                  />
+                </>
+              )}
               <div className="border-edge my-1 border-t" />
               <MenuItem label={t('menu.settings')} onClick={() => { setMenuOpen(false); openAppModal('settings') }} />
             </div>

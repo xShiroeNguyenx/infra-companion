@@ -1,5 +1,7 @@
 # Tiếp tục phiên sau — Trạng thái dự án Infra Companion
 
+> **Cập nhật 2026-07-29 — v0.1.34 ĐÃ commit (`a059e62`) + tag `v0.1.34`. v0.2.0 SẴN SÀNG RELEASE (đã bump + docs, CHƯA commit/tag, CHƯA test GUI).** Đây là **minor bump chứ không phải patch** vì v0.2.0 mở 2 vùng tính năng mới, không phải sửa lỗi: **(1) LOCAL DEV STACK** (thay Laragon/XAMPP) — tính năng làm dần nhiều phiên, nay đủ để phát hành: app tự tải + tự quản runtime portable (PHP 8.3/8.4 NTS, Nginx 1.30, MariaDB 11.4 LTS) và **tool tuỳ chọn** (Adminer, **phpMyAdmin**, Composer, WP-CLI, Node 24 LTS, mkcert) vào `userData`, sha256 GHIM TRONG SOURCE (nginx không công bố checksum → app tự tính + ghi provenance + nói rõ ở UI), mirror khi link rot, smoke-test sau cài, đường 📁 cài-từ-file khi AV/mạng chặn; **ProcessSupervisor** (start/stop/restart từng service hoặc cả stack, pool `php-cgi`, health probe theo cổng, restart backoff, 20 dòng stderr cuối khi crash, dừng ĐÀNG HOÀNG `nginx -s quit`/`mariadb-admin shutdown` — không bao giờ taskkill `mysqld`, **reap orphan theo exe path chứ không theo PID**); **site** trỏ vào folder có sẵn (tự nhận static/php/wordpress), URL `http://<slug>.localhost:<cổng>` → **0 hosts file, 0 UAC** (RFC 6761), config regenerate từ DB mỗi lần apply + reload gate bằng `nginx -t`, log site nằm trong khu vực app (KHÔNG rải vào repo của user), **⌨ Terminal tại site** có `php`/`composer`/`wp`/`node`/`npm` sẵn trong PATH (qua shim `bin/*.cmd` + `addToPath`); **DB** MariaDB 3307+ (né XAMPP 3306), datadir NGOÀI `runtimes/`, cấp DB+user+grant từng site, root CÓ password sinh ngẫu nhiên, dump/import `.sql`, ghi credential vào `wp-config.php` (backup trước + từ chối nếu file không giống wp-config), Adminer (`db.localhost`) + **phpMyAdmin** (`pma.localhost`, `auth_type=config` nên vào là dùng ngay). ⚠️ **phpMyAdmin 5.2 KHÔNG hỗ trợ PHP 8.4** → `pickPhpForWebApp` + `webApp.maxPhp='8.3'` tự chọn 8.3 cho vhost pma; `config.inc.php` do app SINH vào thư mục runtime pma (ngoại lệ có chủ ý của quy ước "runtimes read-only", lý do ghi trong `templates/pmaConfig.ts`). **(2) HOSTMAP** (`⋯` → 🎯) — trả lời câu hỏi của user "có cách nào trỏ domain sang IP mà KHÔNG sửa file hosts?": mở browser Chromium với `--host-resolver-rules="MAP domain ip"` → DNS chỉ bị ghi đè **trong đúng cửa sổ đó**, hostname không đổi nên **cert HTTPS vẫn khớp**, và **mở song song nhiều cửa sổ tới nhiều server** (file hosts chỉ trỏ được 1 IP mỗi lúc). `--user-data-dir` là **BẮT BUỘC** (browser đang mở với profile mặc định sẽ chỉ "mở tab" ở tiến trình cũ và **BỎ QUA cờ resolver** → bug im lặng: cửa sổ mở mà vẫn vào IP cũ). Hàng rào an ninh: pattern/IP phải validate trước khi ghép vì chuỗi rules tách bằng dấu phẩy — `a.com,MAP * <ip xấu>` chèn được rule map cả Internet (có test riêng). Dữ liệu ở `hostmap.json` trong userData (không vào vault: không có secret, mà vault tự khoá 15 phút idle). Giới hạn đã ghi vào docs: chỉ Chromium (Firefox không), vô hiệu khi máy đi qua proxy hệ thống, không phủ Postman/client DB (dùng tunnel hoặc nút copy `curl --resolve`). **ĐÃ kiểm chứng cơ chế bằng browser thật trên máy này** (Edge nhận cờ, request tới đúng IP:port chỉ định, `Host` header vẫn là domain gốc) + sha256 của cả 5 artifact mới đối chiếu bằng cách tải thật. **Typecheck 3 pkg XANH + 690 test PASS (36 skip cần node:sqlite) + build XANH**; CHƯA test GUI (cần: bật Settings → Local dev, cài runtime, tạo site, cấp DB, mở Adminer/phpMyAdmin; và tạo 1 group HostMap với 5 IP thật rồi bấm Mở / Mở cả 5). Bump 0.2.0 + CHANGELOG [0.2.0] + README (badge/features/limitations/structure/test-count) + USER-GUIDE §16C+§16D + landing (hero + 2 card) + handoff. **Working tree giờ CHỈ còn nội dung của v0.2.0** → cảnh báo "KHÔNG `git add -A`" của v0.1.34 KHÔNG còn áp dụng; block git v0.2.0 ở cuối file vẫn liệt kê tường minh từng file/thư mục. — _(Ghi chú cũ giữ bên dưới.)_
+
 > **Cập nhật 2026-07-28 — v0.1.33 ĐÃ commit (`b3d4c6d`) + tag `v0.1.33`. v0.1.34 SẴN SÀNG RELEASE (đã bump + docs, CHƯA commit/tag, CHƯA test GUI).** Fix **regression tunnel do chính v0.1.31 gây ra**: user báo tunnel `jpdb11` (`127.0.0.1:3311` → `192.168.1.71:3306` qua host `jpap06`) trước chạy tốt, nay HeidiSQL báo *"reading initial communication packet"* dù tunnel xanh. **Đọc vault (`%APPDATA%/@infra/desktop/vault.db`) mới lòi ra gốc: cả jpap05…jpap09 đều CÙNG endpoint SSH `vn_dev@133.242.68.60:22`, khác nhau ở LOGIN SCRIPT (`ssh jpapNN`)** → đích `192.168.1.7x` là địa chỉ theo mạng của MÁY SÂU, nhưng v0.1.31 lại ưu tiên `direct-tcpip` phát từ GATE: dải 192.168.x.x tồn tại ở cả 2 mạng nên gate mở sang máy khác / bị firewall drop SYN; sshd chỉ xác nhận kênh SAU khi `connect()` xong nên kênh **treo im, không lỗi** → tunnel xanh mà client DB chờ tới timeout. **Sửa** (`TunnelService.ts`): thêm `chooseLocalForwardRoute(destHost, loginSteps)` (export) — login script CÓ hop `ssh` (`loginScriptEntersAnotherHost()` mới ở `loginScript.ts`) + đích cụ thể → **`script-then-native`** (nc trên máy sâu TRƯỚC như thời ≤v0.1.30, chết mới đổi sang direct-tcpip → ca G1-Devops của v0.1.31 vẫn tự chạy); loopback → `script`; chỉ su/sudo hoặc không login script → `native`. Kèm: class `UpstreamRelay` (đệm ≤256KB byte client để **phát lại** khi đổi đường, có backpressure), `stripper.pipe(socket, {end:false})` (nếu để pipe tự `end` socket thì đổi đường xong client đã đóng nốt chiều kia — bug đã dính lúc viết test), watchdog **15s** cho direct-tcpip không xác nhận (trước treo vô hạn), và nc-không-nối-được-đích giờ có detail (marker in TRƯỚC `nc` nên "thấy marker" ≠ nối được). 2 file test mới `tunnelRoute.test.ts` + `tunnelFallback.test.ts` (fake ssh2 Client + socket TCP thật: nc-first, đổi đường, phát lại byte, loopback không fallback). **Typecheck 3 pkg XANH + 632 test PASS + build XANH**; CHƯA test GUI (cần mở HeidiSQL vào `127.0.0.1:3311`). Bump 0.1.34 + CHANGELOG/README/landing/handoff. ⚠️ Working tree còn tính năng **localdev đang dở** (chưa xong, chưa vào changelog) → **KHÔNG `git add -A`**; block git v0.1.34 cuối file chỉ add đúng file của fix này. — _(Ghi chú cũ giữ bên dưới.)_
 
 > **Cập nhật 2026-07-26 — v0.1.32 ĐÃ commit (`10bd7c4`) + tag `v0.1.32` push origin. v0.1.33 SẴN SÀNG RELEASE (đã bump + docs, CHƯA commit/tag, CHƯA test GUI).** 2 fix nhỏ sau khi user test GUI v0.1.32: **(1) Auto-complete Tab cướp focus / khoá màn hình** — dropdown mở, bấm Tab chèn lệnh NHƯNG Tab của trình duyệt vẫn nhảy focus sang nút khoá vault → Enter kế tiếp khoá app thay vì chạy lệnh. Gốc: `attachCustomKeyEventHandler` trả `false` chỉ ngăn xterm xử lý, KHÔNG chặn default trình duyệt. Fix `TerminalPane.tsx`: dropdown mở + phím ↑↓/Tab/Enter(index≥0)/Esc → `event.preventDefault()`+`stopPropagation()` rồi mới xử lý → focus ở nguyên terminal, Enter chạy đúng lệnh vừa chèn. **(2) Compare "N cột" ≤5 server vừa màn hình** — trước `minmax(12rem,1fr)`+`minWidth:max-content` → tổng bề ngang vượt màn hình, phải cuộn NGANG mới thấy cột kế. Fix `CompareView.tsx` `ColumnsView`: `fitAll = ok.length<=5` → `gridTemplateColumns='3rem repeat(N, minmax(0,1fr))'` + bỏ `minWidth` + container `overflow-x-hidden` → mọi cột chia đều vừa màn hình, dòng dài wrap, chỉ cuộn DỌC (căn theo số dòng); >5 cột giữ `minmax(11rem,1fr)`+cuộn ngang. **Typecheck 3 pkg XANH + 227 test PASS + build XANH**; CHƯA test GUI. Bump 0.1.33 (2 package.json) + CHANGELOG [0.1.33] Fixed + README + landing + handoff. Lệnh git v0.1.33 ở block Git cuối file. — _(Ghi chú cũ giữ bên dưới.)_
@@ -38,7 +40,7 @@
 
 ## Đang ở đâu
 
-Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 → v0.1.13 (đã tag/phát hành)**. App build + typecheck + test đều sạch (147 core test: 137 Node 20 + suite SQLite chạy qua Electron-Node).
+Đã xong **Phase 0 → 6** (hơn 23 tính năng) + **1 phiên rà soát chất lượng** + **v0.1.3 → v0.1.34 (đã tag/phát hành)**; **v0.2.0 đã bump + docs, chờ commit/tag** (Local dev stack + HostMap — xem note trên cùng). App build + typecheck + test đều sạch (**690 core test PASS, 36 skip** cần `node:sqlite` — chạy qua Electron-Node để có nốt).
 
 **v0.1.14 (2026-07-08 đêm, ĐÃ bump version + docs, CHƯA commit/tag, GUI đã test một phần bằng pnpm dev — card mới hiện đúng trên jpap09)** — schema vault KHÔNG đổi (vẫn **v9**; metrics.db riêng có schema v2 của chính nó):
 1. **F04 Alert ngưỡng monitoring**: `packages/core/src/monitor/AlertEngine.ts` (hysteresis thuần: breach 3 sample ~9s, vùng chết [T-margin,T), recover 3 sample, offline 3 fail/2 ok, re-alert 15'; timing theo sample.ts → test deterministic) + `webhook.ts` (Google Chat/Slack/Discord/Telegram tự nhận diện theo URL, generic JSON fallback; conn không đơn vị %) + `apps/desktop/src/main/ipc/monitorSettings.ts` (`monitor-settings.json` userData — CHỦ Ý không vault để alert chạy khi vault khoá; nút Gửi thử; Load max 10000, Conn max 1e6, Steal/RAM/Disk 0-100). Dispatch 3 kênh trong `main/ipc/monitor.ts`: MONITOR_ALERT → toast renderer; Electron `Notification` (chỉ breach; ĐÃ `setAppUserModelId` win32 — **verify Windows toast trên bản đóng gói**); webhook fire-and-forget không retry. Mặc định: RAM/Disk 90, Steal 20, Load/Conn TẮT (baseline mỗi server một khác), offline bật. ⚠️ ĐỔI chữ ký IPC `monitor.start(hosts: {id,label}[])` — main cần label khi vault khoá.
@@ -181,6 +183,48 @@ Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps
 **Landing page = flow ĐỘC LẬP** (`.github/workflows/pages.yml`, deploy `docs/landing/`): tự chạy khi **push thay đổi `docs/landing/**` lên `main`** (hoặc chạy tay workflow_dispatch) — **KHÔNG gắn tag/release → không build lại app**. `ci.yml` đã thêm `paths-ignore: docs/** + **/*.md` để push chỉ-docs không kích hoạt build 3-OS. **Setting 1 lần**: repo → Settings → Pages → Source = **GitHub Actions**. URL: `https://xshiroenguyenx.github.io/infra-companion/`. Link User guide/Changelog/Roadmap trong landing trỏ GitHub blob/main (không tương đối) để hoạt động khi publish.
 
 ```powershell
+# ============================================================
+# v0.2.0 — LOCAL DEV STACK (thay Laragon/XAMPP) + HOSTMAP (tro domain sang server, khong sua hosts)
+# (v0.1.34 DA commit a059e62 + tag da push — v0.2.0 la commit MOI TREN dinh, KHONG amend)
+# MINOR bump (0.1.x -> 0.2.0): mo 2 vung tinh nang moi, khong phai fix.
+# Working tree gio CHI con noi dung v0.2.0 -> canh bao "khong git add -A" cua v0.1.34 het hieu luc.
+# ============================================================
+cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
+
+# BUOC 1: commit + push main (BAT BUOC truoc khi tag). Kiem `git status` truoc.
+git status
+
+# 1a. File MOI cua 2 tinh nang
+git add packages/core/src/localdev packages/core/src/hostmap
+git add apps/desktop/src/main/ipc/localdev.ts apps/desktop/src/main/ipc/hostmap.ts
+git add apps/desktop/src/renderer/src/features/localdev
+git add apps/desktop/src/renderer/src/components/HostMapModal.tsx
+git add apps/desktop/src/renderer/src/stores/localdev.ts apps/desktop/src/renderer/src/stores/hostmap.ts
+
+# 1b. File SAN CO bi sua (dang ky IPC, preload, modal registry, menu, i18n, env cho terminal tai site)
+git add apps/desktop/src/main/index.ts apps/desktop/src/main/ipc/terminal.ts apps/desktop/src/preload/index.ts
+git add apps/desktop/src/renderer/src/App.tsx apps/desktop/src/renderer/src/components/SettingsModal.tsx
+git add apps/desktop/src/renderer/src/components/Sidebar.tsx apps/desktop/src/renderer/src/components/TabsBar.tsx
+git add apps/desktop/src/renderer/src/i18n/dict.ts apps/desktop/src/renderer/src/stores/tabs.ts apps/desktop/src/renderer/src/stores/ui.ts
+git add packages/core/src/connection/LocalSession.ts packages/core/src/connection/SessionManager.ts packages/core/src/index.ts
+git add packages/shared/src/ipc.ts packages/shared/src/types.ts
+
+# 1c. Version + tai lieu
+git add package.json apps/desktop/package.json CHANGELOG.md README.md docs/USER-GUIDE.md docs/landing/index.html docs/TIEP-TUC-PHIEN-SAU.md
+
+git commit -m @'
+feat: local dev stack replaces Laragon/XAMPP (self-managed PHP/nginx/MariaDB + Adminer/phpMyAdmin/Composer/WP-CLI/Node/mkcert, sites at *.localhost with no hosts file or admin, per-site database) + point a domain at one specific server without touching the hosts file (v0.2.0)
+'@
+git push origin main
+
+# BUOC 2: tag SAU KHI push + SAU KHI test GUI
+#   - Local dev: Settings -> Local dev (bat) -> tab Runtimes cai PHP 8.3 + Nginx + MariaDB (+ phpMyAdmin)
+#     -> "▶ Chay stack" -> them 1 site -> "Cap database" -> mo Adminer va phpMyAdmin
+#   - HostMap: ... -> 🎯 -> tao group (domain + 5 IP that) -> Mo / Mo ca 5 server
+git tag v0.2.0
+git push origin v0.2.0
+# Xong: cho Actions ~5-10 phut -> Releases/v0.2.0 co InfraCompanion-Setup-0.2.0.exe + latest.yml
+
 # ============================================================
 # v0.1.34 — Fix regression v0.1.31: tunnel qua host CO login script phai di nc tren MAY SAU truoc
 # (v0.1.33 DA commit b3d4c6d + tag da push — v0.1.34 la commit MOI TREN dinh, KHONG amend)

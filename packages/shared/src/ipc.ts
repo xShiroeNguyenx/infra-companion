@@ -165,7 +165,72 @@ export const IPC = {
   PLUGINS_PROMPT: 'plugins:prompt',
 
   MARKETPLACE_LIST: 'marketplace:list',
-  MARKETPLACE_INSTALL: 'marketplace:install'
+  MARKETPLACE_INSTALL: 'marketplace:install',
+
+  // Local dev stack (Laragon/LocalWP-style): runtime tự tải, service tự supervise, site local.
+  // Toàn bộ chạy trên MÁY LOCAL — không liên quan SSH. Xem plan localdev.
+  LOCALDEV_ENABLED: 'localdev:enabled',
+  LOCALDEV_HEALTH: 'localdev:health',
+  LOCALDEV_OPEN_FOLDER: 'localdev:open-folder',
+
+  LOCALDEV_RUNTIME_CATALOG: 'localdev:runtime-catalog',
+  LOCALDEV_RUNTIME_INSTALL: 'localdev:runtime-install',
+  LOCALDEV_RUNTIME_CANCEL: 'localdev:runtime-cancel',
+  LOCALDEV_RUNTIME_REMOVE: 'localdev:runtime-remove',
+  /** Event: tiến độ tải/giải nén runtime. */
+  LOCALDEV_RUNTIME_PROGRESS: 'localdev:runtime-progress',
+
+  LOCALDEV_SERVICES: 'localdev:services',
+  LOCALDEV_SERVICE_ACTION: 'localdev:service-action',
+  LOCALDEV_STOP_ALL: 'localdev:stop-all',
+  /** Event: trạng thái 1 service đổi (start/stop/crash/unhealthy). */
+  LOCALDEV_SERVICE_EVENT: 'localdev:service-event',
+
+  LOCALDEV_SITES: 'localdev:sites',
+  LOCALDEV_SITE_SAVE: 'localdev:site-save',
+  LOCALDEV_SITE_DELETE: 'localdev:site-delete',
+  LOCALDEV_SITE_OPEN: 'localdev:site-open',
+  LOCALDEV_SITE_PICK_FOLDER: 'localdev:site-pick-folder',
+  LOCALDEV_SITE_SHELL_ENV: 'localdev:site-shell-env',
+  /** Event: tiến độ 1 thao tác dài trên site (tạo/xoá/clone). */
+  LOCALDEV_SITE_EVENT: 'localdev:site-event',
+
+  // Database (MariaDB do app quản) — mỗi site 1 DB + 1 user riêng
+  LOCALDEV_DB_STATUS: 'localdev:db-status',
+  LOCALDEV_DB_PROVISION: 'localdev:db-provision',
+  LOCALDEV_DB_DUMP: 'localdev:db-dump',
+  LOCALDEV_DB_IMPORT: 'localdev:db-import',
+  LOCALDEV_DB_LIST: 'localdev:db-list',
+  /** Mở Adminer (công cụ DB nhẹ, 1 file) để xem/sửa database bằng browser. */
+  LOCALDEV_DB_ADMINER: 'localdev:db-adminer',
+  /** Mở phpMyAdmin — cùng vai trò với Adminer, cho ai đã quen giao diện của XAMPP. */
+  LOCALDEV_DB_PMA: 'localdev:db-pma',
+  /** Ghi credential DB vào wp-config.php của site (có backup file cũ). */
+  LOCALDEV_SITE_WP_CONFIG: 'localdev:site-wp-config',
+  /** Đọc wp-config.php của site đang trỏ vào DB nào. */
+  LOCALDEV_SITE_WP_CONFIG_READ: 'localdev:site-wp-config-read',
+
+  LOCALDEV_LOG_TAIL: 'localdev:log-tail',
+  LOCALDEV_SETTINGS_GET: 'localdev:settings-get',
+  LOCALDEV_SETTINGS_SET: 'localdev:settings-set',
+
+  /**
+   * HostMap — trỏ domain sang IP chỉ định KHÔNG sửa file hosts, KHÔNG cần admin (mở browser
+   * Chromium với --host-resolver-rules). Tên kênh cố ý KHÔNG phải `hosts:*` — nhóm đó là
+   * server SSH trong vault, khác hoàn toàn.
+   */
+  HOSTMAP_STATE: 'hostmap:state',
+  HOSTMAP_SAVE_GROUP: 'hostmap:save-group',
+  HOSTMAP_DELETE_GROUP: 'hostmap:delete-group',
+  HOSTMAP_SET_ACTIVE: 'hostmap:set-active',
+  /** Mở 1 cửa sổ browser đã map domain → IP của target. */
+  HOSTMAP_OPEN: 'hostmap:open',
+  /** Mở song song mỗi target 1 cửa sổ (so sánh 5 con LB cùng lúc). */
+  HOSTMAP_OPEN_ALL: 'hostmap:open-all',
+  /** Lệnh curl --resolve tương đương để dán vào terminal. */
+  HOSTMAP_CURL: 'hostmap:curl',
+  /** Xoá profile browser đã sinh (đăng nhập lại từ đầu / giải phóng đĩa). */
+  HOSTMAP_CLEAR_PROFILES: 'hostmap:clear-profiles'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

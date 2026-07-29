@@ -14,6 +14,8 @@ import { MonitorModal } from './components/MonitorModal'
 import { MonitorDock } from './components/MonitorDock'
 import { MonitorTabView } from './components/MonitorTabView'
 import { CompareTabView } from './components/CompareTabView'
+import { LocaldevTabView } from './features/localdev/LocaldevTabView'
+import { LocaldevSettingsModal } from './features/localdev/LocaldevSettingsModal'
 import { MetricsHistoryModal } from './components/MetricsHistoryModal'
 import { SyncModal } from './components/SyncModal'
 import { AiModal } from './components/AiModal'
@@ -39,11 +41,13 @@ import { useToastsStore } from './stores/toasts'
 import { useUiStore } from './stores/ui'
 import { usePluginStore } from './stores/plugins'
 import { useMonitorStore } from './stores/monitor'
+import { useLocaldevStore } from './stores/localdev'
 import { useWatcherStore } from './stores/watcher'
 import { useVaultStore } from './stores/vault'
 import { ProcessesModal } from './components/ProcessesModal'
 import { ServicesModal } from './components/ServicesModal'
 import { CompareModal } from './components/CompareModal'
+import { HostMapModal } from './components/HostMapModal'
 
 /** Toast cảnh báo monitoring — chạy ngoài component (trong subscribe) nên đọc ngôn ngữ từ store. */
 function formatAlertToast(a: import('@infra/shared').MonitorAlertDto): string {
@@ -97,6 +101,7 @@ export default function App() {
   const historyHostId = useMonitorStore((s) => s.historyHostId)
   const pluginCommands = usePluginStore((s) => s.contributions)
   const watcherEnabled = useWatcherStore((s) => s.enabled)
+  const localdevEnabled = useLocaldevStore((s) => s.enabled)
   const allHosts = useDataStore((s) => s.hosts)
   const booted = useRef(false)
   const openedInitialTab = useRef(false)
@@ -144,8 +149,21 @@ export default function App() {
     )
     // F39: kết quả sweep watcher nền → chấm xanh/đỏ ở sidebar
     const offWatcher = window.infra.watcher.onStatus((list) => useWatcherStore.getState().applyStatuses(list))
+    // Local dev: trạng thái service / tiến độ tải runtime / tiến độ thao tác site (main là nguồn sự thật)
+    const offLdService = window.infra.localdev.onServiceEvent((s) =>
+      useLocaldevStore.getState().applyServiceEvent(s)
+    )
+    const offLdRuntime = window.infra.localdev.onRuntimeProgress((p) =>
+      useLocaldevStore.getState().applyRuntimeProgress(p)
+    )
+    const offLdSite = window.infra.localdev.onSiteEvent((e) => useLocaldevStore.getState().applySiteEvent(e))
+    // Đọc cờ enabled sớm: quyết định có hiện entry point local dev hay không
+    void useLocaldevStore.getState().refreshEnabled()
     return () => {
       offWatcher()
+      offLdService()
+      offLdRuntime()
+      offLdSite()
       offLocked()
       offExit()
       offStatus()
@@ -255,6 +273,16 @@ export default function App() {
     { id: 'open-services', label: t('menu.services'), run: () => setModal('services') },
     { id: 'open-compare', label: t('menu.compare'), run: () => setModal('compare') },
     { id: 'open-compare-tab', label: `🔍 ${t('compare.openInTab')}`, run: () => useTabsStore.getState().openCompareTab() },
+    { id: 'open-hostmap', label: t('menu.hostmap'), run: () => setModal('hostmap') },
+    // Local dev: chỉ hiện lệnh khi tính năng đã bật (tránh loãng palette cho user chỉ dùng SSH).
+    // "Dừng mọi service" luôn hiện khi đã bật — escape hatch cho process kẹt.
+    ...(localdevEnabled
+      ? [
+          { id: 'open-localdev', label: t('menu.localdev'), run: () => useTabsStore.getState().openLocaldevTab() },
+          { id: 'localdev-settings', label: `⚙ ${t('settings.localdev')}`, run: () => setModal('localdev-settings') },
+          { id: 'localdev-stop-all', label: t('localdev.stopAll'), run: () => void useLocaldevStore.getState().stopAll() }
+        ]
+      : []),
     { id: 'open-net', label: t('menu.net'), run: () => setModal('net') },
     { id: 'open-ai', label: t('menu.ai'), run: () => setModal('ai') },
     { id: 'open-ai-diagnose', label: `🩺 ${t('ai.diagnose.title')}`, run: () => setModal('ai-diagnose') },
@@ -317,6 +345,7 @@ export default function App() {
                 if (tab.kind === 'vnc') return <VncView key={tab.id} tab={tab} active={tab.id === activeId} />
                 if (tab.kind === 'monitor') return <MonitorTabView key={tab.id} tab={tab} active={tab.id === activeId} />
                 if (tab.kind === 'compare') return <CompareTabView key={tab.id} active={tab.id === activeId} />
+                if (tab.kind === 'localdev') return <LocaldevTabView key={tab.id} active={tab.id === activeId} />
                 return <TerminalTabView key={tab.id} tab={tab} active={tab.id === activeId} />
               })}
             </div>
@@ -345,6 +374,8 @@ export default function App() {
       {modal === 'processes' && <ProcessesModal onClose={() => setModal(null)} />}
       {modal === 'services' && <ServicesModal onClose={() => setModal(null)} />}
       {modal === 'compare' && <CompareModal onClose={() => setModal(null)} />}
+      {modal === 'hostmap' && <HostMapModal onClose={() => setModal(null)} />}
+      {modal === 'localdev-settings' && <LocaldevSettingsModal onClose={() => setModal(null)} />}
       {historyHostId && (
         <MetricsHistoryModal
           hostId={historyHostId}

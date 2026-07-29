@@ -15,14 +15,16 @@ export class LocalSession implements TerminalSession {
     cols: number,
     rows: number,
     private readonly sink: SessionSink,
-    cwd?: string
+    cwd?: string,
+    /** Biến môi trường đè lên env kế thừa (vd PATH có php cho terminal của site local dev). */
+    env?: Record<string, string>
   ) {
     this.pty = spawn(profile.shellPath, profile.args ?? [], {
       name: 'xterm-256color',
       cols: sanitizeDim(cols, 80),
       rows: sanitizeDim(rows, 24),
       cwd: cwd ?? profile.cwd ?? os.homedir(),
-      env: cleanEnv()
+      env: cleanEnv(env)
     })
     this.pty.onData((data) => this.sink.data(this.id, data))
     this.pty.onExit(({ exitCode }) => {
@@ -58,11 +60,15 @@ function sanitizeDim(value: number, fallback: number): number {
   return Number.isInteger(value) && value > 0 && value < 10_000 ? value : fallback
 }
 
-function cleanEnv(): Record<string, string> {
+/** env kế thừa từ app + override do caller cấp (override THẮNG, vd PATH có php của site). */
+function cleanEnv(extra?: Record<string, string>): Record<string, string> {
   const env: Record<string, string> = {}
   for (const [key, value] of Object.entries(process.env)) {
     if (value !== undefined) env[key] = value
   }
   env['TERM_PROGRAM'] = 'InfraCompanion'
+  if (extra) {
+    for (const [key, value] of Object.entries(extra)) env[key] = value
+  }
   return env
 }

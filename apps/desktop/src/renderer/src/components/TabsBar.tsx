@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ShellProfile, SnippetDto } from '@infra/shared'
 import { useDataStore } from '../stores/data'
+import { useLocaldevStore, stackDot, type LdStackDot } from '../stores/localdev'
 import { useTabsStore, type AppTab } from '../stores/tabs'
 import { tabColor } from '../lib/groupColor'
 import { RunSnippetModal } from './RunSnippetModal'
@@ -12,6 +13,7 @@ function tabTitle(tab: AppTab): string {
   if (tab.kind === 'vnc') return tab.vncTitle ?? 'VNC'
   if (tab.kind === 'monitor') return 'Monitoring'
   if (tab.kind === 'compare') return 'Compare'
+  if (tab.kind === 'localdev') return 'Local dev'
   const active = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
   if (tab.panes.length > 1) return `${active?.title ?? 'terminal'} +${tab.panes.length - 1}`
   return active?.title ?? 'terminal'
@@ -22,12 +24,23 @@ function tabSubtitle(tab: AppTab): string | undefined {
   if (tab.kind === 'vnc') return tab.vncTitle
   if (tab.kind === 'monitor') return 'Monitoring'
   if (tab.kind === 'compare') return 'Compare'
+  if (tab.kind === 'localdev') return 'Local dev'
   const active = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
   return active?.subtitle
 }
 
-/** Chấm trạng thái: terminal lấy theo pane active; sftp/vnc/monitor luôn xanh. */
-function statusDotClass(tab: AppTab): string {
+/**
+ * Chấm trạng thái: terminal lấy theo pane active; sftp/vnc/monitor/compare luôn xanh.
+ * `localdev` là tab ĐẦU TIÊN có chấm sống thật (phản ánh stack local đang chạy hay chết) →
+ * phải truyền `ldDot` từ store vào, không tự tính trong hàm thuần này.
+ */
+function statusDotClass(tab: AppTab, ldDot: LdStackDot): string {
+  if (tab.kind === 'localdev') {
+    if (ldDot === 'running') return 'bg-success'
+    if (ldDot === 'partial') return 'bg-warning'
+    if (ldDot === 'error') return 'bg-danger'
+    return 'bg-edge-strong'
+  }
   if (tab.kind === 'sftp' || tab.kind === 'vnc' || tab.kind === 'monitor' || tab.kind === 'compare') return 'bg-success'
   const active = tab.panes.find((p) => p.id === tab.activePaneId) ?? tab.panes[0]
   const status = active?.status ?? 'connecting'
@@ -41,6 +54,8 @@ export function TabsBar() {
   const t = useT()
   const { tabs, activeId, openLocal, showDashboard, closeTab, setActive } = useTabsStore()
   const snippets = useDataStore((s) => s.snippets)
+  // Chấm của tab localdev phản ánh stack thật (chạy/một phần/chết) — lấy từ store dùng chung
+  const ldDot = useLocaldevStore(stackDot)
   // Màu group (production đỏ…) — sọc trên đầu tab của host thuộc group có màu
   const hosts = useDataStore((s) => s.hosts)
   const groups = useDataStore((s) => s.groups)
@@ -113,11 +128,12 @@ export function TabsBar() {
             }}
             title={tabSubtitle(tab) ?? tabTitle(tab)}
           >
-            <span className={`size-1.5 shrink-0 rounded-full ${statusDotClass(tab)}`} />
+            <span className={`size-1.5 shrink-0 rounded-full ${statusDotClass(tab, ldDot)}`} />
             {tab.kind === 'sftp' && <span className="text-subtle shrink-0">📁</span>}
             {tab.kind === 'vnc' && <span className="text-subtle shrink-0">🖥️</span>}
             {tab.kind === 'monitor' && <span className="text-subtle shrink-0">📊</span>}
             {tab.kind === 'compare' && <span className="text-subtle shrink-0">🔍</span>}
+            {tab.kind === 'localdev' && <span className="text-subtle shrink-0">🧱</span>}
             {tab.broadcast && <span className="text-warning shrink-0" title="Broadcast ON">📡</span>}
             <span className="truncate">{tabTitle(tab)}</span>
             <button

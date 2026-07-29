@@ -109,7 +109,7 @@ export function registerTerminalIpc(): { dispose: () => void; bridge: TerminalBr
         const shells = await loadShells()
         const profile = shells.find((s) => s.id === req.profileId) ?? shells[0]
         if (!profile) throw new Error('Không tìm thấy shell nào trên máy')
-        const sessionId = manager.createLocal(profile, req.cols, req.rows, req.cwd)
+        const sessionId = manager.createLocal(profile, req.cols, req.rows, req.cwd, req.env)
         owners.set(sessionId, event.sender)
         watchSender(event.sender)
         return { sessionId, kind: 'local', title: profile.label }

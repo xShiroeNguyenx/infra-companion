@@ -12,6 +12,10 @@ export type PaneOrigin =
   | { kind: 'local'; profileId?: string }
   | { kind: 'host'; hostId: string }
   | { kind: 'quick'; target: string }
+  /** Shell tại thư mục 1 site local dev. CHỈ giữ siteId (không denormalize cwd/env): đường dẫn
+   *  runtime được resolve lại lúc mở, nên workspace lưu rồi mở lại vẫn đúng sau khi đổi
+   *  thư mục gốc hoặc nâng version PHP. */
+  | { kind: 'site-shell'; siteId: string }
 
 /** Một pane terminal trong tab (mỗi pane = 1 phiên local/ssh riêng). */
 export interface Pane {
@@ -28,7 +32,7 @@ export interface Pane {
   origin?: PaneOrigin
 }
 
-export type TabKind = 'terminal' | 'sftp' | 'vnc' | 'monitor' | 'compare'
+export type TabKind = 'terminal' | 'sftp' | 'vnc' | 'monitor' | 'compare' | 'localdev'
 
 export interface AppTab {
   id: string
@@ -91,6 +95,10 @@ interface TabsState {
   openMonitorTab: () => void
   /** Mở So sánh config thành 1 tab riêng (chỉ 1 tab compare duy nhất; đã có thì focus lại). */
   openCompareTab: () => void
+  /** Mở Local dev (stack + site local) thành 1 tab riêng — 1 tab duy nhất, có sub-nav bên trong. */
+  openLocaldevTab: () => void
+  /** Mở terminal tại thư mục 1 site local dev, có php/wp sẵn trong PATH. */
+  openSiteShell: (siteId: string) => Promise<void>
   /** Mở thêm pane trong tab đang active (split). opener tạo phiên. */
   splitLocal: (profileId?: string) => Promise<void>
   splitSsh: (hostId: string) => Promise<void>
@@ -124,7 +132,29 @@ function originOf(req: TerminalCreateRequest): PaneOrigin {
 function reqOf(origin: PaneOrigin): TerminalCreateRequest {
   if (origin.kind === 'local') return { kind: 'local', profileId: origin.profileId, cols: 80, rows: 24 }
   if (origin.kind === 'quick') return { kind: 'ssh', quickTarget: origin.target, cols: 80, rows: 24 }
+  // site-shell: cwd/env phải resolve lại từ main (không lưu sẵn) → xử lý ở reconnect/restore
+  if (origin.kind === 'site-shell') return { kind: 'local', cols: 80, rows: 24 }
   return { kind: 'ssh', hostId: origin.hostId, cols: 80, rows: 24 }
+}
+
+/** Request mở lại shell của site — resolve cwd/env từ main tại thời điểm mở. */
+async function siteShellRequest(siteId: string): Promise<{ req: TerminalCreateRequest; title: string }> {
+  const env = await window.infra.localdev.siteShellEnv(siteId)
+  if (!env.ok) throw new Error(env.error ?? 'Không mở được terminal cho site')
+  return {
+    req: { kind: 'local', cols: 80, rows: 24, cwd: env.cwd, env: env.env },
+    title: env.title
+  }
+}
+
+/**
+ * Như `reqOf` nhưng resolve được cả `site-shell` (cần gọi main để lấy cwd/env).
+ * Dùng ở MỌI chỗ mở lại pane (reconnect / restore workspace) — nếu dùng `reqOf` thuần thì
+ * shell của site sẽ âm thầm mở thành shell trần ở home, mất cwd và mất php trong PATH.
+ */
+async function reqOfAsync(origin: PaneOrigin): Promise<TerminalCreateRequest> {
+  if (origin.kind === 'site-shell') return (await siteShellRequest(origin.siteId)).req
+  return reqOf(origin)
 }
 
 /** Tạo 1 phiên terminal qua IPC và trả về Pane (kèm origin để lưu workspace). */
@@ -307,6 +337,40 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       return { tabs: [...state.tabs, tab], activeId: tab.id }
     }),
 
+  openSiteShell: async (siteId) => {
+    try {
+      const { req, title } = await siteShellRequest(siteId)
+      const res = await window.infra.terminal.create(req)
+      addTab(set, {
+        id: newPaneId(),
+        sessionId: res.sessionId,
+        kind: res.kind,
+        title: `⌨ ${title}`,
+        subtitle: req.cwd,
+        status: 'connected',
+        // Giữ siteId để lưu/mở lại workspace mà không denormalize đường dẫn
+        origin: { kind: 'site-shell', siteId }
+      })
+    } catch (error) {
+      toastError(error)
+    }
+  },
+
+  // Tab localdev KHÔNG giữ session nào: supervisor sống trong main process và sống LÂU HƠN tab.
+  openLocaldevTab: () =>
+    set((state) => {
+      const existing = state.tabs.find((t) => t.kind === 'localdev')
+      if (existing) return { activeId: existing.id }
+      const tab: AppTab = {
+        id: newTabId(),
+        kind: 'localdev',
+        panes: [],
+        activePaneId: null,
+        broadcast: false
+      }
+      return { tabs: [...state.tabs, tab], activeId: tab.id }
+    }),
+
   splitLocal: async (profileId) => {
     const tab = get().activeTab()
     if (!tab || tab.kind !== 'terminal') return get().openLocal(profileId)
@@ -342,7 +406,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         clearTermSession(pane.sessionId)
       }
     }
-    // kind 'monitor': không có phiên nào để dọn (đọc chung useMonitorStore) — chỉ gỡ tab
+    // kind 'monitor'/'compare'/'localdev': không có phiên nào để dọn — chỉ gỡ tab.
+    // ⚠️ 'localdev': TUYỆT ĐỐI KHÔNG stop service ở đây. Stack local sống trong main process
+    // và phải sống lâu hơn tab (đóng tab ≠ tắt web server đang chạy). Muốn dừng thì dùng
+    // nút Dừng trong tab, hoặc lệnh palette "Dừng mọi service local".
     set((state) => {
       const index = state.tabs.findIndex((t) => t.id === id)
       const tabs = state.tabs.filter((t) => t.id !== id)
@@ -387,7 +454,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       )
     }))
     try {
-      const res = await window.infra.terminal.create(reqOf(origin))
+      const res = await window.infra.terminal.create(await reqOfAsync(origin))
       // Dọn phiên cũ: main đã dọn khi exit (kill chỉ để chắc), termBus xoá hàng đợi/snapshot id cũ
       window.infra.terminal.kill(prev.sessionId)
       clearTermSession(prev.sessionId)
@@ -516,7 +583,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       let tabId: string | null = null
       for (const origin of wt.panes) {
         try {
-          const pane = await createPane(reqOf(origin))
+          const pane = await createPane(await reqOfAsync(origin))
           // 1 pane lỗi (host đã xoá…) không chặn các pane khác trong tab
           if (tabId === null) tabId = addTab(set, pane)
           else addPane(set, tabId, pane)

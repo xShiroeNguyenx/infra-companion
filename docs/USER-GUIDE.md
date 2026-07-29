@@ -558,6 +558,80 @@ New connection protocols (pluggable SessionKind) · permission enforcement + con
 
 ---
 
+## 16C. Local dev stack (replaces Laragon / XAMPP) — `Settings → Local dev`, then `⋯` → 🧱 Local dev
+
+**What it is**: run your local PHP / WordPress sites **inside this app**. It downloads and supervises its own portable PHP, Nginx and MariaDB — you don't install Laragon or XAMPP, and the app's installer doesn't get bigger.
+
+**Windows only for now.** The feature is **off by default**; nothing is written to disk until you turn it on in **Settings → Local dev**, where you also pick the **folder** everything lives in (put it on a roomy drive — moving it later is painful), the **HTTP port range**, and how many **`php-cgi` workers** to run.
+
+### A. Install what you need — the **Runtimes** tab
+
+Two groups: **Stack** (required to serve sites) and **Tools** (optional).
+
+| | What | Size |
+|---|---|---|
+| Stack | PHP 8.3 / 8.4 (NTS) · Nginx 1.30 · MariaDB 11.4 LTS | ~34 / ~3 / ~95 MB |
+| Tools | **Adminer** (light DB browser, 1 file) · **phpMyAdmin** · **Composer** · **WP-CLI** · **Node 24 LTS + npm** · **mkcert** | 0.2–37 MB |
+
+- **Install** downloads from the official site and checks the file against a **SHA-256 pinned inside the app**. Nginx publishes no checksum (only a PGP signature), so there the app computes one and writes it into a provenance file next to the runtime — the card says so explicitly.
+- **📁** next to it installs from a file **you** downloaded — the escape hatch when a corporate network or antivirus blocks the download. The checksum is still verified.
+- Every binary is **smoke-tested right after install**, so a missing *Visual C++ Redistributable* is reported there and then instead of at first start.
+- PHP needs **Visual C++ Redistributable 2015–2022 (x64)** on the machine. **phpMyAdmin 5.2 doesn't support PHP 8.4** — install PHP 8.3 as well and the app automatically serves phpMyAdmin with 8.3.
+
+### B. Start / stop — the **Services** tab
+
+**▶ Start stack** starts MariaDB → the `php-cgi` pool → Nginx (in that order; Nginx first would 502 on the first request). Each service shows state, PID, port, uptime, restart count, and — when something dies — **the last 20 lines of its stderr**, so you get the reason rather than just "stopped".
+
+- Crashes are restarted automatically with a backoff; repeated failures stop and stay visible instead of looping.
+- Stopping is always **graceful** (`nginx -s quit`, `mariadb-admin shutdown`). A hard kill of `mysqld` is the equivalent of pulling the plug mid-transaction, so the app never does it.
+- If the app itself was killed, leftover `nginx`/`mysqld` processes **holding your ports** are detected and reaped the next time you start — recognised by their executable path, never by PID (Windows reuses PIDs fast enough to kill an innocent process).
+- **Stop all local services** is in the Command Palette as an escape hatch.
+
+### C. Add a site — the **Sites** tab
+
+Point at a project folder you already have; the type (**static / PHP / WordPress**) is auto-detected. The site is served at **`http://<slug>.localhost:<port>`** — **no hosts-file edit and no admin rights**, because browsers resolve `*.localhost` to loopback themselves (RFC 6761).
+
+- Config (`nginx` vhost, `php.ini`, `my.ini`) is **regenerated from the database every time you apply**, and each reload is gated by `nginx -t` — a broken vhost shows a red message instead of taking the whole stack down with it.
+- Site logs live in the app's own area, **never scattered into your project folder** (it might be a git repo).
+- **⌨ Terminal** opens a shell at the site root with `php`, `composer`, `wp`, `node` and `npm` already on `PATH`.
+- Note for `curl` / WordPress cron: Windows' own resolver does **not** resolve `*.localhost` — only browsers do. Loopback calls from PHP need `127.0.0.1` (or a hosts entry).
+
+### D. Databases
+
+MariaDB listens on **3307 and up, never 3306**, so an existing XAMPP/Laragon/MySQL keeps working. The data directory lives **outside** the runtime folder, so upgrading or removing a runtime never touches your data.
+
+- **Provision database** creates a database + user + grant for that site. `root` gets a **generated password** (kept in `conf/mariadb/root.cnf`), not a blank one: your local sites run on loopback too, so a vulnerable site would otherwise reach every other site's data.
+- **Export / Import `.sql`** — dumps from phpMyAdmin, `mysqldump` or XAMPP all work.
+- **Write into `wp-config.php`** puts the credentials into a WordPress site (the old file is backed up first, and the action refuses if the file doesn't actually look like `wp-config.php`).
+- **Adminer** and **phpMyAdmin** buttons open the DB in your browser (`db.localhost` / `pma.localhost`); phpMyAdmin logs itself in as root.
+
+### E. Not there yet
+
+`.test` domains and local HTTPS (mkcert is installed and on `PATH`, but `mkcert -install` + issuing a certificate is still manual) · a WordPress downloader (point it at a folder you already have) · deploy between local and a server · public share links.
+
+---
+
+## 16D. Point a domain at a specific server (no hosts file) — `⋯` → 🎯
+
+**The problem**: you have a domain served by 5 load-balanced machines and you want to see what **one** of them returns. The usual answer is opening `C:\Windows\System32\drivers\etc\hosts` as administrator and editing an IP by hand — every time you switch machine, and every time you forget to undo it you spend an afternoon debugging your own hosts file.
+
+**What this does instead**: you list the domains once plus the IP of each server, then click a server and press **Open**. The app launches a Chromium browser window whose **DNS override applies to that window only**.
+
+1. Create a group (e.g. *Webike Global*) and put the domains in, one per line — a one-level wildcard works: `*.example.com` covers every subdomain.
+2. Add the servers: a label (*LB1*) and its IP. **From a saved server…** pulls the IP straight out of a host you already have in the app.
+3. Click a server chip to select it → **Open**. To switch machine, click another chip and open again.
+
+Why it beats a hosts file:
+
+- **No admin rights and nothing to clean up** — the hosts file is never touched, so a crash can't leave a stale entry behind, and no other application on the machine is affected.
+- **HTTPS still validates** — the hostname in the URL doesn't change, so SNI and the `Host` header stay real and the certificate matches (unlike browsing `https://<ip>/`).
+- **All servers at once** — *Open all N* opens one window per server, each with its **own cookie jar**, so logging into LB1 doesn't clobber your LB2 session. A hosts file can only point at one IP at a time.
+- **Copy curl command** gives you the same trick for a terminal (`curl --resolve`).
+
+Limits: needs a **Chromium** browser (Chrome / Edge / Brave / Vivaldi — Firefox has no equivalent flag), and it has **no effect behind a system proxy**, because then the proxy resolves DNS. Non-browser clients (Postman, MySQL clients) aren't covered — use a tunnel (§9) or the curl command. Each server keeps a separate browser profile, so the first visit is a fresh browser (no extensions, no existing logins); the footer shows how much disk the profiles use and lets you clear them.
+
+---
+
 ## 17. Keyboard shortcuts
 
 | Key | Action |
@@ -586,7 +660,9 @@ New connection protocols (pluggable SessionKind) · permission enforcement + con
 - **Bulk / Monitor / SFTP / Local-forward tunnels over a login script** rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` on the gate) and `su`/`sudo` steps are supported; setups that force a TTY password prompt may still fail. Login-script tunnels additionally need `nc` on the innermost hop.
 - **Sync** currently has only the **folder** backend (Google Drive/Dropbox/Syncthing/network share); WebDAV, S3, Git are planned.
 - **Secrets manager** supports 1Password, Bitwarden, HashiCorp Vault via CLI; KeePassXC is planned.
-- **Plugin system** is at **v1** (commands + observe/write output + panel + storage + Marketplace tab with ed25519-signed entries); no new protocols, permission enforcement, or output transform yet — see §16D.
+- **Plugin system** is at **v1** (commands + observe/write output + panel + storage + Marketplace tab with ed25519-signed entries); no new protocols, permission enforcement, or output transform yet — see §16B-D.
 - **Remote desktop (VNC/RDP)** tunnels through **jump-host chains** only; a target reachable solely via an interactive **login-script gate** is not yet supported. **RDP** launches the OS client through a tunnel (not embedded); embedded FreeRDP isn't planned. VNC requires a real VNC server on the target and network reachability (LAN or SSH tunnel).
 - **AI troubleshooter** runs **read-only** commands only (blocked by a main-process guard + your per-step approval); to apply a fix you run it yourself.
+- **Local dev stack** is **Windows-only** for now; `.test` domains and local HTTPS aren't wired up yet, there's no WordPress downloader, and no local↔server deploy or share link — see §16C-E. phpMyAdmin 5.2 needs PHP ≤ 8.3 (install 8.3 alongside 8.4 and the app picks it automatically).
+- **Point a domain at a server** needs a **Chromium** browser and does nothing behind a system proxy; it covers browsers only, not Postman or database clients — see §16D.
 - Not yet available: a self-hosted **team server**, **cloud import** (AWS/GCP…), a **Docker/K8s browser** — see [../ROADMAP.md](../ROADMAP.md).

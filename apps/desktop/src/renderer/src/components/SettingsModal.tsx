@@ -18,11 +18,19 @@ import { useToastsStore } from '../stores/toasts'
 import { DEFAULT_GUARD_PATTERNS } from '../lib/commandGuard'
 import { SHORTCUT_ACTIONS, eventToCombo, isValidShortcut, type ShortcutAction } from '../lib/shortcuts'
 import { CustomPaletteSection } from './CustomPaletteSection'
+import { LocaldevSettingsView } from '../features/localdev/LocaldevSettingsView'
 import { LayoutGlyph } from './LayoutGlyph'
 import { Button, Field, TextArea, TextInput } from './ui'
 
 /** Các nhóm cài đặt hiển thị ở cột điều hướng bên trái của màn hình Settings. */
-type SettingsSection = 'appearance' | 'background' | 'terminal' | 'autocomplete' | 'shortcuts' | 'guard'
+type SettingsSection =
+  | 'appearance'
+  | 'background'
+  | 'terminal'
+  | 'autocomplete'
+  | 'shortcuts'
+  | 'guard'
+  | 'localdev'
 
 /** Cạnh tối đa khi nén ảnh nền — đủ nét cho màn 4K, đủ nhỏ để vừa localStorage. */
 const MAX_DIM = 2560
@@ -263,7 +271,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     { id: 'terminal', label: t('settings.terminal'), icon: '▮' },
     { id: 'autocomplete', label: t('settings.autocomplete'), icon: '⌥' },
     { id: 'shortcuts', label: t('settings.shortcuts'), icon: '⌨' },
-    { id: 'guard', label: t('settings.cmdGuard'), icon: '🛡️' }
+    { id: 'guard', label: t('settings.cmdGuard'), icon: '🛡️' },
+    // Local dev là môi trường dev local (không phải SSH) — để cuối danh sách, mặc định TẮT
+    { id: 'localdev', label: t('settings.localdev'), icon: '🧱' }
   ]
   const activeLabel = navItems.find((n) => n.id === section)?.label ?? ''
 
@@ -713,6 +723,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 </div>
               </>
             )}
+
+            {section === 'localdev' && <LocaldevSettingsView />}
 
             {section === 'shortcuts' && (
               <>

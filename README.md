@@ -1,8 +1,8 @@
 # Infra Companion
 
-> A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, and more.
+> A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, **a self-managed local PHP/WordPress dev stack**, and more.
 
-**Current release: v0.1.34 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.2.0 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -114,6 +114,22 @@
 - Ping (latency), DNS lookup (A / AAAA / PTR), port scan (16 common ports)
 - Runs locally — no SSH needed
 
+### Local Dev Stack (Windows · opt-in) — replaces Laragon / XAMPP
+- **Off by default** — enable under **Settings → Local dev**; nothing touches disk until you do
+- **The app manages its own runtimes**: PHP 8.3 / 8.4 (NTS), Nginx 1.30, MariaDB 11.4 LTS, and optional tools (**Adminer**, **phpMyAdmin**, **Composer**, **WP-CLI**, **Node 24 LTS + npm**, **mkcert**) — downloaded at runtime, so the installer doesn't grow
+- **Every artifact is verified against a SHA-256 pinned in the app** (nginx publishes no checksum, so the app computes one, records it in a provenance file, and says so in the UI); mirrors on link rot, smoke-test after install, plus an "install from a file I downloaded" path for blocked networks
+- **Service manager**: start/stop/restart Nginx · MariaDB · a pool of `php-cgi` workers; per-service PID/port/uptime/restarts and **the last 20 stderr lines when one crashes**; graceful stop only (never a hard kill on `mysqld`); **orphan processes from an app crash are detected by exe path and reaped** on next start
+- **Sites**: point at an existing project folder (static / PHP / WordPress auto-detected), served at `http://<slug>.localhost:<port>` — **no hosts file, no admin rights** (browsers resolve `*.localhost` themselves, RFC 6761). Config is regenerated from the DB on every apply and each reload is gated by `nginx -t`, so one bad vhost can't kill the stack
+- **Databases**: MariaDB on **3307+** so an existing XAMPP/MySQL keeps working; data directory lives outside the runtime folder; per-site DB + user + grant, generated `root` password, `.sql` export/import, and a "write credentials into `wp-config.php`" action that backs up first
+- **⌨ Terminal at a site** with `php`, `composer`, `wp`, `node`, `npm` already on `PATH`
+
+### Domain → Server Mapping (no hosts file, no admin)
+- Test **one specific machine in a load-balanced cluster** without editing `C:\Windows\System32\drivers\etc\hosts`
+- List the domains once (`www.example.com` or `*.example.com`) + the IP of each server, then click a server → **Open**: a Chromium window launches with a **DNS override scoped to that window**
+- **HTTPS still validates** — the hostname is unchanged, so SNI/`Host` stay real and the certificate matches (unlike hitting `https://<ip>/`)
+- **Open all N** gives one window per server, each with its own cookie jar — impossible with a hosts file, which points at one IP at a time
+- **Copy curl command** (`curl --resolve`) for the same trick in a terminal. Needs a Chromium browser (Chrome/Edge/Brave/Vivaldi); no effect behind a system proxy
+
 ### E2EE Sync
 - Encrypts vault to a single blob (`AES-256-GCM`) — the backend **never sees plaintext**
 - Sync via **any shared folder** (Google Drive, Dropbox, OneDrive, Syncthing, network share)
@@ -185,8 +201,9 @@ pnpm test         # unit tests (crypto, sync-merge, ssh_config parser)
 
 ```bash
 pnpm test
-# 21 tests pass on Node 20; 6 sync-merge tests are skipped (require node:sqlite / Node ≥ 22.5)
-# To run all 27 tests using Electron's bundled Node 24 runtime:
+# v0.2.0: 690 tests pass; 36 are skipped on Node 20 (they need node:sqlite / Node ≥ 22.5 —
+# the vault-merge and local-dev store suites).
+# To run those too, use Electron's bundled Node 24 runtime:
 $env:ELECTRON_RUN_AS_NODE='1'
 & ".\node_modules\electron\dist\electron.exe" ".\node_modules\vitest\vitest.mjs" run
 # (PowerShell — run from repo root)
@@ -204,7 +221,8 @@ infra-companion/
 │       ├── src/preload/          # Preload bridge (contextBridge)
 │       └── src/renderer/         # React UI
 │           ├── features/         # hosts, terminal, sftp, tunnels, snippets,
-│           │                     #   monitor, runbooks, ai, sync, vault, …
+│           │                     #   monitor, runbooks, ai, sync, vault,
+│           │                     #   localdev (local PHP stack), …
 │           ├── components/       # shared UI components
 │           └── stores/           # Zustand stores
 ├── packages/
@@ -219,6 +237,10 @@ infra-companion/
 │   │   ├── ai/                   # Provider adapters (Anthropic/OpenAI/Ollama)
 │   │   ├── bulk/                 # BulkService
 │   │   ├── secrets/              # SecretsService (op/bw/vault CLI bridge)
+│   │   ├── localdev/             # Local PHP stack: runtime catalog/installer,
+│   │   │                         #   process supervisor, port allocator,
+│   │   │                         #   nginx/php.ini/my.ini templates, DB service
+│   │   ├── hostmap/              # domain → IP override (Chromium resolver rules)
 │   │   └── nettools/             # ping, DNS, port scan
 │   ├── shared/                   # TypeScript types + typed IPC contracts
 │   └── ui/                       # Design system (Radix UI + Tailwind)
@@ -266,7 +288,10 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.1.34)
+## Known Limitations (v0.2.0)
+
+- **Local dev stack is Windows-only** for now (OS-specific work is isolated behind a single adapter, so other platforms are a matter of writing one). `.test` domains and local HTTPS are **not wired up yet** — mkcert installs and lands on `PATH`, but issuing/trusting a certificate is still a manual `mkcert -install`. There is no WordPress downloader (point it at a folder you already have), and no local↔server deploy or public-share link yet. phpMyAdmin 5.2 does not support PHP 8.4, so the app serves it with PHP 8.3 when both are installed
+- **Domain → server mapping needs a Chromium browser** (Chrome/Edge/Brave/Vivaldi); Firefox has no equivalent flag, and the override has no effect when the machine routes through a system proxy (the proxy resolves DNS itself). Non-browser clients (Postman, MySQL clients) aren't covered — use a tunnel or the `curl --resolve` command instead
 
 - Bulk / Monitor / SFTP / Local-forward tunnels through login scripts rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` installed on the gate) and `su` / `sudo` steps are supported; exotic setups that force a TTY password prompt may still fail. Login-script tunnels also need `nc` on the innermost hop
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))

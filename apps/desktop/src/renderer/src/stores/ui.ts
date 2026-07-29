@@ -17,6 +17,8 @@ export type AppModal =
   | 'processes'
   | 'services'
   | 'compare'
+  | 'hostmap'
+  | 'localdev-settings'
   | null
 
 interface UiState {

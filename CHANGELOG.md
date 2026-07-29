@@ -5,6 +5,31 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.0] — 2026-07-29
+
+Two additions that take the app past "SSH client": it can now **run your PHP/WordPress sites locally** (no Laragon/XAMPP), and it can **point a domain at one specific server** so you can test a single machine in a load-balanced cluster.
+
+### Added
+
+- **Local dev stack — run local PHP / WordPress sites without Laragon or XAMPP** (Windows for now, **opt-in** under **Settings → Local dev**; nothing is written to disk until you enable it). The app downloads and supervises its own portable runtimes, so the installer stays the same size and you decide what lands on your machine:
+  - **Runtimes it installs for you** — PHP 8.3 / 8.4 (NTS), Nginx 1.30, MariaDB 11.4 LTS, plus optional tools: **Adminer**, **phpMyAdmin**, **Composer**, **WP-CLI**, **Node.js 24 LTS + npm**, **mkcert**. Every download is checked against a **SHA-256 pinned inside the app**; where upstream publishes no checksum (nginx) the app computes one and records it in a provenance file next to the runtime, and says so in the UI. Downloads stream with progress and fall back to mirrors, each binary is smoke-tested right after install (so "missing Visual C++ Redistributable" is reported *then*, not at first start), and a **📁 install-from-file** path exists for when a corporate network or antivirus blocks the download.
+  - **Service manager** — start/stop/restart Nginx, MariaDB, and a pool of `php-cgi` workers individually or all at once, with per-service state, PID, port, uptime, restart count, and the **last 20 lines of stderr when something crashes** (so you get the reason, not just "stopped"). Crashes auto-restart with backoff; shutdown is always graceful (`nginx -s quit`, `mariadb-admin shutdown` — never a hard kill on `mysqld`, which would mean InnoDB crash recovery next start). If the app itself was killed, **orphan processes left holding your ports are detected and reaped** on the next start — identified by executable path, never by PID (Windows recycles PIDs fast enough to kill an innocent process).
+  - **Sites** — point at a project folder you already have; the kind (static / PHP / WordPress) is auto-detected. Every config file (nginx vhost, `php.ini`, `my.ini`) is **regenerated from the database on each apply**, and every reload is gated by `nginx -t` so one bad vhost can't take the whole stack down. Sites are served at `http://<slug>.localhost:<port>` — **no hosts-file edit and no admin rights**, because browsers resolve `*.localhost` to loopback themselves (RFC 6761). Site logs go into the app's own area, never scattered into your project folder, and **⌨ Terminal** opens a shell at the site root with PHP, `composer`, `wp`, `node` and `npm` already on `PATH`.
+  - **Databases** — MariaDB listens on **3307+ (not 3306)** so an existing XAMPP/Laragon/MySQL install keeps working; the data directory lives **outside** the runtime folder, so upgrading or removing a runtime never touches your data. One click provisions a **database + user + grant per site**, `root` gets a generated password (not a blank one — a vulnerable local site would otherwise reach every other site's data), and you get **.sql export / import**, a **"write these credentials into `wp-config.php`"** action (backs the file up first, and refuses if the file doesn't actually look like `wp-config.php`), plus **Adminer** or **phpMyAdmin** to browse the data.
+  - **Ports** are allocated automatically inside a range you choose, remembered per purpose (so a bookmarked URL keeps working), and Windows/Hyper-V reserved ranges are skipped.
+- **Point a domain at a specific server — without touching your hosts file** (`⋯` → **🎯 Point domain at a server**, or the Command Palette). Testing one machine in a load-balanced cluster used to mean opening `C:\Windows\System32\drivers\etc\hosts` as admin and editing an IP by hand, every single time. Instead, list the domains once (`www.example.com`, or `*.example.com`) plus the IP of each server, then click a server and hit **Open**: the app launches a Chromium browser window whose **DNS override is scoped to that window only**. Three consequences worth the change:
+  - **No hosts file, no admin rights** — nothing to clean up if the app dies, and no other application on the machine is affected.
+  - **HTTPS still validates** — the hostname in the URL is unchanged, so SNI and the `Host` header stay real and the certificate matches (unlike browsing `https://<ip>/`).
+  - **All servers at once** — *Open all N* gives you one window per server, each with its own cookie jar, so logging into LB1 doesn't clobber your session on LB2. A hosts file can only ever point at one of them.
+
+  There's also a **Copy curl command** button (`curl --resolve`, the same trick from a terminal). Requires a Chromium browser (Chrome / Edge / Brave / Vivaldi — Firefox has no equivalent flag), and it has no effect if the machine routes through a system proxy, since the proxy resolves DNS itself.
+
+### Known limits of the new local dev stack
+
+Windows only for the moment (the OS-specific work is isolated behind one adapter). `.test` domains and local HTTPS are not wired up yet — mkcert installs and is on `PATH`, but issuing and trusting a certificate is still a manual `mkcert -install`. There is no WordPress downloader (point the app at a folder you already have) and no local↔server deploy or public-share link yet.
+
+---
+
 ## [0.1.34] — 2026-07-28
 
 ### Fixed
