@@ -1,7 +1,44 @@
 # ROADMAP — Infra Companion
 
-> Phiên bản hiện tại: **Phase 0–6** — tính năng đã có xem [docs/USER-GUIDE.md](docs/USER-GUIDE.md).  
+> Phiên bản hiện tại: **Phase 0–6 + Local dev stack (v0.2.x)** — tính năng đã có xem [docs/USER-GUIDE.md](docs/USER-GUIDE.md).  
 > File này liệt kê những gì **chưa làm** hoặc **chỉ làm một phần** trong các phase trước, sắp xếp theo thứ tự ưu tiên.
+
+---
+
+## Local dev stack (v0.2.0) — phần CÒN LẠI
+
+> Vùng tính năng mới, thay Laragon/XAMPP: app tự tải + tự quản PHP/Nginx/MariaDB portable, site trỏ
+> vào folder có sẵn chạy ở `*.localhost` (0 hosts file, 0 UAC), cấp DB + user cho từng site,
+> Adminer/phpMyAdmin/Composer/WP-CLI/Node/mkcert. Kế hoạch đầy đủ ở
+> `C:\Users\DELL\.claude\plans\wplocal-laragon-*.md` (M0–M5); dưới đây là các mốc CHƯA làm.
+>
+> ~~M1 nền tảng + service manager + site PHP~~ ✅ v0.2.0 · ~~M2 phần DB (cấp DB/user, dump/import,
+> ghi `wp-config.php`)~~ ✅ v0.2.0 · ~~sửa site: domain custom / loại site / docroot / cổng 80~~ ✅ v0.2.1
+
+- **M1.5 — `.test` + HTTPS local** — mkcert đã cài sẵn và nằm trong PATH của terminal site, nhưng
+  app CHƯA tự `mkcert -install` + cấp cert per-site + sinh vhost 443. Đây là hạng mục duy nhất còn
+  lại cần thao tác quyền cao (cert store), nên làm opt-in và gom 1 lần xin quyền cho cả lô.
+  *(Domain `.test` hiện đã đặt được ở form sửa site — chỉ thiếu phần phân giải: dùng nút 🎯 hoặc
+  hosts entry tay.)*
+- **M2 phần còn lại — tạo site WordPress mới** — hiện chỉ trỏ vào folder CÓ SẴN; chưa có bước tải
+  WordPress + scaffold `wp-config.php` + chạy `wp core install` (WP-CLI đã cài sẵn).
+- **M3 — Deploy local ↔ server SSH** ⭐ — đây là phần *cầu nối* mà Laragon/LocalWP không có: pull/push
+  file + DB với chính VPS đã cấu hình trong app (SFTP + exec sẵn có), `wp search-replace` domain, và
+  so config local vs prod bằng CompareView. Làm `pull` trước.
+- **M4 — Share public link** — cho người khác xem site local (provider `ssh` reverse forward, hoặc
+  `cloudflared`).
+- **macOS/Linux** — toàn bộ chỗ OS-specific đã nhốt trong `PlatformAdapter` (`WindowsAdapter` là impl
+  duy nhất, `PosixAdapter` là stub throw), nên đây là viết 1 adapter chứ không phải sửa rải rác.
+
+## HostMap — trỏ domain sang IP không sửa hosts (v0.2.0) — phần CÒN LẠI
+
+> Mở browser Chromium với `--host-resolver-rules` → DNS ghi đè trong đúng cửa sổ đó, cert HTTPS vẫn
+> khớp, mở song song nhiều server. ~~Nhóm domain + nhiều server đích + mở tất cả + copy `curl --resolve`~~ ✅ v0.2.0
+
+- **Proxy loopback trong app** — để phủ những client KHÔNG hiểu cờ Chromium: Firefox, Postman, client
+  DB. Hướng: proxy HTTP/CONNECT trên 127.0.0.1 (HTTPS đi CONNECT nên không đụng cert), tuỳ chọn bật
+  proxy cho user hiện tại qua HKCU (không cần admin) + tự khôi phục khi thoát app.
+- **Nhớ vị trí/cỡ cửa sổ browser** và tuỳ chọn xoá profile theo từng target (hiện chỉ xoá cả nhóm).
 
 ---
 
@@ -33,8 +70,13 @@
 - **SFTP remote ↔ remote** (P45 phần còn lại) — chuyển file giữa 2 host, app làm trung gian stream.
 - **Log bookmarks** (P51) — đánh dấu vị trí quan trọng trong session log, nhảy nhanh khi xem lại.
 - **Windows Hello / Touch ID** (P17 phần còn lại) — xác thực sinh trắc khi mở nhanh vault (phần "remember DEK qua DPAPI/safeStorage" ĐÃ có).
-- **Autocomplete từ history** (P36)†, **shortcut tuỳ biến** (P39)†, **latency + status bar chi tiết** (P40)†, **nhiều cửa sổ / kéo tab ra ngoài** (P31 phần còn lại)†.
-- **Tunnel auto-start + health monitor** (F15 phần còn lại)† — tunnel tự mở khi khởi động app, tự reconnect, hiện traffic.
+- **Autocomplete từ history** (P36)†, **shortcut tuỳ biến** (P39)†, **latency + status bar chi tiết** (P40)†.
+- **Kéo tab ra thành cửa sổ riêng** (P31 phần còn lại)† — *đã có một phần*: Monitoring (v0.1.24) và
+  Tunnels (v0.2.1) tách được ra cửa sổ always-on-top; còn lại là kéo BẤT KỲ tab (nhất là terminal) ra
+  ngoài — cái này khó hơn nhiều vì phải di chuyển cả phiên PTY/SSH sang cửa sổ mới.
+- **Tunnel auto-start + health monitor** (F15 phần còn lại)† — tunnel tự mở khi khởi động app, tự
+  reconnect, hiện traffic. *(v0.2.1 đã làm phần theo dõi thủ công: mở ở tab, tách cửa sổ riêng, sắp
+  xếp theo tên — nhưng auto-start/auto-reconnect thì chưa.)*
 - **Runbook đa bước + diff output giữa các host + dry-run** (F03 phần còn lại)† — Bulk exec đã có, phần orchestration chưa.
 - **Alert ngưỡng monitoring** (F04 phần còn lại) — bảng `monitor_rules` chưa có trong schema (v9); xem thêm mở rộng ở Wave 3.
 - **Wake-on-LAN + mDNS/LAN discovery** (F07 phần còn lại) — toolbox đã có ping/DNS/port, chưa có WoL/discovery.
@@ -62,7 +104,7 @@
 - *(Mở rộng P47 — sau)*: editor tích hợp trong app (CodeMirror) bên cạnh "mở bằng editor local" đã có.
 
 ### 3C. Ops & Monitoring (bồi lên Monitoring dock v0.1.9)
-- ~~**Monitor tách cửa sổ riêng + chọn host theo workspace/nhóm**~~ — ✅ Đã làm (v0.1.24): nút ⧉ tách dock monitor ra **cửa sổ riêng always-on-top** (vẫn cập nhật khi thu nhỏ app chính, dùng chung luồng sample — không mở SSH thêm; Gộp lại/Dừng từ cả 2 phía); chip **Chọn nhanh** trong modal Monitoring tick cả nhóm/workspace 1 click; grip ◢ resize dock; icon app crop lại lấp đầy khung. *Còn lại (sau): nhớ vị trí/cỡ cửa sổ tách rời qua phiên; mini-mode chỉ hiện bar.*
+- ~~**Monitor tách cửa sổ riêng + chọn host theo workspace/nhóm**~~ — ✅ Đã làm (v0.1.24): nút ⧉ tách dock monitor ra **cửa sổ riêng always-on-top** (vẫn cập nhật khi thu nhỏ app chính, dùng chung luồng sample — không mở SSH thêm; Gộp lại/Dừng từ cả 2 phía); chip **Chọn nhanh** trong modal Monitoring tick cả nhóm/workspace 1 click; grip ◢ resize dock; icon app crop lại lấp đầy khung. **v0.2.1**: hạ tầng cửa sổ tách rời đã tách thành `createDetachedWindow()` và **Tunnels dùng lại được ngay** (⧉ trong header Tunnels); 4 công cụ dài (AI chẩn đoán, Tunnels, Tiến trình, Services) mở được ở TAB thay popup. *Còn lại (sau): nhớ vị trí/cỡ cửa sổ tách rời qua phiên; mini-mode chỉ hiện bar; lưu tab công cụ vào workspace.*
 - **F32 — Lịch sử metrics + đồ thị** ⭐ — lưu sample vào SQLite, xem đồ thị 1h/24h thay vì chỉ realtime; đi cặp với alert ngưỡng (F04) + kênh báo webhook Slack/Telegram/Discord.
 - ~~**F33 — Process viewer**~~ — ✅ Đã làm (v0.1.25): modal ⚙ Tiến trình (menu ⋯ / palette) — bảng top-like qua kênh exec riêng (xuyên login-script), sort CPU/RAM, filter, tự làm mới 5s, kill TERM/-9 có confirm.
 - ~~**F34 — Systemd manager**~~ — ✅ Đã làm (v0.1.25): modal 🧰 Services — list toàn bộ service + trạng thái, start/stop/restart có confirm (cần root thì hiện lỗi systemctl nguyên văn), xem journalctl 120 dòng ngay trong modal.
@@ -105,8 +147,8 @@
 - **Dọn schema** ⚡ — migration MỚI xoá bảng chết `vpn_profiles` + cột `hosts.vpn_profile_id` (giữ đúng thứ tự migration — v10 đã dùng cho `diagnoses`, v11 cho totp/color; xem ghi chú VPN trong handoff).
 
 ### 🎯 Gợi ý 5 mục làm trước
-*(F41/F04/F32/F46 trong danh sách cũ đã xong — cập nhật 2026-07-19)*
-1. **F53 Tray + chạy nền** (+F15 tunnel auto-start) — nối tiếp monitor pop-out v0.1.24: đóng cửa sổ mà monitoring/watcher/tunnel vẫn sống trong tray.
+*(F41/F04/F32/F46 trong danh sách cũ đã xong — cập nhật 2026-08-01; xem thêm mục **Local dev stack — phần CÒN LẠI** ở đầu file, trong đó **M3 deploy local↔server** là hạng mục có giá trị khác biệt nhất)*
+1. **F53 Tray + chạy nền** (+F15 tunnel auto-start) — nối tiếp pop-out của monitor (v0.1.24) và tunnel (v0.2.1): đóng cửa sổ mà monitoring/watcher/tunnel vẫn sống trong tray.
 2. **P46 SFTP transfer queue** (+ P45 remote↔remote) — parity còn thiếu rõ nhất.
 3. **F23 Shell integration OSC 133** — tính năng "vượt Termius" thật sự, nền cho nhiều thứ sau.
 4. **Mobile connect (hướng web-gateway)** — desktop làm relay, mobile mở PWA xterm.js qua LAN/tailnet; làm SAU tray (desktop chạy nền 24/7 là tiền đề).

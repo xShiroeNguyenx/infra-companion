@@ -8,7 +8,8 @@ import type {
   LdServiceDto,
   LdSettingsDto,
   LdSiteDto,
-  LdSiteEventDto
+  LdSiteEventDto,
+  LdSiteInputDto
 } from '@infra/shared'
 import { errorMessage, useToastsStore } from './toasts'
 
@@ -54,6 +55,10 @@ interface LocaldevState {
   removeRuntime: (id: string) => Promise<void>
   /** Thêm site trỏ vào folder có sẵn; trả về site đã tạo (null nếu lỗi/huỷ). */
   addSite: (name: string, rootPath: string) => Promise<LdSiteDto | null>
+  /** Sửa site: tên / domain / loại / docroot / bản PHP. Trả null nếu lỗi (toast đã hiện). */
+  editSite: (input: LdSiteInputDto) => Promise<LdSiteDto | null>
+  /** Mở site bằng browser có DNS override → URL không có :port, không cần hosts entry. */
+  openSiteNoPort: (id: string) => Promise<void>
   /** removeFiles=false: chỉ bỏ khỏi danh sách, KHÔNG xoá file của user. */
   deleteSite: (id: string, removeFiles: boolean) => Promise<void>
   /** Cấp (hoặc lấy lại) database cho site. Idempotent — site đã có DB thì trả credential cũ. */
@@ -216,6 +221,26 @@ export const useLocaldevStore = create<LocaldevState>((set, get) => ({
     } catch (error) {
       toastError(error)
       return null
+    }
+  },
+
+  editSite: async (input) => {
+    try {
+      const site = await window.infra.localdev.siteSave(input)
+      await get().refreshAll()
+      return site
+    } catch (error) {
+      toastError(error)
+      return null
+    }
+  },
+
+  openSiteNoPort: async (id) => {
+    try {
+      const res = await window.infra.localdev.siteOpenNoPort(id)
+      if (!res.ok) useToastsStore.getState().push(res.error ?? 'Không mở được browser', 'error')
+    } catch (error) {
+      toastError(error)
     }
   },
 

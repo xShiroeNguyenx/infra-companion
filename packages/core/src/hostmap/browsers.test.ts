@@ -66,6 +66,19 @@ describe('detectChromiumBrowsers', () => {
     expect(found.map((b) => b.id)).toEqual(['edge'])
   })
 
+  test('dựng path kiểu WINDOWS kể cả khi chạy trên Linux/macOS (CI build 3 OS)', async () => {
+    // Regression: bản đầu dùng `join` của nền tảng đang chạy → trên Linux ra
+    // 'C:\Program Files/Google\Chrome\Application\chrome.exe' (dấu / lai vào giữa) nên
+    // `exists` không khớp và toàn bộ test dò browser đỏ ở job ubuntu/macos.
+    const seen: string[] = []
+    await detectChromiumBrowsers(ENV, (p) => {
+      seen.push(p)
+      return Promise.resolve(false)
+    })
+    expect(seen.length).toBeGreaterThan(0)
+    for (const p of seen) expect(p, p).not.toContain('/')
+  })
+
   test('id browser không trùng nhau (id là khoá user chọn, lưu vào cấu hình)', () => {
     const ids = CHROMIUM_BROWSERS.map((b) => b.id)
     expect(new Set(ids).size).toBe(ids.length)

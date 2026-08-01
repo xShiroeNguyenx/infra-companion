@@ -1,7 +1,6 @@
 import { app, ipcMain } from 'electron'
-import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { access, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
   IPC,
@@ -14,15 +13,19 @@ import {
   type HostMapTargetDto
 } from '@infra/shared'
 import {
-  buildChromiumArgs,
   buildCurlResolveCommand,
   buildHostResolverRules,
   defaultUrlFor,
-  detectChromiumBrowsers,
   isSafeHostPattern,
   isSafeHttpUrl,
   isSafeIpLiteral
 } from '@infra/core'
+import {
+  browserProfileDir,
+  browserProfilesRoot,
+  detectBrowsers,
+  openMappedBrowser
+} from '../lib/chromiumLaunch'
 
 /**
  * HostMap — "đổi IP của domain" để test 1 server trong cụm load balance, KHÔNG sửa file hosts
@@ -48,16 +51,7 @@ function statePath(): string {
 }
 
 /** Thư mục chứa profile browser app sinh ra (1 profile/target — xem buildChromiumArgs). */
-function profilesRoot(): string {
-  return join(app.getPath('userData'), 'hostmap-profiles')
-}
-
-async function exists(p: string): Promise<boolean> {
-  return access(p).then(
-    () => true,
-    () => false
-  )
-}
+const profilesRoot = browserProfilesRoot
 
 function str(v: unknown, max: number): string | null {
   if (typeof v !== 'string') return null
@@ -131,14 +125,7 @@ async function writeState(state: HostMapFile): Promise<void> {
 }
 
 async function browsers(): Promise<HostMapBrowserDto[]> {
-  return detectChromiumBrowsers(
-    {
-      programFiles: process.env['ProgramFiles'],
-      programFilesX86: process.env['ProgramFiles(x86)'],
-      localAppData: process.env['LOCALAPPDATA']
-    },
-    exists
-  )
+  return detectBrowsers()
 }
 
 /** Tổng dung lượng profile đã sinh — mỗi profile Chromium ~100-300MB nên phải cho user thấy. */
@@ -161,45 +148,21 @@ async function stateDto(): Promise<HostMapStateDto> {
   return { groups, browsers: list, profilesBytes: bytes }
 }
 
-/**
- * Thư mục profile cho 1 (group, target). Id do app sinh (uuid) nhưng vẫn lọc ký tự: id đi qua
- * IPC nên về nguyên tắc renderer gửi được chuỗi bất kỳ, và chuỗi đó thành ĐƯỜNG DẪN.
- */
-function profileDirFor(groupId: string, targetId: string): string {
-  const safe = (s: string): string => s.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 60) || 'x'
-  return join(profilesRoot(), `${safe(groupId)}-${safe(targetId)}`)
-}
-
-interface LaunchPlan {
-  exe: string
-  args: string[]
-}
-
-/** Dựng lệnh mở 1 cửa sổ cho 1 target. Throw kèm lý do người đọc hiểu được. */
-function planLaunch(
+/** Mở 1 cửa sổ cho 1 target. Throw nếu group thiếu domain/URL (lý do người đọc hiểu được). */
+async function launchTarget(
   group: HostMapGroupDto,
   target: HostMapTargetDto,
   browser: HostMapBrowserDto
-): LaunchPlan {
+): Promise<{ ok: boolean; error?: string }> {
   const rules = buildHostResolverRules(group.patterns, target.ip)
   const url = group.url ?? defaultUrlFor(group.patterns)
   if (url === null) throw new Error('Chưa có domain nào trong nhóm này')
-  return {
-    exe: browser.exe,
-    args: buildChromiumArgs({ rules, profileDir: profileDirFor(group.id, target.id), url })
-  }
-}
-
-/**
- * Spawn browser tách hẳn khỏi app: `detached` + `unref` để đóng app không giết cửa sổ browser,
- * và stdio 'ignore' để pipe của browser không giữ tiến trình app sống.
- */
-function launch(plan: LaunchPlan): void {
-  const child = spawn(plan.exe, plan.args, { detached: true, stdio: 'ignore', windowsHide: false })
-  child.on('error', (e) => {
-    console.error('[hostmap] cannot launch browser:', e.message)
+  return openMappedBrowser({
+    rules,
+    url,
+    profileDir: browserProfileDir(group.id, target.id),
+    browser
   })
-  child.unref()
 }
 
 export function registerHostMapIpc(): void {
@@ -274,9 +237,8 @@ export function registerHostMapIpc(): void {
             error: 'Không tìm thấy Chrome/Edge/Brave/Vivaldi trên máy — tính năng này cần browser Chromium.'
           }
         }
-        await mkdir(profilesRoot(), { recursive: true })
-        launch(planLaunch(group, target, browser))
-        return { ok: true, opened: 1 }
+        const res = await launchTarget(group, target, browser)
+        return res.ok ? { ok: true, opened: 1 } : { ok: false, error: res.error }
       } catch (e) {
         return { ok: false, error: (e as Error).message }
       }
@@ -290,14 +252,14 @@ export function registerHostMapIpc(): void {
       const list = await browsers()
       const browser = pickBrowser(list, group, browserId)
       if (!browser) return { ok: false, error: 'Không tìm thấy browser Chromium trên máy' }
-      await mkdir(profilesRoot(), { recursive: true })
       // Mỗi target 1 profile riêng ⇒ mở song song được; sai 1 target không chặn các target khác
       let opened = 0
       const errors: string[] = []
       for (const target of group.targets) {
         try {
-          launch(planLaunch(group, target, browser))
-          opened += 1
+          const res = await launchTarget(group, target, browser)
+          if (res.ok) opened += 1
+          else errors.push(`${target.label}: ${res.error ?? 'không mở được'}`)
         } catch (e) {
           errors.push(`${target.label}: ${(e as Error).message}`)
         }

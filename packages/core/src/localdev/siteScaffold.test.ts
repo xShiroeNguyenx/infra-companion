@@ -1,5 +1,15 @@
 import { describe, expect, test } from 'vitest'
-import { deriveDomain, detectSiteKind, slugify, uniqueDomain, uniqueSlug } from './siteScaffold'
+import {
+  deriveDomain,
+  detectSiteKind,
+  detectSiteKindDetailed,
+  isSafeSiteDomain,
+  resolvesWithoutHostsFile,
+  siteUrl,
+  slugify,
+  uniqueDomain,
+  uniqueSlug
+} from './siteScaffold'
 
 describe('slugify', () => {
   test('tên thường', () => {
@@ -115,5 +125,89 @@ describe('detectSiteKind', () => {
 
   test('không phân biệt hoa thường (WP-CONFIG.PHP)', () => {
     expect(detectSiteKind(['WP-CONFIG.PHP']).kind).toBe('wordpress')
+  })
+})
+
+describe('detectSiteKindDetailed', () => {
+  test('Laravel THẮNG WordPress khi thư mục có cả hai dấu hiệu', () => {
+    // Ca đã gặp thật: project Laravel bị dán nhãn WORDPRESS. Nguyên nhân có thể là trong repo
+    // lẫn 1 bản WP cũ (hoặc user trỏ vào thư mục cha) — `artisan` phải thắng vì nó chắc chắn hơn.
+    const guess = detectSiteKindDetailed(['artisan', 'composer.json', 'public', 'wp-config.php'])
+    expect(guess.kind).toBe('php')
+    expect(guess.docRootSub).toBe('public')
+    expect(guess.reason).toContain('artisan')
+  })
+
+  test('Laravel chưa có public/ (mới clone, chưa build) vẫn là php, docroot gốc', () => {
+    expect(detectSiteKindDetailed(['artisan', 'composer.json', 'app'])).toEqual({
+      kind: 'php',
+      docRootSub: '',
+      reason: 'artisan (Laravel)'
+    })
+  })
+
+  test('lý do nêu ĐÚNG file đã khiến đoán WordPress (để user đối chiếu được)', () => {
+    expect(detectSiteKindDetailed(['wp-load.php', 'index.php']).reason).toBe('wp-load.php')
+    expect(detectSiteKindDetailed(['wp-config-sample.php']).reason).toBe('wp-config-sample.php')
+  })
+
+  test('Symfony (bin/config/public/src) → php + public/', () => {
+    const guess = detectSiteKindDetailed(['bin', 'config', 'public', 'src', 'var'])
+    expect(guess.kind).toBe('php')
+    expect(guess.docRootSub).toBe('public')
+  })
+
+  test('tĩnh: lý do nói rõ là "không thấy file .php"', () => {
+    expect(detectSiteKindDetailed(['index.html']).reason).toContain('không thấy file .php')
+  })
+
+  test('detectSiteKind (bản gọn) vẫn khớp bản chi tiết', () => {
+    for (const entries of [['artisan'], ['wp-config.php'], ['index.php'], ['index.html'], []]) {
+      const d = detectSiteKindDetailed(entries)
+      expect(detectSiteKind(entries)).toEqual({ kind: d.kind, docRootSub: d.docRootSub })
+    }
+  })
+})
+
+describe('isSafeSiteDomain', () => {
+  test('nhận domain thường + custom TLD', () => {
+    expect(isSafeSiteDomain('theblogsnew.localhost')).toBe(true)
+    expect(isSafeSiteDomain('blog.dev.test')).toBe(true)
+    expect(isSafeSiteDomain('my-site.local')).toBe(true)
+  })
+
+  test('BẮT BUỘC có dấu chấm — "mysite" browser coi là từ khoá tìm kiếm, không phải host', () => {
+    expect(isSafeSiteDomain('mysite')).toBe(false)
+    expect(isSafeSiteDomain('localhost')).toBe(false)
+  })
+
+  test('chặn IP, khoảng trắng, newline (đường vào config nginx / hosts)', () => {
+    expect(isSafeSiteDomain('127.0.0.1')).toBe(false)
+    expect(isSafeSiteDomain('a b.test')).toBe(false)
+    expect(isSafeSiteDomain('a.test\nevil.test')).toBe(false)
+    expect(isSafeSiteDomain('a.test:8080')).toBe(false)
+  })
+})
+
+describe('resolvesWithoutHostsFile', () => {
+  test('chỉ *.localhost là tự phân giải (RFC 6761)', () => {
+    expect(resolvesWithoutHostsFile('site.localhost')).toBe(true)
+    expect(resolvesWithoutHostsFile('a.b.localhost')).toBe(true)
+    expect(resolvesWithoutHostsFile('site.test')).toBe(false)
+    expect(resolvesWithoutHostsFile('site.local')).toBe(false)
+    // Không nhận nhầm domain chỉ CHỨA chữ localhost
+    expect(resolvesWithoutHostsFile('localhost.evil.com')).toBe(false)
+  })
+})
+
+describe('siteUrl', () => {
+  test('bỏ :80 với http và :443 với https (URL sạch)', () => {
+    expect(siteUrl('site.localhost', 80)).toBe('http://site.localhost/')
+    expect(siteUrl('site.localhost', 443, true)).toBe('https://site.localhost/')
+  })
+
+  test('giữ cổng khi không phải cổng mặc định', () => {
+    expect(siteUrl('site.localhost', 8080)).toBe('http://site.localhost:8080/')
+    expect(siteUrl('site.localhost', 80, true)).toBe('https://site.localhost:80/')
   })
 })

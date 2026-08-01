@@ -5,6 +5,32 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.1] — 2026-08-01
+
+> **If you are on macOS or Linux, take this release instead of 0.2.0.** The 0.2.0 tag only produced a Windows installer: the macOS and Linux build jobs stopped at the test step because of the first item under *Fixed*, so no `.dmg` / `.AppImage` was published for it. Nothing about the Windows 0.2.0 build was affected.
+
+### Added
+
+- **Open the long-running tools in a tab instead of a popup** — **AI troubleshooter**, **Tunnels**, **Processes** and **Services** each have an **⊞ Open in tab** button in their popup header (and a Command Palette entry). A popup is modal: while the AI works through a diagnosis step by step, or you watch a tunnel come up, the rest of the app is blocked. In a tab you can keep working, switch away and come back — the session keeps running, because the tab and the popup are the *same* component reading the same state.
+- **Tunnels in their own always-on-top window** (⧉ **Detach** in the Tunnels header, or the Command Palette) — the same idea as the detached monitoring window: a small window that stays on top and lets you see and start/stop tunnels while your DB client or browser covers the app. It shares the app's live tunnel events, so it needs no second connection of its own.
+- **Tunnels are sorted by name (A→Z)** everywhere they appear — the list, the tab, the detached window and the Dashboard. Sorting is natural and case-insensitive, so `db2` comes before `db10` and `JPDB2` before `jpdb11`. Previously they came back in creation order, which tells you nothing once you have a dozen of them.
+- **Edit a local site — custom domain, site kind, docroot, PHP version** (✎ on any site row). Until now everything about a site was decided once, when you added it, and nothing could be corrected afterwards:
+  - **Any domain you want**, not just the generated `<slug>.localhost` — `myshop.test`, `blog.local`, or a real domain. The app validates it (no spaces/newlines — those would break the nginx config), refuses a domain already used by another site or by its own database tools, and regenerates the vhost immediately. If the domain doesn't end in `.localhost` it also tells you right there that your machine won't resolve it on its own, and points at the two ways to fix that.
+  - **Override the detected kind** (WordPress / PHP / static) or press **Re-detect**, which now also tells you *why* it guessed — e.g. *"Guessed WORDPRESS because of: wp-config.php"*. Detection runs on the folder contents and can legitimately be wrong (you pointed at a parent folder, or a stray `wp-*.php` sits in the repo), and a wrong guess used to be permanent.
+  - `artisan` now wins over WordPress markers, so a **Laravel project that happens to contain a `wp-*.php` file is no longer labelled WordPress**, and its docroot is `public/`.
+- **Serve sites without a port in the URL** — two independent ways, because port 80 isn't always available:
+  - **Settings → Local dev → Use port 80** — sites become `http://my-site.localhost/`. Windows doesn't require admin rights for port 80, but it's often already held by IIS / *World Wide Web Publishing Service* / http.sys; when that happens the app **falls back to your port range and says so** in the warnings instead of failing to start.
+  - **🎯 Open without a port** on any site row — opens a Chromium window whose DNS override maps the site's domain straight to `127.0.0.1:<real port>`. The URL has no port, **no hosts file entry is needed**, and it works with any custom domain even while something else owns port 80. (Same mechanism as *point a domain at a server*; it only applies to that browser window.)
+
+### Fixed
+
+- **The URL on a site row could point at a dead port** — it was stored when the site was added, so after changing the port range (or switching port 80 on) the link opened a port nothing was listening on. It now always reflects the port nginx is actually using.
+
+- **Browser detection built Windows paths with the host platform's separator** — the *point a domain at a server* feature looks for Chrome/Edge/Brave/Vivaldi at their standard install paths, and joined those paths with the separator of whatever OS was running. On Windows that's correct; on macOS/Linux the same input produced `C:\Program Files/Google\Chrome\…` (a `/` spliced into the middle), so the detection unit tests failed there and took the release build with them. Those paths are Windows paths by definition, so they're now always joined the Windows way — identical output on every platform. No behaviour change for users, who run this on Windows.
+- **Secret scanning no longer trips over a test fixture** — the WordPress `wp-config.php` rewrite test contains two invented database passwords so it can assert the generated file byte for byte. The generic-API-key rule flagged one of them as a leak and failed the scan; the file is now allowlisted by path in `.gitleaks.toml` (with the reasoning written next to it), the same way three PEM-header false positives already were.
+
+---
+
 ## [0.2.0] — 2026-07-29
 
 Two additions that take the app past "SSH client": it can now **run your PHP/WordPress sites locally** (no Laragon/XAMPP), and it can **point a domain at one specific server** so you can test a single machine in a load-balanced cluster.

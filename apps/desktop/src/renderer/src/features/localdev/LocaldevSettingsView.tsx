@@ -100,6 +100,25 @@ export function LocaldevSettingsView() {
             <p className="text-subtle mt-1 text-[11px] leading-relaxed">{t('settings.localdevPortsHint')}</p>
           </Field>
 
+          <Field label={t('settings.localdevPort80')}>
+            <div className="grid grid-cols-2 gap-2">
+              {([false, true] as const).map((on) => (
+                <button
+                  key={String(on)}
+                  onClick={() => void saveSettings({ usePort80: on })}
+                  className={`rounded border px-2 py-2 text-sm ${
+                    settings.usePort80 === on
+                      ? 'border-accent text-content bg-accent-soft/40'
+                      : 'border-edge text-muted hover:bg-hover'
+                  }`}
+                >
+                  {on ? t('plugins.enable') : t('plugins.disable')}
+                </button>
+              ))}
+            </div>
+            <p className="text-subtle mt-1 text-[11px] leading-relaxed">{t('settings.localdevPort80Hint')}</p>
+          </Field>
+
           <Field label={`${t('settings.localdevPhpPool')} — ${settings.phpPoolSize}`}>
             <input
               type="range"

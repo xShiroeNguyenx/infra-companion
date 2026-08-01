@@ -48,6 +48,7 @@ import { ProcessesModal } from './components/ProcessesModal'
 import { ServicesModal } from './components/ServicesModal'
 import { CompareModal } from './components/CompareModal'
 import { HostMapModal } from './components/HostMapModal'
+import { ToolTabView } from './components/ToolTabView'
 
 /** Toast cảnh báo monitoring — chạy ngoài component (trong subscribe) nên đọc ngôn ngữ từ store. */
 function formatAlertToast(a: import('@infra/shared').MonitorAlertDto): string {
@@ -270,7 +271,17 @@ export default function App() {
     { id: 'open-monitor', label: t('menu.monitor'), run: () => setModal('monitor') },
     { id: 'open-monitor-tab', label: `📊 ${t('monitor.openInTab')}`, run: () => useTabsStore.getState().openMonitorTab() },
     { id: 'open-processes', label: t('menu.processes'), run: () => setModal('processes') },
+    {
+      id: 'open-processes-tab',
+      label: `📋 ${t('procs.title')} — ${t('tabs.openInTab')}`,
+      run: () => useTabsStore.getState().openToolTab('processes')
+    },
     { id: 'open-services', label: t('menu.services'), run: () => setModal('services') },
+    {
+      id: 'open-services-tab',
+      label: `⚙ ${t('svc.title')} — ${t('tabs.openInTab')}`,
+      run: () => useTabsStore.getState().openToolTab('services')
+    },
     { id: 'open-compare', label: t('menu.compare'), run: () => setModal('compare') },
     { id: 'open-compare-tab', label: `🔍 ${t('compare.openInTab')}`, run: () => useTabsStore.getState().openCompareTab() },
     { id: 'open-hostmap', label: t('menu.hostmap'), run: () => setModal('hostmap') },
@@ -286,10 +297,25 @@ export default function App() {
     { id: 'open-net', label: t('menu.net'), run: () => setModal('net') },
     { id: 'open-ai', label: t('menu.ai'), run: () => setModal('ai') },
     { id: 'open-ai-diagnose', label: `🩺 ${t('ai.diagnose.title')}`, run: () => setModal('ai-diagnose') },
+    {
+      id: 'open-ai-diagnose-tab',
+      label: `🩺 ${t('ai.diagnose.title')} — ${t('tabs.openInTab')}`,
+      run: () => useTabsStore.getState().openToolTab('ai-diagnose')
+    },
     { id: 'open-recordings', label: t('menu.recordings'), run: () => setModal('recordings') },
     { id: 'open-sync', label: t('menu.sync'), run: () => setModal('sync') },
     { id: 'open-snippets', label: t('menu.snippets'), run: () => setModal('snippets') },
     { id: 'open-tunnels', label: t('menu.tunnels'), run: () => setModal('tunnels') },
+    {
+      id: 'open-tunnels-tab',
+      label: `🔀 ${t('tunnel.title')} — ${t('tabs.openInTab')}`,
+      run: () => useTabsStore.getState().openToolTab('tunnels')
+    },
+    {
+      id: 'open-tunnels-detached',
+      label: `⧉ ${t('tunnel.title')} — ${t('tunnel.detach')}`,
+      run: () => void window.infra.tunnels.openDetached()
+    },
     { id: 'open-keys', label: `🔑 ${t('sidebar.keys')}`, run: () => setModal('keys') },
     { id: 'open-settings', label: t('menu.settings'), run: () => setModal('settings') },
     { id: 'open-plugins', label: t('menu.plugins'), run: () => setModal('plugins') },
@@ -346,6 +372,14 @@ export default function App() {
                 if (tab.kind === 'monitor') return <MonitorTabView key={tab.id} tab={tab} active={tab.id === activeId} />
                 if (tab.kind === 'compare') return <CompareTabView key={tab.id} active={tab.id === activeId} />
                 if (tab.kind === 'localdev') return <LocaldevTabView key={tab.id} active={tab.id === activeId} />
+                if (
+                  tab.kind === 'tunnels' ||
+                  tab.kind === 'processes' ||
+                  tab.kind === 'services' ||
+                  tab.kind === 'ai-diagnose'
+                ) {
+                  return <ToolTabView key={tab.id} kind={tab.kind} active={tab.id === activeId} />
+                }
                 return <TerminalTabView key={tab.id} tab={tab} active={tab.id === activeId} />
               })}
             </div>

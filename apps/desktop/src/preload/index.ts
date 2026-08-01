@@ -69,7 +69,10 @@ const api: InfraApi = {
     start: (id) => ipcRenderer.invoke(IPC.TUNNELS_START, id),
     stop: (id) => ipcRenderer.invoke(IPC.TUNNELS_STOP, id),
     states: () => ipcRenderer.invoke(IPC.TUNNELS_STATES),
-    onState: (cb) => subscribe<TunnelStateDto>(IPC.TUNNELS_EVENT, cb)
+    onState: (cb) => subscribe<TunnelStateDto>(IPC.TUNNELS_EVENT, cb),
+    openDetached: () => ipcRenderer.invoke(IPC.TUNNELS_OPEN_DETACHED),
+    closeDetached: () => ipcRenderer.send(IPC.TUNNELS_CLOSE_DETACHED),
+    onDetachedState: (cb) => subscribe<boolean>(IPC.TUNNELS_DETACHED_STATE, cb)
   },
   terminal: {
     create: (req: TerminalCreateRequest) => ipcRenderer.invoke(IPC.TERM_CREATE, req),
@@ -203,6 +206,8 @@ const api: InfraApi = {
     dbList: () => ipcRenderer.invoke(IPC.LOCALDEV_DB_LIST),
     dbAdminer: (siteId) => ipcRenderer.invoke(IPC.LOCALDEV_DB_ADMINER, siteId),
     dbPhpMyAdmin: (siteId) => ipcRenderer.invoke(IPC.LOCALDEV_DB_PMA, siteId),
+    siteOpenNoPort: (siteId) => ipcRenderer.invoke(IPC.LOCALDEV_SITE_OPEN_NOPORT, siteId),
+    siteDetect: (rootPath) => ipcRenderer.invoke(IPC.LOCALDEV_SITE_DETECT, rootPath),
     siteWpConfigRead: (siteId) => ipcRenderer.invoke(IPC.LOCALDEV_SITE_WP_CONFIG_READ, siteId),
     siteWpConfigWrite: (siteId) => ipcRenderer.invoke(IPC.LOCALDEV_SITE_WP_CONFIG, siteId),
 

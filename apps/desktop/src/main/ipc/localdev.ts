@@ -3,21 +3,26 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { mkdir, open, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
+  ADMINER_DOMAIN,
   DbService,
   LocalDevStore,
   MARIADB_SERVICE_ID,
   ManagedStackProvider,
+  PMA_DOMAIN,
   ProcessSupervisor,
   RUNTIME_SOURCES,
   RuntimeManager,
   WEB_PORT_PURPOSE,
   applyWpDbConfig,
+  buildHostResolverRules,
   checkPort,
   createPlatformAdapter,
-  detectSiteKind,
+  detectSiteKindDetailed,
+  isSafeSiteDomain,
   localDevPaths,
   looksLikeWpConfig,
   readWpDbConfig,
+  siteUrl,
   uniqueDomain,
   uniqueSlug,
   wpDbHost,
@@ -39,10 +44,12 @@ import {
   type LdServiceDto,
   type LdSettingsDto,
   type LdShellEnvDto,
+  type LdSiteDetectDto,
   type LdSiteDto,
   type LdSiteInputDto,
   type LdWpConfigDto
 } from '@infra/shared'
+import { browserProfileDir, openMappedBrowser } from '../lib/chromiumLaunch'
 
 /**
  * Local dev stack (Laragon/LocalWP-style) — wiring THẬT của M1.
@@ -64,6 +71,9 @@ function defaultSettings(): LdSettingsDto {
     root: join(app.getPath('userData'), 'localdev-root'),
     httpPortFrom: 8080,
     httpPortTo: 8099,
+    // Mặc định TẮT: cổng 80 hay bị IIS/http.sys giữ sẵn, và bật mặc định sẽ khiến lần chạy đầu
+    // của nhiều máy rơi vào nhánh "lùi cổng" kèm cảnh báo — gây hoang mang hơn là tiện.
+    usePort80: false,
     phpPoolSize: 4,
     autoStart: false
   }
@@ -88,6 +98,7 @@ function sanitize(raw: unknown): LdSettingsDto {
     root: typeof s.root === 'string' && s.root.trim() ? s.root.trim() : d.root,
     httpPortFrom: from,
     httpPortTo: to,
+    usePort80: typeof s.usePort80 === 'boolean' ? s.usePort80 : d.usePort80,
     phpPoolSize: clampInt(s.phpPoolSize, d.phpPoolSize, 1, 16),
     autoStart: typeof s.autoStart === 'boolean' ? s.autoStart : d.autoStart
   }
@@ -168,7 +179,12 @@ async function findWpConfig(site: SiteRow): Promise<string | null> {
   return null
 }
 
-function toSiteDto(s: SiteRow): LdSiteDto {
+/**
+ * `webPort`: cổng nginx ĐANG dùng. Bắt buộc truyền vào chứ không lấy `s.httpPort`: cột đó được
+ * ghi lúc THÊM site, nên sau khi user đổi dải cổng / bật cổng 80 thì URL trên card trỏ vào cổng
+ * đã chết (bấm vào ra trang lỗi) — đúng loại bug làm user nghĩ site hỏng.
+ */
+function toSiteDto(s: SiteRow, webPort?: number | null): LdSiteDto {
   return {
     id: s.id,
     name: s.name,
@@ -177,7 +193,7 @@ function toSiteDto(s: SiteRow): LdSiteDto {
     rootPath: s.rootPath,
     docRoot: s.docRoot,
     phpVersion: s.phpVersion,
-    httpPort: s.httpPort,
+    httpPort: webPort ?? s.httpPort,
     https: s.https,
     kind: s.kind,
     status: s.status,
@@ -264,6 +280,7 @@ export function registerLocalDevIpc(): { dispose: () => Promise<void>; initIfEna
         phpPoolSize: settings.phpPoolSize,
         httpPortFrom: settings.httpPortFrom,
         httpPortTo: settings.httpPortTo,
+        usePort80: settings.usePort80,
         timezone: 'Asia/Ho_Chi_Minh'
       }),
       cleanTmp: () => runtime!.cleanTmp()
@@ -399,6 +416,18 @@ export function registerLocalDevIpc(): { dispose: () => Promise<void>; initIfEna
       warnings.push(`Site chưa có database: ${names} — mở site rồi bấm "Cấp database".`)
     }
     if (lastApplyError !== null) warnings.push(`Lỗi cấu hình nginx: ${lastApplyError}`)
+    // Bật "dùng cổng 80" mà 80 bị chiếm: phải nói ra, nếu không user thấy URL vẫn còn :8080 và
+    // tưởng cài đặt không có tác dụng. Thủ phạm thường là IIS / World Wide Web Publishing Service.
+    if (settings.usePort80) {
+      const { port, port80Fallback } = await ensureStack().stack.webPortInfo()
+      if (port80Fallback || (port !== null && port !== 80)) {
+        warnings.push(
+          `Cổng 80 đang bị tiến trình khác giữ (thường là IIS / "World Wide Web Publishing Service" hoặc http.sys) — ` +
+            `app đang dùng cổng ${String(port ?? settings.httpPortFrom)}. Tắt dịch vụ đó rồi Chạy lại stack, ` +
+            `hoặc dùng nút "Mở (bỏ cổng)" trên site.`
+        )
+      }
+    }
     if (siteCount > 0 && sup.status().filter((s) => s.state === 'running').length === 0) {
       warnings.push('Stack đang dừng — vào tab Dịch vụ bấm ▶ để chạy nginx và PHP.')
     }
@@ -593,7 +622,9 @@ export function registerLocalDevIpc(): { dispose: () => Promise<void>; initIfEna
 
   ipcMain.handle(IPC.LOCALDEV_SITES, (): LdSiteDto[] => {
     if (!settings.enabled) return []
-    return ensureStack().store.listSites().map(toSiteDto)
+    const { store } = ensureStack()
+    const webPort = store.getPort(WEB_PORT_PURPOSE)
+    return store.listSites().map((s) => toSiteDto(s, webPort))
   })
 
   ipcMain.handle(IPC.LOCALDEV_SITE_SAVE, async (_e, input: LdSiteInputDto): Promise<LdSiteDto> => {
@@ -603,14 +634,57 @@ export function registerLocalDevIpc(): { dispose: () => Promise<void>; initIfEna
     if (!name) throw new Error('Tên site không được để trống')
 
     if (input.id) {
+      const current = st.getSite(input.id)
+      if (!current) throw new Error('Site không tồn tại')
+
+      // ── Domain: user sửa được sang domain bất kỳ ──
+      let domain: string | undefined
+      const wanted = input.domain?.trim()
+      if (wanted !== undefined && wanted.length > 0 && wanted !== current.domain) {
+        if (!isSafeSiteDomain(wanted)) {
+          throw new Error(`Domain không hợp lệ: ${wanted} (cần dạng ten-mien.tld, không dấu cách)`)
+        }
+        // Không cho trùng domain của site khác — nginx sẽ chọn vhost đầu tiên khớp, site kia
+        // "biến mất" một cách không thể hiểu nổi.
+        if (st.takenDomains().has(wanted) ) throw new Error(`Domain "${wanted}" đã dùng cho site khác`)
+        // Cũng không được đụng 2 domain của công cụ DB (Adminer/phpMyAdmin) do stack tự sinh
+        if (wanted === ADMINER_DOMAIN || wanted === PMA_DOMAIN) {
+          throw new Error(`"${wanted}" là domain dành cho công cụ database của app — chọn tên khác`)
+        }
+        domain = wanted
+      }
+
+      // ── Loại site: 'auto' = dò lại từ đĩa, còn lại là user ép cứng khi app đoán sai ──
+      let kind: SiteRow['kind'] | undefined
+      let docRootFromKind: string | undefined
+      if (input.kind !== undefined) {
+        if (input.kind === 'auto') {
+          const guess = detectSiteKindDetailed(await readdir(current.rootPath).catch(() => [] as string[]))
+          kind = guess.kind
+          docRootFromKind = guess.docRootSub ? join(current.rootPath, guess.docRootSub) : current.rootPath
+        } else {
+          kind = input.kind
+        }
+      }
+      // phpVersion phải nhất quán với kind: site tĩnh không cần PHP, mà site php/wordpress
+      // không có PHP thì nginx chỉ trả về mã nguồn dạng text.
+      let phpVersion: string | null | undefined = input.phpVersion
+      if (kind === 'static') phpVersion = null
+      else if (kind !== undefined && current.phpVersion === null && phpVersion === undefined) {
+        const installed = await rt.listInstalled()
+        phpVersion = installed.find((r) => r.id.startsWith('php-') && !r.broken)?.id ?? null
+      }
+
       const updated = st.updateSite(input.id, {
         name,
-        ...(input.docRoot ? { docRoot: input.docRoot } : {}),
-        ...(input.phpVersion !== undefined ? { phpVersion: input.phpVersion } : {})
+        ...(domain !== undefined ? { domain } : {}),
+        ...(kind !== undefined ? { kind } : {}),
+        ...(input.docRoot ? { docRoot: input.docRoot } : docRootFromKind ? { docRoot: docRootFromKind } : {}),
+        ...(phpVersion !== undefined ? { phpVersion } : {})
       })
       if (!updated) throw new Error('Site không tồn tại')
       await applyAndSync()
-      return toSiteDto(st.getSite(input.id) ?? updated)
+      return toSiteDto(st.getSite(input.id) ?? updated, st.getPort(WEB_PORT_PURPOSE))
     }
 
     const rootPath = String(input.rootPath ?? '').trim()
@@ -623,9 +697,18 @@ export function registerLocalDevIpc(): { dispose: () => Promise<void>; initIfEna
     }
 
     const entries = await readdir(rootPath).catch(() => [] as string[])
-    const detected = detectSiteKind(entries)
+    const guess = detectSiteKindDetailed(entries)
+    // User ép loại ngay lúc thêm (hiếm) thì tôn trọng; docroot vẫn theo gợi ý của bản dò
+    const detected = {
+      kind: input.kind !== undefined && input.kind !== 'auto' ? input.kind : guess.kind,
+      docRootSub: guess.docRootSub
+    }
     const slug = uniqueSlug(name, st.takenSlugs())
-    const domain = input.domain?.trim() || uniqueDomain(slug, st.takenDomains())
+    const wantedDomain = input.domain?.trim()
+    if (wantedDomain !== undefined && wantedDomain.length > 0 && !isSafeSiteDomain(wantedDomain)) {
+      throw new Error(`Domain không hợp lệ: ${wantedDomain} (cần dạng ten-mien.tld, không dấu cách)`)
+    }
+    const domain = wantedDomain || uniqueDomain(slug, st.takenDomains())
     const docRoot = input.docRoot?.trim() || (detected.docRootSub ? join(rootPath, detected.docRootSub) : rootPath)
     const installed = await rt.listInstalled()
     const php =
@@ -650,7 +733,7 @@ export function registerLocalDevIpc(): { dispose: () => Promise<void>; initIfEna
     // KHÔNG ghi lỗi tầng stack (vd "chưa cài nginx") vào site.lastError — nó không phải lỗi của
     // site này, và sẽ dính vĩnh viễn trên card. Lỗi stack hiện ở health/services.
     await applyAndSync()
-    return toSiteDto(st.getSite(created.id) ?? created)
+    return toSiteDto(st.getSite(created.id) ?? created, st.getPort(WEB_PORT_PURPOSE))
   })
 
   ipcMain.handle(
@@ -689,7 +772,48 @@ export function registerLocalDevIpc(): { dispose: () => Promise<void>; initIfEna
     const site = ensureStack().store.getSite(id)
     if (!site) return
     const port = ensureStack().store.getPort(WEB_PORT_PURPOSE) ?? site.httpPort
-    void shell.openExternal(`http://${site.domain}:${String(port)}/`)
+    // siteUrl bỏ ':80' → URL sạch khi user đã bật cổng 80
+    void shell.openExternal(siteUrl(site.domain, port, site.https))
+  })
+
+  /**
+   * Mở site bằng browser Chromium có DNS override `MAP <domain> 127.0.0.1:<cổng>`.
+   *
+   * Giải quyết 2 việc cùng lúc mà KHÔNG cần cổng 80 và KHÔNG cần hosts entry:
+   *  - URL không còn `:port` (browser tưởng là cổng 80, thực tế nối vào cổng nginx đang dùng);
+   *  - domain custom (`.test`, `.local`, domain thật) chạy được dù resolver máy không biết nó.
+   * Đánh đổi: chỉ có tác dụng trong cửa sổ browser do app mở (giống tính năng HostMap).
+   */
+  ipcMain.handle(IPC.LOCALDEV_SITE_OPEN_NOPORT, async (_e, id: string): Promise<LdResultDto> => {
+    if (!settings.enabled) return { ok: false, error: 'Local dev đang tắt' }
+    try {
+      const { store: st } = ensureStack()
+      const site = st.getSite(id)
+      if (!site) return { ok: false, error: 'Site không tồn tại' }
+      const port = st.getPort(WEB_PORT_PURPOSE) ?? site.httpPort
+      const scheme = site.https ? 'https' : 'http'
+      return await openMappedBrowser({
+        rules: buildHostResolverRules([site.domain], `127.0.0.1:${String(port)}`),
+        url: `${scheme}://${site.domain}/`,
+        profileDir: browserProfileDir('site', site.id)
+      })
+    } catch (e) {
+      return { ok: false, error: (e as Error).message }
+    }
+  })
+
+  /** Dò lại loại site từ nội dung thư mục + LÝ DO (form sửa site hiện ra để user đối chiếu). */
+  ipcMain.handle(IPC.LOCALDEV_SITE_DETECT, async (_e, rootPath: string): Promise<LdSiteDetectDto> => {
+    try {
+      const dir = String(rootPath ?? '').trim()
+      if (!dir) return { ok: false, error: 'Chưa có đường dẫn' }
+      const info = await stat(dir).catch(() => null)
+      if (!info?.isDirectory()) return { ok: false, error: `Không phải thư mục: ${dir}` }
+      const guess = detectSiteKindDetailed(await readdir(dir))
+      return { ok: true, kind: guess.kind, docRootSub: guess.docRootSub, reason: guess.reason }
+    } catch (e) {
+      return { ok: false, error: (e as Error).message }
+    }
   })
 
   ipcMain.handle(IPC.LOCALDEV_SITE_PICK_FOLDER, async (event): Promise<string | null> => {

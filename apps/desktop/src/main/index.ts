@@ -123,23 +123,30 @@ function notifyDetachedState(open: boolean): void {
   if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send(IPC.MONITOR_DETACHED_STATE, open)
 }
 
-function openDetachedMonitor(hosts: Array<{ id: string; label: string }>): void {
-  detachedMonitorHosts = hosts
-  if (detachedMonitorWin && !detachedMonitorWin.isDestroyed()) {
-    detachedMonitorWin.focus()
-    return
-  }
+/**
+ * Cửa sổ "tách rời" dùng chung cho monitor và tunnel: nhỏ, KHÔNG khung, always-on-top, sống độc
+ * lập với cửa sổ chính (app chính bị che/thu nhỏ vẫn theo dõi được). Nó nạp CÙNG renderer với
+ * hash route riêng (`#monitor`, `#tunnels`) nên dùng lại toàn bộ store + preload sẵn có.
+ */
+function createDetachedWindow(opts: {
+  hash: string
+  title: string
+  width: number
+  height: number
+  minWidth: number
+  minHeight: number
+}): BrowserWindow {
   const iconPath = windowIconPath()
   const win = new BrowserWindow({
-    width: 320,
-    height: 440,
-    minWidth: 220,
-    minHeight: 150,
+    width: opts.width,
+    height: opts.height,
+    minWidth: opts.minWidth,
+    minHeight: opts.minHeight,
     frame: false,
     resizable: true,
     alwaysOnTop: true,
     skipTaskbar: false,
-    title: 'Monitor — Infra Companion',
+    title: opts.title,
     backgroundColor: '#0b0e14',
     ...(iconPath ? { icon: iconPath } : {}),
     webPreferences: {
@@ -155,12 +162,59 @@ function openDetachedMonitor(hosts: Array<{ id: string; label: string }>): void 
     if (url.startsWith('https:') || url.startsWith('http:')) void shell.openExternal(url)
     return { action: 'deny' }
   })
-  loadRenderer(win, 'monitor')
+  loadRenderer(win, opts.hash)
+  return win
+}
+
+function openDetachedMonitor(hosts: Array<{ id: string; label: string }>): void {
+  detachedMonitorHosts = hosts
+  if (detachedMonitorWin && !detachedMonitorWin.isDestroyed()) {
+    detachedMonitorWin.focus()
+    return
+  }
+  const win = createDetachedWindow({
+    hash: 'monitor',
+    title: 'Monitor — Infra Companion',
+    width: 320,
+    height: 440,
+    minWidth: 220,
+    minHeight: 150
+  })
   detachedMonitorWin = win
   notifyDetachedState(true)
   win.on('closed', () => {
     detachedMonitorWin = null
     notifyDetachedState(false)
+  })
+}
+
+// ── Cửa sổ tunnel tách rời: bảng tunnel + bật/tắt tại chỗ, không cần quay lại app chính.
+//    KHÔNG có luồng dữ liệu riêng: `TUNNELS_EVENT` vốn đã broadcast tới MỌI cửa sổ, và các
+//    IPC list/start/stop dùng vault đã mở khoá ở main → cửa sổ này gọi y như cửa sổ chính.
+let detachedTunnelsWin: BrowserWindow | null = null
+
+function notifyTunnelsDetachedState(open: boolean): void {
+  if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send(IPC.TUNNELS_DETACHED_STATE, open)
+}
+
+function openDetachedTunnels(): void {
+  if (detachedTunnelsWin && !detachedTunnelsWin.isDestroyed()) {
+    detachedTunnelsWin.focus()
+    return
+  }
+  const win = createDetachedWindow({
+    hash: 'tunnels',
+    title: 'Tunnels — Infra Companion',
+    width: 380,
+    height: 460,
+    minWidth: 280,
+    minHeight: 160
+  })
+  detachedTunnelsWin = win
+  notifyTunnelsDetachedState(true)
+  win.on('closed', () => {
+    detachedTunnelsWin = null
+    notifyTunnelsDetachedState(false)
   })
 }
 
@@ -172,6 +226,9 @@ function registerDetachedMonitorIpc(): void {
   ipcMain.handle(IPC.MONITOR_DETACHED_INIT, () => ({ hosts: detachedMonitorHosts }))
   // Dừng theo dõi (từ bất kỳ cửa sổ nào) → đóng luôn cửa sổ tách rời cho khỏi hiển thị dữ liệu chết
   ipcMain.on(IPC.MONITOR_STOP_ALL, () => detachedMonitorWin?.close())
+
+  ipcMain.handle(IPC.TUNNELS_OPEN_DETACHED, () => openDetachedTunnels())
+  ipcMain.on(IPC.TUNNELS_CLOSE_DETACHED, () => detachedTunnelsWin?.close())
 }
 
 // AUMID custom: (1) bản đóng gói cần khớp appId đã cài để Windows toast (alert F04) hoạt động;

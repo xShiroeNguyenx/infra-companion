@@ -859,17 +859,36 @@ export interface LdSiteDto {
   updatedAt: number
 }
 
+/** 'auto' = dò lại từ nội dung thư mục; còn lại là user ép cứng. */
+export type LdSiteKindInputDto = 'auto' | 'static' | 'php' | 'wordpress'
+
 export interface LdSiteInputDto {
   id?: string
   name: string
-  /** Bỏ trống → suy ra từ name. */
+  /** Bỏ trống → suy ra từ name (tạo mới) / giữ nguyên (sửa). Sửa được sang domain bất kỳ. */
   domain?: string
-  /** Trỏ vào folder có sẵn (M1) — bắt buộc ở bản hiện tại. */
-  rootPath: string
-  /** Bỏ trống → chính rootPath. */
+  /** Trỏ vào folder có sẵn (M1) — bắt buộc khi TẠO MỚI, bỏ qua khi sửa. */
+  rootPath?: string
+  /** Bỏ trống → chính rootPath (tạo mới) / giữ nguyên (sửa). */
   docRoot?: string
   phpVersion?: string | null
   https?: boolean
+  /**
+   * Loại site. Bỏ trống khi tạo mới = dò tự động; khi SỬA, đây là đường để user chữa lại khi
+   * app đoán sai (vd project Laravel bị nhận thành WordPress).
+   */
+  kind?: LdSiteKindInputDto
+}
+
+/** Kết quả dò loại site + LÝ DO — hiện trong form để user biết app căn cứ vào file nào. */
+export interface LdSiteDetectDto {
+  ok: boolean
+  kind?: 'static' | 'php' | 'wordpress'
+  /** Thư mục con nên làm docroot ('' = chính thư mục gốc). */
+  docRootSub?: string
+  /** vd 'artisan (Laravel)' hoặc 'wp-config.php'. */
+  reason?: string
+  error?: string
 }
 
 /** Trạng thái tổng thể để UI hiện 1 chấm màu + Doctor panel. */
@@ -892,6 +911,14 @@ export interface LdSettingsDto {
   /** Dải port cấp cho web server. */
   httpPortFrom: number
   httpPortTo: number
+  /**
+   * Dùng cổng 80 để URL không còn `:port` (`http://site.localhost/`).
+   *
+   * Windows KHÔNG đòi quyền admin cho cổng <1024, nhưng cổng 80 rất hay bị chiếm sẵn
+   * (IIS / World Wide Web Publishing Service / http.sys, Skype cũ). Chiếm rồi thì app tự lùi
+   * về dải cổng bên dưới và báo ở phần cảnh báo — KHÔNG chết stack.
+   */
+  usePort80: boolean
   /** Số worker php-cgi = số request PHP đồng thời tối đa (Windows không có php-fpm). */
   phpPoolSize: number
   /** Tự khởi động stack khi mở app (mặc định TẮT — tiết kiệm 300-500MB RAM). */
@@ -1066,6 +1093,11 @@ export interface InfraApi {
     stop(id: string): Promise<void>
     states(): Promise<TunnelStateDto[]>
     onState(cb: (e: TunnelStateDto) => void): () => void
+    /** Tách bảng tunnel ra cửa sổ riêng always-on-top (theo dõi khi app chính bị che). */
+    openDetached(): Promise<void>
+    closeDetached(): void
+    /** Cửa sổ tách rời đang mở? (để cửa sổ chính đổi nhãn nút) */
+    onDetachedState(cb: (open: boolean) => void): () => void
   }
   terminal: {
     create(req: TerminalCreateRequest): Promise<TerminalCreateResponse>
@@ -1234,6 +1266,14 @@ export interface InfraApi {
     /** removeFiles=true mới xoá file trên đĩa (mặc định chỉ bỏ khỏi danh sách). */
     siteDelete(id: string, removeFiles: boolean): Promise<LdResultDto>
     siteOpen(id: string): void
+    /**
+     * Mở site trong browser Chromium với DNS override `MAP <domain> 127.0.0.1:<port>` — URL
+     * KHÔNG có `:port` và KHÔNG cần hosts entry, dùng được cả domain custom (`.test`, `.local`).
+     * Cùng cơ chế với tính năng HostMap.
+     */
+    siteOpenNoPort(id: string): Promise<LdResultDto>
+    /** Dò lại loại site từ nội dung thư mục (kèm lý do) — cho form sửa site. */
+    siteDetect(rootPath: string): Promise<LdSiteDetectDto>
     /** Hộp thoại chọn thư mục (main mở dialog) — null nếu user huỷ. */
     sitePickFolder(): Promise<string | null>
     /** cwd+env để renderer mở tab terminal tại site (renderer không tự dựng path runtime). */

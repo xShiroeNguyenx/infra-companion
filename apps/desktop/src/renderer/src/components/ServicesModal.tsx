@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import type { ServiceActionDto, ServiceInfoDto } from '@infra/shared'
 import { useDataStore } from '../stores/data'
-import { Button, ConfirmModal, Modal, Select } from './ui'
+import { Button, ConfirmModal, ModalOrPanel, Select } from './ui'
+import { OpenInTabButton } from './OpenInTabButton'
 import { useT } from '../i18n'
 
 /**
@@ -9,7 +10,7 @@ import { useT } from '../i18n'
  * có confirm, xem journalctl 120 dòng cuối ngay trong modal. start/stop thường cần quyền
  * root trên server — không có quyền thì stderr của systemctl hiện nguyên văn.
  */
-export function ServicesModal({ onClose }: { onClose: () => void }) {
+export function ServicesModal({ onClose, embedded }: { onClose?: () => void; embedded?: boolean }) {
   const t = useT()
   const hosts = useDataStore((s) => s.hosts).filter((h) => h.protocol === 'ssh')
   const [hostId, setHostId] = useState('')
@@ -60,7 +61,12 @@ export function ServicesModal({ onClose }: { onClose: () => void }) {
   )
 
   return (
-    <Modal title={t('svc.title')} onClose={onClose}>
+    <ModalOrPanel
+      embedded={embedded}
+      title={t('svc.title')}
+      onClose={onClose}
+      headerExtra={embedded ? undefined : <OpenInTabButton kind="services" onDone={onClose} />}
+    >
       <div className="w-[760px] max-w-full">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <Select
@@ -207,6 +213,6 @@ export function ServicesModal({ onClose }: { onClose: () => void }) {
           onCancel={() => setConfirmAction(null)}
         />
       )}
-    </Modal>
+    </ModalOrPanel>
   )
 }

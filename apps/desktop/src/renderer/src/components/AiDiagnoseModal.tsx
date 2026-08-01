@@ -6,11 +6,20 @@ import { MiniMarkdown } from '../lib/miniMarkdown'
 import { useAiDiagnoseStore, type DiagnoseStep } from '../stores/aiDiagnose'
 import { useDataStore } from '../stores/data'
 import { useTabsStore } from '../stores/tabs'
-import { Button, Field, Modal, Select, TextArea } from './ui'
+import { Button, Field, ModalOrPanel, Select, TextArea } from './ui'
+import { OpenInTabButton } from './OpenInTabButton'
 
 /** F48 — AI chẩn đoán sự cố: mô tả triệu chứng → AI đề xuất lệnh read-only từng bước,
  *  user duyệt → chạy qua kênh exec riêng → AI đọc output đề xuất tiếp → kết luận. */
-export function AiDiagnoseModal({ onClose, onMinimize }: { onClose: () => void; onMinimize: () => void }) {
+export function AiDiagnoseModal({
+  onClose,
+  onMinimize,
+  embedded
+}: {
+  onClose?: () => void
+  onMinimize?: () => void
+  embedded?: boolean
+}) {
   const t = useT()
   const session = useAiDiagnoseStore((s) => s.session)
   const start = useAiDiagnoseStore((s) => s.start)
@@ -46,23 +55,30 @@ export function AiDiagnoseModal({ onClose, onMinimize }: { onClose: () => void; 
   }
 
   return (
-    <Modal
+    <ModalOrPanel
+      embedded={embedded}
       title={`🩺 ${t('ai.diagnose.title')}`}
       onClose={onClose}
       closeOnBackdrop={false}
       headerExtra={
-        <button
-          type="button"
-          className="text-subtle hover:text-content shrink-0 px-1 text-lg leading-none"
-          aria-label={t('panel.minimize')}
-          title={t('ai.diagnose.minimizeHint')}
-          onClick={onMinimize}
-        >
-          –
-        </button>
+        embedded ? undefined : (
+          <>
+            <OpenInTabButton kind="ai-diagnose" onDone={onClose} />
+            <button
+              type="button"
+              className="text-subtle hover:text-content shrink-0 px-1 text-lg leading-none"
+              aria-label={t('panel.minimize')}
+              title={t('ai.diagnose.minimizeHint')}
+              onClick={onMinimize}
+            >
+              –
+            </button>
+          </>
+        )
       }
     >
-      <div className="w-[min(620px,88vw)]">
+      {/* Trong tab thì rộng thoải mái; popup giữ 620px như cũ */}
+      <div className={embedded ? 'w-full max-w-3xl' : 'w-[min(620px,88vw)]'}>
         {!session ? (
           <>
             <Field label={t('ai.diagnose.hostLabel')}>
@@ -118,7 +134,7 @@ export function AiDiagnoseModal({ onClose, onMinimize }: { onClose: () => void; 
           />
         )}
       </div>
-    </Modal>
+    </ModalOrPanel>
   )
 }
 

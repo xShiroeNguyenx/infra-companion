@@ -46,6 +46,8 @@ export interface StackSettings {
   httpPortFrom: number
   httpPortTo: number
   timezone: string
+  /** Ưu tiên cổng 80 để URL không có `:port`. Bị chiếm ⇒ tự lùi về dải trên (không chết stack). */
+  usePort80?: boolean
 }
 
 export interface ManagedStackDeps {
@@ -98,6 +100,10 @@ export interface MariadbTarget {
    * không được lặp lại mỗi lần kết nối — `DROP DATABASE test` là thao tác phá dữ liệu.
    */
   securedMarkerFile: string
+}
+
+function inRange(port: number, [from, to]: PortRange): boolean {
+  return port >= from && port <= to
 }
 
 /** Tập cổng đã chiếm, TRỪ cổng của chính purpose đang xét (nếu không nó tự chặn chính mình). */
@@ -213,6 +219,8 @@ export class ManagedStackProvider implements StackProvider {
   /** Cổng đã cấp cho pool php của từng runtime, giữ trong phiên để sinh config nhất quán. */
   private phpPorts = new Map<string, number[]>()
   private webPort: number | null = null
+  /** Bật "dùng cổng 80" nhưng 80 bị chiếm ⇒ đã lùi về dải cấu hình. UI đọc để cảnh báo. */
+  private webPort80Fallback = false
   private mariadb: MariadbTarget | null = null
   /** Config đã sinh + spec đã đăng ký cho trạng thái hiện tại? Xem `ensurePrepared`. */
   private prepared = false
@@ -330,26 +338,51 @@ export class ManagedStackProvider implements StackProvider {
 
     // ── Cổng web ──
     if (this.webPort === null) {
-      const remembered = ports.getPort(WEB_PORT_PURPOSE)
-      const res = await allocatePort(
-        remembered,
-        [cfg.httpPortFrom, cfg.httpPortTo],
-        // Loại cổng CỦA CHÍNH purpose này khỏi tập "đã bị chiếm" — nếu không, cổng đã ghi nhớ
-        // tự coi mình bị chiếm ⇒ mỗi lần khởi động lại cấp cổng mới ⇒ URL user bookmark chết.
-        takenExcept(ports.takenPorts(), remembered),
-        reserved,
-        probe
-      )
-      if (res.port === null) {
-        throw new Error(
-          `Không còn cổng rảnh trong dải ${String(cfg.httpPortFrom)}–${String(cfg.httpPortTo)}` +
-            (res.lastReason === 'os-reserved'
-              ? ' (dải này đang bị Windows/Hyper-V giữ — đổi dải cổng trong Cài đặt)'
-              : '')
-        )
+      const range: PortRange = [cfg.httpPortFrom, cfg.httpPortTo]
+      const rememberedRaw = ports.getPort(WEB_PORT_PURPOSE)
+      // Cổng đã ghi nhớ chỉ được ưu tiên khi còn hợp lệ với cài đặt HIỆN TẠI: user tắt "dùng
+      // cổng 80" mà vẫn nhớ 80 thì phải rời khỏi 80, nếu không cài đặt bấm xong không có tác dụng.
+      const remembered =
+        rememberedRaw !== null && (rememberedRaw === 80 ? cfg.usePort80 === true : inRange(rememberedRaw, range))
+          ? rememberedRaw
+          : null
+      const taken = takenExcept(ports.takenPorts(), remembered)
+
+      // Bật cổng 80: thử ĐÚNG cổng 80 trước. Windows không đòi admin cho cổng <1024, nhưng 80
+      // rất hay bị IIS/http.sys/Skype giữ → chiếm thì LÙI về dải cấu hình + ghi cờ để UI cảnh
+      // báo, chứ không làm cả stack không lên được vì một tuỳ chọn thẩm mỹ.
+      this.webPort80Fallback = false
+      if (cfg.usePort80 === true) {
+        const res80 = await allocatePort(80, [80, 80], taken, reserved, probe)
+        if (res80.port !== null) {
+          this.webPort = res80.port
+          ports.setPort(WEB_PORT_PURPOSE, res80.port)
+        } else {
+          this.webPort80Fallback = true
+        }
       }
-      this.webPort = res.port
-      ports.setPort(WEB_PORT_PURPOSE, res.port)
+
+      if (this.webPort === null) {
+        const res = await allocatePort(
+          remembered,
+          range,
+          // Loại cổng CỦA CHÍNH purpose này khỏi tập "đã bị chiếm" — nếu không, cổng đã ghi nhớ
+          // tự coi mình bị chiếm ⇒ mỗi lần khởi động lại cấp cổng mới ⇒ URL user bookmark chết.
+          taken,
+          reserved,
+          probe
+        )
+        if (res.port === null) {
+          throw new Error(
+            `Không còn cổng rảnh trong dải ${String(cfg.httpPortFrom)}–${String(cfg.httpPortTo)}` +
+              (res.lastReason === 'os-reserved'
+                ? ' (dải này đang bị Windows/Hyper-V giữ — đổi dải cổng trong Cài đặt)'
+                : '')
+          )
+        }
+        this.webPort = res.port
+        ports.setPort(WEB_PORT_PURPOSE, res.port)
+      }
     }
 
     // ── php.ini + pool cho từng runtime PHP ──
@@ -834,6 +867,11 @@ export class ManagedStackProvider implements StackProvider {
   private async resolveWebPort(): Promise<number | null> {
     await this.ensurePrepared()
     return this.webPort ?? this.deps.ports.getPort(WEB_PORT_PURPOSE)
+  }
+
+  /** Cổng web hiện tại + có phải đã lùi khỏi cổng 80 hay không (cho health/UI). */
+  async webPortInfo(): Promise<{ port: number | null; port80Fallback: boolean }> {
+    return { port: await this.resolveWebPort(), port80Fallback: this.webPort80Fallback }
   }
 
   /** URL mở Adminer, đã điền sẵn server/username/db để bớt 3 lần gõ. */

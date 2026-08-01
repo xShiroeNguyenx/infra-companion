@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, **a self-managed local PHP/WordPress dev stack**, and more.
 
-**Current release: v0.2.0 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.2.1 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -49,6 +49,7 @@
 - **Split layouts** — arrange panes as auto grid, side-by-side columns, stacked rows, main-left, or main-top; switch from the **▼** next to Split ON or set the default in Settings → Terminal
 - **Pane frame styles** — Compact bar (default) or Mac style (rounded corners + round red close button), in Settings → Terminal
 - **Command palette button** — a toolbar button opens the palette for people who don't know the `Ctrl+Shift+P` shortcut
+- **Tools in tabs, not blocking popups** — Monitoring, Compare, Local dev, **Tunnels**, **Processes**, **Services** and the **AI troubleshooter** all open in a tab (⊞ in the popup header, or the palette), so a long-running diagnosis or a tunnel you're watching never freezes the rest of the app; Monitoring and Tunnels can also **detach into an always-on-top window**
 - **Open a group as split panes** — one click on a group header opens every host in it side by side, ready to broadcast
 - **Workspaces** — save a layout (tabs + split panes + broadcast) and restore it in one click (⋯ → Workspaces)
 - **Broadcast input** — type once, send to all open panes simultaneously (Ctrl+Shift+B)
@@ -88,7 +89,8 @@
 
 ### Tunnels
 - **Local** (L), **Remote** (R), **Dynamic / SOCKS5** (D) port forwarding
-- Managed tunnel dashboard — toggle on/off, **edit** rules, persistent across restarts
+- Managed tunnel dashboard — toggle on/off, **edit** rules, persistent across restarts, **sorted by name** (natural order: `db2` before `db10`)
+- **Pin it where you need it**: ⊞ **open in a tab** (so the popup stops blocking the app) or ⧉ **detach into an always-on-top window** — watch and toggle tunnels while your DB client covers the app
 - **Tunnel through a login-script gate** — a Local forward whose via-host is reached by a login script (nested `ssh` in a shell) tunnels by running `nc` on the innermost hop, so you can reach e.g. a database only pingable from the deepest machine straight from `127.0.0.1` (needs `nc` on the far end)
 
 ### Remote Desktop (VNC & RDP)
@@ -119,7 +121,8 @@
 - **The app manages its own runtimes**: PHP 8.3 / 8.4 (NTS), Nginx 1.30, MariaDB 11.4 LTS, and optional tools (**Adminer**, **phpMyAdmin**, **Composer**, **WP-CLI**, **Node 24 LTS + npm**, **mkcert**) — downloaded at runtime, so the installer doesn't grow
 - **Every artifact is verified against a SHA-256 pinned in the app** (nginx publishes no checksum, so the app computes one, records it in a provenance file, and says so in the UI); mirrors on link rot, smoke-test after install, plus an "install from a file I downloaded" path for blocked networks
 - **Service manager**: start/stop/restart Nginx · MariaDB · a pool of `php-cgi` workers; per-service PID/port/uptime/restarts and **the last 20 stderr lines when one crashes**; graceful stop only (never a hard kill on `mysqld`); **orphan processes from an app crash are detected by exe path and reaped** on next start
-- **Sites**: point at an existing project folder (static / PHP / WordPress auto-detected), served at `http://<slug>.localhost:<port>` — **no hosts file, no admin rights** (browsers resolve `*.localhost` themselves, RFC 6761). Config is regenerated from the DB on every apply and each reload is gated by `nginx -t`, so one bad vhost can't kill the stack
+- **Sites**: point at an existing project folder (static / PHP / WordPress auto-detected, and you can **override the guess** or ask *why* it guessed), served at `http://<slug>.localhost:<port>` — **no hosts file, no admin rights** (browsers resolve `*.localhost` themselves, RFC 6761). Config is regenerated from the DB on every apply and each reload is gated by `nginx -t`, so one bad vhost can't kill the stack
+- **Custom domain per site** (`myshop.test`, `blog.local`, a real domain) and **no port in the URL** — either serve on port 80 (falls back to your port range if IIS/http.sys already owns it) or use **🎯 Open without a port**, a Chromium window whose DNS override maps the domain to the real port with no hosts entry at all
 - **Databases**: MariaDB on **3307+** so an existing XAMPP/MySQL keeps working; data directory lives outside the runtime folder; per-site DB + user + grant, generated `root` password, `.sql` export/import, and a "write credentials into `wp-config.php`" action that backs up first
 - **⌨ Terminal at a site** with `php`, `composer`, `wp`, `node`, `npm` already on `PATH`
 
@@ -201,7 +204,7 @@ pnpm test         # unit tests (crypto, sync-merge, ssh_config parser)
 
 ```bash
 pnpm test
-# v0.2.0: 690 tests pass; 36 are skipped on Node 20 (they need node:sqlite / Node ≥ 22.5 —
+# v0.2.1: 707 tests pass; 36 are skipped on Node 20 (they need node:sqlite / Node ≥ 22.5 —
 # the vault-merge and local-dev store suites).
 # To run those too, use Electron's bundled Node 24 runtime:
 $env:ELECTRON_RUN_AS_NODE='1'
@@ -288,7 +291,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.2.0)
+## Known Limitations (v0.2.1)
 
 - **Local dev stack is Windows-only** for now (OS-specific work is isolated behind a single adapter, so other platforms are a matter of writing one). `.test` domains and local HTTPS are **not wired up yet** — mkcert installs and lands on `PATH`, but issuing/trusting a certificate is still a manual `mkcert -install`. There is no WordPress downloader (point it at a folder you already have), and no local↔server deploy or public-share link yet. phpMyAdmin 5.2 does not support PHP 8.4, so the app serves it with PHP 8.3 when both are installed
 - **Domain → server mapping needs a Chromium browser** (Chrome/Edge/Brave/Vivaldi); Firefox has no equivalent flag, and the override has no effect when the machine routes through a system proxy (the proxy resolves DNS itself). Non-browser clients (Postman, MySQL clients) aren't covered — use a tunnel or the `curl --resolve` command instead

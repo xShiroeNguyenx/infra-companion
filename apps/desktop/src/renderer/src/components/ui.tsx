@@ -55,6 +55,36 @@ export function Modal({
   )
 }
 
+/**
+ * Bọc nội dung một công cụ: mặc định là MODAL, `embedded` thì phẳng ra để nhúng vào tab.
+ *
+ * Vì sao cần: mấy công cụ dài (Tunnels, Tiến trình, Services, AI chẩn đoán) mở dạng popup thì
+ * KHOÁ cả app — user không làm được việc khác trong lúc chờ. Mở trong tab giải quyết đúng chuyện
+ * đó. Dùng 1 wrapper thay vì copy component ra bản thứ hai: sửa logic một chỗ, hai nơi cùng hưởng.
+ */
+export function ModalOrPanel({
+  embedded = false,
+  title,
+  children,
+  onClose,
+  headerExtra,
+  closeOnBackdrop = true
+}: {
+  embedded?: boolean
+  title: string
+  children: ReactNode
+  onClose?: () => void
+  headerExtra?: ReactNode
+  closeOnBackdrop?: boolean
+}) {
+  if (embedded) return <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{children}</div>
+  return (
+    <Modal title={title} onClose={onClose} headerExtra={headerExtra} closeOnBackdrop={closeOnBackdrop}>
+      {children}
+    </Modal>
+  )
+}
+
 /** Hộp xác nhận cho hành động phá huỷ (xoá host/key/file…) — backend xoá là vĩnh viễn. */
 export function ConfirmModal({
   title,

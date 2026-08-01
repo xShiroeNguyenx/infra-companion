@@ -45,6 +45,20 @@ interface DataState {
 
 const toast = (error: unknown): void => useToastsStore.getState().push(errorMessage(error))
 
+/**
+ * Tunnel xếp theo TÊN (A→Z) — sắp ngay tại store nên modal, tab, cửa sổ tách rời và Dashboard
+ * đều cùng một thứ tự. Vault trả về theo thứ tự tạo, mà danh sách nhiều tunnel thì thứ tự đó
+ * không giúp tìm gì cả.
+ *
+ * `numeric` để `db2` đứng trước `db10` (so sánh chuỗi thuần sẽ đảo ngược), `sensitivity:'base'`
+ * để hoa/thường và dấu tiếng Việt không tách nhóm riêng.
+ */
+function sortTunnels(list: TunnelRuleDto[]): TunnelRuleDto[] {
+  return [...list].sort((a, b) =>
+    (a.label || '').localeCompare(b.label || '', undefined, { numeric: true, sensitivity: 'base' })
+  )
+}
+
 export const useDataStore = create<DataState>((set, get) => ({
   hosts: [],
   groups: [],
@@ -71,7 +85,7 @@ export const useDataStore = create<DataState>((set, get) => ({
       ])
       const tunnelStates: DataState['tunnelStates'] = {}
       for (const state of states) tunnelStates[state.ruleId] = { status: state.status, detail: state.detail }
-      set({ hosts, groups, keys, history, snippets, tunnels, tunnelStates, loaded: true })
+      set({ hosts, groups, keys, history, snippets, tunnels: sortTunnels(tunnels), tunnelStates, loaded: true })
     } catch (error) {
       toast(error)
     }
@@ -184,7 +198,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   saveTunnel: async (input) => {
     try {
       await window.infra.tunnels.save(input)
-      set({ tunnels: await window.infra.tunnels.list() })
+      set({ tunnels: sortTunnels(await window.infra.tunnels.list()) })
       return true
     } catch (error) {
       toast(error)

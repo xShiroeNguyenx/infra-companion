@@ -183,11 +183,15 @@ export type { MysqlCliDeps, SqlResult } from './localdev/mysqlCli'
 export {
   deriveDomain,
   detectSiteKind,
+  detectSiteKindDetailed,
+  isSafeSiteDomain,
+  resolvesWithoutHostsFile,
+  siteUrl,
   slugify,
   uniqueDomain,
   uniqueSlug
 } from './localdev/siteScaffold'
-export type { SiteTld } from './localdev/siteScaffold'
+export type { SiteKind, SiteKindGuess, SiteTld } from './localdev/siteScaffold'
 export { PhpCgiPool } from './localdev/php/PhpCgiPool'
 export type { PhpBackend, PhpPoolInput } from './localdev/php/PhpBackend'
 export { PROVENANCE_FILE, RuntimeManager } from './localdev/RuntimeManager'

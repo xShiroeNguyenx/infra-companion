@@ -213,6 +213,8 @@ export const vi = {
   'tabs.moveLeft': 'Dời sang trái / lên',
   'tabs.moveRight': 'Dời sang phải / xuống',
   'tabs.close': 'Đóng tab (Ctrl+Shift+W)',
+  'tabs.openInTab': 'Mở ở tab',
+  'tabs.openInTabHint': 'Chuyển công cụ này sang một tab — popup khoá cả app, tab thì làm việc khác song song được.',
   'tabs.runSnippet': 'Chạy snippet trên phiên đang mở',
   'tabs.noSnippet': 'Chưa có snippet (tạo trong menu ⋯ ở sidebar)',
   'tabs.newLocal': 'Tab terminal local mới (Ctrl+Shift+T)',
@@ -319,6 +321,19 @@ export const vi = {
   'localdev.site.addHint':
     'App tự dò loại site (WordPress / Laravel / PHP / tĩnh), tự sinh domain .localhost và cấu hình nginx. Laravel sẽ dùng public/ làm web root.',
   'localdev.site.open': 'Mở trong browser',
+  'localdev.site.openNoPort': 'Mở không cần cổng — browser Chromium với DNS riêng cho cửa sổ đó (URL không có :port, domain nào cũng chạy)',
+  'localdev.site.edit': 'Sửa site (domain, loại, docroot)',
+  'localdev.site.domain': 'Domain',
+  'localdev.site.kind': 'Loại site',
+  'localdev.site.kindAuto': 'Tự dò lại',
+  'localdev.site.php': 'PHP',
+  'localdev.site.phpNone': 'Không dùng PHP',
+  'localdev.site.docRoot': 'Docroot (thư mục nginx trỏ vào)',
+  'localdev.site.detect': 'Dò lại',
+  'localdev.site.detectedAs': 'App đoán {kind} vì thấy: {reason}. Đoán sai thì chọn tay ở ô Loại site.',
+  'localdev.site.domainNeedsHosts':
+    'Domain không kết thúc bằng .localhost nên máy sẽ không tự phân giải: dùng nút 🎯 "Mở không cần cổng" (không cần sửa gì), hoặc tự thêm dòng vào file hosts.',
+  'localdev.site.save': 'Lưu',
   'localdev.site.terminal': 'Mở terminal tại thư mục site (có php trong PATH)',
   'localdev.site.openFolder': 'Mở thư mục',
   'localdev.site.delTitle': 'Bỏ site khỏi danh sách?',
@@ -376,7 +391,10 @@ export const vi = {
     'Nên chọn đường dẫn ngắn, KHÔNG dấu cách và không ký tự tiếng Việt (ví dụ C:\\infra-localdev) — nginx và MariaDB rất hay lỗi với đường dẫn lạ. Đổi về sau phải chuyển cả runtime lẫn site nên hãy chọn đúng ngay từ đầu.',
   'settings.localdevPorts': 'Dải cổng web',
   'settings.localdevPortsHint':
-    'Mặc định 8080–8099. Tránh 80/443 vì trên Windows hay trùng IIS/http.sys/Skype/Docker.',
+    'Mặc định 8080–8099. Đây là dải dùng khi không bật cổng 80 bên dưới.',
+  'settings.localdevPort80': 'Dùng cổng 80 (URL không có :port)',
+  'settings.localdevPort80Hint':
+    'Bật thì site mở ở http://ten-site.localhost/ thay vì :8080. Windows không cần quyền admin cho cổng 80, nhưng cổng này hay bị IIS / "World Wide Web Publishing Service" / http.sys giữ sẵn — nếu bị chiếm, app tự lùi về dải cổng trên và hiện cảnh báo (không làm stack chết). Cách khác không cần cổng 80: nút 🎯 trên từng site.',
   'settings.localdevPhpPool': 'Số worker PHP',
   'settings.localdevPhpPoolHint':
     'Windows không có php-fpm nên app chạy nhiều tiến trình php-cgi. Đây CHÍNH LÀ số request PHP xử lý đồng thời tối đa — để 1 rất dễ treo khi trang tự gọi HTTP về chính nó.',
@@ -632,6 +650,10 @@ export const vi = {
 
   // Tunnels
   'tunnel.title': 'Port Forwarding — Tunnels',
+  'tunnel.detach': 'Tách ra ngoài',
+  'tunnel.detachHint': 'Mở bảng tunnel thành cửa sổ RIÊNG luôn nổi trên cùng — theo dõi được khi app chính bị che (giống Monitoring).',
+  'tunnel.reattach': 'Đóng cửa sổ rời, quay lại app',
+  'tunnel.detachedTitle': 'Tunnel — {running}/{total} đang chạy',
   'tunnel.typeL': 'Local (máy này → qua SSH → đích)',
   'tunnel.typeR': 'Remote (server → về máy này)',
   'tunnel.typeD': 'Dynamic (SOCKS5 proxy)',
@@ -1156,6 +1178,8 @@ export const en: Partial<Record<I18nKey, string>> = {
   'tabs.moveLeft': 'Move left / up',
   'tabs.moveRight': 'Move right / down',
   'tabs.close': 'Close tab (Ctrl+Shift+W)',
+  'tabs.openInTab': 'Open in tab',
+  'tabs.openInTabHint': 'Move this tool into a tab — a popup blocks the whole app, a tab lets you keep working.',
   'tabs.runSnippet': 'Run snippet on open sessions',
   'tabs.noSnippet': 'No snippets yet (create from the ⋯ menu in the sidebar)',
   'tabs.newLocal': 'New local terminal tab (Ctrl+Shift+T)',
@@ -1258,6 +1282,19 @@ export const en: Partial<Record<I18nKey, string>> = {
   'localdev.site.addHint':
     'The app detects the site type (WordPress / Laravel / PHP / static), derives a .localhost domain and writes the nginx config. Laravel uses public/ as web root.',
   'localdev.site.open': 'Open in browser',
+  'localdev.site.openNoPort': 'Open without a port — Chromium window with its own DNS override (no :port in the URL, any domain works)',
+  'localdev.site.edit': 'Edit site (domain, kind, docroot)',
+  'localdev.site.domain': 'Domain',
+  'localdev.site.kind': 'Site kind',
+  'localdev.site.kindAuto': 'Re-detect',
+  'localdev.site.php': 'PHP',
+  'localdev.site.phpNone': 'No PHP',
+  'localdev.site.docRoot': 'Docroot (what nginx serves)',
+  'localdev.site.detect': 'Re-detect',
+  'localdev.site.detectedAs': 'Guessed {kind} because of: {reason}. If that is wrong, pick the kind by hand.',
+  'localdev.site.domainNeedsHosts':
+    'This domain does not end in .localhost, so your machine will not resolve it: use the 🎯 "Open without a port" button (nothing to configure), or add a hosts entry yourself.',
+  'localdev.site.save': 'Save',
   'localdev.site.terminal': 'Open a terminal in the site folder (php on PATH)',
   'localdev.site.openFolder': 'Open folder',
   'localdev.site.delTitle': 'Remove site from the list?',
@@ -1310,8 +1347,10 @@ export const en: Partial<Record<I18nKey, string>> = {
   'settings.localdevRootHint':
     'Prefer a short path with NO spaces and no non-ASCII characters (e.g. C:\\infra-localdev) — nginx and MariaDB are notoriously fragile with unusual paths. Changing it later means moving both runtimes and sites, so pick well now.',
   'settings.localdevPorts': 'Web port range',
-  'settings.localdevPortsHint':
-    'Defaults to 8080–8099. Avoid 80/443 — on Windows they often clash with IIS/http.sys/Skype/Docker.',
+  'settings.localdevPortsHint': 'Defaults to 8080–8099. Used whenever port 80 below is off.',
+  'settings.localdevPort80': 'Use port 80 (no :port in the URL)',
+  'settings.localdevPort80Hint':
+    'Serves sites at http://my-site.localhost/ instead of :8080. Windows needs no admin rights for port 80, but it is often already held by IIS / "World Wide Web Publishing Service" / http.sys — if it is taken, the app falls back to the range above and warns you (the stack still starts). Alternative that needs no port 80: the 🎯 button on each site.',
   'settings.localdevPhpPool': 'PHP workers',
   'settings.localdevPhpPoolHint':
     'Windows has no php-fpm, so the app runs several php-cgi processes. This IS your maximum number of concurrent PHP requests — setting it to 1 will deadlock when a page calls HTTP back into itself.',
@@ -1557,6 +1596,10 @@ export const en: Partial<Record<I18nKey, string>> = {
   'snippet.back': 'Back',
 
   'tunnel.title': 'Port Forwarding — Tunnels',
+  'tunnel.detach': 'Detach',
+  'tunnel.detachHint': 'Open the tunnel table in its OWN always-on-top window — keep watching it while the app is covered (like Monitoring).',
+  'tunnel.reattach': 'Close the separate window, back to the app',
+  'tunnel.detachedTitle': 'Tunnels — {running}/{total} running',
   'tunnel.typeL': 'Local (this machine → via SSH → target)',
   'tunnel.typeR': 'Remote (server → back to this machine)',
   'tunnel.typeD': 'Dynamic (SOCKS5 proxy)',
@@ -2070,6 +2113,8 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'tabs.moveLeft': '左 / 上へ移動',
   'tabs.moveRight': '右 / 下へ移動',
   'tabs.close': 'タブを閉じる (Ctrl+Shift+W)',
+  'tabs.openInTab': 'タブで開く',
+  'tabs.openInTabHint': 'このツールをタブへ移動します — ポップアップはアプリ全体を塞ぎますが、タブなら並行して作業できます。',
   'tabs.runSnippet': '開いているセッションでスニペットを実行',
   'tabs.noSnippet': 'スニペットがありません（サイドバーの ⋯ メニューで作成）',
   'tabs.newLocal': '新しいローカルターミナルタブ (Ctrl+Shift+T)',
@@ -2172,6 +2217,19 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'localdev.site.addHint':
     'サイト種別（WordPress / Laravel / PHP / 静的）を自動判定し、.localhost ドメインと nginx 設定を生成します。Laravel は public/ をドキュメントルートにします。',
   'localdev.site.open': 'ブラウザで開く',
+  'localdev.site.openNoPort': 'ポートなしで開く — そのウィンドウ専用の DNS 上書きで Chromium を起動 (URL に :port が付かず、どのドメインでも動作)',
+  'localdev.site.edit': 'サイトを編集 (ドメイン・種類・docroot)',
+  'localdev.site.domain': 'ドメイン',
+  'localdev.site.kind': 'サイト種類',
+  'localdev.site.kindAuto': '再判定',
+  'localdev.site.php': 'PHP',
+  'localdev.site.phpNone': 'PHP を使わない',
+  'localdev.site.docRoot': 'Docroot (nginx が配信するフォルダ)',
+  'localdev.site.detect': '再判定',
+  'localdev.site.detectedAs': '{reason} が見つかったため {kind} と判定しました。違う場合は種類を手動で選んでください。',
+  'localdev.site.domainNeedsHosts':
+    '.localhost で終わらないドメインは OS が解決できません: 🎯「ポートなしで開く」を使う (設定不要)、または hosts に自分で追記してください。',
+  'localdev.site.save': '保存',
   'localdev.site.terminal': 'サイトフォルダでターミナルを開く（PATH に php あり）',
   'localdev.site.openFolder': 'フォルダを開く',
   'localdev.site.delTitle': 'リストからサイトを削除しますか?',
@@ -2224,8 +2282,10 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'settings.localdevRootHint':
     '空白や非 ASCII 文字を含まない短いパス（例: C:\\infra-localdev）を推奨 — nginx と MariaDB は特殊なパスで頻繁に失敗します。後から変更するとランタイムとサイトの両方を移動する必要があります。',
   'settings.localdevPorts': 'Web ポート範囲',
-  'settings.localdevPortsHint':
-    '既定は 8080–8099。80/443 は Windows で IIS/http.sys/Skype/Docker と衝突しやすいため避けてください。',
+  'settings.localdevPortsHint': '既定は 8080–8099。下の「ポート 80」がオフのときに使われます。',
+  'settings.localdevPort80': 'ポート 80 を使う (URL に :port を付けない)',
+  'settings.localdevPort80Hint':
+    'オンにすると :8080 ではなく http://my-site.localhost/ で配信します。Windows ではポート 80 に管理者権限は不要ですが、IIS / "World Wide Web Publishing Service" / http.sys が既に占有していることが多く、その場合は上のポート範囲へ自動的に戻して警告を表示します (スタックは起動します)。ポート 80 不要の代替手段: 各サイトの 🎯 ボタン。',
   'settings.localdevPhpPool': 'PHP ワーカー数',
   'settings.localdevPhpPoolHint':
     'Windows には php-fpm がないため、複数の php-cgi プロセスを起動します。これが同時処理可能な PHP リクエストの上限です — 1 にするとページが自分自身に HTTP 要求した際にデッドロックします。',
@@ -2471,6 +2531,10 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'snippet.back': '戻る',
 
   'tunnel.title': 'ポート転送 — トンネル',
+  'tunnel.detach': '切り離す',
+  'tunnel.detachHint': 'トンネル一覧を常に最前面の別ウィンドウで開きます — アプリが隠れていても監視できます (Monitoring と同じ)。',
+  'tunnel.reattach': '別ウィンドウを閉じてアプリに戻す',
+  'tunnel.detachedTitle': 'トンネル — {running}/{total} 稼働中',
   'tunnel.typeL': 'Local（このPC → SSH経由 → 宛先）',
   'tunnel.typeR': 'Remote（サーバー → このPCへ）',
   'tunnel.typeD': 'Dynamic（SOCKS5 プロキシ）',

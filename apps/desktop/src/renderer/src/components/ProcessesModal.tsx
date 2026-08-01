@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ProcessInfoDto } from '@infra/shared'
 import { useDataStore } from '../stores/data'
-import { Button, ConfirmModal, Modal, Select } from './ui'
+import { Button, ConfirmModal, ModalOrPanel, Select } from './ui'
+import { OpenInTabButton } from './OpenInTabButton'
 import { useT } from '../i18n'
 
 const REFRESH_MS = 5_000
@@ -11,7 +12,7 @@ const REFRESH_MS = 5_000
  * (không đụng terminal đang mở, xuyên login-script như Bulk). Sort CPU/RAM, filter,
  * kill có confirm (TERM trước; KILL cho tiến trình cứng đầu). Linux only.
  */
-export function ProcessesModal({ onClose }: { onClose: () => void }) {
+export function ProcessesModal({ onClose, embedded }: { onClose?: () => void; embedded?: boolean }) {
   const t = useT()
   const hosts = useDataStore((s) => s.hosts).filter((h) => h.protocol === 'ssh')
   const [hostId, setHostId] = useState('')
@@ -63,7 +64,12 @@ export function ProcessesModal({ onClose }: { onClose: () => void }) {
   )
 
   return (
-    <Modal title={t('procs.title')} onClose={onClose}>
+    <ModalOrPanel
+      embedded={embedded}
+      title={t('procs.title')}
+      onClose={onClose}
+      headerExtra={embedded ? undefined : <OpenInTabButton kind="processes" onDone={onClose} />}
+    >
       <div className="w-[760px] max-w-full">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <Select
@@ -198,7 +204,7 @@ export function ProcessesModal({ onClose }: { onClose: () => void }) {
           onCancel={() => setConfirmKill(null)}
         />
       )}
-    </Modal>
+    </ModalOrPanel>
   )
 }
 

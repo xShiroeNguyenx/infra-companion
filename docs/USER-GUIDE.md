@@ -192,6 +192,8 @@ Settings opens as a **full-screen page** with a category rail on the left — **
 - Open the tabs/splits you want → `⋯` → **Workspaces** → name it → **Save**.
 - Restore: pick a workspace → **Open** (adds to your current tabs). **✏** renames, **✕** deletes.
 
+> A workspace saves **terminal and SFTP tabs**. Tool tabs (Monitoring, Compare, Local dev, Tunnels, Processes, Services, AI troubleshooter) are **not** part of it — they hold no session, so reopening one from the `⋯` menu or the palette is a single click.
+
 **Notes**:
 - Opening a workspace creates **fresh SSH sessions** (re-login, no old scrollback).
 - Opening **adds** tabs (doesn't close current ones) — opening twice doubles the tabs.
@@ -266,6 +268,13 @@ Settings opens as a **full-screen page** with a category rail on the left — **
 | **L (Local)** | A port on your machine → through SSH → destination (e.g. reach a remote DB as if local) |
 | **R (Remote)** | A port on the server → back to your machine |
 | **D (Dynamic)** | A local SOCKS5 proxy — browse the web through the server |
+
+**Where the panel lives** — the popup is modal, so it blocks the app while you watch a tunnel come up. Two ways out, both in the Tunnels header (and in the Command Palette):
+
+- **⊞ Open in tab** — the same panel as a tab; keep working, switch away and back.
+- **⧉ Detach** — a small **always-on-top window** (like the detached monitoring window). Ideal while your DB client or browser covers the app: you still see each tunnel's status dot and can start/stop it. It shares the app's live tunnel events, so nothing reconnects. Close it (⧉ *Merge back*) to return.
+
+**Order** — the list is sorted **by name, A→Z**, in the popup, the tab, the detached window and the Dashboard alike. Sorting is natural and case-insensitive: `db2` comes before `db10`, `JPDB2` before `jpdb11`.
 
 **Name your tunnels**: the tunnel editor has an optional **Name** field — give each rule a friendly label (e.g. *"Prod DB"*, *"Staging Grafana"*) so a long list stays readable. The list shows the name on top and the actual route (`:port → host:port`) underneath, so you always see where a named tunnel goes. Leave the name blank and it falls back to the route as before.
 
@@ -344,6 +353,8 @@ Connect to a **graphical desktop**, tunneling through your SSH jump hosts when n
 
 ## 11B. Uptime watcher · Processes · Services
 
+> **Processes** and **Services** both have **⊞ Open in tab** in their header (and a palette entry) — the table gets the full window and stops blocking the app while auto-refresh runs.
+
 **📡 Uptime watcher** (`⋯` → *Uptime watcher*): toggle it on and the app **TCP-checks every saved host once a minute without opening any session** — a green/red dot next to each host in the sidebar shows reachability (hover for latency). State is remembered across restarts; toggle again to turn off. Best-effort: a host behind a login-script gate is checked at its **gate address**, which still tells you "the gate is alive".
 
 **⚙ Processes** (`⋯` → *Processes*, or the command palette): pick a host → a live `top`-style table (PID, user, CPU%, MEM%, RSS, runtime, command) fetched over a **dedicated exec channel** — your open terminals are never touched, and login-script hosts work like Bulk. Sort by **CPU/RAM**, filter by command/user/PID, tick **auto-refresh 5s**, and hover a row to **kill** (✕ = TERM; `-9` = force KILL) with a confirmation. Killing another user's process requires matching privileges on the server. Linux only.
@@ -404,6 +415,8 @@ Purely local, no SSH. Enter a host/IP then:
 **What it is**: an **agent mode** for diagnosing a sick server. You describe a symptom; the AI proposes **one read-only diagnostic command at a time** (with a one-line rationale); **you approve each step**; the command runs and the AI reads the output before proposing the next — until it reaches a conclusion and suggested fix.
 
 **Use**: open it from the **⋯ tools menu** (sidebar) → **🩺 AI troubleshooter**, or `Ctrl+Shift+P` → 🩺 → pick an SSH host → type the symptom ("web returns 502", "load is high") → **Start**. For each step: **Approve & run** / **Skip** / **Stop**. The conclusion appears at the end; **New diagnosis** resets.
+
+**⊞ Open in tab** (header, or the palette) moves the whole thing into a tab, so a diagnosis that takes several minutes doesn't block the rest of the app — the session keeps running while you work elsewhere and switch back. The **–** button still minimizes the popup to a pill if you prefer that.
 
 **Minimize while it works**: the AI can take a while to think or run a command — press the **–** button in the window header to drop it to a small pill (bottom-right) and keep using the rest of the app. The pill shows live status (analyzing / running / **needs your approval** / done); click it to reopen. The session keeps running in the background regardless.
 
@@ -596,6 +609,21 @@ Point at a project folder you already have; the type (**static / PHP / WordPress
 - **⌨ Terminal** opens a shell at the site root with `php`, `composer`, `wp`, `node` and `npm` already on `PATH`.
 - Note for `curl` / WordPress cron: Windows' own resolver does **not** resolve `*.localhost` — only browsers do. Loopback calls from PHP need `127.0.0.1` (or a hosts entry).
 
+**✎ Edit a site** (hover a row): change its **name**, **domain**, **kind**, **docroot** and **PHP version**.
+
+- **Domain** — anything you like, not just the generated `<slug>.localhost`: `myshop.test`, `blog.local`, even a real domain. Spaces/newlines are rejected (they'd corrupt the nginx config), and a domain already used by another site — or by the app's own `db.localhost` / `pma.localhost` — is refused with a reason. Change it and the vhost is rewritten immediately.
+- **Kind** — the detected value (WordPress / PHP / static) is a *guess* from the folder contents. **Re-detect** re-runs it and shows **what it matched on** (e.g. *"Guessed WORDPRESS because of: wp-config.php"*), so you can see whether the guess makes sense; if it doesn't, pick the kind by hand. A Laravel project wins on `artisan` even if a stray `wp-*.php` file is lying around, and its docroot defaults to `public/`.
+- **Docroot** — the folder nginx actually serves; useful when the framework layout isn't detected (`public/`, `web/`, `htdocs/`…).
+
+### C2. Getting rid of `:8080` in the URL
+
+Two independent options — use whichever fits, they don't conflict:
+
+| | How | Trade-off |
+|---|---|---|
+| **Use port 80** | Settings → Local dev → *Use port 80* | Works in every browser and tool. Windows needs no admin for port 80, but it's often taken by **IIS / "World Wide Web Publishing Service" / http.sys** — then the app falls back to your port range and says so in the warnings (the stack still starts). Free it with `net stop W3SVC` (as admin) or by disabling that Windows service. |
+| **🎯 Open without a port** | The 🎯 button on a site row | Nothing to configure, works even while something else owns port 80, and covers **custom domains without a hosts entry**. Only applies to the Chromium window the app opens (same mechanism as §16D). |
+
 ### D. Databases
 
 MariaDB listens on **3307 and up, never 3306**, so an existing XAMPP/Laragon/MySQL keeps working. The data directory lives **outside** the runtime folder, so upgrading or removing a runtime never touches your data.
@@ -665,4 +693,5 @@ Limits: needs a **Chromium** browser (Chrome / Edge / Brave / Vivaldi — Firefo
 - **AI troubleshooter** runs **read-only** commands only (blocked by a main-process guard + your per-step approval); to apply a fix you run it yourself.
 - **Local dev stack** is **Windows-only** for now; `.test` domains and local HTTPS aren't wired up yet, there's no WordPress downloader, and no local↔server deploy or share link — see §16C-E. phpMyAdmin 5.2 needs PHP ≤ 8.3 (install 8.3 alongside 8.4 and the app picks it automatically).
 - **Point a domain at a server** needs a **Chromium** browser and does nothing behind a system proxy; it covers browsers only, not Postman or database clients — see §16D.
+- **Tool tabs aren't saved in a workspace** (Monitoring, Compare, Local dev, Tunnels, Processes, Services, AI troubleshooter) — they carry no session, so they're one click to reopen; only terminal and SFTP tabs are restored. The **detached** Monitoring/Tunnels windows also don't remember their size and position between runs yet.
 - Not yet available: a self-hosted **team server**, **cloud import** (AWS/GCP…), a **Docker/K8s browser** — see [../ROADMAP.md](../ROADMAP.md).

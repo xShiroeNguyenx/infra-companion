@@ -34,6 +34,11 @@ export const IPC = {
   TUNNELS_STOP: 'tunnels:stop',
   TUNNELS_STATES: 'tunnels:states',
   TUNNELS_EVENT: 'tunnels:event',
+  /** Tách bảng tunnel ra CỬA SỔ RIÊNG always-on-top (như monitor) để theo dõi khi app bị che. */
+  TUNNELS_OPEN_DETACHED: 'tunnels:open-detached',
+  TUNNELS_CLOSE_DETACHED: 'tunnels:close-detached',
+  /** Event → cửa sổ chính: cửa sổ tách rời đang mở hay đã đóng (để đổi nhãn nút). */
+  TUNNELS_DETACHED_STATE: 'tunnels:detached-state',
 
   TERM_CREATE: 'terminal:create',
   TERM_WRITE: 'terminal:write',
@@ -190,6 +195,10 @@ export const IPC = {
   LOCALDEV_SITE_SAVE: 'localdev:site-save',
   LOCALDEV_SITE_DELETE: 'localdev:site-delete',
   LOCALDEV_SITE_OPEN: 'localdev:site-open',
+  /** Mở site bằng browser Chromium có DNS override → URL không có :port, không cần hosts. */
+  LOCALDEV_SITE_OPEN_NOPORT: 'localdev:site-open-noport',
+  /** Dò lại loại site (static/php/wordpress) + lý do, cho form sửa site. */
+  LOCALDEV_SITE_DETECT: 'localdev:site-detect',
   LOCALDEV_SITE_PICK_FOLDER: 'localdev:site-pick-folder',
   LOCALDEV_SITE_SHELL_ENV: 'localdev:site-shell-env',
   /** Event: tiến độ 1 thao tác dài trên site (tạo/xoá/clone). */

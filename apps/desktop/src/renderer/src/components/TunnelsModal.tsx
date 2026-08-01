@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { TunnelRuleDto, TunnelType } from '@infra/shared'
 import { useDataStore } from '../stores/data'
-import { Button, ConfirmModal, Field, Modal, Select, TextInput } from './ui'
+import { Button, ConfirmModal, Field, ModalOrPanel, Select, TextInput } from './ui'
+import { OpenInTabButton } from './OpenInTabButton'
 import { useT } from '../i18n'
 import type { I18nKey } from '../i18n/dict'
 
@@ -16,7 +17,7 @@ const routeOf = (r: Pick<TunnelRuleDto, 'type' | 'bindPort' | 'destHost' | 'dest
   r.type === 'D' ? `SOCKS5 :${r.bindPort}` : `:${r.bindPort} → ${r.destHost}:${r.destPort}`
 
 /** Tunnel Dashboard: danh sách rule + trạng thái runtime + form thêm rule. */
-export function TunnelsModal({ onClose }: { onClose: () => void }) {
+export function TunnelsModal({ onClose, embedded }: { onClose?: () => void; embedded?: boolean }) {
   const t = useT()
   const { hosts, tunnels, tunnelStates, saveTunnel, deleteTunnel, startTunnel, stopTunnel } = useDataStore()
   const [mode, setMode] = useState<'list' | 'add'>('list')
@@ -91,11 +92,31 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title={t('tunnel.title')} onClose={onClose}>
+    <ModalOrPanel
+      embedded={embedded}
+      title={t('tunnel.title')}
+      onClose={onClose}
+      headerExtra={
+        embedded ? undefined : (
+          <>
+            <OpenInTabButton kind="tunnels" onDone={onClose} />
+            <button
+              type="button"
+              className="border-edge-strong text-muted hover:bg-hover hover:text-content shrink-0 rounded border px-2 py-0.5 text-[11px] font-normal"
+              title={t('tunnel.detachHint')}
+              onClick={() => void window.infra.tunnels.openDetached()}
+            >
+              ⧉ {t('tunnel.detach')}
+            </button>
+          </>
+        )
+      }
+    >
       {mode === 'list' && (
         <>
-          {/* width cố định: w-fit của Modal sẽ giãn theo label dài nhất (truncate vô hiệu) */}
-          <div className="mb-3 max-h-80 w-[520px] max-w-full overflow-y-auto">
+          {/* width cố định: w-fit của Modal sẽ giãn theo label dài nhất (truncate vô hiệu).
+              Trong tab thì bỏ trần chiều cao — tab đã có sẵn cả màn hình. */}
+          <div className={`mb-3 max-w-full overflow-y-auto ${embedded ? 'w-full' : 'max-h-80 w-[520px]'}`}>
             {tunnels.length === 0 && (
               <p className="py-4 text-center text-xs text-subtle">{t('tunnel.empty')}</p>
             )}
@@ -247,6 +268,6 @@ export function TunnelsModal({ onClose }: { onClose: () => void }) {
           </div>
         </form>
       )}
-    </Modal>
+    </ModalOrPanel>
   )
 }

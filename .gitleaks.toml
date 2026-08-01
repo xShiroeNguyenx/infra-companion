@@ -20,4 +20,11 @@ paths = [
   '''apps/desktop/scripts/smoke-runtime\.cjs''',
   # Modal nhập key: placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" trong ô textarea
   '''apps/desktop/src/renderer/src/components/KeysModal\.tsx''',
+  # Test golden-string cho việc GHI credential DB vào wp-config.php: fixture chứa 2 mật khẩu
+  # BỊA ('S3cret_pw-01', 'cR.Jv1Bx7xc@WTqo') để kiểm hàm thay `define(...)` — không phải
+  # credential thật của bất kỳ hệ thống nào. Rule `generic-api-key` bắt theo từ khoá
+  # "password" + entropy nên báo nhầm. Allowlist theo ĐƯỜNG DẪN (không phải theo giá trị) vì
+  # scan chạy `fetch-depth: 0` → chuỗi đã nằm trong lịch sử commit, đổi giá trị ở commit sau
+  # KHÔNG làm scan lịch sử hết đỏ.
+  '''packages/core/src/localdev/wpConfig\.test\.ts''',
 ]

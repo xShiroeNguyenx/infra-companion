@@ -111,6 +111,8 @@ async function harness(over?: {
   mariadbDataDirs?: readonly string[]
   /** Text mà `mariadb-install-db --help` trả về (quyết định cờ nào được truyền). */
   installDbHelp?: string
+  /** Bật "dùng cổng 80" (URL không có :port). */
+  usePort80?: boolean
 }): Promise<H> {
   const rootDir = mkdtempSync(join(tmpdir(), 'infra-stack-'))
   roots.push(rootDir)
@@ -174,6 +176,7 @@ async function harness(over?: {
       phpPoolSize: over?.poolSize ?? 2,
       httpPortFrom: over?.portRange?.[0] ?? 8080,
       httpPortTo: over?.portRange?.[1] ?? 8099,
+      ...(over?.usePort80 !== undefined ? { usePort80: over.usePort80 } : {}),
       timezone: 'Asia/Ho_Chi_Minh'
     }),
     probePort: (p) => Promise.resolve(
@@ -960,5 +963,41 @@ describe('ManagedStackProvider — công cụ DB + shim CLI', () => {
     expect(await h.provider.adminerUrl()).toBeNull()
     expect(await h.provider.phpMyAdminUrl()).toBeNull()
     expect(await h.provider.phpMyAdminReady()).toBe(false)
+  })
+})
+
+/**
+ * Cổng 80 (URL không có `:port`). Điểm dễ sai nằm ở FALLBACK: cổng 80 trên Windows rất hay bị
+ * IIS/http.sys giữ, và một tuỳ chọn thẩm mỹ thì KHÔNG được phép làm cả stack không lên được.
+ */
+describe('ManagedStackProvider — cổng 80', () => {
+  test('bật + cổng 80 rảnh ⇒ web nghe cổng 80, vhost cũng listen 80', async () => {
+    const h = await harness({ usePort80: true })
+    await h.provider.applySites()
+    expect(h.ports.all().web).toBe(80)
+    expect(await h.provider.webPortInfo()).toEqual({ port: 80, port80Fallback: false })
+    expect(readFileSync(join(h.paths.confNginxSites, 'demo.conf'), 'utf8')).toContain('listen 127.0.0.1:80;')
+  })
+
+  test('bật nhưng cổng 80 BỊ CHIẾM ⇒ lùi về dải cấu hình + gắn cờ để UI cảnh báo (KHÔNG throw)', async () => {
+    const h = await harness({ usePort80: true, busyPorts: [80] })
+    await h.provider.applySites()
+    const info = await h.provider.webPortInfo()
+    expect(info.port).toBe(8080)
+    // Cờ này là thứ health đọc để nói "cổng 80 đang bị IIS giữ, đang dùng 8080"
+    expect(info.port80Fallback).toBe(true)
+  })
+
+  test('TẮT nhưng đã ghi nhớ cổng 80 từ lần bật trước ⇒ phải RỜI khỏi 80', async () => {
+    // Nếu vẫn ưu tiên cổng đã ghi nhớ thì tắt cài đặt xong không có tác dụng gì
+    const h = await harness({ usePort80: false, ports: { web: 80 } })
+    await h.provider.applySites()
+    expect(h.ports.all().web).toBe(8080)
+  })
+
+  test('tắt + cổng đã ghi nhớ TRONG dải ⇒ giữ nguyên (URL user bookmark không chết)', async () => {
+    const h = await harness({ usePort80: false, ports: { web: 8085 } })
+    await h.provider.applySites()
+    expect(h.ports.all().web).toBe(8085)
   })
 })

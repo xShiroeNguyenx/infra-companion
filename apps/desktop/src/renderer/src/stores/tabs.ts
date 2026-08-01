@@ -32,7 +32,23 @@ export interface Pane {
   origin?: PaneOrigin
 }
 
-export type TabKind = 'terminal' | 'sftp' | 'vnc' | 'monitor' | 'compare' | 'localdev'
+/**
+ * Tab công cụ = tab KHÔNG giữ session nào (state sống trong store/main), mỗi loại nhiều nhất 1 tab.
+ * Mở ở tab thay vì popup để không khoá cả app trong lúc công cụ đang chạy dài (chẩn đoán AI,
+ * theo dõi tunnel, xem tiến trình…) — đây là lý do tồn tại của nhóm này.
+ */
+export const TOOL_TAB_KINDS = [
+  'monitor',
+  'compare',
+  'localdev',
+  'tunnels',
+  'processes',
+  'services',
+  'ai-diagnose'
+] as const
+export type ToolTabKind = (typeof TOOL_TAB_KINDS)[number]
+
+export type TabKind = 'terminal' | 'sftp' | 'vnc' | ToolTabKind
 
 export interface AppTab {
   id: string
@@ -97,6 +113,8 @@ interface TabsState {
   openCompareTab: () => void
   /** Mở Local dev (stack + site local) thành 1 tab riêng — 1 tab duy nhất, có sub-nav bên trong. */
   openLocaldevTab: () => void
+  /** Mở (hoặc focus) 1 tab công cụ — Tunnels / Tiến trình / Services / AI chẩn đoán… */
+  openToolTab: (kind: ToolTabKind) => void
   /** Mở terminal tại thư mục 1 site local dev, có php/wp sẵn trong PATH. */
   openSiteShell: (siteId: string) => Promise<void>
   /** Mở thêm pane trong tab đang active (split). opener tạo phiên. */
@@ -309,33 +327,20 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   showDashboard: () => set({ activeId: null }),
 
-  openMonitorTab: () =>
+  /**
+   * Mở (hoặc focus) tab công cụ. Mỗi loại NHIỀU NHẤT 1 tab: các công cụ này đọc chung 1 store,
+   * mở 2 tab cùng loại chỉ tạo 2 bản UI dẫm chân nhau chứ không thêm giá trị gì.
+   */
+  openToolTab: (kind) =>
     set((state) => {
-      const existing = state.tabs.find((t) => t.kind === 'monitor')
+      const existing = state.tabs.find((t) => t.kind === kind)
       if (existing) return { activeId: existing.id }
-      const tab: AppTab = {
-        id: newTabId(),
-        kind: 'monitor',
-        panes: [],
-        activePaneId: null,
-        broadcast: false
-      }
+      const tab: AppTab = { id: newTabId(), kind, panes: [], activePaneId: null, broadcast: false }
       return { tabs: [...state.tabs, tab], activeId: tab.id }
     }),
 
-  openCompareTab: () =>
-    set((state) => {
-      const existing = state.tabs.find((t) => t.kind === 'compare')
-      if (existing) return { activeId: existing.id }
-      const tab: AppTab = {
-        id: newTabId(),
-        kind: 'compare',
-        panes: [],
-        activePaneId: null,
-        broadcast: false
-      }
-      return { tabs: [...state.tabs, tab], activeId: tab.id }
-    }),
+  openMonitorTab: () => get().openToolTab('monitor'),
+  openCompareTab: () => get().openToolTab('compare'),
 
   openSiteShell: async (siteId) => {
     try {
@@ -357,19 +362,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   },
 
   // Tab localdev KHÔNG giữ session nào: supervisor sống trong main process và sống LÂU HƠN tab.
-  openLocaldevTab: () =>
-    set((state) => {
-      const existing = state.tabs.find((t) => t.kind === 'localdev')
-      if (existing) return { activeId: existing.id }
-      const tab: AppTab = {
-        id: newTabId(),
-        kind: 'localdev',
-        panes: [],
-        activePaneId: null,
-        broadcast: false
-      }
-      return { tabs: [...state.tabs, tab], activeId: tab.id }
-    }),
+  // Tab localdev KHÔNG giữ session nào: supervisor sống trong main process và sống LÂU HƠN tab.
+  openLocaldevTab: () => get().openToolTab('localdev'),
 
   splitLocal: async (profileId) => {
     const tab = get().activeTab()

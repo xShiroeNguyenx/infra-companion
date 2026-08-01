@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { win32 } from 'node:path'
 
 /**
  * Dò browser Chromium đã cài trên máy (Chrome/Edge/Brave/Vivaldi) — chỉ những browser này hiểu
@@ -10,6 +10,11 @@ import { join } from 'node:path'
  * sách chọn, và user luôn có ô "đường dẫn tuỳ chọn".
  *
  * THUẦN theo nghĩa: env + hàm `exists` được inject ⇒ test không cần cài browser thật.
+ *
+ * Ghép đường dẫn bằng `win32.join` chứ KHÔNG phải `join` của nền tảng đang chạy: đây là đường
+ * dẫn Windows (`%ProgramFiles%`, `.exe`) nên phải luôn dùng `\` — dùng `join` thì cùng một input
+ * sẽ ra `C:\Program Files/Google\Chrome\...` khi chạy trên Linux/macOS (CI build 3 OS đã đỏ
+ * đúng vì lý do này), và hàm mất tính xác định giữa các nền tảng.
  */
 
 /** Gốc thư mục cài — tên biến môi trường khác nhau giữa 32/64-bit và per-user. */
@@ -82,7 +87,7 @@ export async function detectChromiumBrowsers(
     for (const p of cand.paths) {
       const base = env[p.base]
       if (base === undefined || base === '') continue
-      const exe = join(base, p.rel)
+      const exe = win32.join(base, p.rel)
       if (await exists(exe)) {
         out.push({ id: cand.id, name: cand.name, exe })
         break // mỗi browser chỉ lấy 1 vị trí đầu tiên tìm thấy

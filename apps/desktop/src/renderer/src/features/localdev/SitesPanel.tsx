@@ -137,13 +137,33 @@ export function SitesPanel() {
 }
 
 /** 1 hàng site — cũng dùng lại được ở Dashboard về sau. */
+/**
+ * URL của site — bỏ `:80`/`:443` để URL sạch khi user đã bật cổng 80.
+ * (Bản dùng chung `siteUrl()` nằm ở `@infra/core`, nhưng renderer KHÔNG được import core —
+ * core kéo theo node-pty/ssh2. Giữ 3 dòng ở đây, đổi thì đổi cả hai.)
+ */
+function siteUrlOf(site: LdSiteDto): string {
+  const scheme = site.https ? 'https' : 'http'
+  const isDefault = site.https ? site.httpPort === 443 : site.httpPort === 80
+  return isDefault ? `${scheme}://${site.domain}/` : `${scheme}://${site.domain}:${String(site.httpPort)}/`
+}
+
+/** Domain tự phân giải về loopback? Chỉ *.localhost (RFC 6761) — xem resolvesWithoutHostsFile. */
+function autoResolves(domain: string): boolean {
+  return domain === 'localhost' || domain.toLowerCase().endsWith('.localhost')
+}
+
 export function SiteRow({ site, onDelete }: { site: LdSiteDto; onDelete?: () => void }) {
   const t = useT()
   const openSiteShell = useTabsStore((s) => s.openSiteShell)
+  const openSiteNoPort = useLocaldevStore((s) => s.openSiteNoPort)
   const [showDb, setShowDb] = useState(false)
-  const url = `http://${site.domain}:${String(site.httpPort)}/`
+  const [editing, setEditing] = useState(false)
+  const url = siteUrlOf(site)
   // Site tĩnh không cần DB → không làm rối UI bằng nút vô nghĩa
   const needsDb = site.kind !== 'static'
+  /** Còn :port trong URL, hoặc domain không tự phân giải ⇒ nút "mở không cần cổng" có ích. */
+  const noPortUseful = site.httpPort !== 80 || !autoResolves(site.domain)
   return (
     <div className="border-edge bg-input rounded border">
       <div className="group flex items-center gap-2 px-3 py-2">
@@ -181,6 +201,22 @@ export function SiteRow({ site, onDelete }: { site: LdSiteDto; onDelete?: () => 
           >
             ↗
           </button>
+          {noPortUseful && (
+            <button
+              className="border-edge-strong text-muted hover:bg-hover rounded border px-1.5 text-[11px]"
+              title={t('localdev.site.openNoPort')}
+              onClick={() => void openSiteNoPort(site.id)}
+            >
+              🎯
+            </button>
+          )}
+          <button
+            className="border-edge-strong text-muted hover:bg-hover rounded border px-1.5 text-[11px]"
+            title={t('localdev.site.edit')}
+            onClick={() => setEditing((v) => !v)}
+          >
+            ✎
+          </button>
           <button
             className="border-edge-strong text-muted hover:bg-hover rounded border px-1.5 text-[11px]"
             title={t('localdev.site.terminal')}
@@ -211,7 +247,136 @@ export function SiteRow({ site, onDelete }: { site: LdSiteDto; onDelete?: () => 
           </span>
         )}
       </div>
+      {editing && <SiteEditBlock site={site} onDone={() => setEditing(false)} />}
       {showDb && needsDb && <SiteDbBlock site={site} />}
+    </div>
+  )
+}
+
+const KIND_OPTIONS = ['auto', 'wordpress', 'php', 'static'] as const
+
+/**
+ * Sửa site: domain, LOẠI SITE, docroot, bản PHP.
+ *
+ * Vì sao "Loại site" phải sửa được: app chỉ ĐOÁN loại lúc thêm site (theo file trong thư mục).
+ * Đoán sai là chuyện có thật — ví dụ project Laravel bị dán nhãn WordPress vì trong repo lẫn
+ * file `wp-*.php`, hoặc user trỏ vào thư mục cha. Không có ô này thì nhãn sai đó vĩnh viễn.
+ * Nút "Dò lại" hiện LÝ DO app đoán (file nào) để user đối chiếu chứ không phải tin suông.
+ */
+function SiteEditBlock({ site, onDone }: { site: LdSiteDto; onDone: () => void }) {
+  const t = useT()
+  const editSite = useLocaldevStore((s) => s.editSite)
+  const runtimes = useLocaldevStore((s) => s.runtimes)
+  const [name, setName] = useState(site.name)
+  const [domain, setDomain] = useState(site.domain)
+  const [kind, setKind] = useState<(typeof KIND_OPTIONS)[number]>(site.kind)
+  const [docRoot, setDocRoot] = useState(site.docRoot)
+  const [phpVersion, setPhpVersion] = useState(site.phpVersion ?? '')
+  const [detected, setDetected] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const phpRuntimes = runtimes.filter((r) => r.kind === 'php' && r.installed)
+
+  const detect = async (): Promise<void> => {
+    const res = await window.infra.localdev.siteDetect(site.rootPath)
+    if (!res.ok || res.kind === undefined) return setDetected(res.error ?? '—')
+    setDetected(t('localdev.site.detectedAs', { kind: res.kind.toUpperCase(), reason: res.reason ?? '' }))
+    setKind(res.kind)
+    if (res.docRootSub !== undefined) {
+      setDocRoot(res.docRootSub ? `${site.rootPath}\\${res.docRootSub}` : site.rootPath)
+    }
+  }
+
+  const save = async (): Promise<void> => {
+    setBusy(true)
+    try {
+      const saved = await editSite({
+        id: site.id,
+        name: name.trim() || site.name,
+        domain: domain.trim(),
+        kind,
+        docRoot: docRoot.trim() || site.docRoot,
+        phpVersion: phpVersion === '' ? null : phpVersion
+      })
+      if (saved) onDone()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="border-edge space-y-2 border-t px-3 py-2">
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="min-w-32 flex-1">
+          <span className="text-subtle mb-1 block text-[10px] tracking-wide uppercase">{t('localdev.site.name')}</span>
+          <TextInput className="!text-xs" value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+        <label className="min-w-40 flex-[2]">
+          <span className="text-subtle mb-1 block text-[10px] tracking-wide uppercase">
+            {t('localdev.site.domain')}
+          </span>
+          <TextInput
+            className="!font-mono !text-xs"
+            value={domain}
+            placeholder="my-site.localhost"
+            onChange={(e) => setDomain(e.target.value)}
+          />
+        </label>
+        <label className="min-w-28">
+          <span className="text-subtle mb-1 block text-[10px] tracking-wide uppercase">{t('localdev.site.kind')}</span>
+          <select
+            className="border-edge-strong bg-input text-content focus:border-accent w-full rounded border px-2 py-1.5 text-xs outline-none"
+            value={kind}
+            onChange={(e) => setKind(e.target.value as (typeof KIND_OPTIONS)[number])}
+          >
+            {KIND_OPTIONS.map((k) => (
+              <option key={k} value={k}>
+                {k === 'auto' ? t('localdev.site.kindAuto') : k}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="min-w-24">
+          <span className="text-subtle mb-1 block text-[10px] tracking-wide uppercase">{t('localdev.site.php')}</span>
+          <select
+            className="border-edge-strong bg-input text-content focus:border-accent w-full rounded border px-2 py-1.5 text-xs outline-none"
+            value={phpVersion}
+            onChange={(e) => setPhpVersion(e.target.value)}
+          >
+            <option value="">{t('localdev.site.phpNone')}</option>
+            {phpRuntimes.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.id.replace('php-', 'PHP ')}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <label className="block">
+        <span className="text-subtle mb-1 block text-[10px] tracking-wide uppercase">
+          {t('localdev.site.docRoot')}
+        </span>
+        <TextInput className="!font-mono !text-xs" value={docRoot} onChange={(e) => setDocRoot(e.target.value)} />
+      </label>
+
+      {/* Domain không phải *.localhost thì browser không tự phân giải — nói NGAY, kèm đường ra */}
+      {!autoResolves(domain.trim()) && domain.trim().length > 0 && (
+        <p className="text-warning text-[10px] leading-relaxed">{t('localdev.site.domainNeedsHosts')}</p>
+      )}
+      {detected !== null && <p className="text-subtle text-[10px] leading-relaxed">ℹ {detected}</p>}
+
+      <div className="flex justify-end gap-2">
+        <Button className="!px-2 !py-1 !text-xs" onClick={() => void detect()}>
+          {t('localdev.site.detect')}
+        </Button>
+        <Button className="!px-2 !py-1 !text-xs" onClick={onDone}>
+          {t('common.cancel')}
+        </Button>
+        <Button variant="primary" className="!px-2 !py-1 !text-xs" disabled={busy} onClick={() => void save()}>
+          {busy ? '…' : t('localdev.site.save')}
+        </Button>
+      </div>
     </div>
   )
 }
