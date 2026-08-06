@@ -32,6 +32,31 @@ export {
 export type { ChromiumArgsInput, HostMapGroup, HostMapTarget } from './hostmap/hostMap'
 export { CHROMIUM_BROWSERS, detectChromiumBrowsers } from './hostmap/browsers'
 export type { BrowserCandidate, BrowserEnv, DetectedBrowser } from './hostmap/browsers'
+// F57 — Chọn font terminal từ danh sách font có trên máy + font user tự thêm.
+export {
+  ADDABLE_FONT_EXT,
+  SCANNABLE_FONT_EXT,
+  SFNT_HEADER_BYTES,
+  SFNT_TABLE_ENTRY_BYTES,
+  detectFontContainer,
+  isAddableFontBytes,
+  isScannableFontFile,
+  parseFamilyFromNameTable,
+  parseTableDirectory,
+  sfntNumTables,
+  ttcFontOffsets,
+  ttcNumFonts
+} from './fonts/sfnt'
+export type { FontContainer, SfntTable } from './fonts/sfnt'
+export {
+  FONT_SCAN_MAX_DEPTH,
+  FONT_SCAN_MAX_FILES,
+  buildFontStack,
+  primaryFontFamily,
+  quoteFontFamily,
+  systemFontDirs
+} from './fonts/fontDirs'
+export type { FontDirEnv } from './fonts/fontDirs'
 export { MonitorService } from './monitor/MonitorService'
 export type { MetricSample, MonitorTarget } from './monitor/MonitorService'
 export { AlertEngine } from './monitor/AlertEngine'

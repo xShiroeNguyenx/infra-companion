@@ -5,6 +5,27 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.4] — 2026-08-06
+
+### Added
+
+- **Pick the terminal font from a list instead of typing a CSS name** (Settings → Terminal → **Font**). The old field was a raw `font-family` string, which meant you had to already know the exact family name and got no feedback when you got it wrong. Now it's a dropdown of the fonts **actually present on this machine**, read from your operating system's font folders — the app opens each font file and reads its real family name out of the file, because filenames don't tell you (`segoeui.ttf` is "Segoe UI", `CascadiaMono-Regular.ttf` is "Cascadia Mono"). A **↻** button re-scans, for when you install a font while the app is open.
+  - **A live sample** under the dropdown shows `ilI1 O0 {}[]() <=> --> │├─┤` and a shell prompt in the font you're considering, so you can judge the characters that actually matter in a terminal without closing Settings.
+  - **It tells you when your font isn't really being used.** A `font-family` that names a font you don't have silently falls back to something else — the app now says so outright: *"this machine doesn't have X → the terminal is rendering with a substitute"*. It also warns when the chosen font **is not monospace**, which otherwise shows up as mysteriously misaligned columns and broken box-drawing.
+- **Add a font you downloaded, without installing it into the OS** (**+ Add a font file**). Pick a `.ttf` / `.otf` / `.ttc` / `.woff` / `.woff2` and the app copies it into its own data folder and registers it for the terminal — useful on a machine where you can't install fonts, or when you just don't want a one-off font in your system list. Up to 8 fonts, 2 MB each. The family name is read from the file and stays editable in case the guess is off; files are validated by their **magic bytes**, not their extension, so a renamed non-font is rejected instead of written into the app's data folder.
+  - Typing a full CSS stack by hand is still available behind **Type a CSS stack**, for anyone who wants several fallbacks in a specific order.
+- **Every tool is now one click away on the Dashboard** — two rows of icons across the top, spread evenly over the full width. The `⋯` menu had grown to twenty entries: a list you had to open, read and scan every time. The icons come from the same labels as the menu, so the two can't drift apart, and hovering one names it. The **uptime watcher** tile stays lit while it's running, since that one is a toggle rather than a panel. The menu keeps every entry: it's still the way in while you're on a terminal tab with no Dashboard in sight.
+- **The Dashboard is much wider, and the space is actually used** (it was capped at a narrow column while the feature list kept growing). Favourites go up to five across, the monitoring history charts up to four, and the counters stretch the full width. The four lists at the bottom — recent connections, workspaces, tunnels, keyboard shortcuts — each keep the full width but **split into two columns inside one box**, so a ten-row list is five rows tall instead of ten with half the page blank. They fold back to a single column on a narrow window.
+- **Quick connect moved up next to *+ New terminal***, in the header row. Both do the same job — open a session — so they belong in the same place, and it's the first thing your eye lands on rather than a field further down the page. Type `user@host[:port]`, press Enter; a confirmation drops down under the box when what you typed looks like a target.
+- **Host groups are cards now, not tiny chips.** A chip only had room for a name and a number, which isn't enough to decide whether to open a group. Each card carries a **full-height band in the group's colour**, a `⊞ N` count chip, **one dot per host** (green up, red down, grey while unknown), the group's default SSH user if it has one, the first few host names, and a footer that says what clicking actually does — *open N panes in one tab*. Deliberately a different shape from the single-host cards under ★ Favorites: those open one tab, these open the whole group, and at a glance you can now tell which is which.
+  - The up/down dots and the `x/y up` ratio only appear once the **📡 uptime watcher** has actually checked those hosts. A group with no results yet shows grey dots and no ratio, rather than claiming `0/5` is down.
+
+### Changed
+
+- Three menu icons are now distinct, because the Dashboard shows icons **without labels** and duplicates were impossible to tell apart: **Processes** is 📋 (was ⚙, same as Settings), **Snippets** is 📝 (was ⚡, same as Bulk Execution), and **SSH Keys** gained 🔑. Same features, same places.
+
+---
+
 ## [0.2.3] — 2026-08-06
 
 ### Added

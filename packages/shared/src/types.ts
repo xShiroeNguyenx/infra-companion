@@ -1378,6 +1378,29 @@ export interface HostMapBrowserDto {
   exe: string
 }
 
+/** Một font user tự thêm từ file. `dataUrl` để renderer đăng ký bằng `FontFace`. */
+export interface CustomFontDto {
+  id: string
+  /** Tên họ font dùng trong CSS `font-family` — đọc từ file, user sửa được. */
+  family: string
+  /** Tên file trong `userData/fonts` (do main tự sinh, không phải tên user đặt). */
+  fileName: string
+  sizeBytes: number
+  dataUrl: string
+}
+
+export interface FontListDto {
+  /** Tên họ font đọc được từ thư mục font của hệ điều hành, đã sắp xếp + loại trùng. */
+  system: string[]
+  custom: CustomFontDto[]
+  /** true = quét không ra font nào → UI phải chỉ user dùng ô nhập tay thay vì im lặng. */
+  scanFailed: boolean
+}
+
+export type FontAddResultDto =
+  | { ok: true; font: CustomFontDto }
+  | { ok: false; reason: 'full' | 'tooLarge' | 'notFont' | 'io' }
+
 export interface HostMapStateDto {
   groups: HostMapGroupDto[]
   /** Browser Chromium tìm thấy trên máy. Rỗng ⇒ UI phải nói rõ vì sao không mở được. */
@@ -1706,6 +1729,15 @@ export interface InfraApi {
     curlCommand(groupId: string, targetId?: string): Promise<HostMapCurlDto>
     /** Xoá profile browser đã sinh cho group (hoặc tất cả nếu bỏ trống). */
     clearProfiles(groupId?: string): Promise<HostMapOpenDto>
+  }
+  /** F57 — nguồn font cho dropdown chọn font terminal (Settings → Terminal). */
+  fonts: {
+    list(): Promise<FontListDto>
+    /** Quét lại thư mục font của hệ điều hành — dùng sau khi user vừa cài font mới. */
+    rescan(): Promise<FontListDto>
+    add(name: string, bytes: Uint8Array): Promise<FontAddResultDto>
+    rename(id: string, family: string): Promise<boolean>
+    remove(id: string): Promise<boolean>
   }
   ai: {
     getConfig(): Promise<AiConfigDto | null>

@@ -3,7 +3,6 @@ import { useT } from '../i18n'
 import {
   PANE_FRAMES,
   PANE_LAYOUTS,
-  TERM_FONT_DEFAULT,
   useSettingsStore,
   type CommandAlias,
   type BgFit,
@@ -21,6 +20,7 @@ import { CustomPaletteSection } from './CustomPaletteSection'
 import { LocaldevSettingsView } from '../features/localdev/LocaldevSettingsView'
 import { LayoutGlyph } from './LayoutGlyph'
 import { MouseCursorSection } from './MouseCursorSection'
+import { TermFontSection } from './TermFontSection'
 import { Button, Field, TextArea, TextInput } from './ui'
 
 /** Các nhóm cài đặt hiển thị ở cột điều hướng bên trái của màn hình Settings. */
@@ -108,7 +108,6 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     backgroundBlur,
     backgroundPosition,
     backgroundFit,
-    termFontFamily,
     termFontSize,
     termLineHeight,
     termCursor,
@@ -126,7 +125,6 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     setBackgroundBlur,
     setBackgroundPosition,
     setBackgroundFit,
-    setTermFontFamily,
     setTermFontSize,
     setTermLineHeight,
     setTermCursor,
@@ -633,24 +631,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                   <p className="text-subtle mt-1 text-[11px]">{t('settings.paneFrameHint')}</p>
                 </Field>
 
-                <Field label={t('settings.termFont')}>
-                  <div className="flex gap-2">
-                    <TextInput
-                      value={termFontFamily}
-                      onChange={(e) => setTermFontFamily(e.target.value)}
-                      placeholder={TERM_FONT_DEFAULT}
-                      className="!font-mono !text-xs"
-                    />
-                    <button
-                      onClick={() => setTermFontFamily(TERM_FONT_DEFAULT)}
-                      className="border-edge text-muted hover:bg-hover shrink-0 rounded border px-3 text-sm"
-                      title={t('settings.termFontReset')}
-                    >
-                      ↺
-                    </button>
-                  </div>
-                  <p className="text-subtle mt-1 text-[10px] leading-relaxed">{t('settings.termFontHint')}</p>
-                </Field>
+                <TermFontSection />
 
                 <MouseCursorSection />
               </>

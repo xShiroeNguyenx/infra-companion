@@ -256,7 +256,18 @@ export const IPC = {
   /** Lệnh curl --resolve tương đương để dán vào terminal. */
   HOSTMAP_CURL: 'hostmap:curl',
   /** Xoá profile browser đã sinh (đăng nhập lại từ đầu / giải phóng đĩa). */
-  HOSTMAP_CLEAR_PROFILES: 'hostmap:clear-profiles'
+  HOSTMAP_CLEAR_PROFILES: 'hostmap:clear-profiles',
+
+  // ── F57: chọn font terminal ──────────────────────────────────────────────
+  /** Danh sách font trên máy (đã nhớ đệm) + font user tự thêm kèm data URL. */
+  FONTS_LIST: 'fonts:list',
+  /** Quét lại thư mục font của hệ điều hành (sau khi user vừa cài font mới). */
+  FONTS_RESCAN: 'fonts:rescan',
+  /** Thêm font từ file user chọn (renderer gửi bytes, main tự đặt tên file). */
+  FONTS_ADD: 'fonts:add',
+  /** Đổi tên họ font đã thêm (tên này là thứ đi vào CSS font-family). */
+  FONTS_RENAME: 'fonts:rename',
+  FONTS_REMOVE: 'fonts:remove'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

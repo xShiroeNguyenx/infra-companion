@@ -6,3 +6,6 @@ release/
 *.local
 .DS_Store
 .env
+
+# Quy tắc làm việc cho Claude Code — giữ ở máy, không publish
+CLAUDE.md

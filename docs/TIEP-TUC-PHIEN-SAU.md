@@ -41,9 +41,26 @@
 > | v0.2.0 | đã publish, **chỉ có installer Windows** (2 job mac/linux đỏ ở bước Test — xem block v0.2.1) |
 > | v0.2.1 | ✅ **ĐÃ commit `c66d346` + tag đã push** |
 > | v0.2.2 | ✅ **ĐÃ commit `5711b68` + tag `v0.2.2` đã push.** Nội dung = F55 theo dõi bất đồng bộ master↔slave + chuẩn hoá địa chỉ/tên mẫu |
-> | **v0.2.3** | 🟡 **SẴN SÀNG RELEASE — chưa commit/tag, CHƯA TEST GUI.** Đã bump 2 package.json + CHANGELOG `[0.2.3]` 2026-08-06 + README (badge, mục tính năng, limitations) + landing hero + ROADMAP F56 ✅ v0.2.3 |
+> | v0.2.3 | ✅ **ĐÃ commit `2e0efe8` + tag `v0.2.3` đã push origin** (2026-08-06). **Tag trước khi test GUI** → checklist ở block `v0.2.3` vẫn nên chạy; lỗi gì thì ra bản sau chứ KHÔNG đè tag |
+> | **v0.2.4** | 🟡 **SẴN SÀNG RELEASE — chưa commit/tag, CHƯA TEST GUI.** = **F57 dropdown chọn font terminal + thêm font từ file** + **F58 Dashboard: lưới 20 icon công cụ 2 hàng · nới `max-w-3xl`→`1600px` · kết nối nhanh lên hàng header · nhóm host thành card · 4 mục cuối chia 2 cột bên trong**. Docs đủ: 2 package.json + CHANGELOG `[0.2.4]` (Added ×6 · Changed ×1) + README (badge, bullet Dashboard, bullet Font picker, Known Limitations v0.2.4, test-count **1073**) + ROADMAP **F57 + F58** ✅ + USER-GUIDE §1B + §5B + landing (hero + 2 card mới 🅰️/🏠, bỏ tag NEW của card 🔁). **Cổng chất lượng đã chạy đủ: typecheck 3 package · 1073 test xanh (54 file) · build sạch · `0.2.4` trong bundle và không còn `0.2.3` · soát IP public 0 dòng** |
+>
+> **F58 lưới công cụ + nới rộng Dashboard (2026-08-06)** — `features/dashboard/ToolGrid.tsx` (mới) + `DashboardView.tsx`. Khung Dashboard `max-w-3xl` → **`max-w-[1600px]`**; favorites thêm `xl:grid-cols-5`, lịch sử monitoring thêm `xl:grid-cols-3 2xl:grid-cols-4`; ngược lại **giới hạn** ô Kết nối nhanh (`max-w-2xl`) và hàng Stats (`xl:max-w-4xl`) vì kéo dài 1600px thì vô lý. **Kết nối nhanh chuyển lên hàng header** cạnh "+ Terminal mới" (cùng mục đích "mở phiên mới"); nút gợi ý xác nhận thành **dropdown absolute** (`top-full`) vì hàng header không còn chỗ cho một dòng nữa, và header có `flex-wrap` để cửa sổ hẹp thì xuống dòng chứ không tràn. **Chip nhóm host → `GroupCard`**: **dải màu `group.color` chạy hết chiều cao** (absolute inset-y-0, không phải vạch nhỏ cạnh tên), surface `bg-elevated` + `border-edge-strong` + `rounded-md`, chip `⊞ N`, **một chấm cho MỖI host** (xanh sống / đỏ chết / **xám = chưa check**), `group.username`, tên vài host đầu + `+N`, và **dòng footer nói thẳng bấm vào thì gì** ("Mở N pane trong 1 tab"). Cả bộ này là để **phân biệt với card 1 host ở mục Yêu thích** — user báo bản đầu (chỉ vạch nhỏ + 3 dòng chữ) nhìn na ná card một host. **`up/checked` chỉ tính trên host ĐÃ có kết quả check** (`statuses[id] !== undefined`): watcher mới bật mà tính cả host chưa check thì hiện "0/5" là **nói sai**; cùng lý do đó chấm chưa check phải XÁM chứ không đỏ. 4 ô số đếm bỏ `xl:max-w-4xl` → giãn full.
+> **4 mục dạng danh sách ở cuối** (kết nối gần đây · workspaces · tunnels · phím tắt): mỗi mục vẫn chiếm **HẾT chiều rộng**, nhưng **danh sách BÊN TRONG chia 2 cột** qua component `TwoColumnList` (cắt mảng làm 2 nửa, nửa đầu nhận phần dư). ⚠️ Bản đầu tôi hiểu sai thành "chia 4 mục vào 2 cột, mỗi mục 1 cột" — user phải nói lại. `TwoColumnList` là **MỘT hộp viền duy nhất có kẻ dọc giữa** chứ không phải 2 hộp rời (2 hộp rời trông như 2 danh sách khác nhau); dưới `xl` về 1 cột và đổi `divide-x` → `divide-y` để 2 nửa nối thành dải liên tục. Cheat sheet phím tắt phải **dữ liệu hoá** (`SHORTCUTS`) mới chia được.
+> Lưới công cụ: **20 mục, ép đúng 2 hàng** bằng `gridTemplateColumns: repeat(ceil(n/2), …)` (10+10 khi bật Local dev, 10+9 khi tắt), ô `h-14 w-full` + `text-2xl` và cột `1fr` để **dàn đều hết chiều rộng** (bản đầu dùng `w-fit` nên dồn cục bên trái — user yêu cầu sửa). **Icon lấy TỪ nhãn i18n `menu.*`** qua `splitMenuLabel()` (cắt ở dấu cách đầu) chứ không khai lại emoji — đổi ở `dict.ts` là dashboard đổi theo, không lệch 2 nơi. Watcher là **toggle** nên có state `active` (viền accent) và chèn ngay sau Monitoring; Local dev mở TAB chứ không modal và chỉ hiện khi user bật ở Cài đặt. Menu `⋯` **giữ nguyên** — đó là đường vào duy nhất khi đang ở tab terminal.
+> ⚠️ **Lưới chỉ có icon nên emoji TRÙNG là không phân biệt được**: đã tách `menu.processes` ⚙→📋 (trùng Cài đặt) và `menu.snippets` ⚡→📝 (trùng Bulk), thêm `menu.keys` 🔑 (trước chỉ là nút riêng ở sidebar, chưa có icon) — cả 3 ngôn ngữ. Đã kiểm bằng script đọc `dict.ts`: **20 công cụ / 20 icon khác nhau / 0 cặp trùng**. Thêm công cụ mới thì chạy lại kiểm này.
+> ⚠️ **Heredoc của Bash tool ăn mất backslash** (`\\.` → `\.`, `\\s` → `\s` trong template literal = mất nghĩa regex) → viết script kiểm bằng **tool Write**, hoặc tránh regex (dùng `indexOf`).
+>
+> **F57 font (2026-08-06)** — `packages/core/src/fonts/{sfnt,fontDirs}.ts` (thuần, 29 test) + `apps/desktop/src/main/lib/fontScan.ts` + `main/ipc/fonts.ts` + `renderer/src/lib/fontStack.ts` + `stores/fonts.ts` + `components/TermFontSection.tsx`.
+> **Đọc tên họ font từ bảng `name` trong file font** vì tên file không nói được (`segoeui.ttf` → "Segoe UI"); chỉ đọc vài KB/file (header → bảng mục lục → bảng `name`), **đã chạy thật trên máy này: 473 file → 269 họ trong ~150ms**. Ưu tiên nameID **16** (Typographic Family) hơn nameID 1 vì nameID 1 của họ nhiều nét bị cắt thành "Roboto Light". Offset trong bảng mục lục là **TUYỆT ĐỐI từ đầu file**, kể cả bên trong `.ttc`.
+> ⚠️ Cố ý **KHÔNG dùng `queryLocalFonts()`** của Chromium: cần quyền `local-fonts` mà Electron không cấp qua permission handler mặc định + cần user gesture → hỏng thì **hỏng im lặng**.
+> ⚠️ `scanFontFamilies` đặt ở `main/lib/` **không import `electron`** để probe được bằng Node thuần (đã dùng: esbuild bundle + `--alias:@infra/core=<shim chỉ có 2 module fonts>`; alias sang `@infra/core/index` thì kéo `ssh2` + `.node` native vào và esbuild chết).
+> ⚠️ `let entries: Dirent[]` phải khai TƯỜNG MINH — `Awaited<ReturnType<typeof readdir>>` chọn nạp chồng Buffer nên typecheck đỏ.
+> **Font tự thêm**: copy vào `userData/fonts` + index `fonts.json`; kiểm **magic byte** chứ không tin đuôi file; **tên file do main tự sinh** (`<uuid><ext>`) nên tên user gửi lên không thoát được thư mục; renderer nhận data URL rồi `new FontFace(family, url(...))` + `document.fonts.add()` (CSP đã cho `font-src data:`) — **`FontFace.family` chỉ-đọc** nên đổi tên = phải `document.fonts.delete()` rồi tạo lại. Store phải `load()` **ngay lúc App khởi động**, không đợi mở Settings, nếu không terminal vẽ trước khi font được đăng ký.
+> **Phát hiện đáng nhớ**: `Cascadia Mono` (mục đầu trong `TERM_FONT_DEFAULT`) **KHÔNG có trên máy này** → terminal vẫn đang vẽ bằng `Consolas` qua fallback. Đó là lý do có cảnh báo "máy không có font X". `isFontAvailable` đo bề rộng chuỗi thử với **3 generic** (monospace/serif/sans-serif) chứ không dùng `document.fonts.check()` — hàm đó trả **true cả với font không tồn tại**; và phải đủ 3 generic vì Chromium map `monospace` = Courier New, chọn đúng Courier New thì so với riêng monospace sẽ báo sai là "không có".
 >
 > **Nội dung v0.2.3** = **con trỏ chuột tuỳ chỉnh** (19 preset + tự thêm từ file) **+ fix chữ méo ở tab terminal** (WebGL texture atlas hỏng sau khi tab bị `display:none`) — 2 khối dưới. Chỉ chạm renderer, KHÔNG chạm core/vault → vault vẫn ở schema **v15**, 1044 test của core không bị ảnh hưởng (không chạy lại). Typecheck 3 package + build sạch.
+>
+> 📄 **`CLAUDE.md` ở gốc repo = quy tắc làm việc** (git · không đưa dữ liệu thật vào repo · kiến trúc · test · bẫy nền tảng). File đó **đã gitignore, KHÔNG commit** — chỉ nằm ở máy này, Claude Code tự đọc mỗi phiên. Sửa quy tắc thì sửa thẳng file đó.
 >
 > ⚠️ **BÀI HỌC LẶP LẠI LẦN 2** — dòng trạng thái release trong memory nói "v0.2.2 chưa commit/tag" nhưng `git tag` cho thấy đã phát hành rồi. Hậu quả thật: 2 mục trên ban đầu bị ghi vào `[0.2.2]` trong CHANGELOG (mục mô tả nội dung mà bản 0.2.2 đã publish KHÔNG có) — phải chuyển sang `[0.2.3]`. **Luôn chạy `git tag` + `git log -1` + `git ls-tree -r --name-only <tag> | grep <file mới>` TRƯỚC khi tin bất kỳ ghi chú trạng thái nào.**
 >
@@ -279,6 +296,80 @@ Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps
 
 ```powershell
 # ============================================================
+# v0.2.4 — F57 DROPDOWN CHON FONT TERMINAL + THEM FONT TU FILE
+#          + F58 DASHBOARD (luoi cong cu, noi rong, ket noi nhanh len header, card nhom host)
+# (v0.2.3 DA commit 2e0efe8 + tag da push -> v0.2.4 la commit MOI TREN dinh, KHONG amend)
+# Version da bump 0.2.4 o 2 package.json; CHANGELOG [0.2.4] ngay 2026-08-06.
+# 1073 test xanh (1044 -> 1073, +29 test font), typecheck 3 package + build sach. CHUA test GUI.
+# ============================================================
+cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
+
+# --- BUOC 1: commit + push main (BAT BUOC truoc khi tag) ---
+git status
+git add -A                 # file MOI: packages/core/src/fonts/{sfnt,fontDirs}.ts (+2 file test)
+                           #           apps/desktop/src/main/lib/fontScan.ts
+                           #           apps/desktop/src/main/ipc/fonts.ts
+                           #           renderer/src/lib/fontStack.ts
+                           #           renderer/src/stores/fonts.ts
+                           #           renderer/src/components/TermFontSection.tsx
+                           #           renderer/src/features/dashboard/ToolGrid.tsx
+                           # (CLAUDE.md da gitignore - giu o may, KHONG commit)
+git status                 # xac nhan het "Changes not staged"
+git commit -m @'
+feat: pick the terminal font from a dropdown of the fonts actually installed on this machine (family names read out of the font files), with a live sample and warnings when the font is missing or not monospace, or add a downloaded .ttf/.otf/.woff2 without installing it into the OS + rework the Dashboard: every tool as two rows of icons, quick connect in the header, host groups as cards showing which machines are up, and the width actually used (v0.2.4)
+'@
+git push origin main
+
+# --- BUOC 2: tag SAU KHI push + SAU KHI test GUI ---
+#   - Settings > Terminal > "Font": dropdown phai co 2 nhom, "Font tren may" liet ke
+#       ~269 font that (may nay). Chon Consolas -> terminal doi font NGAY.
+#   - O XEM THU ngay duoi dropdown phai doi theo font dang chon.
+#   - CANH BAO: gia tri mac dinh bat dau bang "Cascadia Mono" ma may NAY khong co
+#       -> phai hien dong "may khong co font Cascadia Mono ..." (mau vang).
+#       Chon 1 font khong monospace (vd Arial) -> phai hien canh bao "khong phai monospace".
+#   - Nut ↻ quet lai: cai 1 font moi vao Windows roi bam -> font moi phai xuat hien.
+#   - "+ Them font tu file": tha 1 .ttf tai ve -> them xong TU DUNG luon + toast;
+#       ten ho font phai doc dung tu file (khong phai ten file)
+#       -> doi ten trong o -> terminal phai van dung dung font do
+#       -> doi 1 file .png thanh .ttf roi thu them -> phai bao "khong phai font"
+#       -> xoa font dang dung -> terminal ve font thay the, KHONG treo
+#       -> DONG APP MO LAI: font tu them phai con va terminal van dung duoc no
+#   - "Nhap tay chuoi CSS": mo ra sua duoc stack nhieu lop nhu ban cu
+#   - DASHBOARD (nut 🏠): khung phai RONG han truoc; muc "Cong cu" o tren cung
+#       phai la 2 HANG icon DAN DEU het chieu rong (10+10 neu bat Local dev, 10+9 neu tat)
+#       KHONG duoc thay chu "dashboard.tools" hay "menu.keys" — thay tuc la dang chay
+#         BUNDLE CU, reload (Ctrl+R) hoac khoi dong lai pnpm dev
+#       4 muc cuoi (gan day / workspaces / tunnels / phim tat): MOI muc chiem HET chieu rong,
+#         danh sach BEN TRONG chia 2 COT trong CUNG MOT hop, co ke doc o giua
+#         -> cua so hep hon 1280px: ve 1 cot, 2 nua noi lien thanh mot dai (khong ho ke)
+#         -> muc chi co 1 dong (vd 1 workspace) khong duoc ve cot rong
+#       O "Ket noi nhanh" nam CUNG HANG voi "+ Terminal moi"; go user@host -> hien dropdown
+#         xac nhan NGAY DUOI o nhap (khong bi cat, khong day layout); Enter ket noi duoc
+#       Thu nho cua so ~800px -> khoi phai xuong dong, KHONG tran ra ngoai
+#       NHOM HOST la CARD: phai NHIN RA NGAY khac card 1 host o muc Yeu thich
+#         (dai mau chay het chieu cao + chip "⊞ N" + mot cham moi host + dong footer
+#          "Mo N pane trong 1 tab"); dat mau cho 1 group -> dai mau phai doi theo
+#         -> TAT watcher (📡): cham phai XAM het, KHONG hien ti le "x/y dang song"
+#         -> BAT watcher, doi ~60s: cham doi xanh/do, moi hien ti le
+#         -> group vua bat watcher chua co ket qua nao: cham XAM, KHONG duoc hien "0/5"
+#         -> group >10 host: chi ve 10 cham roi "+N", KHONG tran hang
+#       re chuot len tung icon -> hien dung ten cong cu
+#       bam thu vai icon -> mo dung modal/tab tuong ung (nhat la 📋 Tien trinh va
+#         ⚙ Cai dat, 📝 Snippets va ⚡ Bulk — 2 cap truoc day trung emoji)
+#       bam 📡 -> watcher BAT, o do phai sang vien accent; bam lai -> tat
+#       tat Local dev trong Cai dat -> o 🧱 phai BIEN MAT, luoi con 2 hang 10+9
+#       thu nho cua so con ~900px -> luoi 2 hang KHONG duoc tran ra ngoai
+#       Favorites toi da 5 cot, lich su monitoring toi da 4 cot khi cua so rong
+#       o "Ket noi nhanh" va hang so dem KHONG duoc keo dai het 1600px
+#   - pnpm dist -> CAI BAN INSTALLER -> mo lai -> dropdown van liet ke duoc font
+#       (kiem duong doc thu muc font trong ban dong goi)
+#   - Soat IP public (phai ra 0 dong) — doan PowerShell o dau file nay, muc canh bao
+#
+git tag v0.2.4
+git push origin v0.2.4
+# Xong: cho Actions ~5-10 phut -> Releases/v0.2.4 phai co DU 3 file installer
+
+# ============================================================
 # v0.2.3 — CON TRO CHUOT TUY CHINH (F56) + FIX CHU METO O TAB TERMINAL (WebGL atlas)
 # (v0.2.2 DA commit 5711b68 + tag da push -> v0.2.3 la commit MOI TREN dinh, KHONG amend)
 # Version da bump 0.2.3 o 2 package.json; CHANGELOG [0.2.3] ngay 2026-08-06.
@@ -291,6 +382,7 @@ cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
 git status
 git add -A                 # 2 file MOI: renderer/src/lib/cursors.ts
                            #             renderer/src/components/MouseCursorSection.tsx
+                           # (CLAUDE.md da gitignore - giu o may, KHONG commit)
 git status                 # xac nhan het "Changes not staged"
 git commit -m @'
 feat: pick your mouse cursor — 19 presets (6 from the OS, 13 drawn by the app incl. sword/heart/pine/rocket/pencil/lightning/paw), each a pair of states so hovering a button shows your cursor with an accent glow instead of the browser hand, or add your own images with an editable hotspot + fix garbled terminal text after switching tabs (WebGL glyph atlas) (v0.2.3)

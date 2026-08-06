@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { MetricHistoryHostDto, MetricHistoryPointDto } from '@infra/shared'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { GroupDto, HostDto, MetricHistoryHostDto, MetricHistoryPointDto } from '@infra/shared'
 import type { WorkspaceTab } from '../../stores/tabs'
 import { useDataStore } from '../../stores/data'
 import { useFavoritesStore } from '../../stores/favorites'
@@ -7,10 +7,12 @@ import { useMonitorStore } from '../../stores/monitor'
 import { useSettingsStore } from '../../stores/settings'
 import { useTabsStore } from '../../stores/tabs'
 import { useUiStore } from '../../stores/ui'
+import { useWatcherStore } from '../../stores/watcher'
 import { useWorkspacesStore } from '../../stores/workspaces'
 import { Button } from '../../components/ui'
 import { MetricChart } from '../../components/MetricsHistoryModal'
-import { useT } from '../../i18n'
+import { ToolGrid } from './ToolGrid'
+import { useT, type I18nKey } from '../../i18n'
 
 const LOCALES = { vi: 'vi-VN', en: 'en-US', ja: 'ja-JP' } as const
 
@@ -92,22 +94,56 @@ export function DashboardView({ active }: { active: boolean }) {
 
   return (
     <div className={`absolute inset-0 overflow-y-auto ${active ? '' : 'hidden'}`}>
-      <div className="mx-auto w-full max-w-3xl space-y-5 p-6">
-        <div className="flex items-end justify-between gap-3">
-          <div>
+      {/* Dashboard giờ chứa nhiều mục hơn (lưới công cụ, lịch sử monitoring, workspaces,
+          tunnels) nên nới rộng hẳn khung; max-w vẫn có để trên màn siêu rộng không bị
+          kéo thành những hàng dài quá tầm mắt. */}
+      <div className="mx-auto w-full max-w-[1600px] space-y-5 p-6">
+        {/* flex-wrap: cửa sổ hẹp thì khối phải xuống dòng chứ không tràn ra ngoài */}
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
             <h1 className="text-content text-lg font-semibold">{t('dashboard.title')}</h1>
             <p className="text-subtle text-xs">
               {new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
           </div>
-          <button
-            className="border-edge-strong text-content hover:bg-hover shrink-0 rounded border px-3 py-1.5 text-xs"
-            onClick={() => void openLocal()}
-          >
-            {t('dashboard.newTerminal')}
-          </button>
+          {/* Kết nối nhanh nằm cùng hàng với "+ Terminal mới": cả hai đều là "mở một phiên
+              mới", để chung một chỗ thì khỏi phải đi tìm. Gợi ý xác nhận thả xuống dạng
+              absolute vì hàng header không còn chỗ cho một dòng nữa bên dưới. */}
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="relative">
+              <input
+                value={quick}
+                onChange={(e) => setQuick(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') connectQuick()
+                }}
+                placeholder={t('dashboard.quickPlaceholder')}
+                aria-label={t('dashboard.quickConnect')}
+                title={t('dashboard.quickConnect')}
+                className="border-edge bg-input text-content placeholder-subtle focus:border-accent w-64 rounded border px-2.5 py-1.5 text-xs outline-none sm:w-80"
+              />
+              {isQuick && (
+                <button
+                  className="border-accent/40 bg-elevated text-accent-fg hover:bg-accent-soft/60 absolute top-full right-0 left-0 z-20 mt-1 flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-left text-xs shadow-lg"
+                  onClick={connectQuick}
+                >
+                  <span className="text-accent">→</span>
+                  <span className="truncate">{t('sidebar.connectTo', { target: quick.trim() })}</span>
+                </button>
+              )}
+            </div>
+            <button
+              className="border-edge-strong text-content hover:bg-hover shrink-0 rounded border px-3 py-1.5 text-xs"
+              onClick={() => void openLocal()}
+            >
+              {t('dashboard.newTerminal')}
+            </button>
+          </div>
         </div>
 
+        <ToolGrid />
+
+        {/* 4 ô số đếm giãn full chiều rộng cùng nhịp với lưới công cụ ở trên */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <StatTile label={t('dashboard.stats.hosts')} value={hosts.length} />
           <StatTile label={t('dashboard.stats.groups')} value={groups.length} />
@@ -117,35 +153,12 @@ export function DashboardView({ active }: { active: boolean }) {
 
         <section>
           <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">
-            {t('dashboard.quickConnect')}
-          </h2>
-          <input
-            value={quick}
-            onChange={(e) => setQuick(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') connectQuick()
-            }}
-            placeholder={t('dashboard.quickPlaceholder')}
-            className="border-edge bg-input text-content placeholder-subtle focus:border-accent w-full rounded border px-2.5 py-1.5 text-xs outline-none"
-          />
-          {isQuick && (
-            <button
-              className="border-accent/40 bg-accent-soft/40 text-accent-fg hover:bg-accent-soft/60 mt-1.5 flex w-full items-center gap-1.5 rounded border px-2.5 py-1.5 text-left text-xs"
-              onClick={connectQuick}
-            >
-              <span className="text-accent">→</span> {t('sidebar.connectTo', { target: quick.trim() })}
-            </button>
-          )}
-        </section>
-
-        <section>
-          <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">
             ★ {t('dashboard.favorites')}
           </h2>
           {favHosts.length === 0 ? (
             <p className="text-subtle text-[11px]">{t('dashboard.noFavorites')}</p>
           ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
               {favHosts.map((host) => (
                 <button
                   key={host.id}
@@ -171,16 +184,14 @@ export function DashboardView({ active }: { active: boolean }) {
             <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">
               {t('dashboard.groups')}
             </h2>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {groupChips.map(({ group, hostIds }) => (
-                <button
+                <GroupCard
                   key={group.id}
-                  className="border-edge bg-panel text-muted hover:bg-hover hover:text-content rounded-full border px-3 py-1.5 text-xs"
-                  title={t('sidebar.openGroup', { n: hostIds.length })}
-                  onClick={() => void openSshGroup(hostIds)}
-                >
-                  {group.name} <span className="text-subtle">· {hostIds.length}</span>
-                </button>
+                  group={group}
+                  hosts={hosts.filter((h) => h.groupId === group.id)}
+                  onOpen={() => void openSshGroup(hostIds)}
+                />
               ))}
             </div>
           </section>
@@ -188,6 +199,9 @@ export function DashboardView({ active }: { active: boolean }) {
 
         <MonitorHistorySection active={active} locale={locale} />
 
+        {/* 4 mục dạng DANH SÁCH ở dưới: mỗi mục vẫn chiếm HẾT chiều rộng, nhưng danh sách
+            BÊN TRONG tự chia 2 cột (xem TwoColumnList) — mỗi dòng chỉ dài vài chục ký tự
+            nên một cột đơn kéo hết 1600px là bỏ trắng nửa phải. */}
         <section>
           <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">
             {t('dashboard.recent')}
@@ -195,8 +209,8 @@ export function DashboardView({ active }: { active: boolean }) {
           {history.length === 0 ? (
             <p className="text-subtle text-[11px]">{t('dashboard.noRecent')}</p>
           ) : (
-            <div className="border-edge bg-panel divide-edge/70 divide-y rounded border">
-              {history.slice(0, 10).map((entry) => (
+            <TwoColumnList items={history.slice(0, 10)}>
+              {(entry) => (
                 <button
                   key={entry.id}
                   className="text-muted hover:bg-hover hover:text-content flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px]"
@@ -208,8 +222,8 @@ export function DashboardView({ active }: { active: boolean }) {
                   <span className="min-w-0 flex-1 truncate">{entry.target}</span>
                   <span className="text-subtle shrink-0">{formatWhen(entry.connectedAt, locale)}</span>
                 </button>
-              ))}
-            </div>
+              )}
+            </TwoColumnList>
           )}
         </section>
 
@@ -225,8 +239,8 @@ export function DashboardView({ active }: { active: boolean }) {
           {workspaces.length === 0 ? (
             <p className="text-subtle text-[11px]">{t('dashboard.noWorkspaces')}</p>
           ) : (
-            <div className="border-edge bg-panel divide-edge/70 divide-y rounded border">
-              {workspaces.map((ws) => (
+            <TwoColumnList items={workspaces}>
+              {(ws) => (
                 <button
                   key={ws.id}
                   className="hover:bg-hover flex w-full items-center gap-2 px-3 py-1.5 text-left"
@@ -236,8 +250,8 @@ export function DashboardView({ active }: { active: boolean }) {
                   <span className="text-content min-w-0 flex-1 truncate text-xs">{ws.name}</span>
                   <span className="text-subtle shrink-0 text-[10px]">{summarize(ws.tabs, t)}</span>
                 </button>
-              ))}
-            </div>
+              )}
+            </TwoColumnList>
           )}
         </section>
 
@@ -253,8 +267,8 @@ export function DashboardView({ active }: { active: boolean }) {
           {tunnels.length === 0 ? (
             <p className="text-subtle text-[11px]">{t('dashboard.noTunnels')}</p>
           ) : (
-            <div className="border-edge bg-panel divide-edge/70 divide-y rounded border">
-              {tunnels.map((rule) => {
+            <TwoColumnList items={tunnels}>
+              {(rule) => {
                 const state = tunnelStates[rule.id]?.status ?? 'stopped'
                 const detail = tunnelStates[rule.id]?.detail
                 const running = state === 'active' || state === 'starting'
@@ -288,8 +302,8 @@ export function DashboardView({ active }: { active: boolean }) {
                     </Button>
                   </div>
                 )
-              })}
-            </div>
+              }}
+            </TwoColumnList>
           )}
         </section>
 
@@ -297,18 +311,9 @@ export function DashboardView({ active }: { active: boolean }) {
           <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">
             ⌨ {t('dashboard.shortcuts')}
           </h2>
-          <div className="border-edge bg-panel divide-edge/70 divide-y rounded border">
-            <ShortcutRow label={t('dashboard.sc.palette')} keys={['Ctrl', 'Shift', 'P']} />
-            <ShortcutRow label={t('dashboard.sc.newTab')} keys={['Ctrl', 'Shift', 'T']} />
-            <ShortcutRow label={t('dashboard.sc.closeTab')} keys={['Ctrl', 'Shift', 'W']} />
-            <ShortcutRow label={t('dashboard.sc.cycle')} keys={['Ctrl', 'Tab']} />
-            <ShortcutRow label={t('dashboard.sc.split')} keys={['Ctrl', 'Shift', 'D']} />
-            <ShortcutRow label={t('dashboard.sc.broadcast')} keys={['Ctrl', 'Shift', 'B']} />
-            <ShortcutRow label={t('dashboard.sc.sidebar')} keys={['Ctrl', 'Shift', 'H']} />
-            <ShortcutRow label={t('dashboard.sc.ai')} keys={['Ctrl', 'I']} />
-            <ShortcutRow label={t('dashboard.sc.copyPaste')} keys={['Ctrl', 'Shift', 'C / V']} />
-            <ShortcutRow label={t('dashboard.sc.find')} keys={['Ctrl', 'F']} />
-          </div>
+          <TwoColumnList items={SHORTCUTS}>
+            {(sc) => <ShortcutRow key={sc.key} label={t(sc.key)} keys={sc.combo} />}
+          </TwoColumnList>
           <p className="text-subtle mt-1.5 text-[10px]">{t('dashboard.sc.mouseTip')}</p>
         </section>
       </div>
@@ -368,7 +373,7 @@ function MonitorHistorySection({ active, locale }: { active: boolean; locale: st
       <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">
         📈 {t('dashboard.monHistory')}
       </h2>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {(monHosts ?? []).map((mh) => {
           const label = hosts.find((h) => h.id === mh.hostId)?.label ?? `${mh.hostId.slice(0, 8)}…`
           const points = charts[mh.hostId]
@@ -429,5 +434,129 @@ function StatTile({ label, value }: { label: string; value: number }) {
       <div className="text-content text-lg font-semibold">{value}</div>
       <div className="text-subtle truncate text-[10px] tracking-wider uppercase">{label}</div>
     </div>
+  )
+}
+
+/**
+ * Khung danh sách chia 2 cột BÊN TRONG một mục.
+ *
+ * Cố ý là MỘT hộp có viền duy nhất với đường kẻ dọc ở giữa, không phải 2 hộp rời: 2 hộp
+ * rời trông như 2 danh sách khác nhau, mà đây vẫn là một danh sách. Dưới `xl` thì về 1 cột
+ * và `divide-y` nối 2 nửa lại thành một dải liên tục (đổi sang `divide-x` khi đủ rộng).
+ */
+function TwoColumnList<T>({ items, children }: { readonly items: readonly T[]; readonly children: (item: T) => ReactNode }) {
+  // Nửa đầu nhận phần dư khi lẻ → đọc theo cột trái rồi sang cột phải
+  const half = Math.ceil(items.length / 2)
+  const chunks = items.length <= 1 ? [items] : [items.slice(0, half), items.slice(half)]
+  return (
+    <div className="border-edge bg-panel divide-edge/70 grid divide-y rounded border xl:grid-cols-2 xl:divide-x xl:divide-y-0">
+      {chunks.map((chunk, i) => (
+        <div key={i} className="divide-edge/70 min-w-0 divide-y">
+          {chunk.map(children)}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Cheat sheet phím tắt — dữ liệu hoá để chia được 2 cột. */
+const SHORTCUTS: ReadonlyArray<{ key: I18nKey; combo: string[] }> = [
+  { key: 'dashboard.sc.palette', combo: ['Ctrl', 'Shift', 'P'] },
+  { key: 'dashboard.sc.newTab', combo: ['Ctrl', 'Shift', 'T'] },
+  { key: 'dashboard.sc.closeTab', combo: ['Ctrl', 'Shift', 'W'] },
+  { key: 'dashboard.sc.cycle', combo: ['Ctrl', 'Tab'] },
+  { key: 'dashboard.sc.split', combo: ['Ctrl', 'Shift', 'D'] },
+  { key: 'dashboard.sc.broadcast', combo: ['Ctrl', 'Shift', 'B'] },
+  { key: 'dashboard.sc.sidebar', combo: ['Ctrl', 'Shift', 'H'] },
+  { key: 'dashboard.sc.ai', combo: ['Ctrl', 'I'] },
+  { key: 'dashboard.sc.copyPaste', combo: ['Ctrl', 'Shift', 'C / V'] },
+  { key: 'dashboard.sc.find', combo: ['Ctrl', 'F'] }
+]
+
+/** Số host tối đa hiện tên trong card nhóm — quá số này thì gộp thành "+N". */
+const GROUP_PREVIEW_HOSTS = 4
+/** Số chấm trạng thái tối đa; nhóm lớn hơn thì phần dư gộp thành "+N" cho khỏi tràn hàng. */
+const GROUP_DOTS_MAX = 10
+
+/**
+ * Card một nhóm host: bấm là mở CẢ nhóm thành các pane trong 1 tab.
+ * Thay cho chip nhỏ trước đây — card đủ chỗ để nói thêm những thứ quyết định "có nên mở
+ * nhóm này không": bao nhiêu host, mấy con đang sống (khi watcher đang bật), user SSH mặc
+ * định của nhóm, và tên vài host đầu.
+ */
+function GroupCard({
+  group,
+  hosts,
+  onOpen
+}: {
+  readonly group: GroupDto
+  readonly hosts: HostDto[]
+  readonly onOpen: () => void
+}) {
+  const t = useT()
+  const watcherEnabled = useWatcherStore((s) => s.enabled)
+  const statuses = useWatcherStore((s) => s.statuses)
+
+  // Chỉ tính trên những host ĐÃ có kết quả check: watcher mới bật thì chưa ai có kết quả,
+  // hiện "0/5 sống" lúc đó là nói sai.
+  const checked = hosts.filter((h) => statuses[h.id] !== undefined)
+  const up = checked.filter((h) => statuses[h.id]?.ok).length
+  const showUptime = watcherEnabled && checked.length > 0
+  const allUp = up === checked.length
+
+  const preview = hosts.slice(0, GROUP_PREVIEW_HOSTS)
+  const rest = hosts.length - preview.length
+  const dots = hosts.slice(0, GROUP_DOTS_MAX)
+  const dotsRest = hosts.length - dots.length
+
+  return (
+    <button
+      onClick={onOpen}
+      title={t('sidebar.openGroup', { n: hosts.length })}
+      className="border-edge-strong bg-elevated hover:border-accent/60 hover:bg-hover group relative flex w-full flex-col gap-1.5 overflow-hidden rounded-md border py-3 pr-3 pl-4 text-left"
+    >
+      {/* Dải màu CHẠY HẾT chiều cao (không phải vạch nhỏ cạnh tên): đây là tín hiệu chính
+          phân biệt "một nhóm" với card một host ở mục Yêu thích. Không đặt màu thì dùng
+          màu viền cho vẫn thấy dải. */}
+      <span
+        className="absolute inset-y-0 left-0 w-1.5"
+        style={{ background: group.color ?? 'var(--c-edge-strong)' }}
+      />
+
+      <div className="flex items-center gap-2">
+        <span className="text-content min-w-0 flex-1 truncate text-sm font-semibold">{group.name}</span>
+        {/* Số host thành CHIP: nói ngay "nhiều máy", thay vì lẫn trong dòng chữ nhỏ */}
+        <span className="border-edge bg-app text-muted shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-medium">
+          ⊞ {hosts.length}
+        </span>
+      </div>
+
+      {/* Một chấm cho MỖI host — thấy ngay nhóm này gồm mấy máy và máy nào đang chết.
+          Chưa có kết quả check (watcher tắt / mới bật) thì chấm xám = chưa biết, KHÔNG tô đỏ. */}
+      <div className="flex flex-wrap items-center gap-1">
+        {dots.map((h) => {
+          const st = statuses[h.id]
+          const tone = !watcherEnabled || st === undefined ? 'bg-edge-strong' : st.ok ? 'bg-success' : 'bg-danger'
+          return <span key={h.id} className={`size-1.5 rounded-full ${tone}`} title={h.label} />
+        })}
+        {dotsRest > 0 && <span className="text-subtle text-[10px]">+{dotsRest}</span>}
+        {showUptime && (
+          <span className={`ml-1 text-[11px] ${allUp ? 'text-subtle' : 'text-warning'}`}>
+            {t('dashboard.groupUp', { up, n: checked.length })}
+          </span>
+        )}
+        {group.username && <span className="text-subtle ml-1 truncate text-[11px]">{group.username}</span>}
+      </div>
+
+      <div className="text-muted truncate text-[11px]">
+        {preview.map((h) => h.label).join(' · ')}
+        {rest > 0 && <span className="text-subtle"> +{rest}</span>}
+      </div>
+
+      {/* Nói thẳng bấm vào thì XẢY RA GÌ — khác hẳn card Yêu thích (mở 1 tab) */}
+      <div className="border-edge/70 text-subtle group-hover:text-accent mt-0.5 border-t pt-1.5 text-[10px]">
+        ⊞ {t('dashboard.groupOpenPanes', { n: hosts.length })}
+      </div>
+    </button>
   )
 }

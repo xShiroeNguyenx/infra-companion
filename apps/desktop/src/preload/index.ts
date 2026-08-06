@@ -244,6 +244,13 @@ const api: InfraApi = {
     curlCommand: (groupId, targetId) => ipcRenderer.invoke(IPC.HOSTMAP_CURL, groupId, targetId),
     clearProfiles: (groupId) => ipcRenderer.invoke(IPC.HOSTMAP_CLEAR_PROFILES, groupId)
   },
+  fonts: {
+    list: () => ipcRenderer.invoke(IPC.FONTS_LIST),
+    rescan: () => ipcRenderer.invoke(IPC.FONTS_RESCAN),
+    add: (name, bytes) => ipcRenderer.invoke(IPC.FONTS_ADD, { name, bytes }),
+    rename: (id, family) => ipcRenderer.invoke(IPC.FONTS_RENAME, id, family),
+    remove: (id) => ipcRenderer.invoke(IPC.FONTS_REMOVE, id)
+  },
   ai: {
     getConfig: () => ipcRenderer.invoke(IPC.AI_GET_CONFIG),
     setConfig: (input) => ipcRenderer.invoke(IPC.AI_SET_CONFIG, input),

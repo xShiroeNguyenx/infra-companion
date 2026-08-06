@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, **a self-managed local PHP/WordPress dev stack**, and more.
 
-**Current release: v0.2.3 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.2.4 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -40,7 +40,7 @@
 - **Local terminal** — PowerShell, cmd, Git Bash, WSL shells via node-pty
 
 ### Terminal UX
-- **Dashboard home screen** — the app boots into a home page behind your tabs (🏠 button): quick stats, quick-connect box, favorite hosts, host-group chips (open a group as splits in one click), recent connections, saved workspaces, tunnels with live status + start/stop, and a keyboard-shortcut cheat sheet; prefer boot-to-shell? Settings → Startup page → Terminal
+- **Dashboard home screen** — the app boots into a home page behind your tabs (🏠 button): **every tool as two rows of icons at the top**, quick-connect in the header next to *+ New terminal*, counters, favorite hosts, **host-group cards** (colour band, a dot per host, open the whole group as splits in one click), recent connections, saved workspaces, tunnels with live status + start/stop, and a keyboard-shortcut cheat sheet — the lists split into two columns on a wide window. Prefer boot-to-shell? Settings → Startup page → Terminal
 - **xterm.js** with WebGL renderer — smooth even at high throughput (`yes`, large `cat`)
 - **Multi-tab** with Ctrl+Shift+T / middle-click close
 - **Split panes** — side-by-side sessions, Ctrl+Shift+D
@@ -54,7 +54,8 @@
 - **Workspaces** — save a layout (tabs + split panes + broadcast) and restore it in one click (⋯ → Workspaces)
 - **Broadcast input** — type once, send to all open panes simultaneously (Ctrl+Shift+B)
 - **Background image** — full-window wallpaper from a local file **or a pasted URL** (incl. Google Drive / Dropbox share links), with adjustable opacity, blur, fit (cover/contain), and position (Settings → Background image)
-- **Terminal appearance** — configurable font family, size, line height, and cursor style (Settings → Terminal); applies live
+- **Terminal appearance** — configurable font size, line height, and cursor style (Settings → Terminal); applies live
+- **Font picker** — choose from the fonts **actually installed on this machine** (read from the OS font folders, family names parsed out of the font files themselves), with a live sample and a warning when your font isn't really present or isn't monospace. **Or add a font you downloaded** (`.ttf`/`.otf`/`.ttc`/`.woff2`) without installing it into the OS (Settings → Terminal)
 - **Mouse cursor** — pick from 19 pointers (6 native to your OS, 13 drawn by the app: arrows, ring, dot, 8-bit, sword, heart, pine tree, rocket, pencil, lightning, cat's paw) or **add your own** from a PNG/SVG/CUR you downloaded, with an editable X/Y hotspot. Each one is a **pair of states** — normal plus a hover state (accent-colored glow) used over buttons and links instead of the browser hand — and applies app-wide including the terminal (Settings → Terminal)
 - **Theme studio** — pick a custom accent and recolor the full UI palette per theme (Settings → Appearance → Custom palette); export / import a theme as JSON
 - **Find in terminal** — Ctrl+F with highlight
@@ -215,7 +216,7 @@ pnpm test         # unit tests (crypto, sync-merge, ssh_config parser)
 
 ```bash
 pnpm test
-# 1044 tests; on Node 20 the node:sqlite suites (vault-merge, replication clusters, local-dev
+# 1073 tests; on Node 20 the node:sqlite suites (vault-merge, replication clusters, local-dev
 # store) are skipped — they need Node ≥ 22.5.
 # To run those too, use Electron's bundled Node 24 runtime:
 $env:ELECTRON_RUN_AS_NODE='1'
@@ -302,7 +303,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.2.3)
+## Known Limitations (v0.2.4)
 
 - **Local dev stack is Windows-only** for now (OS-specific work is isolated behind a single adapter, so other platforms are a matter of writing one). `.test` domains and local HTTPS are **not wired up yet** — mkcert installs and lands on `PATH`, but issuing/trusting a certificate is still a manual `mkcert -install`. There is no WordPress downloader (point it at a folder you already have), and no local↔server deploy or public-share link yet. phpMyAdmin 5.2 does not support PHP 8.4, so the app serves it with PHP 8.3 when both are installed
 - **Domain → server mapping needs a Chromium browser** (Chrome/Edge/Brave/Vivaldi); Firefox has no equivalent flag, and the override has no effect when the machine routes through a system proxy (the proxy resolves DNS itself). Non-browser clients (Postman, MySQL clients) aren't covered — use a tunnel or the `curl --resolve` command instead

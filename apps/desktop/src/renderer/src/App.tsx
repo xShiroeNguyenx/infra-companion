@@ -42,6 +42,7 @@ import { useUiStore } from './stores/ui'
 import { usePluginStore } from './stores/plugins'
 import { useMonitorStore } from './stores/monitor'
 import { useLocaldevStore } from './stores/localdev'
+import { useFontsStore } from './stores/fonts'
 import { useWatcherStore } from './stores/watcher'
 import { useReplicationStore } from './stores/replication'
 import { useVaultStore } from './stores/vault'
@@ -125,6 +126,9 @@ export default function App() {
     if (!booted.current) {
       booted.current = true
       void useVaultStore.getState().refresh()
+      // Font user tự thêm phải được đăng ký vào document TRƯỚC khi terminal vẽ, nên nạp ở
+      // đây chứ không đợi mở Settings (không phụ thuộc vault: font không phải dữ liệu bí mật)
+      void useFontsStore.getState().load()
     }
     const offLocked = window.infra.vault.onLocked(() => useVaultStore.getState().markLocked())
     const offExit = window.infra.terminal.onExit((e) =>
