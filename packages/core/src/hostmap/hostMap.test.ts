@@ -11,9 +11,9 @@ import {
 
 describe('isSafeHostPattern', () => {
   test('domain thường và wildcard 1 cấp đều hợp lệ', () => {
-    expect(isSafeHostPattern('www.webike.pk')).toBe(true)
-    expect(isSafeHostPattern('*.webike.net')).toBe(true)
-    expect(isSafeHostPattern('japan.webike.net')).toBe(true)
+    expect(isSafeHostPattern('www.example.com')).toBe(true)
+    expect(isSafeHostPattern('*.example.net')).toBe(true)
+    expect(isSafeHostPattern('japan.example.net')).toBe(true)
   })
 
   test('CHẶN injection rule: dấu phẩy, khoảng trắng, xuống dòng', () => {
@@ -40,10 +40,10 @@ describe('isSafeHostPattern', () => {
 
 describe('isSafeIpLiteral', () => {
   test('nhận v4 và v6, từ chối domain / rỗng / có ngoặc', () => {
-    expect(isSafeIpLiteral('59.106.231.202')).toBe(true)
+    expect(isSafeIpLiteral('203.0.113.10')).toBe(true)
     expect(isSafeIpLiteral('::1')).toBe(true)
     expect(isSafeIpLiteral('2001:db8::5')).toBe(true)
-    expect(isSafeIpLiteral('webike.net')).toBe(false)
+    expect(isSafeIpLiteral('example.net')).toBe(false)
     expect(isSafeIpLiteral('')).toBe(false)
     expect(isSafeIpLiteral('[::1]')).toBe(false)
     expect(isSafeIpLiteral(' 1.2.3.4')).toBe(false)
@@ -52,8 +52,8 @@ describe('isSafeIpLiteral', () => {
 
 describe('buildHostResolverRules', () => {
   test('ghép nhiều domain về cùng 1 IP, phân tách bằng dấu phẩy', () => {
-    expect(buildHostResolverRules(['www.webike.pk', 'vn.webike.net'], '59.106.231.202')).toBe(
-      'MAP www.webike.pk 59.106.231.202,MAP vn.webike.net 59.106.231.202'
+    expect(buildHostResolverRules(['www.example.com', 'vn.example.net'], '203.0.113.10')).toBe(
+      'MAP www.example.com 203.0.113.10,MAP vn.example.net 203.0.113.10'
     )
   })
 
@@ -66,7 +66,8 @@ describe('buildHostResolverRules', () => {
   })
 
   test('throw khi pattern/IP không sạch — KHÔNG tự "làm sạch" rồi chạy tiếp', () => {
-    expect(() => buildHostResolverRules(['a.com,MAP * 6.6.6.6'], '1.2.3.4')).toThrow(/không hợp lệ/)
+    // 203.0.113.66 = "IP của kẻ tấn công" trong ca chèn rule (dải tài liệu, để lệnh soát IP public sạch)
+    expect(() => buildHostResolverRules(['a.com,MAP * 203.0.113.66'], '1.2.3.4')).toThrow(/không hợp lệ/)
     expect(() => buildHostResolverRules(['a.com'], 'not-an-ip')).toThrow(/IP không hợp lệ/)
     expect(() => buildHostResolverRules([], '1.2.3.4')).toThrow(/Chưa có domain/)
   })
@@ -102,8 +103,8 @@ describe('buildChromiumArgs', () => {
 
 describe('defaultUrlFor / isSafeHttpUrl', () => {
   test('suy ra https từ pattern đầu, bỏ tiền tố wildcard', () => {
-    expect(defaultUrlFor(['*.webike.net', 'a.test'])).toBe('https://webike.net/')
-    expect(defaultUrlFor(['www.webike.pk'])).toBe('https://www.webike.pk/')
+    expect(defaultUrlFor(['*.example.net', 'a.test'])).toBe('https://example.net/')
+    expect(defaultUrlFor(['www.example.com'])).toBe('https://www.example.com/')
     expect(defaultUrlFor([])).toBeNull()
   })
 
@@ -122,8 +123,8 @@ describe('buildCurlResolveCommand', () => {
   })
 
   test('wildcard bị rút về domain cụ thể (curl không hiểu *)', () => {
-    expect(buildCurlResolveCommand(['*.webike.net'], '1.2.3.4', 'https://webike.net/', [443])).toContain(
-      '--resolve webike.net:443:1.2.3.4'
+    expect(buildCurlResolveCommand(['*.example.net'], '1.2.3.4', 'https://example.net/', [443])).toContain(
+      '--resolve example.net:443:1.2.3.4'
     )
   })
 

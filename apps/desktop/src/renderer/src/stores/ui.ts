@@ -16,6 +16,7 @@ export type AppModal =
   | 'plugins'
   | 'processes'
   | 'services'
+  | 'replication'
   | 'compare'
   | 'hostmap'
   | 'localdev-settings'

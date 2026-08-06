@@ -14,6 +14,8 @@ import {
   type LdSiteInputDto,
   type MetricSampleDto,
   type MonitorAlertDto,
+  type ReplAlertDto,
+  type ReplSnapshotDto,
   type PasswordQuestion,
   type PluginNotifyDto,
   type PluginPanelDto,
@@ -174,6 +176,23 @@ const api: InfraApi = {
     serviceAction: (hostId, unit, action) => ipcRenderer.invoke(IPC.HTOOLS_SERVICE_ACTION, hostId, unit, action),
     serviceLogs: (hostId, unit) => ipcRenderer.invoke(IPC.HTOOLS_SERVICE_LOGS, hostId, unit),
     readFile: (hostId, path) => ipcRenderer.invoke(IPC.HTOOLS_READ_FILE, hostId, path)
+  },
+  replication: {
+    listPairs: () => ipcRenderer.invoke(IPC.REPL_LIST_PAIRS),
+    savePair: (input) => ipcRenderer.invoke(IPC.REPL_SAVE_PAIR, input),
+    deletePair: (id) => ipcRenderer.invoke(IPC.REPL_DELETE_PAIR, id),
+    testPair: (id, replicaId) => ipcRenderer.invoke(IPC.REPL_TEST_PAIR, id, replicaId),
+    watch: (pairId) => ipcRenderer.invoke(IPC.REPL_WATCH, pairId),
+    unwatch: (pairId) => ipcRenderer.send(IPC.REPL_UNWATCH, pairId),
+    pollNow: (pairId) => ipcRenderer.invoke(IPC.REPL_POLL_NOW, pairId),
+    subscribe: () => ipcRenderer.send(IPC.REPL_SUBSCRIBE),
+    onSample: (cb) => subscribe<ReplSnapshotDto>(IPC.REPL_SAMPLE, cb),
+    onAlert: (cb) => subscribe<ReplAlertDto>(IPC.REPL_ALERT, cb),
+    getSettings: () => ipcRenderer.invoke(IPC.REPL_GET_SETTINGS),
+    setSettings: (s) => ipcRenderer.invoke(IPC.REPL_SET_SETTINGS, s),
+    compare: (pairId, replicaId) => ipcRenderer.invoke(IPC.REPL_COMPARE, pairId, replicaId),
+    checksum: (pairId, tables, mode, replicaId) =>
+      ipcRenderer.invoke(IPC.REPL_CHECKSUM, pairId, tables, mode, replicaId)
   },
   localdev: {
     enabled: () => ipcRenderer.invoke(IPC.LOCALDEV_ENABLED),

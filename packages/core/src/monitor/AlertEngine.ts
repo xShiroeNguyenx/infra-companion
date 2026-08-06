@@ -1,12 +1,22 @@
+import {
+  HysteresisStates,
+  binaryZone,
+  feedHysteresis,
+  numericZone,
+  type HysteresisOptions
+} from './hysteresis'
 import type { MetricSample } from './MonitorService'
 
 /**
- * F04 — Máy trạng thái hysteresis cho cảnh báo ngưỡng monitoring.
+ * F04 — Cảnh báo ngưỡng cho monitoring tài nguyên host.
  *
  * THUẦN logic: không Electron, không I/O, không Date.now() — mọi mốc thời gian
  * lấy từ sample.ts nên test deterministic. Caller (main ipc) subscribe event
  * 'sample' của MonitorService rồi đưa từng sample vào onSample(), nhận về danh
  * sách AlertEvent cần phát (toast/OS notification/webhook).
+ *
+ * Máy trạng thái breach/vùng chết/recover nằm ở `hysteresis.ts` — dùng chung với cảnh báo
+ * replication (F55) để hai bộ cảnh báo không trôi lệch ngữ nghĩa.
  */
 
 /** Ngưỡng một host — null = tắt metric đó. loadPct = load1/cpuCount*100 (chuẩn hoá per-core,
@@ -64,20 +74,11 @@ const THRESHOLD_KEY: Record<NumericMetric, keyof Omit<AlertThresholds, 'offline'
   conn: 'connCount'
 }
 
-interface MetricState {
-  breached: boolean
-  overCount: number
-  underCount: number
-  lastNotifiedAt: number
-}
-
-const newState = (): MetricState => ({ breached: false, overCount: 0, underCount: 0, lastNotifiedAt: 0 })
-
 export class AlertEngine {
   private rules: AlertRules
   private readonly opts: Required<AlertEngineOptions>
   /** key = `${hostId}:${metric}` */
-  private states = new Map<string, MetricState>()
+  private readonly states = new HysteresisStates()
 
   constructor(rules: AlertRules, opts: AlertEngineOptions = {}) {
     this.rules = rules
@@ -128,31 +129,28 @@ export class AlertEngine {
     return events
   }
 
-  /** Offline đánh giá theo sample.ok, kể cả sample lỗi. */
+  /** Offline đánh giá theo sample.ok, kể cả sample lỗi — nhị phân, không có vùng chết. */
   private evalOffline(sample: MetricSample, enabled: boolean, events: AlertEvent[]): void {
     if (!enabled) {
       this.states.delete(`${sample.hostId}:offline`)
       return
     }
-    const st = this.state(sample.hostId, 'offline')
-    if (!sample.ok) {
-      st.overCount += 1
-      st.underCount = 0
-      if (this.shouldNotifyBreach(st, sample.ts, this.opts.offlineBreachSamples)) {
-        events.push({ hostId: sample.hostId, metric: 'offline', kind: 'breach', value: null, threshold: null, ts: sample.ts })
+    const outcome = feedHysteresis(
+      this.states.get(`${sample.hostId}:offline`),
+      binaryZone(!sample.ok),
+      sample.ts,
+      {
+        breachSamples: this.opts.offlineBreachSamples,
+        recoverSamples: this.opts.offlineRecoverSamples,
+        realertCooldownMs: this.opts.realertCooldownMs
       }
-      return
-    }
-    st.underCount += 1
-    st.overCount = 0
-    if (st.breached && st.underCount >= this.opts.offlineRecoverSamples) {
-      st.breached = false
-      st.underCount = 0
-      events.push({ hostId: sample.hostId, metric: 'offline', kind: 'recover', value: null, threshold: null, ts: sample.ts })
+    )
+    if (outcome) {
+      events.push({ hostId: sample.hostId, metric: 'offline', kind: outcome, value: null, threshold: null, ts: sample.ts })
     }
   }
 
-  /** Máy trạng thái breach/vùng chết/recover cho 1 metric số. */
+  /** Metric số: phân vùng theo ngưỡng + vùng chết rồi đẩy vào máy trạng thái chung. */
   private evalNumeric(
     sample: MetricSample,
     metric: NumericMetric,
@@ -160,46 +158,27 @@ export class AlertEngine {
     threshold: number,
     events: AlertEvent[]
   ): void {
-    const st = this.state(sample.hostId, metric)
     // conn là số tuyệt đối (ngưỡng có thể hàng nghìn) → vùng chết theo tỉ lệ 10%
     const margin =
       metric === 'conn'
         ? Math.max(this.opts.recoverMarginPts, Math.round(threshold * 0.1))
         : this.opts.recoverMarginPts
 
-    if (value >= threshold) {
-      st.overCount += 1
-      st.underCount = 0
-      if (this.shouldNotifyBreach(st, sample.ts, this.opts.breachSamples)) {
-        events.push({ hostId: sample.hostId, metric, kind: 'breach', value, threshold, ts: sample.ts })
-      }
-    } else if (value < threshold - margin) {
-      st.underCount += 1
-      st.overCount = 0
-      if (st.breached && st.underCount >= this.opts.recoverSamples) {
-        st.breached = false
-        st.underCount = 0
-        events.push({ hostId: sample.hostId, metric, kind: 'recover', value, threshold, ts: sample.ts })
-      }
-    } else {
-      // vùng chết [T-margin, T): không bên nào — reset cả 2 counter, diệt flapping quanh ngưỡng
-      st.overCount = 0
-      st.underCount = 0
-    }
+    const outcome = feedHysteresis(
+      this.states.get(`${sample.hostId}:${metric}`),
+      numericZone(value, threshold, margin),
+      sample.ts,
+      this.hysteresisOpts
+    )
+    if (outcome) events.push({ hostId: sample.hostId, metric, kind: outcome, value, threshold, ts: sample.ts })
   }
 
-  /** Đủ chuỗi vượt → breach lần đầu; đang breach quá cooldown → nhắc lại. Cập nhật state. */
-  private shouldNotifyBreach(st: MetricState, ts: number, breachSamples: number): boolean {
-    if (!st.breached && st.overCount >= breachSamples) {
-      st.breached = true
-      st.lastNotifiedAt = ts
-      return true
+  private get hysteresisOpts(): HysteresisOptions {
+    return {
+      breachSamples: this.opts.breachSamples,
+      recoverSamples: this.opts.recoverSamples,
+      realertCooldownMs: this.opts.realertCooldownMs
     }
-    if (st.breached && ts - st.lastNotifiedAt >= this.opts.realertCooldownMs) {
-      st.lastNotifiedAt = ts
-      return true
-    }
-    return false
   }
 
   private effectiveThresholds(hostId: string): AlertThresholds {
@@ -219,15 +198,6 @@ export class AlertEngine {
     }
   }
 
-  private state(hostId: string, metric: AlertMetric): MetricState {
-    const key = `${hostId}:${metric}`
-    let st = this.states.get(key)
-    if (!st) {
-      st = newState()
-      this.states.set(key, st)
-    }
-    return st
-  }
 }
 
 /** Giá trị của metric từ sample; load chuẩn hoá theo số CPU, conn là số tuyệt đối. */

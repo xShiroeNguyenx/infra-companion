@@ -282,6 +282,7 @@ export function Sidebar() {
               <MenuItem label={t('menu.processes')} onClick={() => { setMenuOpen(false); openAppModal('processes') }} />
               <MenuItem label={t('menu.services')} onClick={() => { setMenuOpen(false); openAppModal('services') }} />
               <MenuItem label={t('menu.compare')} onClick={() => { setMenuOpen(false); openAppModal('compare') }} />
+              <MenuItem label={t('menu.replication')} onClick={() => { setMenuOpen(false); openAppModal('replication') }} />
               <MenuItem label={t('menu.hostmap')} onClick={() => { setMenuOpen(false); openAppModal('hostmap') }} />
               <MenuItem label={t('menu.ai')} onClick={() => { setMenuOpen(false); openAppModal('ai') }} />
               <MenuItem label={t('menu.aiDiagnose')} onClick={() => { setMenuOpen(false); openAppModal('ai-diagnose') }} />

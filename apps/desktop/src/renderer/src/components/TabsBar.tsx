@@ -15,7 +15,8 @@ const TOOL_TAB_META: Record<ToolTabKind, { label: string; icon: string }> = {
   tunnels: { label: 'Tunnels', icon: '🔀' },
   processes: { label: 'Processes', icon: '📋' },
   services: { label: 'Services', icon: '⚙' },
-  'ai-diagnose': { label: 'AI diagnose', icon: '🩺' }
+  'ai-diagnose': { label: 'AI diagnose', icon: '🩺' },
+  replication: { label: 'Replication', icon: '🔁' }
 }
 
 function toolMeta(kind: AppTab['kind']): { label: string; icon: string } | undefined {

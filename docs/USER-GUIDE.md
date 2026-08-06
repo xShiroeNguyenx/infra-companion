@@ -274,14 +274,14 @@ Settings opens as a **full-screen page** with a category rail on the left — **
 - **⊞ Open in tab** — the same panel as a tab; keep working, switch away and back.
 - **⧉ Detach** — a small **always-on-top window** (like the detached monitoring window). Ideal while your DB client or browser covers the app: you still see each tunnel's status dot and can start/stop it. It shares the app's live tunnel events, so nothing reconnects. Close it (⧉ *Merge back*) to return.
 
-**Order** — the list is sorted **by name, A→Z**, in the popup, the tab, the detached window and the Dashboard alike. Sorting is natural and case-insensitive: `db2` comes before `db10`, `JPDB2` before `jpdb11`.
+**Order** — the list is sorted **by name, A→Z**, in the popup, the tab, the detached window and the Dashboard alike. Sorting is natural and case-insensitive: `db2` comes before `db10`, `DB2` before `db11`.
 
 **Name your tunnels**: the tunnel editor has an optional **Name** field — give each rule a friendly label (e.g. *"Prod DB"*, *"Staging Grafana"*) so a long list stays readable. The list shows the name on top and the actual route (`:port → host:port`) underneath, so you always see where a named tunnel goes. Leave the name blank and it falls back to the route as before.
 
 **Test SOCKS5**: + Tunnel → host `gate-01`, type **Dynamic**, bind `1080` → **Start** (green dot) → set SOCKS5 `127.0.0.1:1080` in your browser → traffic goes through the gate.
 **Test Local**: type L, bind `13306`, dest `127.0.0.1:3306` → connect MySQL to `127.0.0.1:13306`.
 
-**Local tunnel through a login-script chain (reach a DB behind nested SSH)**: if the **via host** is one you reach by a **login script** (e.g. `gate → jpapst04 → jpap05`, where each hop is `ssh` typed inside the shell and won't accept a jump host), a **Local** tunnel forwards by running `nc <dest> <port>` on the innermost machine over the login-script chain (like Bulk/Monitor) — so you can reach a database only pingable from the deepest hop straight from your laptop.
+**Local tunnel through a login-script chain (reach a DB behind nested SSH)**: if the **via host** is one you reach by a **login script** (e.g. `gate → app-01 → app-05`, where each hop is `ssh` typed inside the shell and won't accept a jump host), a **Local** tunnel forwards by running `nc <dest> <port>` on the innermost machine over the login-script chain (like Bulk/Monitor) — so you can reach a database only pingable from the deepest hop straight from your laptop.
 - **Via host** = that login-script host · **Type** = L · **Bind** = e.g. `13306` · **Destination** = `<db-host-as-seen-from-the-innermost-hop>:3306` → **Start** → point your DB client at `127.0.0.1:13306`.
 - Requires **`nc`** on the innermost machine. If the `ssh` hops authenticate by **password**, the intermediate machines need **`sshpass`** (keys need nothing) — same requirement as Bulk/Monitor over login scripts.
 
@@ -362,6 +362,105 @@ Connect to a **graphical desktop**, tunneling through your SSH jump hosts when n
 **🧰 Services** (`⋯` → *Services*): pick a host → every systemd service with its state (green = running, red = failed). Hover a row for **▶ start / ⏹ stop / ↻ restart** (each confirms first — these usually need root; without it systemctl's own error is shown verbatim) and **📜 logs** which opens the unit's last 120 `journalctl` lines right in the window. Servers without systemd aren't supported.
 
 **Group colors** (bonus for busy fleets): edit a group → **Accent color** → pick a swatch (production red, staging yellow…). Every host in the group gets a color stripe on its **sidebar row**, its **tab** and its **split-pane header** — so you always know which terminal is production before you type.
+
+---
+
+## 11C. MySQL/MariaDB replication — `⋯` → 🔁 Replication master/slave
+
+Answers the 2 a.m. question: **is the slave behind, by how much, why, and what do I type now?** Also has **⊞ Open in tab**.
+
+### Setting up a pair
+
+A **cluster** is one master and however many slaves it feeds. **+ Add pair** → name it, point at the master, then add a row per slave.
+
+For each end — the master and every slave — answer the same question: *where is that MySQL*. The dropdown offers two kinds of answer:
+
+- **An SSH host** — MySQL runs on that machine. The app bridges to `127.0.0.1:<port>` through the host's existing jump chain, or runs `mysql` there over SSH.
+- **A saved tunnel** — MySQL is **not** on the SSH host but on another machine inside the network (`10.20.30.40:3306`), reachable only through a tunnel. Pick the tunnel and the app starts it if needed, then connects to its local end.
+
+Slaves can mix the two freely — one behind a tunnel, another straight on its host.
+
+**Credentials.** The cluster has one **default** MySQL user and password, used by every endpoint that doesn't declare its own. Where a machine uses a different account — the master on one, each slave on another — click **⚙** on that row and give it its own. Whatever you leave blank there still falls back to the cluster, so you can override just the user, or just the password. The ⚙ lights up on any endpoint that has its own credentials, so you can see at a glance which ones differ.
+
+The master end is optional — leave it as *None* if you only have access to the slaves; you still get lag and thread state per slave, you just lose the binlog position comparison against the master.
+
+> **Why a cluster rather than one pair per slave.** The master is read **once** per cycle and that single snapshot is compared against every slave. That's lighter on the master than one connection per slave, and it's what makes the numbers comparable: all slaves are measured against the *same* binlog position, so "slave-02 is 40 MB further behind than slave-01" actually means something. Each slave still keeps its own connection, its own diagnosis and its own alert state — one broken slave neither blocks the poll nor mutes the others.
+
+> **Why tunnel mode exists and when you need it.** Bridging straight from a host uses SSH `direct-tcpip`, which always originates at the **gate**. When the target is a private address like `10.20.30.40`, that range often exists on *both* networks, so the gate can open a connection to the wrong machine — or a firewall silently drops the SYN and the channel just hangs, because sshd only confirms it *after* `connect()` returns. Your tunnels already solve this (they go through `nc` on the innermost machine first). Tunnel mode reuses that exact route instead of re-deriving it, so it cannot regress differently from your working tunnels. If the dropdown shows no tunnels, create one under `⋯` → **Tunnels** first.
+
+Leave *MySQL user* and *password* empty — both at cluster level and per endpoint — and the app uses whatever is already on the server: `~/.my.cnf`, or unix_socket auth for your SSH user. That's the simplest and safest setup and the app never handles a database password. Any password you do supply is encrypted in the vault; in CLI mode it reaches the server only through a temporary 0600 `.cnf` file, **never on a command line** where `ps` would expose it to every user on the box.
+
+**Tunnel mode is the exception:** the connection starts on *your* machine, so the server's own credentials cannot apply — that endpoint needs a MySQL user and password (its own, or inherited from the cluster), and only the driver path works (there is no CLI path when you're at the local end of a tunnel). The form checks this per endpoint and says which one is short.
+
+**How it reads status.** *Automatic* tries a direct MySQL connection first — tunnelled through the host's existing SSH jump chain, so a database behind a bastion works with no extra setup — and falls back to running `mysql` over SSH if port 3306 is closed. **Test connection** tells you which route actually worked, naming the tunnel's local address when it went that way.
+
+> The monitoring user needs **`REPLICATION CLIENT`** (MariaDB / MySQL 5.7) or `REPLICATION CLIENT` + `REPLICATION_SLAVE_ADMIN` (MySQL 8). A SELECT-only user cannot read `SHOW SLAVE STATUS`. MySQL 8.4 removed that statement entirely — the app detects the version and uses `SHOW REPLICA STATUS` there.
+
+### Reading the status panel
+
+The master's position sits in a strip at the top — read once for the whole cluster — and below it one card per slave. Each card shows thread state, lag and both binlog gaps at a glance; click it to expand that slave's own diagnoses and runbook. A slave that hasn't reported yet says so instead of pretending to be healthy.
+
+`Seconds_Behind_Master` **lies**, in both directions, so the panel never shows it alone:
+
+- It reports **0 while the IO thread is dead** — the slave has applied everything it managed to fetch, which is nothing.
+- It reports **hours on a deliberately delayed replica** (`MASTER_DELAY`), where that is exactly the point.
+
+So alongside lag you get the **binlog byte gap in both directions** — *Not fetched* (how far the IO thread trails the master) and *Not applied* (how far the SQL thread trails what's already on disk). Those two split the problem immediately: a large *Not fetched* is a network or master-throughput problem; a large *Not applied* is the slave's own write speed, and the binlog is already sitting on its disk. When the two sides are on different binlog files the app says **"3 binlog files behind"** instead of inventing a byte count it cannot know. Any configured `MASTER_DELAY` is subtracted before anything is called late.
+
+### What this costs your servers
+
+Everything in a poll cycle is an **in-memory metadata read** — no table scans, no disk, nothing that grows with your data:
+
+| Where | Statement | How often |
+|---|---|---|
+| Master | `SHOW MASTER STATUS` | once per cycle, shared by every slave |
+| Each slave | `SHOW SLAVE STATUS` | once per cycle |
+| Both | `SELECT @@global.read_only, @@global.super_read_only` | once per cycle |
+| Both | `SHOW GLOBAL VARIABLES` (the config set) | on connect, then every **5 minutes** |
+| Both | `SELECT VERSION()` | **once per session** |
+
+A cluster of one master and three slaves is 8 statements per cycle — about 32 a minute at the 15-second default. That is far below the noise floor of a production MySQL, and 15s is the same ballpark other monitoring tools use.
+
+The config variables (`server_id`, `log_bin`, `binlog_format`, binlog retention…) are read on a 5-minute cycle rather than every poll: `SHOW GLOBAL VARIABLES` materialises the whole ~500-variable list before filtering, while those values change perhaps once a month. `read_only` is deliberately *not* in that group — it's read every cycle with a cheap direct lookup, because a slave that starts accepting writes is a split-brain risk you want to hear about in seconds, not minutes.
+
+Two things worth knowing:
+
+- **Connections stay open** — one per endpoint, so 1 + N per watched cluster. Each idle MySQL connection costs a slot against `max_connections` and a little memory; if a server already runs close to its connection limit, count these in.
+- **CLI mode is materially heavier than the driver.** Every cycle opens an SSH exec channel and spawns a `mysql` process on the server — nested `ssh` + `su` for login-script hosts. The badge on a slave card turns amber when it's on that path, with the reason in its tooltip. If the MySQL port is reachable or a tunnel exists, prefer the driver.
+
+The genuinely expensive operations — `COUNT(*)` and `CHECKSUM TABLE` — are never part of the cycle. They only run when you ask, and are capped at 50 tables per run.
+
+### The runbook
+
+Every problem found is listed worst-first, and each one expands into **checks (read-only, run these first)** and **fixes** — with your real values already substituted:
+
+- **Error 1236** — the app names the binlog file the slave still needs, says plainly that `START SLAVE` will not help because the data is gone, and lays out the full re-seed (`mysqldump --master-data=2` → read the position → `CHANGE MASTER TO`), plus how to stop it happening again (binlog retention).
+- **Error 1062 / 1032** — the table name is pulled out of the error message and the `SELECT` for **both** sides is built for you, because whether skipping the event is harmless depends entirely on whether the two rows are identical. Only then is `sql_slave_skip_counter` offered — marked destructive, spelling out that you are accepting a permanent difference.
+- **Corrupt relay log (1594)** — a `CHANGE MASTER TO` with your actual `Exec_Master_Log_Pos` already filled in, and the reassurance that nothing is lost (relay logs are re-fetchable).
+- **Lag with both threads running** — the query that finds tables **without a PRIMARY KEY**, which is the single most common cause with row-based binlog, plus the right parallel-apply settings for your flavour (MariaDB's `slave_parallel_threads` vs MySQL 8's `replica_parallel_workers`).
+
+**The app never runs any of these.** Buttons copy to your clipboard; anything destructive asks for confirmation before it even does that.
+
+### Background alerts
+
+Tick **Watch in background** per cluster. **⚙** sets the thresholds (shared by every watched cluster): lag in seconds, not-applied bytes, and on/off switches for *threads stopped*, *error code*, *slave accepts writes*, *cannot read status*. An alert fires after **2 consecutive polls** past the threshold and repeats every 15 minutes while it lasts, with a dead-band so a value hovering at the line doesn't flap. Delivery is toast + OS notification + webhook (Slack / Google Chat / Discord / Telegram — same field as monitoring).
+
+Thresholds are set per cluster but the **state machine is per slave**, so each one breaches and recovers on its own. Alerts are labelled `<cluster> · <slave>`, and the webhook payload carries `replicaId` / `replica` as separate fields so downstream automation doesn't have to parse the label.
+
+Thresholds live **outside the vault**, and connections stay open once watching starts, so alerts keep firing after the vault auto-locks at 15 minutes. The lag threshold also drives the diagnosis panel, so the panel and the notifications never contradict each other.
+
+### Data drift (the *Data drift* tab)
+
+Replication can report `Yes / Yes / 0s` while the data has quietly diverged — someone wrote directly to the slave, an old skipped event left a hole, or `binlog_format=STATEMENT` made `NOW()`/`RAND()` produce different values on each side. Two deliberate steps:
+
+Data drift runs against **one slave at a time** — pick which one at the top when the cluster has several.
+
+1. **Quick scan** — reads `information_schema` on both sides: missing tables, engine/collation differences, column and index differences, and the configuration variables that matter (`server_id`, `read_only`, `binlog_format`, `log_bin`, binlog retention, version). Variables that are *supposed* to differ (`server_id` must, `read_only` should) are marked **expected** so they don't look like faults. Takes seconds.
+2. **Tick the suspicious tables → Exact count / CHECKSUM tables** — `COUNT(*)` compares row counts exactly; `CHECKSUM TABLE` compares the contents too, which is the only thing that catches "right number of rows, wrong values". Both scan the full table **on both servers**, so this is a deliberate action, capped at 50 tables per run.
+
+> Row counts in the quick scan are InnoDB **estimates** — several percent off is normal. Use them to narrow down, never to conclude. If the pair has replication filters, out-of-scope tables are dimmed: a difference there is intentional.
+
+**Not covered yet:** GTID gap comparison (position-based only), PostgreSQL streaming replication, and semi-sync specifics.
 
 ---
 
@@ -645,7 +744,7 @@ MariaDB listens on **3307 and up, never 3306**, so an existing XAMPP/Laragon/MyS
 
 **What this does instead**: you list the domains once plus the IP of each server, then click a server and press **Open**. The app launches a Chromium browser window whose **DNS override applies to that window only**.
 
-1. Create a group (e.g. *Webike Global*) and put the domains in, one per line — a one-level wildcard works: `*.example.com` covers every subdomain.
+1. Create a group (e.g. *Production*) and put the domains in, one per line — a one-level wildcard works: `*.example.com` covers every subdomain.
 2. Add the servers: a label (*LB1*) and its IP. **From a saved server…** pulls the IP straight out of a host you already have in the app.
 3. Click a server chip to select it → **Open**. To switch machine, click another chip and open again.
 
@@ -693,5 +792,6 @@ Limits: needs a **Chromium** browser (Chrome / Edge / Brave / Vivaldi — Firefo
 - **AI troubleshooter** runs **read-only** commands only (blocked by a main-process guard + your per-step approval); to apply a fix you run it yourself.
 - **Local dev stack** is **Windows-only** for now; `.test` domains and local HTTPS aren't wired up yet, there's no WordPress downloader, and no local↔server deploy or share link — see §16C-E. phpMyAdmin 5.2 needs PHP ≤ 8.3 (install 8.3 alongside 8.4 and the app picks it automatically).
 - **Point a domain at a server** needs a **Chromium** browser and does nothing behind a system proxy; it covers browsers only, not Postman or database clients — see §16D.
-- **Tool tabs aren't saved in a workspace** (Monitoring, Compare, Local dev, Tunnels, Processes, Services, AI troubleshooter) — they carry no session, so they're one click to reopen; only terminal and SFTP tabs are restored. The **detached** Monitoring/Tunnels windows also don't remember their size and position between runs yet.
+- **Replication monitoring** covers **MySQL/MariaDB position-based replication**. GTID sets aren't compared yet (only binlog file/position), PostgreSQL streaming replication isn't supported, and there's no lag history chart or detached window yet. Per-pair alert thresholds exist in the backend but the UI only exposes the global defaults. Tunnel mode needs a **local-forward (L)** tunnel — SOCKS (D) and remote (R) tunnels have no local end to attach to — and requires a MySQL user/password. See §11C.
+- **Tool tabs aren't saved in a workspace** (Monitoring, Compare, Local dev, Tunnels, Processes, Services, AI troubleshooter, Replication) — they carry no session, so they're one click to reopen; only terminal and SFTP tabs are restored. The **detached** Monitoring/Tunnels windows also don't remember their size and position between runs yet.
 - Not yet available: a self-hosted **team server**, **cloud import** (AWS/GCP…), a **Docker/K8s browser** — see [../ROADMAP.md](../ROADMAP.md).

@@ -9,6 +9,7 @@ import { registerImportIpc } from './ipc/import'
 import { registerMonitorIpc } from './ipc/monitor'
 import { registerWatcherIpc } from './ipc/watcher'
 import { registerHostToolsIpc } from './ipc/hostTools'
+import { registerReplicationIpc } from './ipc/replication'
 import { registerNetToolsIpc } from './ipc/nettools'
 import { registerSyncIpc } from './ipc/sync'
 import { registerPromptIpc } from './ipc/prompts'
@@ -254,6 +255,7 @@ registerMarketplaceIpc()
 const disposeMonitor = registerMonitorIpc()
 const disposeWatcher = registerWatcherIpc()
 registerHostToolsIpc()
+const disposeReplication = registerReplicationIpc()
 const terminal = registerTerminalIpc()
 const disposeSftp = registerSftpIpc()
 const disposeVnc = registerVncIpc()
@@ -309,6 +311,7 @@ app.on('before-quit', (event) => {
   disposeRdp()
   disposeTunnels()
   disposeMonitor()
+  disposeReplication()
   disposeWatcher()
 
   void Promise.race([

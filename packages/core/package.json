@@ -16,6 +16,7 @@
     "@anthropic-ai/sdk": "^0.104.0",
     "@infra/shared": "workspace:*",
     "@noble/hashes": "^2.2.0",
+    "mysql2": "^3.23.2",
     "node-pty": "1.2.0-beta.13",
     "serialport": "^13.0.0",
     "ssh2": "^1.17.0"

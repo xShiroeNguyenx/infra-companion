@@ -32,8 +32,8 @@ export type LocalForwardRoute =
 /**
  * Chọn đường đi cho tunnel L — mấu chốt là ĐÍCH ĐƯỢC HIỂU THEO MÁY NÀO.
  *
- * Login script có hop `ssh` (vd gate `133.x` → `ssh jpap06`) thì máy user thấy trong terminal là
- * máy SÂU, và địa chỉ đích user nhập (vd `192.168.1.71:3306`) là địa chỉ theo mạng của máy sâu đó.
+ * Login script có hop `ssh` (vd gate → `ssh app-06`) thì máy user thấy trong terminal là
+ * máy SÂU, và địa chỉ đích user nhập (vd `10.20.30.40:3306`) là địa chỉ theo mạng của máy sâu đó.
  * direct-tcpip lại luôn xuất phát từ ENDPOINT SSH (gate): dải riêng như 192.168.x.x rất dễ tồn tại
  * ở CẢ HAI mạng nên gate có thể mở nhầm sang máy khác, hoặc bị firewall drop gói SYN — sshd chỉ xác
  * nhận kênh SAU khi connect() xong nên kênh treo im, tunnel vẫn xanh còn client DB chờ tới timeout

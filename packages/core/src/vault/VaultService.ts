@@ -16,6 +16,10 @@ import type {
   HostProtocol,
   KeyImportInput,
   LoginStep,
+  ReplPairDto,
+  ReplPairInput,
+  ReplProbeMode,
+  ReplReplicaDto,
   SnippetDto,
   SnippetInput,
   SshKeyDto,
@@ -700,6 +704,138 @@ export class VaultService {
   }
 
   // -------------------------------------------------------------------------
+  // F55 — Cụm replication: 1 master + N slave
+  // -------------------------------------------------------------------------
+
+  listReplPairs(): ReplPairDto[] {
+    const rows = this.ensureDb()
+      .prepare('SELECT * FROM repl_pairs ORDER BY name')
+      .all() as unknown as ReplPairRow[]
+    return rows.map(toReplPairDto)
+  }
+
+  getReplPair(id: string): ReplPairDto | null {
+    const row = this.ensureDb().prepare('SELECT * FROM repl_pairs WHERE id = ?').get(id) as ReplPairRow | undefined
+    return row ? toReplPairDto(row) : null
+  }
+
+  /**
+   * Credential đã ÁP FALLBACK cho từng đầu: đầu nào khai riêng thì dùng của nó, không thì lấy
+   * mặc định của cụm. Gom vào một chỗ để main không phải lặp lại logic fallback ở nhiều lối đo.
+   *
+   * Mật khẩu chỉ được giải mã ở đây và không bao giờ đi qua IPC — renderer chỉ thấy `hasDbPassword`.
+   * User/password rỗng = dùng credential sẵn trên server (~/.my.cnf / unix_socket auth).
+   */
+  getReplCredentials(id: string): ReplCredentialsResolved {
+    const row = this.ensureDb()
+      .prepare('SELECT db_user, db_password_enc, master_db_user, master_db_password_enc, replicas_json FROM repl_pairs WHERE id = ?')
+      .get(id) as
+      | {
+          db_user: string | null
+          db_password_enc: string | null
+          master_db_user: string | null
+          master_db_password_enc: string | null
+          replicas_json: string
+        }
+      | undefined
+    if (!row) return { cluster: EMPTY_CREDS, master: EMPTY_CREDS, replicas: {} }
+
+    const dek = this.requireDek()
+    const dec = (enc: string | null): string => (enc ? (decryptField(dek, enc) ?? '') : '')
+    const cluster: ReplCreds = { user: row.db_user ?? '', password: dec(row.db_password_enc) }
+    /** Khai riêng = có user HOẶC có mật khẩu; thiếu vế nào thì vế đó lấy của cụm. */
+    const resolve = (user: string | null, enc: string | null): ReplCreds =>
+      !user && !enc ? cluster : { user: user || cluster.user, password: enc ? dec(enc) : cluster.password }
+
+    const replicas: Record<string, ReplCreds> = {}
+    for (const r of parseStoredReplicas(row.replicas_json, 3306)) {
+      replicas[r.id] = resolve(r.dbUser || null, r.dbPasswordEnc)
+    }
+    return { cluster, master: resolve(row.master_db_user, row.master_db_password_enc), replicas }
+  }
+
+  saveReplPair(input: ReplPairInput): ReplPairDto {
+    const db = this.ensureDb()
+    const dek = this.requireDek()
+    const now = Date.now()
+    const id = input.id ?? randomUUID()
+
+    let existing:
+      | { db_password_enc: string | null; master_db_password_enc: string | null; replicas_json: string }
+      | undefined
+    if (input.id) {
+      existing = db
+        .prepare('SELECT db_password_enc, master_db_password_enc, replicas_json FROM repl_pairs WHERE id = ?')
+        .get(input.id) as typeof existing
+      if (!existing) throw new Error('Cụm replication không tồn tại')
+    }
+
+    /** undefined = giữ nguyên · null/'' = xoá · chuỗi = đặt mới (cùng semantics host.notes). */
+    const mergePassword = (incoming: string | null | undefined, current: string | null): string | null => {
+      if (incoming === undefined) return current
+      if (incoming === null || incoming === '') return null
+      return encryptField(dek, incoming)
+    }
+
+    const defaultPort = clampDbPort(input.dbPort)
+    // Mật khẩu riêng của slave nằm trong JSON → phải tra bản cũ THEO ID để giữ được khi user sửa
+    // những thứ khác mà không nhập lại mật khẩu.
+    const previous = new Map(
+      parseStoredReplicas(existing?.replicas_json ?? '[]', defaultPort).map((r) => [r.id, r])
+    )
+    // Slave giữ id cũ khi sửa (để runtime/cảnh báo không bị coi là slave mới), thiếu id thì sinh mới
+    const replicas: StoredReplica[] = (input.replicas ?? [])
+      .filter((r) => r.hostId)
+      .map((r) => {
+        const rid = r.id ?? randomUUID()
+        return {
+          id: rid,
+          label: r.label?.trim() ?? '',
+          hostId: r.hostId,
+          tunnelId: r.tunnelId || null,
+          dbPort: clampDbPort(r.dbPort ?? defaultPort),
+          dbUser: r.dbUser?.trim() ?? '',
+          dbPasswordEnc: mergePassword(r.dbPassword, previous.get(rid)?.dbPasswordEnc ?? null)
+        }
+      })
+
+    const values = [
+      input.name.trim() || 'Cụm không tên',
+      input.masterHostId ?? null,
+      input.masterTunnelId || null,
+      JSON.stringify(replicas),
+      defaultPort,
+      input.dbUser?.trim() || null,
+      mergePassword(input.dbPassword, existing?.db_password_enc ?? null),
+      input.masterDbUser?.trim() || null,
+      mergePassword(input.masterDbPassword, existing?.master_db_password_enc ?? null),
+      input.cliBinary?.trim() || null,
+      safeProbeMode(input.probeMode),
+      clampPollSec(input.pollIntervalSec),
+      input.watchEnabled ? 1 : 0
+    ]
+    if (input.id) {
+      db.prepare(
+        `UPDATE repl_pairs SET name=?, master_host_id=?, master_tunnel_id=?, replicas_json=?, db_port=?,
+         db_user=?, db_password_enc=?, master_db_user=?, master_db_password_enc=?, cli_binary=?,
+         probe_mode=?, poll_interval_sec=?, watch_enabled=?, updated_at=? WHERE id=?`
+      ).run(...values, now, id)
+    } else {
+      db.prepare(
+        `INSERT INTO repl_pairs (name, master_host_id, master_tunnel_id, replicas_json, db_port, db_user,
+         db_password_enc, master_db_user, master_db_password_enc, cli_binary, probe_mode, poll_interval_sec,
+         watch_enabled, created_at, updated_at, id)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      ).run(...values, now, now, id)
+    }
+    return this.getReplPair(id)!
+  }
+
+  deleteReplPair(id: string): void {
+    this.ensureDb().prepare('DELETE FROM repl_pairs WHERE id = ?').run(id)
+  }
+
+  // -------------------------------------------------------------------------
   // Known hosts (TOFU)
   // -------------------------------------------------------------------------
 
@@ -1248,5 +1384,115 @@ function toTunnelDto(row: TunnelRow): TunnelRuleDto {
     destHost: row.dest_host,
     destPort: row.dest_port,
     autoStart: row.auto_start === 1
+  }
+}
+
+interface ReplPairRow {
+  id: string
+  name: string
+  master_host_id: string | null
+  master_tunnel_id: string | null
+  replicas_json: string
+  db_port: number
+  db_user: string | null
+  db_password_enc: string | null
+  master_db_user: string | null
+  master_db_password_enc: string | null
+  cli_binary: string | null
+  probe_mode: string
+  poll_interval_sec: number
+  watch_enabled: number
+}
+
+const REPL_PROBE_MODES: ReplProbeMode[] = ['auto', 'driver', 'cli']
+/** Giá trị lạ (file DB sửa tay / sync từ bản khác) → về mặc định thay vì làm nổ service. */
+function safeProbeMode(mode: string | undefined): ReplProbeMode {
+  return REPL_PROBE_MODES.includes(mode as ReplProbeMode) ? (mode as ReplProbeMode) : 'auto'
+}
+function clampDbPort(port: number | undefined): number {
+  if (!port || !Number.isFinite(port)) return 3306
+  return Math.min(65535, Math.max(1, Math.round(port)))
+}
+/** Cùng biên với clampPollInterval của ReplicationService (5s–300s). */
+function clampPollSec(sec: number | undefined): number {
+  if (!sec || !Number.isFinite(sec)) return 15
+  return Math.min(300, Math.max(5, Math.round(sec)))
+}
+
+/** Credential đã áp fallback cụm → đầu cụ thể. Chỉ tồn tại trong main, không qua IPC. */
+export interface ReplCreds {
+  user: string
+  password: string
+}
+export interface ReplCredentialsResolved {
+  cluster: ReplCreds
+  master: ReplCreds
+  /** key = replicaId */
+  replicas: Record<string, ReplCreds>
+}
+const EMPTY_CREDS: ReplCreds = { user: '', password: '' }
+
+/** Slave như LƯU trong `replicas_json` — có mật khẩu đã mã hoá, KHÁC với DTO gửi renderer. */
+interface StoredReplica {
+  id: string
+  label: string
+  hostId: string
+  tunnelId: string | null
+  dbPort: number
+  dbUser: string
+  dbPasswordEnc: string | null
+}
+
+/** Danh sách slave lưu JSON — file DB sửa tay / bản lỗi không được làm nổ cả app. */
+function parseStoredReplicas(raw: string, fallbackPort: number): StoredReplica[] {
+  let list: unknown
+  try {
+    list = JSON.parse(raw || '[]')
+  } catch {
+    return []
+  }
+  if (!Array.isArray(list)) return []
+  return list
+    .map((item) => (item ?? {}) as Partial<StoredReplica>)
+    .filter((r) => typeof r.hostId === 'string' && r.hostId !== '')
+    .map((r) => ({
+      id: typeof r.id === 'string' && r.id ? r.id : randomUUID(),
+      label: typeof r.label === 'string' ? r.label : '',
+      hostId: r.hostId!,
+      tunnelId: typeof r.tunnelId === 'string' && r.tunnelId ? r.tunnelId : null,
+      dbPort: clampDbPort(typeof r.dbPort === 'number' ? r.dbPort : fallbackPort),
+      dbUser: typeof r.dbUser === 'string' ? r.dbUser : '',
+      dbPasswordEnc: typeof r.dbPasswordEnc === 'string' && r.dbPasswordEnc ? r.dbPasswordEnc : null
+    }))
+}
+
+/** Bỏ mật khẩu đã mã hoá trước khi ra khỏi main — renderer chỉ cần biết CÓ hay KHÔNG. */
+const toReplicaDto = (r: StoredReplica): ReplReplicaDto => ({
+  id: r.id,
+  label: r.label,
+  hostId: r.hostId,
+  tunnelId: r.tunnelId,
+  dbPort: r.dbPort,
+  dbUser: r.dbUser,
+  hasDbPassword: r.dbPasswordEnc !== null
+})
+
+function toReplPairDto(row: ReplPairRow): ReplPairDto {
+  return {
+    id: row.id,
+    name: row.name,
+    masterHostId: row.master_host_id,
+    masterTunnelId: row.master_tunnel_id,
+    replicas: parseStoredReplicas(row.replicas_json, row.db_port).map(toReplicaDto),
+    dbPort: row.db_port,
+    masterDbUser: row.master_db_user ?? '',
+    masterHasDbPassword: row.master_db_password_enc !== null,
+    dbUser: row.db_user ?? '',
+    // Mật khẩu thật KHÔNG BAO GIỜ ra khỏi main — renderer chỉ cần biết có hay không
+    hasDbPassword: row.db_password_enc !== null,
+    cliBinary: row.cli_binary ?? 'mysql',
+    probeMode: safeProbeMode(row.probe_mode),
+    pollIntervalSec: row.poll_interval_sec,
+    watchEnabled: row.watch_enabled === 1
   }
 }

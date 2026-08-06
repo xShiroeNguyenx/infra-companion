@@ -43,9 +43,11 @@ import { usePluginStore } from './stores/plugins'
 import { useMonitorStore } from './stores/monitor'
 import { useLocaldevStore } from './stores/localdev'
 import { useWatcherStore } from './stores/watcher'
+import { useReplicationStore } from './stores/replication'
 import { useVaultStore } from './stores/vault'
 import { ProcessesModal } from './components/ProcessesModal'
 import { ServicesModal } from './components/ServicesModal'
+import { ReplicationModal } from './components/ReplicationModal'
 import { CompareModal } from './components/CompareModal'
 import { HostMapModal } from './components/HostMapModal'
 import { ToolTabView } from './components/ToolTabView'
@@ -148,6 +150,12 @@ export default function App() {
     const offStopped = window.infra.monitor.onStopped(() =>
       useMonitorStore.setState({ active: false, data: {}, detached: false })
     )
+    // F55: kết quả đo replication (đăng ký ở App để cửa sổ nào cũng nhận, kể cả khi panel đóng)
+    const offRepl = window.infra.replication.onSample((s) => useReplicationStore.getState().applySnapshot(s))
+    const offReplAlert = window.infra.replication.onAlert((a) =>
+      useToastsStore.getState().push(a.text, a.kind === 'breach' ? 'error' : 'info')
+    )
+    window.infra.replication.subscribe()
     // F39: kết quả sweep watcher nền → chấm xanh/đỏ ở sidebar
     const offWatcher = window.infra.watcher.onStatus((list) => useWatcherStore.getState().applyStatuses(list))
     // Local dev: trạng thái service / tiến độ tải runtime / tiến độ thao tác site (main là nguồn sự thật)
@@ -161,6 +169,8 @@ export default function App() {
     // Đọc cờ enabled sớm: quyết định có hiện entry point local dev hay không
     void useLocaldevStore.getState().refreshEnabled()
     return () => {
+      offRepl()
+      offReplAlert()
       offWatcher()
       offLdService()
       offLdRuntime()
@@ -302,6 +312,12 @@ export default function App() {
       label: `🩺 ${t('ai.diagnose.title')} — ${t('tabs.openInTab')}`,
       run: () => useTabsStore.getState().openToolTab('ai-diagnose')
     },
+    { id: 'open-replication', label: `🔁 ${t('repl.title')}`, run: () => setModal('replication') },
+    {
+      id: 'open-replication-tab',
+      label: `🔁 ${t('repl.title')} — ${t('tabs.openInTab')}`,
+      run: () => useTabsStore.getState().openToolTab('replication')
+    },
     { id: 'open-recordings', label: t('menu.recordings'), run: () => setModal('recordings') },
     { id: 'open-sync', label: t('menu.sync'), run: () => setModal('sync') },
     { id: 'open-snippets', label: t('menu.snippets'), run: () => setModal('snippets') },
@@ -376,7 +392,8 @@ export default function App() {
                   tab.kind === 'tunnels' ||
                   tab.kind === 'processes' ||
                   tab.kind === 'services' ||
-                  tab.kind === 'ai-diagnose'
+                  tab.kind === 'ai-diagnose' ||
+                  tab.kind === 'replication'
                 ) {
                   return <ToolTabView key={tab.id} kind={tab.kind} active={tab.id === activeId} />
                 }
@@ -407,6 +424,7 @@ export default function App() {
       {modal === 'plugins' && <PluginsModal onClose={() => setModal(null)} />}
       {modal === 'processes' && <ProcessesModal onClose={() => setModal(null)} />}
       {modal === 'services' && <ServicesModal onClose={() => setModal(null)} />}
+      {modal === 'replication' && <ReplicationModal onClose={() => setModal(null)} />}
       {modal === 'compare' && <CompareModal onClose={() => setModal(null)} />}
       {modal === 'hostmap' && <HostMapModal onClose={() => setModal(null)} />}
       {modal === 'localdev-settings' && <LocaldevSettingsModal onClose={() => setModal(null)} />}

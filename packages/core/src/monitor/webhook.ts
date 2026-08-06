@@ -36,22 +36,26 @@ export interface WebhookRequest {
 }
 
 /**
- * Dựng request theo dịch vụ đoán từ URL:
+ * Dựng request theo dịch vụ đoán từ URL — dùng chung cho MỌI loại cảnh báo (F04 monitoring,
+ * F55 replication). Tách khỏi `buildWebhookRequest` để không phải copy bảng nhận diện dịch vụ:
  * - chat.googleapis.com (Google Chat)   → { text }
  * - hooks.slack.com                     → { text }
  * - discord.com/api/webhooks            → { content }
  * - api.telegram.org/bot…/sendMessage   → tách chat_id từ query, POST { chat_id, text } vào URL bỏ query
- * - còn lại (generic)                   → JSON đầy đủ { text, hostId, host, metric, kind, value, threshold, ts }
+ * - còn lại (generic)                   → JSON { text, ...fields }
  * URL không parse được → null (caller bỏ qua + log).
  */
-export function buildWebhookRequest(webhookUrl: string, alert: AlertEvent & { label: string }): WebhookRequest | null {
+export function buildWebhookRequestFor(
+  webhookUrl: string,
+  text: string,
+  fields: Record<string, unknown>
+): WebhookRequest | null {
   let url: URL
   try {
     url = new URL(webhookUrl)
   } catch {
     return null
   }
-  const text = formatAlertText(alert)
 
   if (url.hostname === 'chat.googleapis.com' || url.hostname === 'hooks.slack.com') {
     return { url: webhookUrl, body: JSON.stringify({ text }) }
@@ -67,17 +71,18 @@ export function buildWebhookRequest(webhookUrl: string, alert: AlertEvent & { la
     const clean = `${url.origin}${url.pathname}`
     return { url: clean, body: JSON.stringify(chatId ? { chat_id: chatId, text } : { text }) }
   }
-  return {
-    url: webhookUrl,
-    body: JSON.stringify({
-      text,
-      hostId: alert.hostId,
-      host: alert.label,
-      metric: alert.metric,
-      kind: alert.kind,
-      value: alert.value,
-      threshold: alert.threshold,
-      ts: alert.ts
-    })
-  }
+  return { url: webhookUrl, body: JSON.stringify({ text, ...fields }) }
+}
+
+/** F04 — webhook cho cảnh báo tài nguyên host. */
+export function buildWebhookRequest(webhookUrl: string, alert: AlertEvent & { label: string }): WebhookRequest | null {
+  return buildWebhookRequestFor(webhookUrl, formatAlertText(alert), {
+    hostId: alert.hostId,
+    host: alert.label,
+    metric: alert.metric,
+    kind: alert.kind,
+    value: alert.value,
+    threshold: alert.threshold,
+    ts: alert.ts
+  })
 }

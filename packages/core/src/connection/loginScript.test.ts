@@ -84,8 +84,8 @@ describe('deriveSftpExecFromLoginSteps (SFTP qua gate)', () => {
     })
 
     it('su có password không có ssh → giữ stdin "{ echo PASS; cat; } | su … -c <probe>"', () => {
-      const cmd = deriveSftpExecFromLoginSteps([{ send: 'su vn_root' }, { send: 'PW', secret: true }])
-      expect(cmd).toMatch(/^\{ echo 'PW'; cat; \} \| su vn_root -c '/)
+      const cmd = deriveSftpExecFromLoginSteps([{ send: 'su admin' }, { send: 'PW', secret: true }])
+      expect(cmd).toMatch(/^\{ echo 'PW'; cat; \} \| su admin -c '/)
       expect(cmd).toContain('/usr/libexec/openssh/sftp-server')
       expect(cmd).not.toContain('-s sftp')
     })

@@ -5,7 +5,7 @@ import { isSafeDomain } from '../localdev/templates/escape'
  * "Đổi IP của domain" mà KHÔNG sửa file hosts và KHÔNG cần quyền admin.
  *
  * Cách làm: mọi browser Chromium (Chrome/Edge/Brave/Vivaldi) nhận cờ
- *   --host-resolver-rules="MAP www.webike.pk 59.106.231.202,MAP *.webike.net 59.106.231.206"
+ *   --host-resolver-rules="MAP www.example.com 203.0.113.10,MAP *.example.net 203.0.113.11"
  * ghi đè phân giải DNS **chỉ trong tiến trình browser đó**. Ba hệ quả quan trọng:
  *  1. Không đụng `C:\Windows\System32\drivers\etc\hosts` ⇒ không cần admin, không có gì phải
  *     dọn nếu app chết giữa đường, và các app khác trên máy không bị ảnh hưởng.
@@ -27,7 +27,7 @@ import { isSafeDomain } from '../localdev/templates/escape'
 
 export interface HostMapTarget {
   id: string
-  /** Nhãn user thấy, vd 'LB1 — jpap05'. */
+  /** Nhãn user thấy, vd 'LB1 — web-01'. */
   label: string
   /** IP đích (v4 hoặc v6, KHÔNG kèm ngoặc vuông). */
   ip: string
@@ -36,7 +36,7 @@ export interface HostMapTarget {
 export interface HostMapGroup {
   id: string
   name: string
-  /** Domain hoặc pattern kiểu `*.webike.net`. */
+  /** Domain hoặc pattern kiểu `*.example.net`. */
   patterns: string[]
   /** Các server có thể trỏ tới (5 con LB…). */
   targets: HostMapTarget[]

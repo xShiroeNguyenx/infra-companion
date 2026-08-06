@@ -235,7 +235,7 @@ function GroupForm({ group, onDone }: { group: HostMapGroupDto | null; onDone: (
           <TextArea
             rows={5}
             value={patternsText}
-            placeholder={'www.webike.pk\nvn.webike.net\n*.webike.net'}
+            placeholder={'www.example.com\nvn.example.net\n*.example.net'}
             onChange={(e) => setPatternsText(e.target.value)}
           />
         </Field>
@@ -255,7 +255,7 @@ function GroupForm({ group, onDone }: { group: HostMapGroupDto | null; onDone: (
             <TextInput
               className="flex-1"
               value={tg.ip}
-              placeholder="59.106.231.202"
+              placeholder="203.0.113.10"
               onChange={(e) => setTarget(i, { ip: e.target.value })}
             />
             <button

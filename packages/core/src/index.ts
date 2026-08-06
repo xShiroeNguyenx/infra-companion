@@ -36,9 +36,111 @@ export { MonitorService } from './monitor/MonitorService'
 export type { MetricSample, MonitorTarget } from './monitor/MonitorService'
 export { AlertEngine } from './monitor/AlertEngine'
 export type { AlertRules, AlertThresholds, AlertEvent, AlertMetric } from './monitor/AlertEngine'
-export { buildWebhookRequest, formatAlertText } from './monitor/webhook'
+export { buildWebhookRequest, buildWebhookRequestFor, formatAlertText } from './monitor/webhook'
+export type { AlertInfo, WebhookRequest } from './monitor/webhook'
+export { HysteresisStates, binaryZone, feedHysteresis, newHysteresisState, numericZone } from './monitor/hysteresis'
+export type { HysteresisOptions, HysteresisOutcome, HysteresisState, HysteresisZone } from './monitor/hysteresis'
 export { MetricsStore } from './monitor/MetricsStore'
 export type { MetricHistoryPoint, MetricHistoryHost } from './monitor/MetricsStore'
+// F55 — Theo dõi bất đồng bộ master ↔ slave (MySQL/MariaDB).
+export {
+  READ_ONLY_SQL,
+  VARS_SQL,
+  computeDrift,
+  mergeReadOnly,
+  masterStatusSqlFor,
+  normalizeMasterStatus,
+  normalizeReplicaStatus,
+  normalizeVars,
+  parseBinlogName,
+  parseServerVersion,
+  parseVerticalG,
+  replicaStatusSqlFor,
+  variableRowsToMap
+} from './replication/status'
+export type {
+  MasterStatus,
+  ReplDrift,
+  ReplFilters,
+  ReplSample,
+  ReplVars,
+  ReplicaStatus,
+  ServerVersion,
+  StatusSql,
+  ThreadState
+} from './replication/status'
+export { diagnose, extractTableFromError, formatBytes, formatDuration } from './replication/diagnose'
+export type { Cmd, Danger, Diagnosis, DiagnoseOptions, Severity } from './replication/diagnose'
+export {
+  buildRemoteMysqlCommand,
+  cleanMysqlStderr,
+  isUnsupportedSyntaxError,
+  makeCliProbe,
+  openDriverProbe,
+  queryFirstSupported,
+  randomCnfPath,
+  shq
+} from './replication/probe'
+export type { CliProbeDeps, DriverProbeOptions, RemoteMysqlOptions, ReplProbe } from './replication/probe'
+export {
+  DEFAULT_POLL_INTERVAL_MS,
+  MAX_POLL_INTERVAL_MS,
+  MIN_POLL_INTERVAL_MS,
+  NO_MASTER,
+  VARS_REFRESH_MS,
+  ReplicationService,
+  clampPollInterval,
+  detectVersion,
+  errorSample,
+  openEndpointProbe,
+  readMasterSnapshot,
+  readSample
+} from './replication/ReplicationService'
+export type {
+  MasterSnapshot,
+  ProbeSession,
+  ReplEndpointTarget,
+  ReplPairTarget,
+  ReplReplicaTarget,
+  ReplicationServiceDeps
+} from './replication/ReplicationService'
+export { DEFAULT_REPL_THRESHOLDS, ReplAlertEngine, errorDetail, errorNo, threadsBad, threadsDetail } from './replication/ReplAlertEngine'
+export type {
+  ReplAlertEngineOptions,
+  ReplAlertEvent,
+  ReplAlertMetric,
+  ReplAlertRules,
+  ReplAlertThresholds
+} from './replication/ReplAlertEngine'
+export { buildReplWebhookRequest, formatReplAlertText } from './replication/replWebhook'
+export type { ReplAlertInfo } from './replication/replWebhook'
+export {
+  COLUMNS_SQL,
+  INDEXES_SQL,
+  TABLE_INVENTORY_SQL,
+  buildChecksumSql,
+  buildCountSql,
+  diffInventory,
+  diffSchemaEntries,
+  diffVariables,
+  isFilteredOut,
+  matchesWildPattern,
+  normalizeColumns,
+  normalizeIndexes,
+  normalizeTableRows,
+  readChecksumRow,
+  readCountRow
+} from './replication/compare'
+export type {
+  DiffInventoryOptions,
+  SchemaDiff,
+  SchemaDiffStatus,
+  SchemaEntry,
+  TableDiff,
+  TableDiffStatus,
+  TableInfo,
+  VarDiff
+} from './replication/compare'
 export { AiService } from './ai/AiService'
 export type { AiProvider, AiRuntimeConfig, AiAskRequest, AiAskResult, AiMode } from './ai/AiService'
 export { isReadOnlyCommand } from './ai/readonlyGuard'
@@ -48,7 +150,14 @@ export type { SecretProvider } from './secrets/SecretsService'
 export { generateTotp, isValidTotpSecret, normalizeTotpSecret, applyTotpToken, TOTP_TOKEN } from './secrets/totp'
 export { importSshConfig, parseSshConfig } from './importers/sshConfig'
 export { VaultService } from './vault/VaultService'
-export type { KnownHostRecord, ResolvedConnection, ResolvedEndpoint, SyncSnapshot } from './vault/VaultService'
+export type {
+  KnownHostRecord,
+  ReplCreds,
+  ReplCredentialsResolved,
+  ResolvedConnection,
+  ResolvedEndpoint,
+  SyncSnapshot
+} from './vault/VaultService'
 export { deriveSyncKey, newSyncSalt } from './vault/crypto'
 export { SyncService, createBackend } from './sync/SyncService'
 export type { SyncBackend, SyncResult } from './sync/SyncService'

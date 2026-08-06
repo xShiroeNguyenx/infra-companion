@@ -36,12 +36,12 @@ const RULE: TunnelRuleDto = {
   label: 'test',
   bindHost: '127.0.0.1',
   bindPort: 0, // 0 = xin cổng trống bất kỳ
-  destHost: '192.168.1.71',
+  destHost: '10.20.30.40',
   destPort: 3306,
   autoStart: false
 }
 
-const LOGIN_STEPS = [{ send: 'ssh jpap06' }, { send: 'secret', secret: true }]
+const LOGIN_STEPS = [{ send: 'ssh app-06' }, { send: 'secret', secret: true }]
 
 interface Harness {
   service: TunnelService
@@ -114,8 +114,8 @@ describe('tunnel L qua login-script có hop ssh', () => {
     await waitFor(() => h.execCommands.length === 1, 'exec nc')
 
     expect(h.execCommands[0]).toContain('sshpass') // hop ssh của login script, có password
-    expect(h.execCommands[0]).toContain(' jpap06 ')
-    expect(h.execCommands[0]).toContain('exec nc 192.168.1.71 3306')
+    expect(h.execCommands[0]).toContain(' app-06 ')
+    expect(h.execCommands[0]).toContain('exec nc 10.20.30.40 3306')
     expect(h.forwardTargets).toEqual([])
 
     // MOTD + marker + lời chào của MySQL
@@ -141,7 +141,7 @@ describe('tunnel L qua login-script có hop ssh', () => {
     h.nc.push(Buffer.from(marker))
     h.nc.push(null)
     await waitFor(() => h.forwardTargets.length === 1, 'fallback direct-tcpip')
-    expect(h.forwardTargets).toEqual(['192.168.1.71:3306'])
+    expect(h.forwardTargets).toEqual(['10.20.30.40:3306'])
 
     h.native.push(Buffer.from('mysql-greeting'))
     const received = await new Promise<Buffer>((resolve) => socket.once('data', (d: Buffer) => resolve(d)))

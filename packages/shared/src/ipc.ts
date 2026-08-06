@@ -131,6 +131,23 @@ export const IPC = {
   // F49 — đọc nội dung 1 file trên host qua kênh exec riêng (cho tính năng so sánh config)
   HTOOLS_READ_FILE: 'htools:read-file',
 
+  // F55 — theo dõi bất đồng bộ master ↔ slave (MySQL/MariaDB)
+  REPL_LIST_PAIRS: 'repl:list-pairs',
+  REPL_SAVE_PAIR: 'repl:save-pair',
+  REPL_DELETE_PAIR: 'repl:delete-pair',
+  REPL_TEST_PAIR: 'repl:test-pair',
+  REPL_WATCH: 'repl:watch',
+  REPL_UNWATCH: 'repl:unwatch',
+  REPL_POLL_NOW: 'repl:poll-now',
+  REPL_SAMPLE: 'repl:sample',
+  REPL_ALERT: 'repl:alert',
+  // Cửa sổ chỉ-nhận-sample (không tự mở kết nối) — cùng cơ chế MONITOR_SUBSCRIBE
+  REPL_SUBSCRIBE: 'repl:subscribe',
+  REPL_GET_SETTINGS: 'repl:get-settings',
+  REPL_SET_SETTINGS: 'repl:set-settings',
+  REPL_COMPARE: 'repl:compare',
+  REPL_CHECKSUM: 'repl:checksum',
+
   AI_GET_CONFIG: 'ai:get-config',
   AI_SET_CONFIG: 'ai:set-config',
   AI_ASK: 'ai:ask',

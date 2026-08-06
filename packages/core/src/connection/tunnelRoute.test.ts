@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { chooseLocalForwardRoute } from './TunnelService'
 import { loginScriptEntersAnotherHost } from './loginScript'
 
-const SSH_STEP = [{ send: 'ssh jpap06' }, { send: 'pw', secret: true }]
+const SSH_STEP = [{ send: 'ssh app-06' }, { send: 'pw', secret: true }]
 const SU_ONLY = [{ send: 'sudo -i' }]
 
 describe('loginScriptEntersAnotherHost', () => {
@@ -23,18 +23,18 @@ describe('loginScriptEntersAnotherHost', () => {
 
 describe('chooseLocalForwardRoute', () => {
   it('không login script → native', () => {
-    expect(chooseLocalForwardRoute('192.168.1.71', [])).toBe('native')
+    expect(chooseLocalForwardRoute('10.20.30.40', [])).toBe('native')
     expect(chooseLocalForwardRoute('127.0.0.1', [])).toBe('native')
   })
 
   it('login script chỉ su/sudo → native (cùng máy với endpoint SSH)', () => {
-    expect(chooseLocalForwardRoute('192.168.1.71', SU_ONLY)).toBe('native')
+    expect(chooseLocalForwardRoute('10.20.30.40', SU_ONLY)).toBe('native')
   })
 
   it('hop ssh + đích cụ thể → nc trên máy sâu TRƯỚC, native là đường lui', () => {
     // Regression v0.1.31→v0.1.33: native-first khiến gate mở kết nối sang mạng của GATE
     // (192.168.x.x trùng dải) hoặc bị firewall drop SYN → tunnel xanh mà DB client chờ mãi.
-    expect(chooseLocalForwardRoute('192.168.1.71', SSH_STEP)).toBe('script-then-native')
+    expect(chooseLocalForwardRoute('10.20.30.40', SSH_STEP)).toBe('script-then-native')
     expect(chooseLocalForwardRoute('db-internal', SSH_STEP)).toBe('script-then-native')
   })
 

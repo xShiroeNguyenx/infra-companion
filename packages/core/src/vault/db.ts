@@ -162,6 +162,88 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE hosts ADD COLUMN totp_enc TEXT;
   ALTER TABLE groups ADD COLUMN color TEXT;
+  `,
+  // v12 — F55: cặp master↔slave cần theo dõi bất đồng bộ. master_host_id có thể NULL
+  // (chỉ có quyền/đường mạng tới slave — vẫn đọc được lag và trạng thái thread).
+  // db_password_enc mã hoá bằng DEK. ON DELETE CASCADE theo replica: xoá host thì cặp vô nghĩa;
+  // master thì SET NULL để cặp vẫn dùng được ở chế độ chỉ-slave.
+  `
+  CREATE TABLE repl_pairs (
+    id               TEXT PRIMARY KEY,
+    name             TEXT NOT NULL,
+    replica_host_id  TEXT NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+    master_host_id   TEXT REFERENCES hosts(id) ON DELETE SET NULL,
+    db_port          INTEGER NOT NULL DEFAULT 3306,
+    db_user          TEXT,
+    db_password_enc  TEXT,
+    cli_binary       TEXT,
+    probe_mode       TEXT NOT NULL DEFAULT 'auto',
+    poll_interval_sec INTEGER NOT NULL DEFAULT 15,
+    watch_enabled    INTEGER NOT NULL DEFAULT 0,
+    created_at       INTEGER NOT NULL,
+    updated_at       INTEGER NOT NULL
+  );
+  CREATE INDEX idx_repl_pairs_replica ON repl_pairs(replica_host_id);
+  `,
+  // v13 — F55: đọc MySQL qua TUNNEL đã lưu thay vì bắc cầu tới host SSH. Cần khi MySQL nằm ở máy
+  // khác trong mạng trong (vd 10.20.30.40:3306): tunnel đã có logic đi `nc` trên máy sâu trước
+  // (chooseLocalForwardRoute), còn bắc cầu thẳng chỉ là direct-tcpip phát từ gate → đi sai mạng.
+  // CỐ Ý KHÔNG đặt FK tới tunnels(id): ON DELETE SET NULL sẽ âm thầm biến cặp về chế độ host và
+  // đo sai đường: thà giữ id treo để lúc đo báo thẳng "tunnel đã bị xoá, chọn lại".
+  `
+  ALTER TABLE repl_pairs ADD COLUMN replica_tunnel_id TEXT;
+  ALTER TABLE repl_pairs ADD COLUMN master_tunnel_id TEXT;
+  `,
+  // v14 — F55: một cụm = 1 master + N SLAVE (trước đây 1 cặp chỉ 1 slave). Thực tế gần như luôn
+  // là một master nhiều slave; gom lại thì master chỉ khai một lần, mỗi chu kỳ đọc master MỘT lần
+  // rồi so cho mọi slave (nhẹ cho master + các slave được so trên CÙNG mốc vị trí binlog).
+  //
+  // Danh sách slave lưu JSON (tiền lệ: hosts.jump_chain) thay vì bảng con, vì phải BỎ cột
+  // replica_host_id — nó là FK ON DELETE CASCADE, nghĩa là xoá host của slave ĐẦU sẽ xoá luôn cả
+  // cụm gồm các slave khác. Với JSON thì host/tunnel biến mất chỉ làm slave đó báo lỗi lúc đo,
+  // đúng cách đã chọn cho tunnel_id ở v13.
+  //
+  // SQLite không DROP COLUMN được khi cột nằm trong FK → phải dựng lại bảng. Thứ tự dưới đây
+  // KHÔNG cần tắt `foreign_keys` (không tắt được trong transaction): lúc DROP thì chưa có bảng
+  // nào tham chiếu repl_pairs. Nội suy JSON bằng nối chuỗi an toàn vì id là UUID/hex.
+  `
+  CREATE TABLE repl_pairs_v14 (
+    id                TEXT PRIMARY KEY,
+    name              TEXT NOT NULL,
+    master_host_id    TEXT REFERENCES hosts(id) ON DELETE SET NULL,
+    master_tunnel_id  TEXT,
+    replicas_json     TEXT NOT NULL DEFAULT '[]',
+    db_port           INTEGER NOT NULL DEFAULT 3306,
+    db_user           TEXT,
+    db_password_enc   TEXT,
+    cli_binary        TEXT,
+    probe_mode        TEXT NOT NULL DEFAULT 'auto',
+    poll_interval_sec INTEGER NOT NULL DEFAULT 15,
+    watch_enabled     INTEGER NOT NULL DEFAULT 0,
+    created_at        INTEGER NOT NULL,
+    updated_at        INTEGER NOT NULL
+  );
+  INSERT INTO repl_pairs_v14 (id, name, master_host_id, master_tunnel_id, replicas_json, db_port,
+    db_user, db_password_enc, cli_binary, probe_mode, poll_interval_sec, watch_enabled, created_at, updated_at)
+  SELECT id, name, master_host_id, master_tunnel_id,
+    '[{"id":"' || id || '","label":"","hostId":"' || replica_host_id || '","tunnelId":' ||
+      CASE WHEN replica_tunnel_id IS NULL THEN 'null' ELSE '"' || replica_tunnel_id || '"' END ||
+      ',"dbPort":' || db_port || '}]',
+    db_port, db_user, db_password_enc, cli_binary, probe_mode, poll_interval_sec, watch_enabled,
+    created_at, updated_at
+  FROM repl_pairs;
+  DROP INDEX IF EXISTS idx_repl_pairs_replica;
+  DROP TABLE repl_pairs;
+  ALTER TABLE repl_pairs_v14 RENAME TO repl_pairs;
+  `,
+  // v15 — F55: credential RIÊNG cho từng đầu. Thực tế không phải lúc nào cũng có một tài khoản
+  // giám sát dùng chung: master một tài khoản, mỗi slave một tài khoản khác là chuyện thường.
+  // db_user/db_password_enc của cụm giữ vai trò MẶC ĐỊNH; đầu nào khai riêng thì thắng.
+  // Credential riêng của từng SLAVE nằm trong `replicas_json` (mật khẩu vẫn mã hoá bằng DEK, chỉ
+  // là chỗ lưu đổi từ cột sang field JSON) — không cần thêm cột cho slave.
+  `
+  ALTER TABLE repl_pairs ADD COLUMN master_db_user TEXT;
+  ALTER TABLE repl_pairs ADD COLUMN master_db_password_enc TEXT;
   `
 ]
 

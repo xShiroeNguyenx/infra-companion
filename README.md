@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, **a self-managed local PHP/WordPress dev stack**, and more.
 
-**Current release: v0.2.1 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.2.2 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -112,6 +112,16 @@
 - **Alert thresholds** — Load (uncapped, %/CPU) / RAM / Disk / CPU steal / connections / offline, global defaults + per-host overrides, hysteresis + 15-min re-alert; delivered as in-app toast, **Windows notification**, and optional **webhook** (Google Chat / Slack / Discord / Telegram auto-detected, with a test button); alerts keep firing even while the vault is locked
 - **Metrics history** — samples downsampled into a local `metrics.db` (minute buckets kept 48 h, 10-minute kept 30 days); 📈 on any card opens 1 h / 24 h charts for Load, CPU, steal, RAM, disk and connections
 
+### MySQL / MariaDB replication — is the slave behind, and what do I type now?
+- **One master, all its slaves, one screen** — declare the cluster once; each cycle reads the master **once** and compares every slave against that single snapshot. Lighter on the master than one connection per slave, and it makes the differences between slaves meaningful (same binlog position for all). Each slave keeps its own connection, diagnosis and alert state, so one broken slave neither blocks nor silences the others
+- **Measures drift three ways, because `Seconds_Behind_Master` lies** — it reads 0 while the IO thread is dead, and reads hours on a deliberately delayed replica. Alongside lag you get the **binlog byte gap in both directions** (how far the IO thread trails the master, how far the SQL thread trails what it already fetched), with any `MASTER_DELAY` subtracted first
+- **15 diagnosis rules, each with a copy-paste runbook** carrying your real values: error **1236** names the purged binlog file and says plainly that `START SLAVE` won't help; error **1062** pulls the table out of the error message and builds the comparison `SELECT` for both sides; a corrupt relay log gets a `CHANGE MASTER TO` with your actual `Exec_Master_Log_Pos`. Read-only checks come first, destructive commands are labelled and confirm before they reach your clipboard — **the app never runs a fix itself**
+- **Reaches the database whichever way your network allows** — a direct MySQL connection tunnelled through the host's existing SSH jump chain, falling back to `mysql` over SSH when 3306 is closed. Uses the credentials already on the server by default; a password you supply is vault-encrypted and only ever passed through a temporary 0600 `.cnf`, never on a command line
+- **Or point it at a saved tunnel** — for the common case where MySQL isn't on the SSH host but on another machine inside the network (`10.20.30.40:3306`). The app starts the tunnel if needed and connects to its local end, reusing the exact route the tunnel already worked out (including the one that must go through `nc` on the innermost machine, where a plain `direct-tcpip` from the gate silently reaches the wrong network)
+- **Background alerts that survive the vault locking** — threads stopped, error code, slave accepting writes, lag or apply-backlog over threshold; same hysteresis as resource monitoring, delivered as toast + notification + webhook
+- **Data drift, not just status** — replication can say `Yes/Yes/0s` while the data has quietly diverged. Compare table lists, columns, indexes and the configuration variables that matter, then run an exact `COUNT(*)` or `CHECKSUM TABLE` on the tables you pick
+- Works with MariaDB and MySQL **including 8.4**, where `SHOW SLAVE STATUS` no longer exists
+
 ### Network Toolbox
 - Ping (latency), DNS lookup (A / AAAA / PTR), port scan (16 common ports)
 - Runs locally — no SSH needed
@@ -204,8 +214,8 @@ pnpm test         # unit tests (crypto, sync-merge, ssh_config parser)
 
 ```bash
 pnpm test
-# v0.2.1: 707 tests pass; 36 are skipped on Node 20 (they need node:sqlite / Node ≥ 22.5 —
-# the vault-merge and local-dev store suites).
+# 1044 tests; on Node 20 the node:sqlite suites (vault-merge, replication clusters, local-dev
+# store) are skipped — they need Node ≥ 22.5.
 # To run those too, use Electron's bundled Node 24 runtime:
 $env:ELECTRON_RUN_AS_NODE='1'
 & ".\node_modules\electron\dist\electron.exe" ".\node_modules\vitest\vitest.mjs" run
@@ -291,12 +301,13 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.2.1)
+## Known Limitations (v0.2.2)
 
 - **Local dev stack is Windows-only** for now (OS-specific work is isolated behind a single adapter, so other platforms are a matter of writing one). `.test` domains and local HTTPS are **not wired up yet** — mkcert installs and lands on `PATH`, but issuing/trusting a certificate is still a manual `mkcert -install`. There is no WordPress downloader (point it at a folder you already have), and no local↔server deploy or public-share link yet. phpMyAdmin 5.2 does not support PHP 8.4, so the app serves it with PHP 8.3 when both are installed
 - **Domain → server mapping needs a Chromium browser** (Chrome/Edge/Brave/Vivaldi); Firefox has no equivalent flag, and the override has no effect when the machine routes through a system proxy (the proxy resolves DNS itself). Non-browser clients (Postman, MySQL clients) aren't covered — use a tunnel or the `curl --resolve` command instead
 
 - Bulk / Monitor / SFTP / Local-forward tunnels through login scripts rebuild the path non-interactively: `ssh` hops (password hops need `sshpass` installed on the gate) and `su` / `sudo` steps are supported; exotic setups that force a TTY password prompt may still fail. Login-script tunnels also need `nc` on the innermost hop
+- **Replication monitoring** covers MySQL/MariaDB **position-based** replication: GTID sets aren't compared yet (binlog file/position only), PostgreSQL streaming replication isn't supported, and there's no lag history chart or detached window yet. Reading status needs the `REPLICATION CLIENT` privilege
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md))
 - Secrets Manager: 1Password, Bitwarden, HashiCorp Vault via CLI (KeePassXC planned)
 - **Remote desktop tunneling** reaches targets via **jump-host chains** (SSH `-J` style); a target reachable only through an interactive **login-script gate** is not yet supported. **RDP** opens the OS client through a tunnel (not embedded); embedded FreeRDP is not planned. VNC needs a real VNC server on the target and network reachability (LAN or SSH tunnel)

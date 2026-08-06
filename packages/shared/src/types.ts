@@ -204,6 +204,346 @@ export interface TunnelRuleInput {
   autoStart?: boolean
 }
 
+// ---------------------------------------------------------------------------
+// F55 — Theo dõi bất đồng bộ master ↔ slave (MySQL/MariaDB)
+// ---------------------------------------------------------------------------
+
+/** `auto` = thử driver mysql2 trước, hỏng thì rơi sang chạy `mysql` CLI qua SSH. */
+export type ReplProbeMode = 'auto' | 'driver' | 'cli'
+
+/**
+ * Một slave trong cụm. `hostId` luôn có (dùng làm nhãn + để biết máy nào); `tunnelId` có giá trị
+ * nghĩa là đọc MySQL qua tunnel đó thay vì bắc cầu tới `127.0.0.1:dbPort` trên host.
+ */
+export interface ReplReplicaDto {
+  id: string
+  /** Nhãn tự đặt; rỗng thì UI lấy tên host/tunnel. */
+  label: string
+  hostId: string
+  /**
+   * Có giá trị = đọc MySQL của slave này **qua tunnel đã lưu** (nối vào đầu local của tunnel).
+   *
+   * Cần khi MySQL nằm ở MÁY KHÁC trong mạng trong (vd `10.20.30.40:3306`) — tunnel đã có logic
+   * định tuyến đúng cho ca đó (`nc` trên máy sâu trước, xem `chooseLocalForwardRoute`), còn cách
+   * bắc cầu thẳng từ host chỉ là `direct-tcpip` phát từ gate và sẽ đi sai mạng.
+   */
+  tunnelId: string | null
+  dbPort: number
+  /** Rỗng = dùng user của cụm. Có giá trị = máy này đăng nhập bằng tài khoản riêng. */
+  dbUser: string
+  /** Chỉ báo có mật khẩu RIÊNG hay không — mật khẩu thật không bao giờ ra khỏi main process. */
+  hasDbPassword: boolean
+}
+
+/**
+ * Một CỤM replication: 1 master + N slave.
+ *
+ * Vì sao không phải "cặp 1-1": thực tế gần như luôn là một master nhiều slave. Gom vào một cụm
+ * thì master chỉ khai MỘT lần, mỗi chu kỳ chỉ đọc master MỘT lần rồi so cho mọi slave — nhẹ cho
+ * master và các slave được so trên CÙNG một mốc vị trí binlog (so lệch nhau mới có nghĩa).
+ */
+export interface ReplPairDto {
+  id: string
+  name: string
+  /** null = chỉ theo dõi slave (không có quyền/đường tới master). */
+  masterHostId: string | null
+  masterTunnelId: string | null
+  /** Ít nhất 1 slave; thứ tự do user sắp. */
+  replicas: ReplReplicaDto[]
+  /** Cổng mặc định: dùng cho master và điền sẵn khi thêm slave mới. */
+  dbPort: number
+  /**
+   * Credential MẶC ĐỊNH của cụm — dùng cho mọi đầu không khai riêng.
+   *
+   * Rỗng = dùng credential sẵn trên server (~/.my.cnf hoặc unix_socket auth). Thực tế thường là
+   * một tài khoản giám sát chung, nhưng master và từng slave đều ghi đè được (xem `masterDbUser`
+   * và `ReplReplicaDto.dbUser`) cho trường hợp mỗi máy một tài khoản.
+   */
+  dbUser: string
+  /** Chỉ báo có mật khẩu hay không — mật khẩu thật KHÔNG BAO GIỜ ra khỏi main process. */
+  hasDbPassword: boolean
+  /** Credential riêng của master. Rỗng = dùng của cụm. */
+  masterDbUser: string
+  masterHasDbPassword: boolean
+  /** Binary client cho chế độ CLI: `mysql` (mặc định) hoặc `mariadb`. */
+  cliBinary: string
+  probeMode: ReplProbeMode
+  pollIntervalSec: number
+  /** Theo dõi nền: vẫn chạy khi đóng tab, sống sót cả khi vault tự khoá. */
+  watchEnabled: boolean
+}
+
+export interface ReplReplicaInput {
+  /** Thiếu = slave mới, main tự sinh id. */
+  id?: string
+  label?: string
+  hostId: string
+  tunnelId?: string | null
+  dbPort?: number
+  /** Rỗng = dùng user của cụm. */
+  dbUser?: string
+  /** undefined = giữ nguyên · null hoặc '' = xoá (về dùng của cụm) · chuỗi = đặt mới. */
+  dbPassword?: string | null
+}
+
+export interface ReplPairInput {
+  id?: string
+  name: string
+  masterHostId?: string | null
+  masterTunnelId?: string | null
+  /** Thay TOÀN BỘ danh sách slave (slave không còn trong danh sách = bị xoá khỏi cụm). */
+  replicas: ReplReplicaInput[]
+  dbPort?: number
+  /** Credential mặc định của cụm. */
+  dbUser?: string
+  /** undefined = giữ nguyên · null hoặc '' = xoá · chuỗi = đặt mới. */
+  dbPassword?: string | null
+  /** Credential riêng của master; rỗng = dùng của cụm. Semantics mật khẩu như trên. */
+  masterDbUser?: string
+  masterDbPassword?: string | null
+  cliBinary?: string
+  probeMode?: ReplProbeMode
+  pollIntervalSec?: number
+  watchEnabled?: boolean
+}
+
+export type ReplThreadState = 'yes' | 'no' | 'connecting' | 'unknown'
+
+export interface ReplFiltersDto {
+  doDb: string
+  ignoreDb: string
+  doTable: string
+  ignoreTable: string
+  wildDoTable: string
+  wildIgnoreTable: string
+  any: boolean
+}
+
+export interface ReplicaStatusDto {
+  ioState: string | null
+  masterHost: string | null
+  masterPort: number | null
+  masterServerId: number | null
+  ioRunning: ReplThreadState
+  sqlRunning: ReplThreadState
+  readFile: string | null
+  readPos: number | null
+  execFile: string | null
+  execPos: number | null
+  secondsBehind: number | null
+  sqlRunningState: string | null
+  relayLogSpace: number | null
+  lastErrno: number
+  lastError: string | null
+  lastIoErrno: number
+  lastIoError: string | null
+  lastSqlErrno: number
+  lastSqlError: string | null
+  sqlDelaySec: number
+  remainingDelaySec: number | null
+  usingGtid: string | null
+  filters: ReplFiltersDto
+}
+
+export interface MasterStatusDto {
+  file: string | null
+  position: number | null
+  doDb: string
+  ignoreDb: string
+}
+
+export interface ReplVarsDto {
+  serverId: number | null
+  readOnly: boolean | null
+  superReadOnly: boolean | null
+  binlogFormat: string | null
+  logBin: boolean | null
+  logSlaveUpdates: boolean | null
+  gtidMode: string | null
+  version: string | null
+  slaveParallelWorkers: number | null
+  binlogExpireSeconds: number | null
+}
+
+export interface ReplDriftDto {
+  lagSec: number | null
+  /** Trễ thật sau khi trừ phần trễ CỐ Ý (MASTER_DELAY). */
+  effectiveLagSec: number | null
+  fetchGapBytes: number | null
+  applyGapBytes: number | null
+  fetchFilesBehind: number | null
+  applyFilesBehind: number | null
+  healthy: boolean
+}
+
+export interface ReplSampleDto {
+  pairId: string
+  /** Slave nào trong cụm — mỗi chu kỳ phát N sample, một cái cho mỗi slave. */
+  replicaId: string
+  replicaLabel: string
+  ts: number
+  ok: boolean
+  mode: 'driver' | 'cli' | null
+  master: MasterStatusDto | null
+  replica: ReplicaStatusDto | null
+  masterVars: ReplVarsDto | null
+  replicaVars: ReplVarsDto | null
+  drift: ReplDriftDto | null
+  error?: string
+  /** Đọc được replica nhưng không đọc được master — lần đo vẫn hợp lệ. */
+  masterError?: string
+}
+
+export type ReplSeverity = 'critical' | 'warn' | 'info'
+/** safe = đảo ngược được · caution = đổi trạng thái · destructive = mất dữ liệu hoặc downtime. */
+export type ReplDanger = 'safe' | 'caution' | 'destructive'
+
+export interface ReplCmdDto {
+  label: string
+  kind: 'sql' | 'shell'
+  on: 'master' | 'replica'
+  text: string
+  danger: ReplDanger
+  note?: string
+}
+
+export interface ReplDiagnosisDto {
+  id: string
+  severity: ReplSeverity
+  title: string
+  why: string
+  checks: ReplCmdDto[]
+  fixes: ReplCmdDto[]
+}
+
+export interface ReplTestResultDto {
+  ok: boolean
+  /** Đường đã dùng được — hiện trên UI để user biết đang chạy driver hay CLI. */
+  mode: 'driver' | 'cli' | null
+  message: string
+}
+
+/**
+ * Những gì renderer nhận sau mỗi lần đo. Chẩn đoán tính ở MAIN chứ không phải renderer:
+ * bảng luật nằm trong `@infra/core` (package Node-only), và tính một lần ở main thì cửa sổ
+ * tách rời cũng dùng chung kết quả.
+ */
+export interface ReplSnapshotDto {
+  sample: ReplSampleDto
+  diagnoses: ReplDiagnosisDto[]
+}
+
+// --- So lệch thực tế (chạy theo yêu cầu) ---
+
+export interface ReplTableInfoDto {
+  schema: string
+  name: string
+  engine: string | null
+  /** ƯỚC LƯỢNG với InnoDB — chỉ để khoanh vùng, không dùng để kết luận. */
+  rowsEstimate: number | null
+  dataBytes: number | null
+  indexBytes: number | null
+  collation: string | null
+}
+
+export type ReplTableDiffStatus =
+  | 'missing-on-replica'
+  | 'missing-on-master'
+  | 'engine-differs'
+  | 'collation-differs'
+  | 'rows-differ'
+  | 'same'
+
+export interface ReplTableDiffDto {
+  schema: string
+  name: string
+  status: ReplTableDiffStatus
+  master: ReplTableInfoDto | null
+  replica: ReplTableInfoDto | null
+  rowDelta: number | null
+  /** Nằm ngoài phạm vi replication → chênh lệch là CỐ Ý. */
+  filtered: boolean
+}
+
+export interface ReplSchemaDiffDto {
+  table: string
+  item: string
+  status: 'missing-on-replica' | 'missing-on-master' | 'differs'
+  masterSignature: string | null
+  replicaSignature: string | null
+}
+
+export interface ReplVarDiffDto {
+  name: string
+  master: string
+  replica: string
+  /** Khác nhau ở biến này là bình thường (server_id, read_only…). */
+  expected: boolean
+  note: string
+}
+
+export interface ReplCompareResultDto {
+  ok: boolean
+  error?: string
+  tables: ReplTableDiffDto[]
+  columns: ReplSchemaDiffDto[]
+  indexes: ReplSchemaDiffDto[]
+  variables: ReplVarDiffDto[]
+  /** Có bộ lọc replication → một số chênh lệch là cố ý. */
+  hasFilters: boolean
+}
+
+export interface ReplChecksumRowDto {
+  schema: string
+  name: string
+  masterCount: number | null
+  replicaCount: number | null
+  masterChecksum: number | null
+  replicaChecksum: number | null
+  /** Tên bảng có ký tự ngoài [A-Za-z0-9_] → không kiểm tự động được (không im lặng bỏ qua). */
+  error?: string
+}
+
+export type ReplAlertMetricDto = 'lag' | 'applyGap' | 'threads' | 'error' | 'writable' | 'probe'
+
+export interface ReplThresholdsDto {
+  /** Trễ thật (giây). null = tắt. */
+  lagSec: number | null
+  /** Byte đã tải về mà chưa apply. null = tắt. */
+  applyGapBytes: number | null
+  threads: boolean
+  error: boolean
+  writable: boolean
+  probe: boolean
+}
+
+export interface ReplSettingsDto {
+  defaults: ReplThresholdsDto
+  /** Override từng cặp — thiếu field nào thì kế thừa defaults. */
+  perPair: Record<string, Partial<ReplThresholdsDto>>
+  webhookUrl: string
+  osNotify: boolean
+}
+
+export interface ReplAlertDto {
+  pairId: string
+  replicaId: string
+  replicaLabel: string
+  /** "<tên cụm> · <tên slave>" — ghi lúc bắt đầu theo dõi để dựng thông báo không cần mở vault. */
+  label: string
+  metric: ReplAlertMetricDto
+  kind: 'breach' | 'recover'
+  value: number | null
+  threshold: number | null
+  detail: string | null
+  /**
+   * Text hiển thị, dựng sẵn ở main. Renderer KHÔNG tự dựng lại: bảng thông điệp nằm trong
+   * `@infra/core` (Node-only) và một bản thứ hai ở renderer chắc chắn sẽ trôi lệch.
+   */
+  text: string
+  ts: number
+}
+
 export type TunnelStatus = 'stopped' | 'starting' | 'active' | 'error'
 
 export interface TunnelStateDto {
@@ -1010,7 +1350,7 @@ export interface HostMapTargetDto {
 export interface HostMapGroupDto {
   id: string
   name: string
-  /** Domain hoặc pattern `*.webike.net`. */
+  /** Domain hoặc pattern `*.example.net`. */
   patterns: string[]
   targets: HostMapTargetDto[]
   /** Server đang chọn (null = chưa chọn ⇒ chưa mở được). */
@@ -1233,6 +1573,44 @@ export interface InfraApi {
     serviceLogs(hostId: string, unit: string): Promise<HostExecResultDto>
     /** F49 — đọc nội dung 1 file trên host (stdout = nội dung), cắt ở ~1MB. Cho tính năng so sánh config. */
     readFile(hostId: string, path: string): Promise<HostExecResultDto>
+  }
+  /**
+   * F55 — theo dõi bất đồng bộ master ↔ slave (MySQL/MariaDB). Chỉ ĐỌC trạng thái và đưa ra
+   * runbook; app không bao giờ tự chạy lệnh sửa.
+   */
+  replication: {
+    listPairs(): Promise<ReplPairDto[]>
+    savePair(input: ReplPairInput): Promise<ReplPairDto>
+    deletePair(id: string): Promise<void>
+    /** Thử kết nối 1 lần cho MỘT slave (mặc định slave đầu), cho biết đang đi đường nào. */
+    testPair(id: string, replicaId?: string): Promise<ReplTestResultDto>
+    /** Bắt đầu đo định kỳ. Kết nối được giữ mở nên vẫn chạy khi vault tự khoá. */
+    watch(pairId: string): Promise<void>
+    unwatch(pairId: string): void
+    /** Đo ngay một lần, không đợi hết chu kỳ. */
+    pollNow(pairId: string): Promise<void>
+    /** Cửa sổ phụ chỉ nhận sample, không tự mở kết nối. */
+    subscribe(): void
+    onSample(cb: (s: ReplSnapshotDto) => void): () => void
+    /** Cảnh báo ngưỡng breach/recover. */
+    onAlert(cb: (a: ReplAlertDto) => void): () => void
+    getSettings(): Promise<ReplSettingsDto>
+    setSettings(s: ReplSettingsDto): Promise<void>
+    /**
+     * So lệch thực tế master ↔ slave: kiểm kê bảng + schema + biến cấu hình.
+     * Chỉ đọc information_schema nên nhanh; số dòng là ƯỚC LƯỢNG.
+     */
+    compare(pairId: string, replicaId?: string): Promise<ReplCompareResultDto>
+    /**
+     * Đếm chính xác (COUNT(*)) và/hoặc CHECKSUM TABLE cho các bảng được chọn.
+     * NẶNG — quét toàn bảng, chạy tuần tự.
+     */
+    checksum(
+      pairId: string,
+      tables: Array<{ schema: string; name: string }>,
+      mode: 'count' | 'checksum',
+      replicaId?: string
+    ): Promise<ReplChecksumRowDto[]>
   }
   /**
    * Local dev stack — chạy trên MÁY LOCAL, không SSH. App tự tải runtime (PHP/MariaDB/Nginx)
