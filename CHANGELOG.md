@@ -5,6 +5,22 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.3] — 2026-08-06
+
+### Added
+
+- **Choose your mouse cursor** (Settings → Terminal → **Mouse cursor**). Nineteen to pick from, in two groups: six of your operating system's own (hand, crosshair, cell, I-beam, grab) and thirteen drawn by the app — white, black and accent-colored arrows, a ring, a dot, an 8-bit pixel arrow, and for the fun of it a sword, a heart, a pine tree, a rocket, a pencil, a lightning bolt and a cat's paw. It applies to the whole app including the terminal, while text fields keep their own I-beam.
+  - **Each cursor is a pair, not one picture**: a normal state and a **hover state** for when you're over something clickable. Pick the sword and you don't get a browser hand on every button — you get the sword, scaled up a touch with an accent-colored glow behind it. Both states come from the same drawing, so they can never drift apart, and the glow follows your accent color. The OS cursors get the conventional pairing instead (grab becomes grabbing, the rest become the hand). A **try-out strip** under the picker shows all three states — normal, clickable, text field — side by side so you can judge a cursor without hunting around the app for something to hover.
+  - Every app-drawn cursor is outlined twice — a soft dark halo under a thin white rim — so it stays legible on the black terminal, on light panels, and on a busy background image alike. A single outline always vanishes against whatever background shares its color.
+  - **Or add one you downloaded** — PNG, GIF, WebP, SVG, CUR or ICO, as many as twelve of them, each with an optional second image for its hover state (the dashed slot next to the thumbnail). Three things are worth knowing before you go shopping for cursors, because none of them announce themselves: Windows **`.ani` files cannot work** in any browser engine, so animated cursor packs are out and the app says so instead of silently doing nothing; an animated GIF keeps only its first frame; and Chromium **ignores any cursor image larger than 128×128 without raising an error**, so anything bigger is scaled down on import rather than left to quietly fail. Each cursor has an **X / Y hotspot** — which pixel is the actual pointing tip — so a ring or crosshair can be centred instead of clicking from its corner; the hover image shares that hotspot, so pick one the same size.
+  - The app ships none of the well-known cursor themes on purpose: they come with their own licences. Download the one you want and add it.
+
+### Fixed
+
+- **Garbled text after switching between terminal tabs.** Come back to a tab you had left a few times and the text could turn into mangled shapes — fragments of the wrong letters — until you dragged a selection over it, at which point it snapped back to normal. The GPU renderer keeps only the *coordinates* of each character inside a glyph atlas on the graphics card; a tab that isn't showing is hidden outright, and the browser is free to throw that atlas away while it is. Returning to the tab usually changed neither the width nor the height, so nothing was redrawn and the stale coordinates kept pointing into an atlas that no longer held what they expected. Selecting text worked because it forced those lines to be drawn again. The tab now rebuilds its glyphs whenever it comes back into view — including panes that are visible but not focused in a split. The same repaint runs when the display scale changes, so dragging the window to a monitor at a different scaling no longer corrupts the text either.
+
+---
+
 ## [0.2.2] — 2026-08-05
 
 ### Added

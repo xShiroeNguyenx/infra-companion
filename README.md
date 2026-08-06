@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, **a self-managed local PHP/WordPress dev stack**, and more.
 
-**Current release: v0.2.2 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.2.3 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -55,6 +55,7 @@
 - **Broadcast input** — type once, send to all open panes simultaneously (Ctrl+Shift+B)
 - **Background image** — full-window wallpaper from a local file **or a pasted URL** (incl. Google Drive / Dropbox share links), with adjustable opacity, blur, fit (cover/contain), and position (Settings → Background image)
 - **Terminal appearance** — configurable font family, size, line height, and cursor style (Settings → Terminal); applies live
+- **Mouse cursor** — pick from 19 pointers (6 native to your OS, 13 drawn by the app: arrows, ring, dot, 8-bit, sword, heart, pine tree, rocket, pencil, lightning, cat's paw) or **add your own** from a PNG/SVG/CUR you downloaded, with an editable X/Y hotspot. Each one is a **pair of states** — normal plus a hover state (accent-colored glow) used over buttons and links instead of the browser hand — and applies app-wide including the terminal (Settings → Terminal)
 - **Theme studio** — pick a custom accent and recolor the full UI palette per theme (Settings → Appearance → Custom palette); export / import a theme as JSON
 - **Find in terminal** — Ctrl+F with highlight
 - **Mouse copy & paste** — select then left-click the highlight to copy, right-click to paste (alongside Ctrl+Shift+C / Ctrl+Shift+V)
@@ -301,7 +302,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.2.2)
+## Known Limitations (v0.2.3)
 
 - **Local dev stack is Windows-only** for now (OS-specific work is isolated behind a single adapter, so other platforms are a matter of writing one). `.test` domains and local HTTPS are **not wired up yet** — mkcert installs and lands on `PATH`, but issuing/trusting a certificate is still a manual `mkcert -install`. There is no WordPress downloader (point it at a folder you already have), and no local↔server deploy or public-share link yet. phpMyAdmin 5.2 does not support PHP 8.4, so the app serves it with PHP 8.3 when both are installed
 - **Domain → server mapping needs a Chromium browser** (Chrome/Edge/Brave/Vivaldi); Firefox has no equivalent flag, and the override has no effect when the machine routes through a system proxy (the proxy resolves DNS itself). Non-browser clients (Postman, MySQL clients) aren't covered — use a tunnel or the `curl --resolve` command instead
@@ -314,6 +315,7 @@ infra-companion/
 - No team server, cloud import (AWS/GCP…), Docker/K8s browser — see [ROADMAP.md](ROADMAP.md); plugin system is at **v1** (🛒 Marketplace tab installs from a static registry, entries are ed25519-signed; no permission enforcement / output transform yet)
 - The **sensitive command guard** matches by text pattern, not by parsing the shell — it errs toward asking (e.g. `grep reboot` triggers the `reboot` rule) rather than staying silent, since a false prompt is safer than a missed `rm -rf`; tune the list in Settings to taste
 - **Split layout** and **pane frame style** are global settings (applied to every split tab), not yet per-tab or per-pane
+- **Custom mouse cursors** are limited by what a browser engine can do: **animated cursors (`.ani`) are impossible** and an animated GIF keeps only its first frame; images are capped at **128×128** (Chromium silently ignores anything larger, so the app scales down on import). The hover state of a cursor you add is a second image you supply, and it shares the normal image's hotspot. Cursors are stored per machine and not synced, and no third-party cursor theme is bundled — the popular ones (Bibata, Breeze, Capitaine) are GPL/LGPL, so download one and add it yourself
 - **TOTP autofill** (`{{totp}}`) substitutes in interactive terminal sessions; exec-channel features (Bulk/Monitoring/SFTP) leave the token untouched. The **uptime watcher** TCP-checks each host's saved address directly — a host behind a login-script gate is checked at its gate address (still useful as "the gate is alive"). **Processes/Services** need Linux (`ps`, `systemd`); service start/stop usually needs root
 
 ---

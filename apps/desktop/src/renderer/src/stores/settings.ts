@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { DEFAULT_GUARD_PATTERNS } from '../lib/commandGuard'
+import { CURSOR_CUSTOM_MAX, currentAccent, isCustomCursor, resolveCursor, type CustomCursor } from '../lib/cursors'
 import { DEFAULT_SHORTCUTS, SHORTCUT_ACTIONS, isValidShortcut, type ShortcutAction } from '../lib/shortcuts'
 
 export type ThemeMode = 'dark' | 'light'
@@ -60,6 +61,8 @@ const CMD_GUARD_PATTERNS_KEY = 'infra.cmdGuard.patterns'
 const SHORTCUTS_KEY = 'infra.term.shortcuts'
 const AUTOCOMPLETE_ON_KEY = 'infra.term.autocomplete'
 const ALIASES_KEY = 'infra.term.aliases'
+const CURSOR_KEY = 'infra.cursor.id'
+const CURSOR_LIST_KEY = 'infra.cursor.custom'
 
 /** Các biến màu UI cho phép tuỳ biến (accent có control riêng nên không nằm ở đây). */
 export const CUSTOM_PALETTE_VARS = [
@@ -226,6 +229,22 @@ function readCommandAliases(): CommandAlias[] {
   }
 }
 
+/** Con trỏ chuột đang chọn: id preset hoặc `custom:<id>`. Mặc định 'system' = không đổi gì. */
+function readMouseCursor(): string {
+  return localStorage.getItem(CURSOR_KEY) || 'system'
+}
+
+/** Con trỏ user tự thêm. Bỏ mục hỏng (data URI sai dạng) thay vì làm vỡ cả danh sách. */
+function readCustomCursors(): CustomCursor[] {
+  try {
+    const arr = JSON.parse(localStorage.getItem(CURSOR_LIST_KEY) || '[]') as unknown
+    if (!Array.isArray(arr)) return []
+    return arr.filter(isCustomCursor).slice(0, CURSOR_CUSTOM_MAX)
+  } catch {
+    return []
+  }
+}
+
 function readCustomColors(): CustomColors {
   const out: CustomColors = { dark: {}, light: {} }
   try {
@@ -255,6 +274,29 @@ export function applyLang(lang: Language): void {
 /** data-bg='on' → CSS làm nền terminal trong suốt để lộ ảnh nền phía sau. */
 export function applyBackground(image: string | null): void {
   document.documentElement.dataset.bg = image ? 'on' : 'off'
+}
+
+/**
+ * Áp cặp con trỏ (thường + hover) lên `<html>` qua CSS var + `data-cursor` / `data-cursor-hover`
+ * (rule nằm ở styles/main.css). `cursor` là thuộc tính KẾ THỪA nên đặt ở gốc là phủ cả app;
+ * ô nhập text vẫn giữ con trỏ ngữ cảnh của nó. Riêng terminal phải override thêm vì
+ * xterm.css đặt cứng `cursor: text`.
+ *
+ * Hai cờ `data-*` tách riêng, KHÔNG gộp: nếu chỉ có `data-cursor` mà rule hover vẫn bật thì
+ * `var(--app-cursor-hover)` không tồn tại → khai báo hỏng ở computed-value time → `cursor`
+ * quay về **inherit** (kế thừa con trỏ thường) chứ KHÔNG về bàn tay mặc định. Preset `system`
+ * sẽ mất luôn bàn tay khi hover nút — đúng kiểu lỗi im lặng khó truy.
+ */
+export function applyMouseCursor(selection: string, customs: CustomCursor[]): void {
+  const root = document.documentElement
+  const { normal, hover } = resolveCursor(selection, customs, currentAccent())
+  if (normal) root.style.setProperty('--app-cursor', normal)
+  else root.style.removeProperty('--app-cursor')
+  root.dataset.cursor = normal ? 'on' : 'off'
+
+  if (hover) root.style.setProperty('--app-cursor-hover', hover)
+  else root.style.removeProperty('--app-cursor-hover')
+  root.dataset.cursorHover = hover ? 'on' : 'off'
 }
 
 /** Làm tối 1 màu hex theo tỉ lệ (0–1) — dùng cho accent-hover. */
@@ -340,6 +382,10 @@ interface SettingsState {
   autoCompleteEnabled: boolean
   /** Danh sách từ tắt → lệnh cho auto-complete (per-máy). */
   commandAliases: CommandAlias[]
+  /** Con trỏ chuột toàn app: id preset hoặc `custom:<id>`. 'system' = giữ con trỏ của OS. */
+  mouseCursor: string
+  /** Con trỏ user tự thêm từ file ảnh. */
+  customCursors: CustomCursor[]
   setTheme: (t: ThemeMode) => void
   setLanguage: (l: Language) => void
   setAccentColor: (c: string | null) => void
@@ -366,6 +412,22 @@ interface SettingsState {
   setAutoCompleteEnabled: (on: boolean) => void
   /** Thay toàn bộ danh sách alias (Settings quản lý mảng, lưu localStorage). */
   setCommandAliases: (list: CommandAlias[]) => void
+  /** Chọn con trỏ chuột (id preset hoặc `custom:<id>`). */
+  setMouseCursor: (id: string) => void
+  /**
+   * Thêm 1 con trỏ tự tạo rồi chọn luôn nó.
+   * Trả 'full' khi đã đủ `CURSOR_CUSTOM_MAX`, 'quota' khi localStorage đầy, 'ok' nếu xong.
+   */
+  addCustomCursor: (c: CustomCursor) => 'ok' | 'full' | 'quota'
+  /** Sửa tên / điểm nhấn của 1 con trỏ tự thêm. */
+  updateCustomCursor: (id: string, patch: Partial<Pick<CustomCursor, 'name' | 'hotX' | 'hotY'>>) => void
+  /**
+   * Gán / gỡ ảnh hover của 1 con trỏ tự thêm (null = gỡ).
+   * Trả false khi localStorage đầy — lúc đó KHÔNG đổi gì.
+   */
+  setCustomCursorHover: (id: string, image: { dataUrl: string; width: number; height: number } | null) => boolean
+  /** Xoá 1 con trỏ tự thêm; nếu đang chọn nó thì trả về con trỏ hệ thống. */
+  removeCustomCursor: (id: string) => void
   /** Override màu UI theo base theme hiện tại. */
   customColors: CustomColors
   /** Đặt/gỡ 1 màu cho theme đang chọn (null = gỡ override). */
@@ -401,11 +463,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   shortcuts: readShortcuts(),
   autoCompleteEnabled: readAutoComplete(),
   commandAliases: readCommandAliases(),
+  mouseCursor: readMouseCursor(),
+  customCursors: readCustomCursors(),
   setTheme: (theme) => {
     localStorage.setItem(THEME_KEY, theme)
     applyTheme(theme)
     // Override màu lưu tách theo theme → áp lại bộ của theme mới
     applyCustomTheme(theme, get().customColors)
+    // Accent mặc định khác nhau giữa dark/light → dựng lại con trỏ bản tô accent
+    applyMouseCursor(get().mouseCursor, get().customCursors)
     set({ theme })
   },
   setLanguage: (language) => {
@@ -417,6 +483,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     if (color) localStorage.setItem(ACCENT_KEY, color)
     else localStorage.removeItem(ACCENT_KEY)
     applyAccent(color)
+    applyMouseCursor(get().mouseCursor, get().customCursors)
     set({ accentColor: color })
   },
   setBackgroundImage: (image) => {
@@ -510,6 +577,60 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     localStorage.setItem(ALIASES_KEY, JSON.stringify(list))
     set({ commandAliases: list })
   },
+  setMouseCursor: (id) => {
+    localStorage.setItem(CURSOR_KEY, id)
+    applyMouseCursor(id, get().customCursors)
+    set({ mouseCursor: id })
+  },
+  addCustomCursor: (cursor) => {
+    const list = get().customCursors
+    if (list.length >= CURSOR_CUSTOM_MAX) return 'full'
+    const next = [...list, cursor]
+    try {
+      localStorage.setItem(CURSOR_LIST_KEY, JSON.stringify(next))
+    } catch {
+      return 'quota' // QuotaExceededError — localStorage đầy (thường do ảnh nền chiếm chỗ)
+    }
+    const selection = `custom:${cursor.id}`
+    localStorage.setItem(CURSOR_KEY, selection)
+    applyMouseCursor(selection, next)
+    set({ customCursors: next, mouseCursor: selection })
+    return 'ok'
+  },
+  updateCustomCursor: (id, patch) => {
+    const next = get().customCursors.map((c) => (c.id === id ? { ...c, ...patch } : c))
+    localStorage.setItem(CURSOR_LIST_KEY, JSON.stringify(next))
+    applyMouseCursor(get().mouseCursor, next)
+    set({ customCursors: next })
+  },
+  setCustomCursorHover: (id, image) => {
+    const next = get().customCursors.map((c) =>
+      c.id === id
+        ? image
+          ? { ...c, hoverDataUrl: image.dataUrl, hoverWidth: image.width, hoverHeight: image.height }
+          : // Gỡ ảnh hover: phải XOÁ hẳn 3 khoá, để undefined thì JSON.stringify bỏ đi
+            // nhưng object trong RAM vẫn còn khoá → `hoverDataUrl` undefined vẫn qua được `if`
+            { id: c.id, name: c.name, dataUrl: c.dataUrl, hotX: c.hotX, hotY: c.hotY, width: c.width, height: c.height }
+        : c
+    )
+    try {
+      localStorage.setItem(CURSOR_LIST_KEY, JSON.stringify(next))
+    } catch {
+      return false
+    }
+    applyMouseCursor(get().mouseCursor, next)
+    set({ customCursors: next })
+    return true
+  },
+  removeCustomCursor: (id) => {
+    const next = get().customCursors.filter((c) => c.id !== id)
+    localStorage.setItem(CURSOR_LIST_KEY, JSON.stringify(next))
+    // Đang dùng đúng con trỏ vừa xoá → quay về con trỏ hệ thống, đừng để trỏ vào chỗ trống
+    const selection = get().mouseCursor === `custom:${id}` ? 'system' : get().mouseCursor
+    localStorage.setItem(CURSOR_KEY, selection)
+    applyMouseCursor(selection, next)
+    set({ customCursors: next, mouseCursor: selection })
+  },
   setCustomColor: (varName, hex) => {
     const { theme, customColors } = get()
     const next: CustomColors = {
@@ -568,6 +689,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     if (accentColor) localStorage.setItem(ACCENT_KEY, accentColor)
     else localStorage.removeItem(ACCENT_KEY)
     applyAccent(accentColor)
+    applyMouseCursor(get().mouseCursor, get().customCursors)
 
     set({ customColors: next, accentColor })
     return true
@@ -580,5 +702,7 @@ export const initialSettings = {
   language: readLang(),
   backgroundImage: readBgImage(),
   accentColor: readAccent(),
-  customColors: readCustomColors()
+  customColors: readCustomColors(),
+  mouseCursor: readMouseCursor(),
+  customCursors: readCustomCursors()
 }

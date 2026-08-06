@@ -7,6 +7,7 @@ import {
   applyBackground,
   applyCustomTheme,
   applyLang,
+  applyMouseCursor,
   applyTheme,
   initialSettings
 } from './stores/settings'
@@ -27,6 +28,8 @@ applyAccent(initialSettings.accentColor)
 applyCustomTheme(initialSettings.theme, initialSettings.customColors)
 // Cửa sổ tách rời KHÔNG có lớp ảnh nền phía sau → bỏ ảnh nền để panel không bị bán trong suốt
 applyBackground(isDetached ? null : initialSettings.backgroundImage)
+// Con trỏ áp cho CẢ cửa sổ tách rời — nhảy giữa 2 cửa sổ mà con trỏ đổi hình sẽ rất khó chịu
+applyMouseCursor(initialSettings.mouseCursor, initialSettings.customCursors)
 
 function Root() {
   if (detachedRoute === 'monitor') return <DetachedMonitorApp />

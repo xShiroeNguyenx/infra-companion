@@ -93,6 +93,46 @@ body,
   --c-panel: rgba(243, 244, 246, 0.62);
 }
 
+/* ── Con trỏ chuột tuỳ chỉnh (Settings → Terminal) ─────────────────────────────
+   `cursor` là thuộc tính KẾ THỪA nên đặt ở gốc là phủ toàn app; ô nhập text vẫn giữ
+   con trỏ ngữ cảnh của nó.
+   Terminal phải override RIÊNG vì xterm.css đặt cứng `.xterm { cursor: text }`; không có
+   rule dưới đây thì con trỏ mới không hiện ở đúng nơi user nhìn nhiều nhất. Selector đủ
+   thắng specificity của xterm nên không cần !important. */
+:root[data-cursor='on'] {
+  cursor: var(--app-cursor);
+}
+:root[data-cursor='on'] .terminal-host .xterm,
+:root[data-cursor='on'] .terminal-host .xterm-screen {
+  cursor: var(--app-cursor);
+}
+
+/* Trạng thái HOVER — trỏ vào thứ bấm được thì đổi sang bản hover của cùng con trỏ đó
+   (thay vì bàn tay mặc định của trình duyệt).
+   ⚠️ Phải LIỆT KÊ TƯỜNG MINH: CSS không có cách nào chọn "phần tử đang có cursor: pointer",
+   nên không thể viết một rule chung ăn theo mọi nơi đã khai pointer.
+   `:not(:disabled)` để nút bị vô hiệu giữ nguyên con trỏ "không cho bấm" của nó.
+   Cờ `data-cursor-hover` tách riêng khỏi `data-cursor`: preset không có bản hover (vd
+   Mặc định) phải để trình duyệt tự lo bàn tay, chứ không được kế thừa con trỏ thường. */
+:root[data-cursor-hover='on']
+  :is(
+    a[href],
+    button,
+    [role='button'],
+    summary,
+    select,
+    input[type='checkbox'],
+    input[type='radio'],
+    input[type='range']
+  ):not(:disabled) {
+  cursor: var(--app-cursor-hover);
+}
+/* Link trong terminal: xterm gắn class này lên `.xterm` khi con trỏ nằm trên link. */
+:root[data-cursor-hover='on'] .terminal-host .xterm.xterm-cursor-pointer,
+:root[data-cursor-hover='on'] .terminal-host .xterm.xterm-cursor-pointer .xterm-screen {
+  cursor: var(--app-cursor-hover);
+}
+
 /* Vùng terminal: nền khớp token để dải dư khi xterm fit không tạo "khung" khác màu;
    padding đều cho cân đối (tránh cảm giác lệch viền). xterm tự vẽ nền theo theme JS. */
 .terminal-host {

@@ -34,19 +34,26 @@
 
 ---
 
-> ## 📦 TRẠNG THÁI RELEASE (2026-08-05)
+> ## 📦 TRẠNG THÁI RELEASE (2026-08-06)
 >
 > | Version | Tình trạng |
 > |---|---|
 > | v0.2.0 | đã publish, **chỉ có installer Windows** (2 job mac/linux đỏ ở bước Test — xem block v0.2.1) |
-> | v0.2.1 | ✅ **ĐÃ commit `c66d346` + tag đã push** (HEAD trùng origin/main). Ghi chú cũ "v0.2.1 chưa commit/tag" là **THÔNG TIN LỖI THỜI** |
-> | **v0.2.2** | 🟡 **SẴN SÀNG RELEASE — chưa commit/tag, CHƯA TEST GUI.** Đã bump 2 package.json + CHANGELOG `[0.2.2]` 2026-08-05 + README badge/limitations + landing (hero + card 🔁) + ROADMAP F55 ✅ v0.2.2. **1044 test xanh** (vault schema tới **v15**) |
+> | v0.2.1 | ✅ **ĐÃ commit `c66d346` + tag đã push** |
+> | v0.2.2 | ✅ **ĐÃ commit `5711b68` + tag `v0.2.2` đã push.** Nội dung = F55 theo dõi bất đồng bộ master↔slave + chuẩn hoá địa chỉ/tên mẫu |
+> | **v0.2.3** | 🟡 **SẴN SÀNG RELEASE — chưa commit/tag, CHƯA TEST GUI.** Đã bump 2 package.json + CHANGELOG `[0.2.3]` 2026-08-06 + README (badge, mục tính năng, limitations) + landing hero + ROADMAP F56 ✅ v0.2.3 |
 >
-> **Nội dung v0.2.2** = F55 theo dõi bất đồng bộ master↔slave (cụm 1 master + N slave, 3 đường lấy dữ liệu, 15 luật chẩn đoán kèm runbook, cảnh báo nền, so lệch dữ liệu) **+ chuẩn hoá địa chỉ/tên mẫu** trong placeholder, comment và fixture theo quy ước ở khối trên. **1038 test xanh** (707 → 1038), typecheck 3 package + build sạch, lệnh soát IP public ra 0 dòng.
+> **Nội dung v0.2.3** = **con trỏ chuột tuỳ chỉnh** (19 preset + tự thêm từ file) **+ fix chữ méo ở tab terminal** (WebGL texture atlas hỏng sau khi tab bị `display:none`) — 2 khối dưới. Chỉ chạm renderer, KHÔNG chạm core/vault → vault vẫn ở schema **v15**, 1044 test của core không bị ảnh hưởng (không chạy lại). Typecheck 3 package + build sạch.
 >
-> ⚠️ Semver: F55 mở một VÙNG TÍNH NĂNG MỚI nên theo lệ là MINOR (0.3.0); **user chọn 0.2.2** → làm theo. Auto-update 0.2.1 → 0.2.2 không ảnh hưởng gì.
+> ⚠️ **BÀI HỌC LẶP LẠI LẦN 2** — dòng trạng thái release trong memory nói "v0.2.2 chưa commit/tag" nhưng `git tag` cho thấy đã phát hành rồi. Hậu quả thật: 2 mục trên ban đầu bị ghi vào `[0.2.2]` trong CHANGELOG (mục mô tả nội dung mà bản 0.2.2 đã publish KHÔNG có) — phải chuyển sang `[0.2.3]`. **Luôn chạy `git tag` + `git log -1` + `git ls-tree -r --name-only <tag> | grep <file mới>` TRƯỚC khi tin bất kỳ ghi chú trạng thái nào.**
 >
-> Lệnh git + checklist test GUI: block `v0.2.2` ở phần Git cuối file.
+> **Con trỏ chuột tuỳ chỉnh (2026-08-06)** — `lib/cursors.ts` + `components/MouseCursorSection.tsx` + rule `:root[data-cursor='on']` trong `styles/main.css`, control đặt ở Settings → Terminal. **19 preset chia 2 nhóm** (6 từ khoá CSS của OS + **13 SVG app tự vẽ**: 3 mũi tên/ring/dot/retro + kiếm, tim, cây thông, tên lửa, bút chì, tia sét, chân mèo) + danh sách user tự thêm từ file. **Mỗi con trỏ là một CẶP trạng thái**: thường + **hover** (trỏ vào thứ bấm được). Bản hover sinh từ CHÍNH hình đó qua `hoverUri()` — phóng `HOVER_SCALE` **quanh đúng điểm nhấn** (nên toạ độ điểm nhấn không xê dịch trong hệ toạ độ hình, chỉ cộng thêm `HOVER_PAD`) + `glow()` 2 lớp màu accent. Bề rộng glow **phải rộng hơn hẳn** quầng tối 3.4 của `haloed` (vẽ đè lên trên), đã tune 2 vòng: 6.5 = gần như không thấy khác bản thường, 12 = quầng xanh nhấn chìm hình, chốt **9.5 @ .26 + 7 @ .6**. Preset hệ thống dùng cặp có sẵn của OS (`grab`→`grabbing`, còn lại →`pointer`). ⚠️ CSS **không có cách nào chọn "phần tử đang có `cursor: pointer`"** nên rule hover phải LIỆT KÊ TƯỜNG MINH (`a[href], button, [role=button], summary, select, checkbox/radio/range`) + `:not(:disabled)`; và **2 cờ `data-cursor` / `data-cursor-hover` phải TÁCH RIÊNG** — nếu bật rule hover khi chưa có `--app-cursor-hover` thì khai báo hỏng ở computed-value time → `cursor` về **inherit** (kế thừa bản thường) chứ KHÔNG về bàn tay, làm preset `system` mất luôn bàn tay khi hover. Con trỏ tự thêm có ô ảnh hover **tuỳ chọn**, dùng CHUNG điểm nhấn với ảnh thường (thêm cặp X/Y thứ 2 chỉ làm rối hàng); gỡ ảnh hover phải **xoá hẳn 3 khoá** chứ không gán `undefined` (khoá vẫn tồn tại trong object RAM). `retro` đã đổi toạ độ ×2 để **1 đơn vị = 1 CSS px** như mọi hình khác, nếu để viewBox nhỏ rồi phóng bằng width/height thì phép dựng ảnh hover phải quy đổi 2 hệ toạ độ. Hình tự vẽ dùng helper `haloed()` — vẽ 2 lớp (quầng tối rộng dưới, nét trắng mảnh trên) vì **một lớp viền đơn luôn tàng hình trên nền cùng màu**, mà con trỏ ở app này đi qua cả terminal tối, panel sáng và ảnh nền rối. Không dùng `<use href="#id">` để đỡ lặp markup: `<use>` trong SVG làm ảnh CSS là chỗ engine xử lý khác nhau, mà con trỏ lỗi thì **im lặng** (không hiện gì, không báo lỗi). **Cố ý KHÔNG đóng gói bộ con trỏ bên thứ ba** (Bibata/Breeze/Adwaita = GPL/LGPL, không mang vào repo MIT). Ba cái bẫy của Chromium đã xử lý: ảnh >128px bị **bỏ qua IM LẶNG** (không lỗi, con trỏ chỉ là không đổi → import luôn thu nhỏ), **`.ani` không chạy** trên mọi engine web (báo lỗi riêng thay vì im lặng), hotspot ra ngoài ảnh làm **cả khai báo CSS bị bỏ** (nên `customCursorCss` kẹp lại). Mọi file nhập vào đều **vẽ lại ra canvas → PNG** (ép trần 128px + chuẩn hoá `.cur`/`.ico` + loại nội dung lạ trong SVG), nên regex kiểm data URI chỉ nhận `data:image/png;base64,…` trước khi ghép vào `cursor: url()`. `cursor` là thuộc tính KẾ THỪA nên đặt ở `:root` là phủ cả app; riêng terminal cần rule thêm vì `xterm.css` đặt cứng `.xterm { cursor: text }`. Bản `arrowAccent`/`ring` tô theo `--c-accent` nên phải `applyMouseCursor` lại ở `setTheme`/`setAccentColor`/`importThemeJson`.
+>
+> **Fix chữ méo (2026-08-06)** — `TerminalPane.tsx`: WebGL renderer chỉ giữ *toạ độ* glyph trong atlas trên GPU; tab không active bị `display:none` nên Chromium được thả drawing buffer, mà lúc quay lại `fit()` là no-op (cols/rows không đổi) → không có gì vẽ lại, toạ độ cũ trỏ vào atlas đã khác → chữ ghép từ nhiều ký tự. Thêm helper `repaintGlyphs()` (`clearTextureAtlas()` + `refresh(0, rows-1)`) gọi ở 2 chỗ: effect bám **`tabVisible`** (không phải `paneActive` — pane không focus trong split vẫn đang hiện) và listener `matchMedia('(resolution: Xdppx)')` cho lúc đổi scale màn hình (query ghim 1 giá trị dppx nên phải tạo lại sau mỗi lần đổi). **Chưa làm**: mỗi pane là 1 WebGL context, Chromium giới hạn ~16/renderer → mở nhiều pane thì context cũ bị thu hồi; `onContextLoss` hiện gỡ addon luôn nên pane đó tụt về DOM renderer vĩnh viễn tới khi tạo lại session.
+>
+> ⚠️ Semver: v0.2.2 (F55) mở một vùng tính năng mới nên theo lệ là MINOR — **user chọn 0.2.2**, đã phát hành như vậy. v0.2.3 là PATCH + tính năng nhỏ nên 0.2.3 là đúng lệ.
+>
+> Lệnh git + checklist test GUI: block `v0.2.3` ở phần Git cuối file.
 > ⚠️ **Đừng sửa file UTF-8 bằng `Get-Content`/`Set-Content`**: PS 5.1 `Get-Content` mặc định đọc ANSI → ghi lại thành UTF-8 là **double-encode**, hỏng hết tiếng Việt (đã dính 1 lần phiên này). Dùng `[System.IO.File]::ReadAllText($p, [Text.Encoding]::UTF8)` + `WriteAllText($p, $t, (New-Object Text.UTF8Encoding($false)))`, hoặc sửa bằng editor.
 
 > **Cập nhật 2026-08-02 — F55 THEO DÕI BẤT ĐỒNG BỘ MASTER ↔ SLAVE (MySQL/MariaDB).** *(Sau đó đã gom vào **v0.2.2** — xem khối TRẠNG THÁI RELEASE ở trên; số test 1004 dưới đây là mốc lúc mới xong phần cơ bản, bản v0.2.2 cuối cùng là 1038.)*
@@ -271,6 +278,65 @@ Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps
 **Landing page = flow ĐỘC LẬP** (`.github/workflows/pages.yml`, deploy `docs/landing/`): tự chạy khi **push thay đổi `docs/landing/**` lên `main`** (hoặc chạy tay workflow_dispatch) — **KHÔNG gắn tag/release → không build lại app**. `ci.yml` đã thêm `paths-ignore: docs/** + **/*.md` để push chỉ-docs không kích hoạt build 3-OS. **Setting 1 lần**: repo → Settings → Pages → Source = **GitHub Actions**. URL: `https://xshiroenguyenx.github.io/infra-companion/`. Link User guide/Changelog/Roadmap trong landing trỏ GitHub blob/main (không tương đối) để hoạt động khi publish.
 
 ```powershell
+# ============================================================
+# v0.2.3 — CON TRO CHUOT TUY CHINH (F56) + FIX CHU METO O TAB TERMINAL (WebGL atlas)
+# (v0.2.2 DA commit 5711b68 + tag da push -> v0.2.3 la commit MOI TREN dinh, KHONG amend)
+# Version da bump 0.2.3 o 2 package.json; CHANGELOG [0.2.3] ngay 2026-08-06.
+# CHI cham renderer (khong cham core/vault) -> vault van schema v15, 1044 test core khong anh huong.
+# Typecheck 3 package + build sach. CHUA test GUI.
+# ============================================================
+cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
+
+# --- BUOC 1: commit + push main (BAT BUOC truoc khi tag) ---
+git status
+git add -A                 # 2 file MOI: renderer/src/lib/cursors.ts
+                           #             renderer/src/components/MouseCursorSection.tsx
+git status                 # xac nhan het "Changes not staged"
+git commit -m @'
+feat: pick your mouse cursor — 19 presets (6 from the OS, 13 drawn by the app incl. sword/heart/pine/rocket/pencil/lightning/paw), each a pair of states so hovering a button shows your cursor with an accent glow instead of the browser hand, or add your own images with an editable hotspot + fix garbled terminal text after switching tabs (WebGL glyph atlas) (v0.2.3)
+'@
+git push origin main
+
+# --- BUOC 2: tag SAU KHI push + SAU KHI test GUI ---
+#   - CON TRO CHUOT (Settings > Terminal > "Con tro chuot"):
+#       2 nhom: "Cua he dieu hanh" (6) + "App tu ve" (13) -> dem du 19 o
+#       chon Cay kiem / Trai tim / Cay thong / Ten lua / But chi / Tia set / Chan meo
+#         -> doi theme SANG roi lai TOI: hinh phai RO O CA HAI (vien 2 lop)
+#         -> bat anh nen roi: hinh van phai tach khoi nen
+#       re chuot len tung o -> con tro doi ngay tai o do (o tu dat cursor cua chinh no)
+#       chon "Mui ten mau nhan" -> doi accent o Giao dien -> con tro phai DOI MAU theo
+#       chon 1 preset -> con tro phai doi CA TRONG TERMINAL (xterm.css dat cung cursor: text)
+#       CAP TRANG THAI: vung thu 3 o duoi picker -> o "Binh thuong" = ban thuong,
+#         o "Bam duoc" = ban HOVER (phong nhe + quang sang accent), o "O nhap" = chu I
+#         -> re chuot len NUT / LINK / CHECKBOX that trong app: phai ra ban hover,
+#            KHONG con la ban tay cua trinh duyet
+#         -> nut DANG BI VO HIEU (disabled) phai giu con tro "khong cho bam" cua no
+#         -> chon "Mac dinh" (system): hover nut phai VE LAI BAN TAY, khong duoc ke thua
+#            con tro thuong (day la ca 2 co data-cursor / data-cursor-hover tach rieng)
+#         -> chon "Nam" (grab): hover phai thanh "dang nam" (grabbing)
+#       o nhap van giu chu I — dung ep het thanh 1 kieu
+#       "+ Them tu file anh": PNG 32px -> hien ngay; anh 512px -> tu thu nho + toast bao
+#       O NET DUT canh thumbnail = anh hover cua con tro tu them:
+#         chua co -> hover nut van la ban tay; nap 1 PNG vao -> hover nut ra dung anh do
+#         bam ↺ -> go anh hover, quay ve ban tay; mo lai app phai giu dung trang thai
+#       thu 1 file .ani -> phai bao loi RIENG (khong duoc im lang)
+#       sua X/Y cua con tro tron -> diem nhan dich theo, click dung cho
+#       xoa con tro dang dung -> tu quay ve "Mac dinh", KHONG mat con tro
+#       mo lai app -> lua chon + danh sach con giu (localStorage)
+#       CUA SO TACH ROI (Monitor / Tunnels) -> con tro phai GIONG cua so chinh
+#   - FIX CHU METO O TAB TERMINAL: bat GPU (Settings > Terminal > Tang toc GPU),
+#       mo 2-3 tab SSH co output, chuyen qua lai NHIEU lan, de yen vai phut roi quay lai
+#       -> chu phai NGUYEN VEN, KHONG con phai to chuot moi hien dung
+#       -> lam lai voi tab da Split: pane KHONG focus cung phai dung
+#       -> keo cua so sang man hinh co scale khac (100% <-> 125%) -> chu van dung
+#   - Soat IP public (phai ra 0 dong) — doan PowerShell o dau file nay, muc canh bao
+#
+git tag v0.2.3
+git push origin v0.2.3
+# Xong: cho Actions ~5-10 phut -> Releases/v0.2.3 phai co DU 3 file:
+#   InfraCompanion-Setup-0.2.3.exe + InfraCompanion-0.2.3.dmg + InfraCompanion-0.2.3.AppImage
+# App 0.2.2 dang cai se hien banner update sau khi mo lai (~10s)
+
 # ============================================================
 # v0.2.2 — F55 THEO DOI BAT DONG BO MASTER <-> SLAVE (MySQL/MariaDB) + chuan hoa dia chi/ten mau
 # (v0.2.1 DA commit c66d346 + tag da push -> v0.2.2 la commit MOI TREN dinh, KHONG amend)

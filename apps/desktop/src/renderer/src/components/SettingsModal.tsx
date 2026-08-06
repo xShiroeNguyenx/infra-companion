@@ -20,6 +20,7 @@ import { SHORTCUT_ACTIONS, eventToCombo, isValidShortcut, type ShortcutAction } 
 import { CustomPaletteSection } from './CustomPaletteSection'
 import { LocaldevSettingsView } from '../features/localdev/LocaldevSettingsView'
 import { LayoutGlyph } from './LayoutGlyph'
+import { MouseCursorSection } from './MouseCursorSection'
 import { Button, Field, TextArea, TextInput } from './ui'
 
 /** Các nhóm cài đặt hiển thị ở cột điều hướng bên trái của màn hình Settings. */
@@ -650,6 +651,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                   </div>
                   <p className="text-subtle mt-1 text-[10px] leading-relaxed">{t('settings.termFontHint')}</p>
                 </Field>
+
+                <MouseCursorSection />
               </>
             )}
 

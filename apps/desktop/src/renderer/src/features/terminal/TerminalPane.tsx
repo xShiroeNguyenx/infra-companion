@@ -85,6 +85,21 @@ interface TerminalPaneProps {
 }
 
 /**
+ * Vẽ lại toàn bộ glyph: xoá texture atlas trên GPU rồi ép xterm render lại mọi dòng.
+ *
+ * WebGL renderer chỉ giữ TOẠ ĐỘ của glyph trong atlas, không giữ hình. Khi atlas bị cấp phát
+ * lại mà bảng toạ độ cũ vẫn còn (canvas bị display:none, devicePixelRatio đổi, driver reset)
+ * thì xterm vẽ đúng ô nhưng lấy sai mảnh ảnh → chữ méo, ghép từ nhiều ký tự khác nhau.
+ * Đây đúng là việc mà tô chọn text bằng chuột làm bằng tay: đánh dấu dòng là dirty để
+ * rasterize lại glyph. Không bật WebGL thì chỉ còn refresh() — vô hại với DOM renderer.
+ */
+function repaintGlyphs(term: Terminal | null, webgl: WebglAddon | null): void {
+  if (!term) return
+  webgl?.clearTextureAtlas()
+  term.refresh(0, term.rows - 1)
+}
+
+/**
  * Một instance xterm.js gắn với một phiên terminal trong 1 pane.
  * Khi tab bật broadcast: phím gõ ở pane này được gửi tới MỌI pane trong tab.
  */
@@ -459,6 +474,35 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     })
     return () => cancelAnimationFrame(frame)
   }, [tabVisible, paneActive])
+
+  // Tab không active bị display:none (TerminalTabView) → canvas WebGL kích thước 0 và Chromium
+  // được phép thả drawing buffer. Lúc quay lại, fit() thường là no-op (cols/rows không đổi) nên
+  // KHÔNG có gì vẽ lại → atlas hỏng nằm nguyên đó cho tới khi user tô chuột. Vẽ lại mỗi lần hiện.
+  // Bám tabVisible chứ không phải paneActive: pane không focus trong split vẫn đang hiển thị.
+  // rAF để chạy sau fit() của effect trên (cùng frame, đúng thứ tự đăng ký) và sau khi có layout.
+  useEffect(() => {
+    if (!tabVisible) return
+    const frame = requestAnimationFrame(() => repaintGlyphs(termRef.current, webglRef.current))
+    return () => cancelAnimationFrame(frame)
+  }, [tabVisible])
+
+  // Đổi devicePixelRatio (kéo cửa sổ sang màn hình scale khác, đổi scale trong Windows) cũng làm
+  // atlas được cấp phát lại → cùng lỗi glyph méo. Query matchMedia ghim đúng một giá trị dppx nên
+  // sau mỗi lần đổi phải tạo query mới cho lần kế tiếp.
+  useEffect(() => {
+    let media: MediaQueryList | null = null
+    function attach(): void {
+      media = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+      media.addEventListener('change', onChange)
+    }
+    function onChange(): void {
+      media?.removeEventListener('change', onChange)
+      repaintGlyphs(termRef.current, webglRef.current)
+      attach()
+    }
+    attach()
+    return () => media?.removeEventListener('change', onChange)
+  }, [])
 
   // Đồng bộ ref cho key handler (đọc LIVE trong closure gắn 1 lần) + đóng gợi ý khi pane mất focus.
   useEffect(() => {
