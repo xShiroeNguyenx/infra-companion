@@ -20,6 +20,9 @@ import type {
   ReplPairInput,
   ReplProbeMode,
   ReplReplicaDto,
+  ReplRunDetailDto,
+  ReplRunDto,
+  ReplRunKind,
   SnippetDto,
   SnippetInput,
   SshKeyDto,
@@ -41,6 +44,7 @@ import {
 } from './crypto'
 import { openDatabase } from './db'
 import { ed25519ToOpenSshPrivate } from './sshKeyFormat'
+import type { ReplRunCounts, ReplRunPayload } from '../replication/history'
 
 export interface KnownHostRecord {
   id: string
@@ -836,6 +840,107 @@ export class VaultService {
   }
 
   // -------------------------------------------------------------------------
+  // F59 — Lịch sử so lệch. Tóm tắt ở cột thường, chi tiết mã hoá bằng DEK (tên database/bảng
+  // của production là thông tin nhạy cảm). Cùng khuôn với `diagnoses`.
+  //
+  // CỐ Ý KHÔNG xoá theo cụm khi xoá cụm: lịch sử là thứ dùng để kiểm lại việc vá dữ liệu, mất
+  // nó vì lỡ tay xoá cụm là mất đúng cái cần. User xoá tường minh ở tab Lịch sử.
+  // -------------------------------------------------------------------------
+
+  /** Trần số bản ghi giữ lại — quét nhiều lần trong ngày là chuyện thường, đừng để phình mãi. */
+  private static readonly REPL_RUN_CAP = 200
+
+  saveReplRun(input: ReplRunSaveInput): string {
+    const db = this.ensureDb()
+    const dek = this.requireDek()
+    const id = randomUUID()
+    db.prepare(
+      `INSERT INTO repl_runs (id, pair_id, pair_name, replica_id, replica_label, master_label, kind,
+        table_diffs, column_diffs, index_diffs, var_diffs, checked, mismatches, data_enc, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+    ).run(
+      id,
+      input.pairId,
+      input.pairName,
+      input.replicaId,
+      input.replicaLabel,
+      input.masterLabel,
+      input.kind,
+      input.counts.tableDiffs,
+      input.counts.columnDiffs,
+      input.counts.indexDiffs,
+      input.counts.varDiffs,
+      input.counts.checked,
+      input.counts.mismatches,
+      encryptField(dek, JSON.stringify(input.payload)),
+      input.createdAt ?? Date.now()
+    )
+    db.prepare(
+      `DELETE FROM repl_runs WHERE id NOT IN (
+         SELECT id FROM repl_runs ORDER BY created_at DESC LIMIT ${VaultService.REPL_RUN_CAP})`
+    ).run()
+    return id
+  }
+
+  /** Danh sách KHÔNG giải mã gì — mở tab lịch sử là hiện ngay, kể cả khi vault đang khoá. */
+  listReplRuns(pairId?: string, limit = VaultService.REPL_RUN_CAP): ReplRunDto[] {
+    const where = pairId ? 'WHERE pair_id = ?' : ''
+    const params = pairId ? [pairId, limit] : [limit]
+    const rows = this.ensureDb()
+      .prepare(
+        `SELECT id, pair_id, pair_name, replica_id, replica_label, master_label, kind, table_diffs,
+          column_diffs, index_diffs, var_diffs, checked, mismatches, created_at
+         FROM repl_runs ${where} ORDER BY created_at DESC LIMIT ?`
+      )
+      .all(...params) as unknown as ReplRunRow[]
+    return rows.map(toReplRunDto)
+  }
+
+  getReplRun(id: string): ReplRunDetailDto | null {
+    const row = this.ensureDb()
+      .prepare(
+        `SELECT id, pair_id, pair_name, replica_id, replica_label, master_label, kind, table_diffs,
+          column_diffs, index_diffs, var_diffs, checked, mismatches, data_enc, created_at
+         FROM repl_runs WHERE id = ?`
+      )
+      .get(id) as (ReplRunRow & { data_enc: string }) | undefined
+    if (!row) return null
+    const empty = { tables: [], columns: [], indexes: [], variables: [], rows: [], hasFilters: false, truncated: false }
+    // Vault khoá → vẫn trả metadata kèm cờ `locked` để UI nói được lý do, thay vì hiện panel rỗng
+    if (!this.dek) return { ...toReplRunDto(row), ...empty, locked: true }
+    const raw = decryptField(this.dek, row.data_enc)
+    let payload: Partial<ReplRunPayload> | null = null
+    try {
+      payload = raw ? (JSON.parse(raw) as Partial<ReplRunPayload>) : null
+    } catch {
+      payload = null
+    }
+    return {
+      ...toReplRunDto(row),
+      ...empty,
+      ...(payload ?? {}),
+      tables: payload?.tables ?? [],
+      columns: payload?.columns ?? [],
+      indexes: payload?.indexes ?? [],
+      variables: payload?.variables ?? [],
+      rows: payload?.rows ?? []
+    }
+  }
+
+  deleteReplRun(id: string): void {
+    this.ensureDb().prepare('DELETE FROM repl_runs WHERE id = ?').run(id)
+  }
+
+  /** Thiếu `pairId` = xoá sạch. Trả về số bản ghi đã xoá để UI báo con số thật. */
+  clearReplRuns(pairId?: string): number {
+    const db = this.ensureDb()
+    const result = pairId
+      ? db.prepare('DELETE FROM repl_runs WHERE pair_id = ?').run(pairId)
+      : db.prepare('DELETE FROM repl_runs').run()
+    return Number(result.changes ?? 0)
+  }
+
+  // -------------------------------------------------------------------------
   // Known hosts (TOFU)
   // -------------------------------------------------------------------------
 
@@ -1494,5 +1599,60 @@ function toReplPairDto(row: ReplPairRow): ReplPairDto {
     probeMode: safeProbeMode(row.probe_mode),
     pollIntervalSec: row.poll_interval_sec,
     watchEnabled: row.watch_enabled === 1
+  }
+}
+
+// --- F59: lịch sử so lệch ---------------------------------------------------
+
+/** Đầu vào lưu một lần so lệch. `counts`/`payload` do `buildScanRun`/`buildChecksumRun` dựng. */
+export interface ReplRunSaveInput {
+  pairId: string
+  pairName: string
+  replicaId: string
+  replicaLabel: string
+  /** Rỗng = cụm không khai master. */
+  masterLabel: string
+  kind: ReplRunKind
+  counts: ReplRunCounts
+  payload: ReplRunPayload
+  /** Thiếu = lúc lưu. */
+  createdAt?: number
+}
+
+interface ReplRunRow {
+  id: string
+  pair_id: string
+  pair_name: string
+  replica_id: string
+  replica_label: string
+  master_label: string
+  kind: string
+  table_diffs: number
+  column_diffs: number
+  index_diffs: number
+  var_diffs: number
+  checked: number
+  mismatches: number
+  created_at: number
+}
+
+const REPL_RUN_KINDS: ReplRunKind[] = ['scan', 'count', 'checksum']
+
+function toReplRunDto(row: ReplRunRow): ReplRunDto {
+  return {
+    id: row.id,
+    pairId: row.pair_id,
+    pairName: row.pair_name,
+    replicaId: row.replica_id,
+    replicaLabel: row.replica_label,
+    masterLabel: row.master_label,
+    kind: REPL_RUN_KINDS.includes(row.kind as ReplRunKind) ? (row.kind as ReplRunKind) : 'scan',
+    tableDiffs: row.table_diffs,
+    columnDiffs: row.column_diffs,
+    indexDiffs: row.index_diffs,
+    varDiffs: row.var_diffs,
+    checked: row.checked,
+    mismatches: row.mismatches,
+    createdAt: row.created_at
   }
 }

@@ -95,8 +95,12 @@ interface TabsState {
   unmergeTab: (tabId: string) => void
   /** Đổi vị trí 1 pane trong tab (delta -1 = sang trái/lên, +1 = sang phải/xuống). */
   movePane: (tabId: string, paneId: string, delta: -1 | 1) => void
+  /** Kéo-thả sắp xếp thanh tab: chuyển `dragId` tới ngay TRƯỚC/SAU `targetId`. */
+  moveTab: (dragId: string, targetId: string, side: 'before' | 'after') => void
   /** Đưa 1 pane lên đầu danh sách — thành "cửa sổ chính" ở layout main-left/main-top. */
   setMainPane: (tabId: string, paneId: string) => void
+  /** Kéo-thả trong lưới split: hai pane ĐỔI CHỖ cho nhau. */
+  swapPanes: (tabId: string, aId: string, bId: string) => void
   openLocal: (profileId?: string) => Promise<void>
   openSsh: (hostId: string) => Promise<void>
   /** Mở nhiều host cùng lúc: mỗi host 1 pane trong CÙNG 1 tab mới (chia màn hình sẵn). */
@@ -518,6 +522,23 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       })
     })),
 
+  /**
+   * Kéo-thả sắp xếp tab. Vị trí chèn tính LẠI sau khi đã rút tab bị kéo ra khỏi mảng — dùng
+   * chỉ số cũ thì kéo sang phải sẽ lệch đúng 1 ô (tab bị rút làm mọi thứ phía sau dồn lên).
+   * KHÔNG đổi `activeId`: kéo để sắp xếp, không phải để chuyển tab.
+   */
+  moveTab: (dragId, targetId, side) =>
+    set((state) => {
+      if (dragId === targetId) return {}
+      const from = state.tabs.findIndex((t) => t.id === dragId)
+      if (from < 0 || !state.tabs.some((t) => t.id === targetId)) return {}
+      const tabs = [...state.tabs]
+      const [moved] = tabs.splice(from, 1)
+      const target = tabs.findIndex((t) => t.id === targetId)
+      tabs.splice(side === 'after' ? target + 1 : target, 0, moved!)
+      return { tabs }
+    }),
+
   setMainPane: (tabId, paneId) =>
     set((state) => ({
       tabs: state.tabs.map((t) => {
@@ -527,6 +548,26 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         const panes = [...t.panes]
         const [moved] = panes.splice(idx, 1)
         panes.unshift(moved!)
+        return { ...t, panes }
+      })
+    })),
+
+  /**
+   * Kéo-thả trong lưới split: ĐỔI CHỖ chứ không chèn-đẩy.
+   *
+   * Vì sao đổi chỗ: chèn-đẩy như thanh tab sẽ làm MỌI pane phía sau nhảy một ô — trong lưới
+   * toàn terminal đang chạy thì đó là cả màn hình xáo lại chỉ vì muốn chuyển một cái. Đổi chỗ
+   * chỉ động đúng 2 ô, và thả lên ô chính (index 0) của layout main-* chính là "đặt làm chính".
+   */
+  swapPanes: (tabId, aId, bId) =>
+    set((state) => ({
+      tabs: state.tabs.map((t) => {
+        if (t.id !== tabId || aId === bId) return t
+        const a = t.panes.findIndex((p) => p.id === aId)
+        const b = t.panes.findIndex((p) => p.id === bId)
+        if (a < 0 || b < 0) return t
+        const panes = [...t.panes]
+        ;[panes[a], panes[b]] = [panes[b]!, panes[a]!]
         return { ...t, panes }
       })
     })),

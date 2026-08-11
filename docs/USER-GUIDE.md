@@ -148,9 +148,11 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 | **Split layout** | The **▼** next to **⊞ Split ON**: pick **Auto grid** / **Side by side** / **Stacked** / **Main left** / **Main top**. Also in **Settings → Terminal → Split layout** (global default) |
 | **Pane frame** | **Settings → Terminal → Pane frame**: **Compact bar** (status dot + title + ✕) or **Mac style** (rounded corners + a round red close button) |
 | **Command palette** | `Ctrl+Shift+P`, or the **⌘ Commands** button at the right of the tab toolbar |
+| **Rearrange panes** | **Drag a pane's title bar** onto another pane: the two **swap places**. Drop anywhere on the target — its whole area lights up, not just the title bar. Only those two move, everything else stays where it is; in **Main left / Main top** that means dropping a pane onto the big one promotes it to main. Only the title bar is draggable, so selecting text inside a terminal still works. The **⋮** menu (move left/right, set as main) is unchanged |
 | **Resize panes** | **Drag the divider** between panes (whole column/row resizes); **double-click** a divider to reset to equal sizes. For **Main left/top** you drag the main/secondary split |
 | **Broadcast** | The **📡 Broadcast** button or `Ctrl+Shift+B`: type in one pane → it's sent to **ALL panes** in the tab |
 | **Switch tabs** | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
+| **Reorder tabs** | **Drag a tab** along the bar and drop it where you want. An accent line shows where it will land — left half of a tab means *before it*, right half means *after it*, and the empty space past the last tab means *to the end*. Dragging near either edge scrolls the bar, so a target that's off-screen is still reachable. Dropping does **not** switch tabs, and nothing is reconnected — the sessions keep running exactly as they were |
 | **Close tab/pane** | `Ctrl+Shift+W`, or `✕` on the tab/pane, or middle-click the tab |
 | **Find in terminal** | `Ctrl+F` |
 | **Copy / Paste** | `Ctrl+Shift+C` / `Ctrl+Shift+V` — **rebind in Settings → ⌨ Keyboard shortcuts**. Pasting goes through the bound combo or right-click only; plain `Ctrl+V` no longer auto-pastes (standard terminal behavior) |
@@ -475,6 +477,14 @@ Data drift runs against **one slave at a time** — pick which one at the top wh
 2. **Tick the suspicious tables → Exact count / CHECKSUM tables** — `COUNT(*)` compares row counts exactly; `CHECKSUM TABLE` compares the contents too, which is the only thing that catches "right number of rows, wrong values". Both scan the full table **on both servers**, so this is a deliberate action, capped at 50 tables per run.
 
 > Row counts in the quick scan are InnoDB **estimates** — several percent off is normal. Use them to narrow down, never to conclude. If the pair has replication filters, out-of-scope tables are dimmed: a difference there is intentional.
+
+### Drift history (the *History* tab)
+
+Every quick scan, exact count and CHECKSUM run is **saved automatically** — you don't press anything. Repairing drifted data takes days (find the tables today, patch rows tomorrow, re-check the day after), and without a record the next scan wipes the previous result off the screen, which is exactly what you need to answer *"is there less drift than last time, and which tables are still wrong?"*.
+
+Each row shows the date and time, which run it was (quick scan / count / CHECKSUM), `master → slave`, and the totals — *3 tables · 1 column · 2 variables*, or *2/5 tables differ* for an exact run. Open a row to get the full list of differences exactly as it looked when it ran, laid out the same way as the Data drift tab so two runs can be read side by side. Tick **All clusters** to see every cluster's history in one list.
+
+The cluster, slave and master names are **copied into the record** when it runs, so renaming or deleting a cluster later doesn't make old records lie — and **deleting a cluster does not delete its history**, since that history is what you use to verify the repair. Clean up with the **✕** on a row, or **Delete all** (which respects the *All clusters* tick: it clears either the selected cluster or everything). The most recent **200** records are kept; older ones drop off on their own. Details are encrypted in the vault with everything else — database and table names of a production server aren't public information — so the summary is readable while the vault is locked, but opening a record's details needs it unlocked.
 
 **Not covered yet:** GTID gap comparison (position-based only), PostgreSQL streaming replication, and semi-sync specifics.
 

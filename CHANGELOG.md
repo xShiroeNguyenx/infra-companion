@@ -5,6 +5,22 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.5] — unreleased
+
+### Added
+
+- **Drift checks are kept now, not thrown away** (`⋯` → 🔁 Replication master/slave → **History**). Repairing drifted data is a job that spans days — find the tables today, patch the rows tomorrow, check again the day after — and until now each **Quick scan** wiped the previous result off the screen, taking with it the only thing that answers *"is there less drift than last time, and which tables are still wrong?"*. Every quick scan, exact count and CHECKSUM run is saved automatically; nothing to press.
+  - A row per run: date and time, which kind of run it was, `master → slave`, and the totals — *3 tables · 1 column · 2 variables*, or *2/5 tables differ* for an exact count. Open it and you get the full list of differences as it stood at that moment, laid out exactly like the Data drift tab so two runs can be read against each other without re-learning the screen. **All clusters** puts every cluster in one list.
+  - Cluster, slave and master names are **copied into the record** as it is written, so renaming a cluster later doesn't rewrite history — and **deleting a cluster leaves its history alone**, because that history is what you use to confirm the repair worked.
+  - **Deleting is yours to do**: ✕ on a single row, or **Delete all**, which follows the *All clusters* tick — one cluster or the lot. The 200 most recent runs are kept and older ones drop off by themselves, so the file can't grow without limit while you scan repeatedly during an incident.
+  - Only the **differences** are stored, never the tables that matched — a database with three thousand identical tables would otherwise write three thousand useless rows on every scan. When a result is long enough to be truncated, the record says so outright rather than letting a shortened list read as the whole picture; the summary counts stay the real totals.
+  - Details are encrypted in the vault like everything else, since the database and table names of a production server are not public information. The summary line stays readable while the vault is locked; opening a record's details needs it unlocked, and says so.
+- **Drag a pane to move it too, once you're split.** Grab a pane's **title bar** and drop it on another pane — the two **swap places**. You can drop anywhere on the target, its whole area lights up, so you're not aiming at a 20-pixel strip. Only those two panes move: inserting instead of swapping would shove every pane after it along one slot, which in a grid of running terminals means the whole screen rearranges to move one thing. In **Main left / Main top** this doubles as *promote to main* — drop a side pane onto the big one. Only the title bar is draggable, so selecting text inside a terminal still works exactly as before, and the **⋮** menu (move left/right, set as main) is unchanged.
+- **Drag a tab to move it.** The tab bar was fixed in the order things happened to be opened, which stops matching how you're working about ten minutes in. Now you drag a tab along the bar and drop it where you want, with an accent line showing exactly where it will land: the left half of a tab means *before it*, the right half *after it*, and the empty space past the last tab means *to the end*. Dragging near either edge scrolls the bar, so a target that's currently off-screen is still reachable. Dropping only reorders — it doesn't switch tabs, and nothing is reconnected: every session keeps running untouched.
+- **Tool names under the Dashboard icons.** The two rows of tool icons added in 0.2.4 were icons only, with the name in a tooltip you had to hover to see. Each tile now carries a short name underneath — the same labels as the `⋯` menu, shortened where the menu name was too long for a tile (*AI troubleshooter* → *Diagnose*, *Compare config* → *Compare*). The tooltip still gives the full name.
+
+---
+
 ## [0.2.4] — 2026-08-06
 
 ### Added

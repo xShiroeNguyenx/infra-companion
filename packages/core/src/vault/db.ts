@@ -244,6 +244,36 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE repl_pairs ADD COLUMN master_db_user TEXT;
   ALTER TABLE repl_pairs ADD COLUMN master_db_password_enc TEXT;
+  `,
+  // v16 — F59: LỊCH SỬ các lần so lệch master ↔ slave. Vá dữ liệu lệch kéo dài nhiều ngày, mà
+  // lần quét sau ghi đè kết quả lần trước → không ai đối chiếu được "đã bớt lệch chưa".
+  //
+  // Con số tóm tắt để ở CỘT THƯỜNG (danh sách hiện được mà không phải giải mã gì); chi tiết
+  // (tên database/bảng/cột của production — thông tin nhạy cảm) nằm trong data_enc mã hoá bằng
+  // DEK, giống hệt cách `diagnoses` lưu output server ở v10.
+  //
+  // KHÔNG FK tới repl_pairs: xoá cụm mà xoá luôn lịch sử thì mất đúng thứ cần để kiểm lại việc
+  // vá dữ liệu. Nhãn cụm/slave/master lưu SAO CHÉP tại thời điểm chạy vì thế.
+  `
+  CREATE TABLE repl_runs (
+    id            TEXT PRIMARY KEY,
+    pair_id       TEXT NOT NULL,
+    pair_name     TEXT NOT NULL,
+    replica_id    TEXT NOT NULL DEFAULT '',
+    replica_label TEXT NOT NULL DEFAULT '',
+    master_label  TEXT NOT NULL DEFAULT '',
+    kind          TEXT NOT NULL,
+    table_diffs   INTEGER NOT NULL DEFAULT 0,
+    column_diffs  INTEGER NOT NULL DEFAULT 0,
+    index_diffs   INTEGER NOT NULL DEFAULT 0,
+    var_diffs     INTEGER NOT NULL DEFAULT 0,
+    checked       INTEGER NOT NULL DEFAULT 0,
+    mismatches    INTEGER NOT NULL DEFAULT 0,
+    data_enc      TEXT NOT NULL,
+    created_at    INTEGER NOT NULL
+  );
+  CREATE INDEX idx_repl_runs_time ON repl_runs(created_at DESC);
+  CREATE INDEX idx_repl_runs_pair ON repl_runs(pair_id, created_at DESC);
   `
 ]
 

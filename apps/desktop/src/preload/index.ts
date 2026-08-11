@@ -192,7 +192,11 @@ const api: InfraApi = {
     setSettings: (s) => ipcRenderer.invoke(IPC.REPL_SET_SETTINGS, s),
     compare: (pairId, replicaId) => ipcRenderer.invoke(IPC.REPL_COMPARE, pairId, replicaId),
     checksum: (pairId, tables, mode, replicaId) =>
-      ipcRenderer.invoke(IPC.REPL_CHECKSUM, pairId, tables, mode, replicaId)
+      ipcRenderer.invoke(IPC.REPL_CHECKSUM, pairId, tables, mode, replicaId),
+    historyList: (pairId) => ipcRenderer.invoke(IPC.REPL_HISTORY_LIST, pairId),
+    historyGet: (id) => ipcRenderer.invoke(IPC.REPL_HISTORY_GET, id),
+    historyDelete: (id) => ipcRenderer.invoke(IPC.REPL_HISTORY_DELETE, id),
+    historyClear: (pairId) => ipcRenderer.invoke(IPC.REPL_HISTORY_CLEAR, pairId)
   },
   localdev: {
     enabled: () => ipcRenderer.invoke(IPC.LOCALDEV_ENABLED),

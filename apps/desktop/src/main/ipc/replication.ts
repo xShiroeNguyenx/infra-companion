@@ -6,8 +6,10 @@ import {
   ReplicationService,
   TABLE_INVENTORY_SQL,
   VARS_SQL,
+  buildChecksumRun,
   buildChecksumSql,
   buildCountSql,
+  buildScanRun,
   clampPollInterval,
   diagnose,
   readMasterSnapshot,
@@ -31,6 +33,7 @@ import {
   type ReplEndpointTarget,
   type ReplPairTarget,
   type ReplReplicaTarget,
+  type ReplRunBuild,
   type ReplSample
 } from '@infra/core'
 import {
@@ -40,6 +43,9 @@ import {
   type ReplCompareResultDto,
   type ReplPairDto,
   type ReplPairInput,
+  type ReplRunDetailDto,
+  type ReplRunDto,
+  type ReplRunKind,
   type ReplSettingsDto,
   type ReplSnapshotDto,
   type ReplTestResultDto
@@ -383,6 +389,55 @@ export function registerReplicationIpc(): () => void {
     }
   }
 
+  /**
+   * F59 — ghi lại một lần so lệch. Nhãn cụm/slave/master SAO CHÉP tại đây: cụm đổi tên hay bị
+   * xoá sau này thì bản ghi cũ vẫn nói đúng lúc đó nó so cái gì với cái gì.
+   *
+   * KHÔNG BAO GIỜ để việc lưu làm hỏng kết quả đo — user cần con số vừa quét hơn là cuốn sổ.
+   * Lỗi ghi log ra console (chỉ xảy ra khi vault khoá, mà lối này thì vault đã phải mở).
+   */
+  function saveRun(pairId: string, replicaId: string | undefined, kind: ReplRunKind, build: ReplRunBuild): void {
+    try {
+      const vault = getVault()
+      const pair = vault.getReplPair(pairId)
+      const replica = replicaId ? pair?.replicas.find((r) => r.id === replicaId) : pair?.replicas[0]
+      const hostLabel = (hostId: string | null | undefined): string =>
+        hostId ? (vault.getHost(hostId)?.label ?? hostId) : ''
+      vault.saveReplRun({
+        pairId,
+        pairName: pair?.name ?? pairId,
+        replicaId: replica?.id ?? replicaId ?? '',
+        replicaLabel: replica?.label || hostLabel(replica?.hostId),
+        masterLabel: hostLabel(pair?.masterHostId),
+        kind,
+        counts: build.counts,
+        payload: build.payload
+      })
+    } catch (error) {
+      console.error('[repl] không lưu được lịch sử so lệch:', error)
+    }
+  }
+
+  ipcMain.handle(IPC.REPL_HISTORY_LIST, (_event, pairId?: string): ReplRunDto[] => {
+    touchActivity()
+    return getVault().listReplRuns(pairId)
+  })
+
+  ipcMain.handle(IPC.REPL_HISTORY_GET, (_event, id: string): ReplRunDetailDto | null => {
+    touchActivity()
+    return getVault().getReplRun(id)
+  })
+
+  ipcMain.handle(IPC.REPL_HISTORY_DELETE, (_event, id: string): void => {
+    touchActivity()
+    getVault().deleteReplRun(id)
+  })
+
+  ipcMain.handle(IPC.REPL_HISTORY_CLEAR, (_event, pairId?: string): number => {
+    touchActivity()
+    return getVault().clearReplRuns(pairId)
+  })
+
   ipcMain.handle(IPC.REPL_COMPARE, async (event, pairId: string, replicaId?: string): Promise<ReplCompareResultDto> => {
     const empty = { tables: [], columns: [], indexes: [], variables: [], hasFilters: false }
     try {
@@ -409,7 +464,7 @@ export function registerReplicationIpc(): () => void {
           master.probe.queryRows(VARS_SQL),
           replica.probe.queryRows(VARS_SQL)
         ])
-        return {
+        const result: ReplCompareResultDto = {
           ok: true,
           tables: diffInventory(normalizeTableRows(mTables), normalizeTableRows(rTables), { filters }),
           columns: diffSchemaEntries(normalizeColumns(mCols), normalizeColumns(rCols)),
@@ -420,6 +475,10 @@ export function registerReplicationIpc(): () => void {
           ),
           hasFilters: filters?.any ?? false
         }
+        // Lưu NGAY, không đợi user bấm gì: lần quét sau sẽ ghi đè kết quả trên màn hình, và cái
+        // mất đi đúng là thứ cần để đối chiếu khi vá dữ liệu ở những ngày sau.
+        saveRun(pairId, replicaId, 'scan', buildScanRun(result))
+        return result
       })
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error), ...empty }
@@ -466,6 +525,7 @@ export function registerReplicationIpc(): () => void {
             }
             out.push(row)
           }
+          saveRun(pairId, replicaId, mode, buildChecksumRun(out))
           return out
         })
       } catch (error) {

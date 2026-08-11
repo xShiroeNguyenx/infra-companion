@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent as ReactDragEvent,
+  type MouseEvent as ReactMouseEvent
+} from 'react'
 import { useDataStore } from '../../stores/data'
 import { useTabsStore, type AppTab } from '../../stores/tabs'
 import { useToastsStore } from '../../stores/toasts'
@@ -115,8 +121,18 @@ function gridSpec(layout: PaneLayout, count: number): GridSpec {
 /** Render các pane của 1 tab terminal dạng lưới + thanh công cụ pane (split, broadcast, log). */
 export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean }) {
   const t = useT()
-  const { tabs, setActivePane, closePane, toggleBroadcast, mergeTabs, mergeTabsSelected, unmergeTab, movePane, setMainPane } =
-    useTabsStore()
+  const {
+    tabs,
+    setActivePane,
+    closePane,
+    toggleBroadcast,
+    mergeTabs,
+    mergeTabsSelected,
+    unmergeTab,
+    movePane,
+    setMainPane,
+    swapPanes
+  } = useTabsStore()
   // Màu group (production đỏ…) — sọc màu trên header pane theo host của pane
   const hosts = useDataStore((s) => s.hosts)
   const groups = useDataStore((s) => s.groups)
@@ -136,6 +152,9 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
   // Menu ⋮ trên header pane (đổi vị trí / đặt làm chính) — fixed theo toạ độ nút để không bị
   // frame mac (overflow-hidden) cắt mất; lưu id pane + vị trí neo menu
   const [paneMenu, setPaneMenu] = useState<{ id: string; x: number; y: number } | null>(null)
+  // Kéo-thả đổi chỗ pane: id pane đang kéo + id pane sẽ nhận
+  const [dragPaneId, setDragPaneId] = useState<string | null>(null)
+  const [dropPaneId, setDropPaneId] = useState<string | null>(null)
   const splitRef = useRef<HTMLDivElement>(null)
   const count = tab.panes.length
   const spec = gridSpec(paneLayout, count)
@@ -153,6 +172,14 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
     e.stopPropagation()
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
     setPaneMenu((cur) => (cur?.id === paneId ? null : { id: paneId, x: r.right, y: r.bottom }))
+  }
+  const endPaneDrag = (): void => {
+    setDragPaneId(null)
+    setDropPaneId(null)
+  }
+  const dropPane = (targetId: string): void => {
+    if (dragPaneId && dragPaneId !== targetId) swapPanes(tab.id, dragPaneId, targetId)
+    endPaneDrag()
   }
   const activeLogging = activePane ? logging.has(activePane.sessionId) : false
   const activeRecording = activePane ? recording.has(activePane.sessionId) : false
@@ -445,20 +472,56 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
           const isActive = pane.id === tab.activePaneId
           // Màu group (production đỏ…) — sọc trái trên header pane khi split nhiều host
           const color = hostColor(paneHostId(pane), hosts, groups)
+          const isDropTarget = dropPaneId === pane.id && dragPaneId !== null && dragPaneId !== pane.id
+          /**
+           * Chỉ HEADER kéo được, không phải cả pane: thân pane là xterm, cho `draggable` ở đó là
+           * mất luôn khả năng bôi đen chọn chữ trong terminal.
+           */
+          const dragHandle = {
+            draggable: true,
+            title: t('tabs.paneDragTip'),
+            onDragStart: (e: ReactDragEvent) => {
+              setDragPaneId(pane.id)
+              e.dataTransfer.effectAllowed = 'move'
+              e.dataTransfer.setData('text/plain', pane.id)
+            },
+            // Thả ra ngoài lưới / bấm Esc giữa chừng thì `drop` không chạy — thiếu dọn ở đây là
+            // viền đích kẹt lại trên màn hình
+            onDragEnd: endPaneDrag
+          }
           return (
             <div
               key={pane.id}
               style={spec.place(i)}
               className={`relative flex min-h-0 min-w-0 flex-col ${hasBackground ? '' : 'bg-app'} ${
                 multi && paneFrame === 'mac' ? 'overflow-hidden rounded-lg' : ''
-              } ${multi && isActive ? 'ring-accent/70 ring-1 ring-inset' : ''}`}
+              } ${
+                isDropTarget
+                  ? 'ring-accent ring-2 ring-inset'
+                  : multi && isActive
+                    ? 'ring-accent/70 ring-1 ring-inset'
+                    : ''
+              }`}
               onMouseDownCapture={() => setActivePane(tab.id, pane.id)}
+              // Thả được vào BẤT KỲ chỗ nào của pane đích (kể cả thân terminal) — đích to thì
+              // không phải ngắm vào dải header cao 20px
+              onDragOver={(e) => {
+                if (!dragPaneId || dragPaneId === pane.id) return
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                setDropPaneId((prev) => (prev === pane.id ? prev : pane.id))
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                dropPane(pane.id)
+              }}
             >
               {multi && paneFrame === 'bar' && (
                 <div
-                  className={`flex h-5 shrink-0 items-center gap-1.5 px-2 text-[10px] ${
+                  {...dragHandle}
+                  className={`flex h-5 shrink-0 cursor-grab items-center gap-1.5 px-2 text-[10px] active:cursor-grabbing ${
                     isActive ? 'bg-hover text-content' : 'bg-panel text-subtle'
-                  }`}
+                  } ${dragPaneId === pane.id ? 'opacity-50' : ''}`}
                   style={color ? { boxShadow: `inset 3px 0 0 ${color}` } : undefined}
                 >
                   <span className={`size-1.5 shrink-0 rounded-full ${statusDot(pane.status)}`} />
@@ -486,9 +549,10 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
               )}
               {multi && paneFrame === 'mac' && (
                 <div
-                  className={`flex h-5 shrink-0 items-center gap-2 px-2 text-[10px] ${
+                  {...dragHandle}
+                  className={`flex h-5 shrink-0 cursor-grab items-center gap-2 px-2 text-[10px] active:cursor-grabbing ${
                     isActive ? 'bg-hover text-content' : 'bg-panel text-subtle'
-                  }`}
+                  } ${dragPaneId === pane.id ? 'opacity-50' : ''}`}
                   style={color ? { boxShadow: `inset 0 2px 0 ${color}` } : undefined}
                 >
                   {/* Nút đóng kiểu macOS: chấm tròn đỏ, hover hiện ✕ */}
@@ -517,7 +581,7 @@ export function TerminalTabView({ tab, active }: { tab: AppTab; active: boolean 
                 </div>
               )}
               <div className="min-h-0 flex-1">
-                <TerminalPane tabId={tab.id} pane={pane} paneActive={isActive} tabVisible={active} />
+                <TerminalPane tabId={tab.id} pane={pane} paneActive={isActive} tabVisible={active} slot={i} />
               </div>
             </div>
           )

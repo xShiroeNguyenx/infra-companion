@@ -147,6 +147,11 @@ export const IPC = {
   REPL_SET_SETTINGS: 'repl:set-settings',
   REPL_COMPARE: 'repl:compare',
   REPL_CHECKSUM: 'repl:checksum',
+  // F59 — lịch sử các lần so lệch (để đối chiếu khi vá dữ liệu qua nhiều ngày)
+  REPL_HISTORY_LIST: 'repl:history-list',
+  REPL_HISTORY_GET: 'repl:history-get',
+  REPL_HISTORY_DELETE: 'repl:history-delete',
+  REPL_HISTORY_CLEAR: 'repl:history-clear',
 
   AI_GET_CONFIG: 'ai:get-config',
   AI_SET_CONFIG: 'ai:set-config',

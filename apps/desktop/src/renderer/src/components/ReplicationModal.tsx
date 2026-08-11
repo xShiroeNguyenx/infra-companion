@@ -5,6 +5,7 @@ import { errorMessage, useToastsStore } from '../stores/toasts'
 import { Button, ConfirmModal, ModalOrPanel, Select } from './ui'
 import { OpenInTabButton } from './OpenInTabButton'
 import { ReplicationCompareView } from './ReplicationCompareView'
+import { ReplicationHistoryView } from './ReplicationHistoryView'
 import { ReplicationPairEditor } from './ReplicationPairEditor'
 import { ReplicationSettingsModal } from './ReplicationSettingsModal'
 import { useT } from '../i18n'
@@ -33,7 +34,7 @@ export function ReplicationModal({ onClose, embedded }: { onClose?: () => void; 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [testing, setTesting] = useState(false)
-  const [view, setView] = useState<'status' | 'compare'>('status')
+  const [view, setView] = useState<'status' | 'compare' | 'history'>('status')
 
   useEffect(() => {
     if (!loaded) void loadPairs()
@@ -131,13 +132,13 @@ export function ReplicationModal({ onClose, embedded }: { onClose?: () => void; 
 
         {pair && (
           <div className="border-edge-strong mb-3 flex w-fit overflow-hidden rounded border text-xs">
-            {(['status', 'compare'] as const).map((k) => (
+            {(['status', 'compare', 'history'] as const).map((k) => (
               <button
                 key={k}
                 className={`px-3 py-1 ${view === k ? 'bg-accent-soft/60 text-accent-fg' : 'text-muted hover:bg-hover'}`}
                 onClick={() => setView(k)}
               >
-                {k === 'status' ? t('repl.view.status') : t('repl.view.compare')}
+                {t(`repl.view.${k}` as const)}
               </button>
             ))}
           </div>
@@ -185,6 +186,10 @@ export function ReplicationModal({ onClose, embedded }: { onClose?: () => void; 
             )}
             <ReplicationCompareView key={compareId} pairId={pair.id} replicaId={compareId} />
           </>
+        )}
+
+        {pair && view === 'history' && (
+          <ReplicationHistoryView key={pair.id} pairId={pair.id} pairName={pair.name} />
         )}
 
         <p className="text-subtle mt-3 text-[10px] leading-relaxed">{t('repl.footNote')}</p>

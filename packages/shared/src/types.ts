@@ -504,6 +504,55 @@ export interface ReplChecksumRowDto {
   error?: string
 }
 
+// --- Lịch sử so lệch (F59) ---
+
+/** `scan` = quét nhanh information_schema · `count` = COUNT(*) · `checksum` = CHECKSUM TABLE. */
+export type ReplRunKind = 'scan' | 'count' | 'checksum'
+
+/**
+ * Một lần so lệch ĐÃ LƯU. Phần metadata nằm ở cột thường (danh sách hiện được ngay), chi tiết
+ * nằm trong payload mã hoá và chỉ đọc khi user bung dòng đó ra.
+ *
+ * Nhãn cụm/slave/master lưu SAO CHÉP tại thời điểm chạy: cụm bị xoá hay đổi tên thì bản ghi cũ
+ * vẫn nói đúng lúc đó nó so cái gì với cái gì.
+ */
+export interface ReplRunDto {
+  id: string
+  /** Cụm lúc chạy — có thể đã bị xoá, nên KHÔNG có FK. */
+  pairId: string
+  pairName: string
+  replicaId: string
+  replicaLabel: string
+  /** Rỗng = cụm chỉ theo dõi slave, không khai master. */
+  masterLabel: string
+  kind: ReplRunKind
+  /** Bảng lệch, không tính bảng ngoài phạm vi replication. */
+  tableDiffs: number
+  columnDiffs: number
+  indexDiffs: number
+  /** Không tính các biến vốn phải khác nhau (server_id, read_only…). */
+  varDiffs: number
+  /** Số bảng đã đếm/checksum (kind ≠ 'scan'). */
+  checked: number
+  /** Số bảng lệch thật trong lần đếm/checksum đó. */
+  mismatches: number
+  createdAt: number
+}
+
+export interface ReplRunDetailDto extends ReplRunDto {
+  /** CHỈ chứa mục lệch — bảng khớp không được lưu, để vault không phình sau mỗi lần quét. */
+  tables: ReplTableDiffDto[]
+  columns: ReplSchemaDiffDto[]
+  indexes: ReplSchemaDiffDto[]
+  variables: ReplVarDiffDto[]
+  rows: ReplChecksumRowDto[]
+  hasFilters: boolean
+  /** Kết quả vượt trần nên đã cắt bớt — hiện thẳng, đừng để tưởng danh sách là đầy đủ. */
+  truncated: boolean
+  /** Vault đang khoá → không giải mã được chi tiết (metadata vẫn đúng). */
+  locked?: boolean
+}
+
 export type ReplAlertMetricDto = 'lag' | 'applyGap' | 'threads' | 'error' | 'writable' | 'probe'
 
 export interface ReplThresholdsDto {
@@ -1634,6 +1683,16 @@ export interface InfraApi {
       mode: 'count' | 'checksum',
       replicaId?: string
     ): Promise<ReplChecksumRowDto[]>
+    /**
+     * Lịch sử so lệch — mỗi lần quét/đếm/checksum được lưu tự động. Thiếu `pairId` = mọi cụm
+     * (kể cả cụm đã bị xoá: bản ghi giữ lại nhãn tại thời điểm chạy).
+     */
+    historyList(pairId?: string): Promise<ReplRunDto[]>
+    /** Chi tiết một bản ghi — payload chỉ được giải mã khi user thật sự mở ra xem. */
+    historyGet(id: string): Promise<ReplRunDetailDto | null>
+    historyDelete(id: string): Promise<void>
+    /** Xoá lịch sử; thiếu `pairId` = xoá sạch. Trả về số bản ghi đã xoá. */
+    historyClear(pairId?: string): Promise<number>
   }
   /**
    * Local dev stack — chạy trên MÁY LOCAL, không SSH. App tự tải runtime (PHP/MariaDB/Nginx)

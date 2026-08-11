@@ -65,10 +65,20 @@ function statusDotClass(tab: AppTab, ldDot: LdStackDot): string {
   return 'bg-warning animate-pulse'
 }
 
+/** Vị trí sẽ chèn khi thả: ngay trước hoặc ngay sau tab `id`. */
+interface DropAt {
+  id: string
+  side: 'before' | 'after'
+}
+
+/** Bề rộng vùng mép thanh tab kích hoạt tự cuộn khi kéo, và số px cuộn mỗi nhịp. */
+const EDGE_ZONE_PX = 48
+const EDGE_SCROLL_PX = 24
+
 /** Thanh tab trên cùng: danh sách tab + nút snippet ⚡ + nút mở tab local mới. */
 export function TabsBar() {
   const t = useT()
-  const { tabs, activeId, openLocal, showDashboard, closeTab, setActive } = useTabsStore()
+  const { tabs, activeId, openLocal, showDashboard, closeTab, setActive, moveTab } = useTabsStore()
   const snippets = useDataStore((s) => s.snippets)
   // Chấm của tab localdev phản ánh stack thật (chạy/một phần/chết) — lấy từ store dùng chung
   const ldDot = useLocaldevStore(stackDot)
@@ -81,6 +91,29 @@ export function TabsBar() {
   const [shells, setShells] = useState<ShellProfile[]>([])
   const menuRef = useRef<HTMLDivElement>(null)
   const snippetMenuRef = useRef<HTMLDivElement>(null)
+  // Kéo-thả sắp xếp tab
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dropAt, setDropAt] = useState<DropAt | null>(null)
+  const stripRef = useRef<HTMLDivElement>(null)
+
+  const endDrag = (): void => {
+    setDragId(null)
+    setDropAt(null)
+  }
+
+  /** Kéo tới sát mép thanh tab thì tự cuộn — nhiều tab thì đích đến đang nằm ngoài màn hình. */
+  const autoScroll = (clientX: number): void => {
+    const el = stripRef.current
+    if (!el || el.scrollWidth <= el.clientWidth) return
+    const rect = el.getBoundingClientRect()
+    if (clientX < rect.left + EDGE_ZONE_PX) el.scrollLeft -= EDGE_SCROLL_PX
+    else if (clientX > rect.right - EDGE_ZONE_PX) el.scrollLeft += EDGE_SCROLL_PX
+  }
+
+  const drop = (): void => {
+    if (dragId && dropAt) moveTab(dragId, dropAt.id, dropAt.side)
+    endDrag()
+  }
 
   useEffect(() => {
     if (!snippetMenuOpen) return
@@ -123,25 +156,73 @@ export function TabsBar() {
           🏠
         </button>
       </div>
-      <div className="flex flex-1 items-stretch gap-px overflow-x-auto">
+      <div
+        ref={stripRef}
+        className="flex flex-1 items-stretch gap-px overflow-x-auto"
+        // Vùng TRỐNG cuối thanh: thả ở đây = đưa tab về cuối. Tab tự xử lý phần của nó nên chỉ
+        // nhận khi event phát ra từ đúng container (target === currentTarget).
+        onDragOver={(e) => {
+          if (!dragId) return
+          e.preventDefault()
+          autoScroll(e.clientX)
+          if (e.target !== e.currentTarget) return
+          const last = tabs[tabs.length - 1]
+          if (last && last.id !== dragId) setDropAt({ id: last.id, side: 'after' })
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          drop()
+        }}
+      >
         {tabs.map((tab) => {
           const color = tabColor(tab, hosts, groups)
+          const marker =
+            dropAt?.id === tab.id
+              ? `inset ${dropAt.side === 'before' ? '2px' : '-2px'} 0 0 var(--c-accent)`
+              : null
+          // Sọc màu group trên đầu tab (nhận diện production/staging) + vạch chỉ chỗ sắp thả.
+          // Cả hai dùng inset shadow chứ KHÔNG dùng border: border làm tab rộng thêm 2px nên
+          // cả thanh giật mỗi lần vạch nhảy sang tab khác.
+          const shadow = [color ? `inset 0 2px 0 ${color}` : null, marker].filter(Boolean).join(', ')
           return (
           <div
             key={tab.id}
             role="tab"
             aria-selected={tab.id === activeId}
+            draggable
             className={`group flex max-w-52 min-w-28 cursor-pointer items-center gap-2 rounded-t px-3 text-xs ${
               tab.id === activeId
                 ? 'bg-app text-content'
                 : 'text-muted hover:bg-hover hover:text-content'
-            }`}
-            // Sọc màu group trên đầu tab — nhận diện production/staging thoáng qua
-            style={color ? { boxShadow: `inset 0 2px 0 ${color}` } : undefined}
+            } ${dragId === tab.id ? 'opacity-40' : ''}`}
+            style={shadow ? { boxShadow: shadow } : undefined}
             onClick={() => setActive(tab.id)}
             onAuxClick={(e) => {
               if (e.button === 1) closeTab(tab.id) // middle click đóng tab
             }}
+            onDragStart={(e) => {
+              setDragId(tab.id)
+              e.dataTransfer.effectAllowed = 'move'
+              // Không có payload thì một số engine bỏ qua luôn chuỗi dragover; giá trị không dùng tới
+              e.dataTransfer.setData('text/plain', tab.id)
+            }}
+            onDragOver={(e) => {
+              if (!dragId || dragId === tab.id) return
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+              // Nửa trái = chèn trước, nửa phải = chèn sau → thả được vào cả hai đầu danh sách
+              const rect = e.currentTarget.getBoundingClientRect()
+              const side = e.clientX < rect.left + rect.width / 2 ? 'before' : 'after'
+              setDropAt((prev) => (prev?.id === tab.id && prev.side === side ? prev : { id: tab.id, side }))
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              drop()
+            }}
+            // Thả ra ngoài thanh tab / bấm Esc giữa chừng: dragend LUÔN chạy, nếu không dọn ở đây
+            // thì tab kéo dở kẹt mờ và vạch chỉ chỗ nằm lại trên màn hình
+            onDragEnd={endDrag}
             title={tabSubtitle(tab) ?? tabTitle(tab)}
           >
             <span className={`size-1.5 shrink-0 rounded-full ${statusDotClass(tab, ldDot)}`} />

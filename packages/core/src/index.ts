@@ -166,6 +166,8 @@ export type {
   TableInfo,
   VarDiff
 } from './replication/compare'
+export { RUN_ENTRY_CAP, buildChecksumRun, buildScanRun, isChecksumMismatch, runHasFindings } from './replication/history'
+export type { ReplRunBuild, ReplRunCounts, ReplRunPayload } from './replication/history'
 export { AiService } from './ai/AiService'
 export type { AiProvider, AiRuntimeConfig, AiAskRequest, AiAskResult, AiMode } from './ai/AiService'
 export { isReadOnlyCommand } from './ai/readonlyGuard'
@@ -179,6 +181,7 @@ export type {
   KnownHostRecord,
   ReplCreds,
   ReplCredentialsResolved,
+  ReplRunSaveInput,
   ResolvedConnection,
   ResolvedEndpoint,
   SyncSnapshot

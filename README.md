@@ -122,6 +122,7 @@
 - **Or point it at a saved tunnel** — for the common case where MySQL isn't on the SSH host but on another machine inside the network (`10.20.30.40:3306`). The app starts the tunnel if needed and connects to its local end, reusing the exact route the tunnel already worked out (including the one that must go through `nc` on the innermost machine, where a plain `direct-tcpip` from the gate silently reaches the wrong network)
 - **Background alerts that survive the vault locking** — threads stopped, error code, slave accepting writes, lag or apply-backlog over threshold; same hysteresis as resource monitoring, delivered as toast + notification + webhook
 - **Data drift, not just status** — replication can say `Yes/Yes/0s` while the data has quietly diverged. Compare table lists, columns, indexes and the configuration variables that matter, then run an exact `COUNT(*)` or `CHECKSUM TABLE` on the tables you pick
+- **Every drift check is kept** — repairing drifted data spans days, so each scan is saved automatically with its date, which slave it ran against, and what differed. Open any record to see that run's full list, compare it with today's, and delete records one by one or all at once when you're done
 - Works with MariaDB and MySQL **including 8.4**, where `SHOW SLAVE STATUS` no longer exists
 
 ### Network Toolbox
@@ -216,7 +217,7 @@ pnpm test         # unit tests (crypto, sync-merge, ssh_config parser)
 
 ```bash
 pnpm test
-# 1073 tests; on Node 20 the node:sqlite suites (vault-merge, replication clusters, local-dev
+# 1091 tests; on Node 20 the node:sqlite suites (vault-merge, replication clusters, local-dev
 # store) are skipped — they need Node ≥ 22.5.
 # To run those too, use Electron's bundled Node 24 runtime:
 $env:ELECTRON_RUN_AS_NODE='1'

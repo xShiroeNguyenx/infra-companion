@@ -82,6 +82,8 @@ interface TerminalPaneProps {
   paneActive: boolean
   /** Tab chứa pane có đang hiển thị không (để fit khi chuyển tab). */
   tabVisible: boolean
+  /** Vị trí ô của pane trong lưới split — đổi khi user kéo-thả đổi chỗ pane. */
+  slot: number
 }
 
 /**
@@ -103,7 +105,7 @@ function repaintGlyphs(term: Terminal | null, webgl: WebglAddon | null): void {
  * Một instance xterm.js gắn với một phiên terminal trong 1 pane.
  * Khi tab bật broadcast: phím gõ ở pane này được gửi tới MỌI pane trong tab.
  */
-export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPaneProps) {
+export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: TerminalPaneProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
@@ -485,6 +487,16 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible }: TerminalPa
     const frame = requestAnimationFrame(() => repaintGlyphs(termRef.current, webglRef.current))
     return () => cancelAnimationFrame(frame)
   }, [tabVisible])
+
+  // Đổi chỗ pane (kéo-thả trong lưới split) làm React MOVE node DOM sang vị trí khác — canvas rời
+  // DOM trong khoảnh khắc nên Chromium được phép thả drawing buffer, mà hai ô đổi chỗ thường CÙNG
+  // kích thước → fit() là no-op và không có gì vẽ lại. Đúng cơ chế đã gây lỗi chữ méo khi chuyển
+  // tab, nên xử lý y hệt: đổi `slot` là vẽ lại.
+  useEffect(() => {
+    if (!tabVisible) return
+    const frame = requestAnimationFrame(() => repaintGlyphs(termRef.current, webglRef.current))
+    return () => cancelAnimationFrame(frame)
+  }, [slot, tabVisible])
 
   // Đổi devicePixelRatio (kéo cửa sổ sang màn hình scale khác, đổi scale trong Windows) cũng làm
   // atlas được cấp phát lại → cùng lỗi glyph méo. Query matchMedia ghim đúng một giá trị dppx nên
