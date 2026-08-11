@@ -13,6 +13,24 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+
+      # electron-builder chỉ upload vào release tên `v${version}` và chỉ publish khi tag khớp
+      # version đã build. Lệch nhau thì nó BỎ QUA bước publish mà KHÔNG báo lỗi — job vẫn xanh,
+      # release vẫn được tạo, chỉ là rỗng không có installer. Đã dính đúng ca này ở v0.2.5
+      # (tag v0.2.5 nhưng 2 package.json còn 0.2.4). Chặn ngay ở đây, TRƯỚC khi tạo release,
+      # để không đẻ ra một release rỗng đè mất "Latest" và làm hỏng auto-update của bản đang chạy.
+      - name: Tag phải khớp version trong package.json
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          root=$(node -p "require('./package.json').version")
+          app=$(node -p "require('./apps/desktop/package.json').version")
+          echo "tag=$tag · root=$root · apps/desktop=$app"
+          if [ "$tag" != "$root" ] || [ "$tag" != "$app" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} không khớp version (root=$root, apps/desktop=$app). Bump CẢ HAI package.json rồi tag lại — nếu không electron-builder sẽ bỏ qua publish và release ra rỗng."
+            exit 1
+          fi
+
       - name: Create GitHub Release
         run: |
           gh release create "${{ github.ref_name }}" \

@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, **a self-managed local PHP/WordPress dev stack**, and more.
 
-**Current release: v0.2.4 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.2.5 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -304,7 +304,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.2.4)
+## Known Limitations (v0.2.5)
 
 - **Local dev stack is Windows-only** for now (OS-specific work is isolated behind a single adapter, so other platforms are a matter of writing one). `.test` domains and local HTTPS are **not wired up yet** — mkcert installs and lands on `PATH`, but issuing/trusting a certificate is still a manual `mkcert -install`. There is no WordPress downloader (point it at a folder you already have), and no local↔server deploy or public-share link yet. phpMyAdmin 5.2 does not support PHP 8.4, so the app serves it with PHP 8.3 when both are installed
 - **Domain → server mapping needs a Chromium browser** (Chrome/Edge/Brave/Vivaldi); Firefox has no equivalent flag, and the override has no effect when the machine routes through a system proxy (the proxy resolves DNS itself). Non-browser clients (Postman, MySQL clients) aren't covered — use a tunnel or the `curl --resolve` command instead

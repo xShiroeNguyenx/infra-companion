@@ -43,7 +43,8 @@
 > | v0.2.2 | ✅ **ĐÃ commit `5711b68` + tag `v0.2.2` đã push.** Nội dung = F55 theo dõi bất đồng bộ master↔slave + chuẩn hoá địa chỉ/tên mẫu |
 > | v0.2.3 | ✅ **ĐÃ commit `2e0efe8` + tag `v0.2.3` đã push origin** (2026-08-06). **Tag trước khi test GUI** → checklist ở block `v0.2.3` vẫn nên chạy; lỗi gì thì ra bản sau chứ KHÔNG đè tag |
 > | v0.2.4 | ✅ **ĐÃ commit `465e6cd` + tag `v0.2.4` đã push origin.** (Dòng dưới là mô tả lúc chuẩn bị release, giữ nguyên làm hồ sơ) |
-> | **v0.2.5** | 🟡 **SẴN SÀNG RELEASE — chưa bump version, chưa commit/tag, CHƯA TEST GUI.** = **F59 lịch sử so lệch replication** (tab Lịch sử + tự lưu mỗi lần quét/đếm/checksum + xoá từng bản/xoá tất cả) + **F60 kéo-thả sắp xếp tab** + **F61 kéo-thả đổi chỗ pane khi Split ON** + **nhãn tên dưới icon ở lưới công cụ Dashboard**. Docs: CHANGELOG `[0.2.5]` + USER-GUIDE §11C "Drift history" + §5 (2 dòng Reorder tabs / Rearrange panes). Cổng chất lượng: typecheck 3 package · **1091 test xanh (56 file)** · build sạch. **CHƯA bump 2 package.json (đang 0.2.4)** |
+> | **v0.2.5** | 🔴 **ĐÃ TAG (`671abee`) NHƯNG RELEASE RỖNG — không có installer nào.** Tag push khi 2 `package.json` còn `0.2.4` → electron-builder bỏ qua publish, job vẫn xanh. Xem khối "TAG MÀ QUÊN BUMP VERSION" ở phần Git. Đã bump lên `0.2.5` + thêm guard vào `release.yml`; còn phải xoá release rỗng, commit, dời tag. Mô tả nội dung cũ bên dưới: |
+> | ~~v0.2.5 (mô tả cũ)~~ | 🟡 **SẴN SÀNG RELEASE — chưa bump version, chưa commit/tag, CHƯA TEST GUI.** = **F59 lịch sử so lệch replication** (tab Lịch sử + tự lưu mỗi lần quét/đếm/checksum + xoá từng bản/xoá tất cả) + **F60 kéo-thả sắp xếp tab** + **F61 kéo-thả đổi chỗ pane khi Split ON** + **nhãn tên dưới icon ở lưới công cụ Dashboard**. Docs: CHANGELOG `[0.2.5]` + USER-GUIDE §11C "Drift history" + §5 (2 dòng Reorder tabs / Rearrange panes). Cổng chất lượng: typecheck 3 package · **1091 test xanh (56 file)** · build sạch. **CHƯA bump 2 package.json (đang 0.2.4)** |
 > | ~~v0.2.4 (mô tả cũ)~~ | 🟡 **SẴN SÀNG RELEASE — chưa commit/tag, CHƯA TEST GUI.** = **F57 dropdown chọn font terminal + thêm font từ file** + **F58 Dashboard: lưới 20 icon công cụ 2 hàng · nới `max-w-3xl`→`1600px` · kết nối nhanh lên hàng header · nhóm host thành card · 4 mục cuối chia 2 cột bên trong**. Docs đủ: 2 package.json + CHANGELOG `[0.2.4]` (Added ×6 · Changed ×1) + README (badge, bullet Dashboard, bullet Font picker, Known Limitations v0.2.4, test-count **1073**) + ROADMAP **F57 + F58** ✅ + USER-GUIDE §1B + §5B + landing (hero + 2 card mới 🅰️/🏠, bỏ tag NEW của card 🔁). **Cổng chất lượng đã chạy đủ: typecheck 3 package · 1073 test xanh (54 file) · build sạch · `0.2.4` trong bundle và không còn `0.2.3` · soát IP public 0 dòng** |
 >
 > **F61 kéo-thả đổi chỗ pane khi Split ON (2026-08-11)** — `stores/tabs.ts` action `swapPanes(tabId, aId, bId)` + `TerminalTabView.tsx` + prop `slot` cho `TerminalPane.tsx`.
@@ -316,6 +317,74 @@ Review toàn bộ codebase (4 agent song song + đọc tay phần lõi), tìm ~3
 Quy trình release (cho lần sau): bump version 2 `package.json` (gốc + `apps/desktop`) + CHANGELOG + README/USER-GUIDE/landing/handoff, rồi push tag `v*.*.*` — release tự kích hoạt (xem `.github/workflows/release.yml`: tạo GitHub Release rồi build song song Win/macOS/Linux). Lưu ý: đổi `docs/landing/index.html` (version trên hero) sẽ tự deploy lại landing page qua flow Pages riêng khi push lên `main`.
 
 **Landing page = flow ĐỘC LẬP** (`.github/workflows/pages.yml`, deploy `docs/landing/`): tự chạy khi **push thay đổi `docs/landing/**` lên `main`** (hoặc chạy tay workflow_dispatch) — **KHÔNG gắn tag/release → không build lại app**. `ci.yml` đã thêm `paths-ignore: docs/** + **/*.md` để push chỉ-docs không kích hoạt build 3-OS. **Setting 1 lần**: repo → Settings → Pages → Source = **GitHub Actions**. URL: `https://xshiroenguyenx.github.io/infra-companion/`. Link User guide/Changelog/Roadmap trong landing trỏ GitHub blob/main (không tương đối) để hoạt động khi publish.
+
+> ## ⚠️ TAG MÀ QUÊN BUMP VERSION = RELEASE RỖNG (dính thật ở v0.2.5, 2026-08-11)
+>
+> Tag `v0.2.5` được push khi **cả hai `package.json` vẫn còn `0.2.4`**. Kết quả: workflow **XANH HẾT**
+> (create-release ✅, build 3 OS ✅, "Success" 3m38s) nhưng release `v0.2.5` **không có một file installer nào**
+> — chỉ có 2 mục "Source code" GitHub tự đính kèm.
+>
+> **Vì sao**: `pnpm dist` chạy `electron-builder` không kèm `--publish`. electron-builder upload vào release
+> tên `v${version}` và chỉ publish khi **tag CI khớp version đã build**. Tag `v0.2.5` ≠ version `0.2.4`
+> → nó **bỏ qua bước publish**, chỉ ghi một dòng log, **không fail job**. Đúng loại "API im lặng": xanh mà không
+> hoạt động. Đã kiểm chứng bằng API GitHub: `v0.2.5` có 0 asset, và asset của `v0.2.4` **không bị đè**
+> (timestamp vẫn là 06/08) — tức là nó không upload nhầm sang đâu cả, mà không upload gì hết.
+>
+> **Hậu quả phải biết**: release rỗng đó chiếm nhãn **Latest**, mà electron-updater lấy release mới nhất rồi
+> tải `latest.yml` trong đó → **auto-update của mọi bản đang cài bị hỏng** cho tới khi xoá release rỗng
+> hoặc nạp đủ asset vào nó.
+>
+> **Đã chặn**: `release.yml` thêm step **"Tag phải khớp version trong package.json"** ngay đầu job
+> `create-release` — lệch là **đỏ ngay và KHÔNG tạo release**, thay vì đẻ ra một release rỗng.
+>
+> **Cách khắc phục khi đã lỡ** (không rewrite lịch sử, chỉ dời tag):
+> 1. Xoá release rỗng trên web (Releases → v0.2.5 → 🗑) — làm TRƯỚC để `v0.2.4` trả lại nhãn Latest và
+>    auto-update chạy lại ngay.
+> 2. Bump 2 `package.json`, commit, `git push origin main`.
+> 3. `git push origin :refs/tags/v0.2.5` + `git tag -d v0.2.5` rồi tag lại ở HEAD mới và push tag.
+
+```powershell
+# ============================================================
+# v0.2.5 — SUA RELEASE RONG + F60 KEO-THA SAP XEP TAB + F61 KEO-THA DOI CHO PANE
+# Tag v0.2.5 da push khi 2 package.json con 0.2.4 -> release v0.2.5 RONG (0 installer).
+# Da bump 2 package.json len 0.2.5 + them guard tag/version vao release.yml.
+# ============================================================
+cd d:\NGUYENKHANH\GLOBAL_WORKSPACE\infra-companion
+
+# --- BUOC 0: xoa release RONG tren web TRUOC ---
+#   github.com/xShiroeNguyenx/infra-companion/releases -> v0.2.5 -> nut thung rac
+#   (may nay khong co gh CLI). Xoa xong v0.2.4 tro lai la "Latest" -> auto-update het loi ngay.
+
+# --- BUOC 1: commit + push main ---
+git status
+git add -A                 # file MOI phien nay: packages/core/src/replication/history.ts (+test)
+                           #   packages/core/src/vault/replRuns.test.ts
+                           #   renderer/src/components/ReplicationHistoryView.tsx
+                           #   renderer/src/components/ReplicationCompareTables.tsx
+git commit -m @'
+fix: publish the installers again — the release workflow now refuses a tag whose version does not match package.json, which is why v0.2.5 shipped with no binaries + drag a tab along the bar to reorder it, and drag a pane by its title bar onto another pane to swap the two (v0.2.5)
+'@
+git push origin main
+
+# --- BUOC 2: doi tag v0.2.5 sang commit moi (KHONG rewrite lich su, chi dich tag) ---
+git push origin :refs/tags/v0.2.5    # xoa tag tren remote
+git tag -d v0.2.5                    # xoa tag local
+git tag v0.2.5                       # tag lai o HEAD moi
+git push origin v0.2.5               # CI chay lai: guard phai XANH, roi build + upload installer
+
+# --- BUOC 3: kiem release sau ~4 phut ---
+#   Releases -> v0.2.5 phai co DU: InfraCompanion-Setup-0.2.5.exe (+ .blockmap), latest.yml,
+#   InfraCompanion-0.2.5.dmg (+ .blockmap), latest-mac.yml, InfraCompanion-0.2.5.AppImage,
+#   latest-linux.yml. Thieu latest.yml = auto-update Windows van hong.
+
+# --- Kiem tra GUI cua F60/F61 (chua lam) ---
+#   - Keo tab doc thanh tab: vach accent hien dung cho se roi vao; tha xong KHONG doi tab dang xem
+#   - Nhieu tab tran ngang: keo sat mep -> thanh tab tu cuon
+#   - Split ON: keo THANH TIEU DE cua pane tha len pane khac -> hai pane doi cho
+#       -> chu trong terminal KHONG duoc meo sau khi doi cho (day la lo ngai chinh)
+#       -> boi den chon chu trong terminal van phai binh thuong
+#       -> layout Main left: tha pane phu len o lon -> no thanh o lon
+```
 
 ```powershell
 # ============================================================
