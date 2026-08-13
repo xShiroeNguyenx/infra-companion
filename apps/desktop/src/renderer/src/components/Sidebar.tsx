@@ -265,6 +265,11 @@ export function Sidebar() {
         <Button className="flex-1 !py-1 !text-xs" onClick={() => openAppModal('keys')}>
           {t('sidebar.keys')}
         </Button>
+        {/* Trợ giúp có nút riêng chứ không chỉ nằm trong ⋯: nó là thứ người ta tìm khi đang bí,
+            lúc đó bắt mở thêm một menu để tìm là sai. */}
+        <Button className="!px-2 !py-1 !text-xs" onClick={() => openAppModal('help')} title={t('help.title')}>
+          ⓘ
+        </Button>
         <div className="relative">
           <Button className="!px-2 !py-1 !text-xs" onClick={() => setMenuOpen((v) => !v)} title={t('sidebar.moreTools')}>
             ⋯
@@ -307,6 +312,7 @@ export function Sidebar() {
               )}
               <div className="border-edge my-1 border-t" />
               <MenuItem label={t('menu.settings')} onClick={() => { setMenuOpen(false); openAppModal('settings') }} />
+              <MenuItem label={t('menu.help')} onClick={() => { setMenuOpen(false); openAppModal('help') }} />
             </div>
           )}
         </div>

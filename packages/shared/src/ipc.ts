@@ -179,6 +179,9 @@ export const IPC = {
   UPDATE_PROGRESS: 'update:progress',
   UPDATE_DOWNLOADED: 'update:downloaded',
 
+  /** Trợ giúp → Gỡ rối: mở thư mục dữ liệu app. Main tự tính path, renderer KHÔNG truyền vào. */
+  HELP_OPEN_USER_DATA: 'help:open-user-data',
+
   PLUGINS_LIST: 'plugins:list',
   PLUGINS_SET_ENABLED: 'plugins:set-enabled',
   PLUGINS_RELOAD: 'plugins:reload',

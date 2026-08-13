@@ -1,6 +1,11 @@
 appId: com.nguyenkhanh.infracompanion
 productName: Infra Companion
 executableName: InfraCompanion
+# LegalCopyright trong version-info của .exe (Properties → Details) và NSHumanReadableCopyright trên
+# macOS. Khai tường minh vì giá trị mặc định lấy `new Date().getFullYear()` LÚC BUILD — năm sẽ tự
+# đổi theo đồng hồ máy build, mỗi bản một khác mà không ai chủ ý.
+# CompanyName thì không cần khai ở đây: nó lấy từ `author` trong package.json ("NguyenKhanh").
+copyright: Copyright © 2026 NguyenKhanh
 directories:
   output: release
   buildResources: build
@@ -26,6 +31,15 @@ publish:
 win:
   target:
     - nsis
+  # ⚠️ KHÔNG khai `signtoolOptions.publisherName` khi app CHƯA ký code.
+  # Trường đó không phải metadata hiển thị — nó là tên dùng để ĐỐI CHIẾU CHỮ KÝ: electron-builder
+  # ghi nó vào `app-update.yml` (PublishManager, chỉ khi `verifyUpdateCodeSignature !== false`), rồi
+  # electron-updater bắt bản .exe tải về phải có chữ ký khớp tên đó. Installer chưa ký ⇒ verify
+  # trượt ⇒ auto-update TỪ CHỐI cài, trong khi CI vẫn xanh và release vẫn đủ file.
+  # Khi nào có chứng chỉ thật thì bỏ comment cả khối này (và ký MỌI bản từ đó trở đi):
+  #
+  # signtoolOptions:
+  #   publisherName: <đúng CN trong chứng chỉ, không phải tên tự đặt>
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true

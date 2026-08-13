@@ -195,6 +195,8 @@ export { discoverPlugins } from './plugins/discover'
 export type { DiscoveredPlugin, InvalidPlugin, DiscoverResult } from './plugins/discover'
 export { pluginScopedPath } from './plugins/paths'
 export { validateRegistry, parseRegistry, semverGt } from './plugins/registry'
+// Trợ giúp / About: cắt mục CHANGELOG của version đang chạy (dùng lúc build, xem file để biết vì sao)
+export { extractChangelogSection } from './help/changelog'
 export type { RegistryFile, RegistryPluginEntry, RegistryResult } from './plugins/registry'
 export {
   pluginSigningPayload,

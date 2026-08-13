@@ -15,8 +15,16 @@ export function UpdateBanner() {
     const offAvailable = window.infra.update.onAvailable((version) =>
       setState({ phase: 'available', version })
     )
+    // Nhận cả khi banner còn ở 'available': lệnh tải có thể đến từ nơi khác (nút trong Trợ giúp),
+    // lúc đó banner phải chuyển sang hiện tiến trình chứ không đứng im ở nút "Tải về".
     const offProgress = window.infra.update.onProgress((percent) =>
-      setState((s) => s.phase === 'downloading' ? { ...s, percent } : s)
+      setState((s) =>
+        s.phase === 'downloading'
+          ? { ...s, percent }
+          : s.phase === 'available'
+            ? { phase: 'downloading', version: s.version, percent }
+            : s
+      )
     )
     const offDownloaded = window.infra.update.onDownloaded((version) =>
       setState({ phase: 'ready', version })

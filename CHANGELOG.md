@@ -5,6 +5,25 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.6] — 2026-08-13
+
+### Added
+
+- **A help centre** (`F1`, the version line in the status bar, the ⓘ button next to `⋯`, or `⋯` → ❓ Help). Until now the app said nothing about itself: the version was a line of dead text in the status bar, there was no way to ask whether a newer build existed, and nothing to hand someone when reporting a problem. Four tabs, one per question you actually arrive with.
+  - **About** — version, build date and commit, the Electron / Chromium / Node versions underneath, your OS and architecture, the **publisher**, and links to the source, the project page, the user guide and the licence. The publisher comes from the same field the installer uses for its own *Company name*, so the app and Windows can't end up naming two different people.
+  - **Check for updates now answers, in words, every time.** The button existed nowhere and the machinery behind it was silent by design: `electron-updater` fires an event when there *is* a new version and says nothing at all when there isn't, so a check that found nothing was indistinguishable from a check that broke. It now reports one of four things — *version X is available* (with a **Download** button, progress shown in the usual banner), *you're on the latest one*, *couldn't check, here is the error*, or *this is a dev build, there is no update metadata to compare against*.
+  - **Shortcuts** — the cheat sheet that used to live only on the Dashboard, now reachable from anywhere including inside a terminal (`Ctrl+/` opens straight to it). The four terminal shortcuts are rendered **from your current settings** rather than printed as constants, so the table stops lying the moment you rebind one. Both screens read the same list, so there is one copy to keep true instead of two.
+  - **What's new** — the changelog entry for the exact build you are running, embedded at build time so it needs no network, with a link to the full changelog.
+  - **Troubleshooting** — one click each to the app data folder, the session log folder and the recordings folder, a link to Issues, and **Copy system information** formatted to paste into a bug report. That text carries the app and OS versions and **nothing about your hosts** — no addresses, no usernames, no host names. Session logs are the opposite: they hold verbatim what your terminal displayed, and the screen says so, because that is the file people attach without rereading.
+
+### Changed
+
+- **The Dashboard shortcut list shows your real terminal shortcuts.** It used to print `Ctrl+Shift+C / V` and `Ctrl+F` as fixed text even after you had rebound them in Settings.
+- **The update banner picks up a download started elsewhere.** Starting the download from the help centre left the banner sitting on its own "Download" button while the file came down behind it; it now switches to the progress bar wherever the download was triggered from.
+- **The copyright line in the installer is fixed text instead of whatever year the build machine thinks it is.** Left unset, electron-builder stamps the *current* year at build time, so a rebuild in January would quietly relabel the same release.
+
+---
+
 ## [0.2.5] — 2026-08-11
 
 ### Added

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { StatusBar } from './components/StatusBar'
 import { TabsBar } from './components/TabsBar'
@@ -23,6 +23,7 @@ import { AiDiagnoseModal } from './components/AiDiagnoseModal'
 import { AiDiagnosePill } from './components/AiDiagnosePill'
 import { RecordingsModal } from './components/RecordingsModal'
 import { SettingsModal } from './components/SettingsModal'
+import { HelpModal, type HelpTab } from './components/HelpModal'
 import { WorkspacesModal } from './components/WorkspacesModal'
 import { PluginsModal } from './components/PluginsModal'
 import { PluginPanelModal } from './components/PluginPanelModal'
@@ -82,6 +83,8 @@ function formatAlertToast(a: import('@infra/shared').MonitorAlertDto): string {
 
 export default function App() {
   const t = useT()
+  // Thẻ mở sẵn của Trợ giúp: F1 vào Giới thiệu, Ctrl+/ nhảy thẳng bảng phím tắt
+  const [helpTab, setHelpTab] = useState<HelpTab>('about')
   const vaultState = useVaultStore((s) => s.state)
   const { tabs, activeId, openLocal } = useTabsStore()
   const toasts = useToastsStore((s) => s.toasts)
@@ -229,6 +232,22 @@ export default function App() {
         togglePalette()
         return
       }
+      // Trợ giúp: F1 (không có modifier nên phải xét TRƯỚC guard ctrlKey bên dưới)
+      if (event.code === 'F1') {
+        event.preventDefault()
+        event.stopPropagation()
+        setHelpTab('about')
+        setModal('help')
+        return
+      }
+      // Ctrl+/ — bảng phím tắt. code 'Slash' là phím vật lý, không lệ thuộc layout
+      if (event.ctrlKey && !event.shiftKey && event.code === 'Slash') {
+        event.preventDefault()
+        event.stopPropagation()
+        setHelpTab('shortcuts')
+        setModal('help')
+        return
+      }
       if (!event.ctrlKey) return
       const state = useTabsStore.getState()
       if (event.shiftKey && event.code === 'Tab') {
@@ -340,6 +359,29 @@ export default function App() {
     { id: 'open-settings', label: t('menu.settings'), run: () => setModal('settings') },
     { id: 'open-plugins', label: t('menu.plugins'), run: () => setModal('plugins') },
     { id: 'open-logs', label: t('menu.openLogs'), run: () => window.infra.terminal.openLogFolder() },
+    {
+      id: 'open-help',
+      label: t('menu.help'),
+      hint: 'F1',
+      run: () => {
+        setHelpTab('about')
+        setModal('help')
+      }
+    },
+    {
+      id: 'open-help-shortcuts',
+      label: `❓ ${t('help.tab.shortcuts')}`,
+      hint: 'Ctrl+/',
+      run: () => {
+        setHelpTab('shortcuts')
+        setModal('help')
+      }
+    },
+    {
+      id: 'open-help-tab',
+      label: `❓ ${t('help.title')} — ${t('tabs.openInTab')}`,
+      run: () => useTabsStore.getState().openToolTab('help')
+    },
     { id: 'toggle-sidebar', label: t('menu.toggleSidebar'), run: () => useUiStore.getState().toggleSidebar() },
     ...pluginCommands.map((c) => ({
       id: `plugin-${c.pluginId}-${c.commandId}`,
@@ -397,7 +439,8 @@ export default function App() {
                   tab.kind === 'processes' ||
                   tab.kind === 'services' ||
                   tab.kind === 'ai-diagnose' ||
-                  tab.kind === 'replication'
+                  tab.kind === 'replication' ||
+                  tab.kind === 'help'
                 ) {
                   return <ToolTabView key={tab.id} kind={tab.kind} active={tab.id === activeId} />
                 }
@@ -432,6 +475,7 @@ export default function App() {
       {modal === 'compare' && <CompareModal onClose={() => setModal(null)} />}
       {modal === 'hostmap' && <HostMapModal onClose={() => setModal(null)} />}
       {modal === 'localdev-settings' && <LocaldevSettingsModal onClose={() => setModal(null)} />}
+      {modal === 'help' && <HelpModal initialTab={helpTab} onClose={() => setModal(null)} />}
       {historyHostId && (
         <MetricsHistoryModal
           hostId={historyHostId}

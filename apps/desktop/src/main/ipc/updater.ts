@@ -1,7 +1,8 @@
 import { ipcMain, app } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import type { BrowserWindow } from 'electron'
-import { IPC } from '@infra/shared'
+import { semverGt } from '@infra/core'
+import { IPC, type UpdateCheckResultDto } from '@infra/shared'
 
 export function registerUpdaterIpc(win: BrowserWindow): void {
   // Không tự tải — hỏi người dùng trước
@@ -27,7 +28,30 @@ export function registerUpdaterIpc(win: BrowserWindow): void {
     console.error('[updater]', err.message)
   })
 
-  ipcMain.handle(IPC.UPDATE_CHECK, () => autoUpdater.checkForUpdates())
+  /**
+   * User tự bấm "Kiểm tra cập nhật" → phải trả lời được thành câu trong MỌI trường hợp.
+   *
+   * `checkForUpdates()` chỉ bắn sự kiện khi CÓ bản mới; không có thì im lặng tuyệt đối, nên nếu
+   * cứ trả `void` như trước thì bấm nút xong màn hình đứng im — user không phân biệt được "đã
+   * mới nhất" với "hỏng mà không ai báo". Ở đây tự so version và trả kết quả tường minh.
+   */
+  ipcMain.handle(IPC.UPDATE_CHECK, async (): Promise<UpdateCheckResultDto> => {
+    const current = app.getVersion()
+    // Bản dev không có metadata update (dev-app-update.yml) → checkForUpdates ném lỗi khó hiểu
+    if (!app.isPackaged) return { status: 'dev' }
+    try {
+      const result = await autoUpdater.checkForUpdates()
+      const remote = result?.updateInfo.version
+      if (!remote) return { status: 'latest', version: current }
+      return semverGt(remote, current)
+        ? { status: 'available', version: remote }
+        : { status: 'latest', version: current }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error('[updater] check failed:', message)
+      return { status: 'error', message }
+    }
+  })
   ipcMain.handle(IPC.UPDATE_DOWNLOAD, () => autoUpdater.downloadUpdate())
   ipcMain.on(IPC.UPDATE_INSTALL, () => {
     autoUpdater.quitAndInstall(false, true)

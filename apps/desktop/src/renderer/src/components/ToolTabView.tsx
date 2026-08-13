@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { AiDiagnoseModal } from './AiDiagnoseModal'
+import { HelpModal } from './HelpModal'
 import { ProcessesModal } from './ProcessesModal'
 import { ReplicationModal } from './ReplicationModal'
 import { ServicesModal } from './ServicesModal'
@@ -21,7 +22,8 @@ const TOOLS: Partial<Record<ToolTabKind, { icon: string; titleKey: I18nKey; rend
   processes: { icon: '📋', titleKey: 'procs.title', render: () => <ProcessesModal embedded /> },
   services: { icon: '⚙', titleKey: 'svc.title', render: () => <ServicesModal embedded /> },
   'ai-diagnose': { icon: '🩺', titleKey: 'ai.diagnose.title', render: () => <AiDiagnoseModal embedded /> },
-  replication: { icon: '🔁', titleKey: 'repl.title', render: () => <ReplicationModal embedded /> }
+  replication: { icon: '🔁', titleKey: 'repl.title', render: () => <ReplicationModal embedded /> },
+  help: { icon: '❓', titleKey: 'help.title', render: () => <HelpModal embedded /> }
 }
 
 export function ToolTabView({ kind, active }: { kind: ToolTabKind; active: boolean }) {

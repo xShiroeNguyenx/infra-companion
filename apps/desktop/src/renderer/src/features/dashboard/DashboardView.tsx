@@ -12,7 +12,8 @@ import { useWorkspacesStore } from '../../stores/workspaces'
 import { Button } from '../../components/ui'
 import { MetricChart } from '../../components/MetricsHistoryModal'
 import { ToolGrid } from './ToolGrid'
-import { useT, type I18nKey } from '../../i18n'
+import { APP_SHORTCUTS, terminalShortcuts } from '../../lib/shortcutList'
+import { useT } from '../../i18n'
 
 const LOCALES = { vi: 'vi-VN', en: 'en-US', ja: 'ja-JP' } as const
 
@@ -61,7 +62,14 @@ export function DashboardView({ active }: { active: boolean }) {
   const openWorkspace = useWorkspacesStore((s) => s.open)
   const { openLocal, openSsh, openSshGroup, openQuick } = useTabsStore()
   const setModal = useUiStore((s) => s.setModal)
+  const termShortcuts = useSettingsStore((s) => s.shortcuts)
   const [quick, setQuick] = useState('')
+
+  // Cheat sheet: phím app (cố định) + 4 phím terminal theo đúng giá trị user đang đặt
+  const shortcuts = useMemo(
+    () => [...APP_SHORTCUTS, ...terminalShortcuts(termShortcuts)],
+    [termShortcuts]
+  )
 
   // History bị vault dedup theo target → số đếm = "số target khác nhau", đủ dùng cho tổng quan
   const stats = useMemo(() => {
@@ -311,7 +319,7 @@ export function DashboardView({ active }: { active: boolean }) {
           <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">
             ⌨ {t('dashboard.shortcuts')}
           </h2>
-          <TwoColumnList items={SHORTCUTS}>
+          <TwoColumnList items={shortcuts}>
             {(sc) => <ShortcutRow key={sc.key} label={t(sc.key)} keys={sc.combo} />}
           </TwoColumnList>
           <p className="text-subtle mt-1.5 text-[10px]">{t('dashboard.sc.mouseTip')}</p>
@@ -410,7 +418,8 @@ function MonitorHistorySection({ active, locale }: { active: boolean; locale: st
   )
 }
 
-function ShortcutRow({ label, keys }: { label: string; keys: string[] }) {
+/** Một dòng cheat sheet — export để thẻ "Phím tắt" trong Trợ giúp dùng đúng cách trình bày này. */
+export function ShortcutRow({ label, keys }: { label: string; keys: string[] }) {
   return (
     <div className="flex items-center justify-between gap-2 px-3 py-1.5">
       <span className="text-muted min-w-0 truncate text-[11px]">{label}</span>
@@ -458,20 +467,6 @@ function TwoColumnList<T>({ items, children }: { readonly items: readonly T[]; r
     </div>
   )
 }
-
-/** Cheat sheet phím tắt — dữ liệu hoá để chia được 2 cột. */
-const SHORTCUTS: ReadonlyArray<{ key: I18nKey; combo: string[] }> = [
-  { key: 'dashboard.sc.palette', combo: ['Ctrl', 'Shift', 'P'] },
-  { key: 'dashboard.sc.newTab', combo: ['Ctrl', 'Shift', 'T'] },
-  { key: 'dashboard.sc.closeTab', combo: ['Ctrl', 'Shift', 'W'] },
-  { key: 'dashboard.sc.cycle', combo: ['Ctrl', 'Tab'] },
-  { key: 'dashboard.sc.split', combo: ['Ctrl', 'Shift', 'D'] },
-  { key: 'dashboard.sc.broadcast', combo: ['Ctrl', 'Shift', 'B'] },
-  { key: 'dashboard.sc.sidebar', combo: ['Ctrl', 'Shift', 'H'] },
-  { key: 'dashboard.sc.ai', combo: ['Ctrl', 'I'] },
-  { key: 'dashboard.sc.copyPaste', combo: ['Ctrl', 'Shift', 'C / V'] },
-  { key: 'dashboard.sc.find', combo: ['Ctrl', 'F'] }
-]
 
 /** Số host tối đa hiện tên trong card nhóm — quá số này thì gộp thành "+N". */
 const GROUP_PREVIEW_HOSTS = 4

@@ -39,7 +39,8 @@ const MODAL_TOOLS: ReadonlyArray<{ key: I18nKey; modal: AppModal }> = [
   { key: 'menu.snippets', modal: 'snippets' },
   { key: 'menu.plugins', modal: 'plugins' },
   { key: 'menu.keys', modal: 'keys' },
-  { key: 'menu.settings', modal: 'settings' }
+  { key: 'menu.settings', modal: 'settings' },
+  { key: 'menu.help', modal: 'help' }
 ]
 
 /**

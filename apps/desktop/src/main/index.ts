@@ -21,6 +21,7 @@ import { registerTunnelsIpc } from './ipc/tunnels'
 import { registerLocalDevIpc } from './ipc/localdev'
 import { registerHostMapIpc } from './ipc/hostmap'
 import { registerFontsIpc } from './ipc/fonts'
+import { registerHelpIpc } from './ipc/help'
 import { registerPluginsIpc } from './ipc/plugins'
 import { registerMarketplaceIpc } from './ipc/marketplace'
 import { getVault, registerVaultIpc } from './ipc/vault'
@@ -264,6 +265,7 @@ const disposeRdp = registerRdpIpc()
 const disposeTunnels = registerTunnelsIpc()
 const localDev = registerLocalDevIpc()
 registerHostMapIpc()
+registerHelpIpc()
 const disposeFonts = registerFontsIpc()
 let disposePlugins: (() => void) | null = null
 

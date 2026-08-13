@@ -64,7 +64,18 @@ const icnsBuffer = png2icons.createICNS(png1024, png2icons.BILINEAR, 0)
 if (!icnsBuffer) throw new Error('png2icons failed to create ICNS buffer')
 writeFileSync(join(BUILD, 'icon.icns'), icnsBuffer)
 
+// ── 4. Bản nhỏ cho GIAO DIỆN (màn hình Trợ giúp) ─────────────────────────────
+// Sinh ở đây thay vì để UI import thẳng icon.png: bản 1024×1024 nặng 1.1 MB mà chỗ dùng chỉ
+// vẽ 64px — bundle renderer phải cõng nguyên MB đó. 128px đủ nét cho màn hình 2× DPI.
+// Lấy từ CÙNG `master` với ico/icns nên đổi ảnh nguồn là mọi nơi đổi theo, không lệch.
+console.log('Generating icon-128.png (UI)…')
+await sharp(master)
+  .resize(128, 128, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
+  .png()
+  .toFile(join(BUILD, 'icon-128.png'))
+
 console.log('\nDone!')
-console.log('  apps/desktop/build/icon.png  — Linux')
-console.log('  apps/desktop/build/icon.ico  — Windows')
-console.log('  apps/desktop/build/icon.icns — macOS')
+console.log('  apps/desktop/build/icon.png      — Linux')
+console.log('  apps/desktop/build/icon.ico      — Windows')
+console.log('  apps/desktop/build/icon.icns     — macOS')
+console.log('  apps/desktop/build/icon-128.png  — giao diện (Trợ giúp → Giới thiệu)')

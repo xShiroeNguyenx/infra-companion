@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import { release } from 'node:os'
 import {
   IPC,
   type BulkRunEvent,
@@ -280,7 +281,13 @@ const api: InfraApi = {
   versions: {
     electron: process.versions.electron ?? '',
     node: process.versions.node ?? '',
-    chrome: process.versions.chrome ?? ''
+    chrome: process.versions.chrome ?? '',
+    platform: process.platform,
+    arch: process.arch,
+    osRelease: release()
+  },
+  help: {
+    openUserData: () => ipcRenderer.send(IPC.HELP_OPEN_USER_DATA)
   },
   update: {
     check: () => ipcRenderer.invoke(IPC.UPDATE_CHECK),

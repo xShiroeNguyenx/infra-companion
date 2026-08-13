@@ -45,7 +45,8 @@ export const TOOL_TAB_KINDS = [
   'processes',
   'services',
   'ai-diagnose',
-  'replication'
+  'replication',
+  'help'
 ] as const
 export type ToolTabKind = (typeof TOOL_TAB_KINDS)[number]
 

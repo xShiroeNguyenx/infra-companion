@@ -1,4 +1,5 @@
 import { useTabsStore } from '../stores/tabs'
+import { useUiStore } from '../stores/ui'
 import { useVaultStore } from '../stores/vault'
 import { useT } from '../i18n'
 import type { I18nKey } from '../i18n/dict'
@@ -14,6 +15,7 @@ export function StatusBar() {
   const t = useT()
   const { tabs, activeId } = useTabsStore()
   const lock = useVaultStore((s) => s.lock)
+  const setModal = useUiStore((s) => s.setModal)
   const tab = tabs.find((t) => t.id === activeId)
   const { electron, node } = window.infra.versions
   const appVersion = __APP_VERSION__
@@ -37,9 +39,10 @@ export function StatusBar() {
         <button className="hover:text-content" title={t('status.lockVault')} onClick={() => void lock()}>
           🔒 {t('status.lockVault')}
         </button>
-        <span>
+        {/* Dòng version là nơi người ta bấm theo phản xạ khi muốn biết "bản nào / có bản mới chưa" */}
+        <button className="hover:text-content" title={t('help.title')} onClick={() => setModal('help')}>
           Infra Companion {appVersion} · Electron {electron} · Node {node}
-        </span>
+        </button>
       </span>
     </div>
   )

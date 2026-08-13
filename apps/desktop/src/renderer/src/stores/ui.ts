@@ -20,6 +20,7 @@ export type AppModal =
   | 'compare'
   | 'hostmap'
   | 'localdev-settings'
+  | 'help'
   | null
 
 interface UiState {

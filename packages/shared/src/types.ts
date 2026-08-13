@@ -1471,6 +1471,20 @@ export interface HostMapCurlDto {
   error?: string
 }
 
+/**
+ * Kết quả một lần user tự bấm "Kiểm tra cập nhật".
+ *
+ * Vì sao phải có kiểu riêng thay vì `Promise<void>`: khi KHÔNG có bản mới, electron-updater
+ * không bắn sự kiện nào cả — bấm nút xong màn hình đứng im, không phân biệt được "đã mới nhất"
+ * với "hỏng không ai báo". Mỗi nhánh ở đây phải nói được thành một câu cho user đọc.
+ */
+export type UpdateCheckResultDto =
+  /** Đang chạy `pnpm dev`: electron-updater không có metadata để hỏi — nói thẳng, đừng báo lỗi. */
+  | { status: 'dev' }
+  | { status: 'available'; version: string }
+  | { status: 'latest'; version: string }
+  | { status: 'error'; message: string }
+
 export interface InfraApi {
   vault: {
     status(): Promise<VaultStatus>
@@ -1831,10 +1845,23 @@ export interface InfraApi {
     electron: string
     node: string
     chrome: string
+    /** 'win32' | 'darwin' | 'linux'… — màn hình Trợ giúp và text báo lỗi cần biết OS nào. */
+    platform: string
+    /** 'x64' | 'arm64'… */
+    arch: string
+    /** `os.release()` — vd '10.0.26200' trên Windows 11. */
+    osRelease: string
+  }
+  help: {
+    /** Mở thư mục dữ liệu app (vault, log, bản ghi…) bằng file explorer. */
+    openUserData(): void
   }
   update: {
-    /** Kiểm tra update — trả về ngay, kết quả về qua onAvailable / onDownloaded. */
-    check(): Promise<void>
+    /**
+     * User tự bấm kiểm tra — trả về kết quả TƯỜNG MINH (kể cả "đã mới nhất" và lỗi), vì
+     * electron-updater im lặng khi không có bản mới. Auto-check nền vẫn đi qua onAvailable.
+     */
+    check(): Promise<UpdateCheckResultDto>
     /** Bắt đầu tải bản cập nhật về nền. */
     download(): Promise<void>
     /** Thoát app và cài bản vừa tải (chỉ gọi sau khi onDownloaded đã bắn). */

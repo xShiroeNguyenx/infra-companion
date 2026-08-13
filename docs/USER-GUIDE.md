@@ -785,10 +785,26 @@ Limits: needs a **Chromium** browser (Chrome / Edge / Brave / Vivaldi — Firefo
 
 ---
 
+## 16E. Help centre — `F1`, the version line in the status bar, or `⋯` → ❓ Help
+
+Four tabs, one for each question you actually arrive with.
+
+**About** — the version you're running, when it was built and from which commit, the Electron / Chromium / Node versions underneath, and your OS. **Check for updates** answers in words every time: *a new version is available*, *you're on the latest one*, *couldn't check, here's why*, or *this is a dev build, there's nothing to compare against*. When there is a new version, a **Download** button appears and the progress shows in the usual banner at the top.
+
+**Shortcuts** — the same list as the Dashboard, reachable from anywhere including inside a terminal (`Ctrl+/` opens straight to it). The four terminal shortcuts are shown **as you have them set**, not as they ship, so the table can't drift from Settings → ⌨ Keyboard shortcuts.
+
+**What's new** — the changelog entry for the exact build you're running, embedded at build time so it works offline. A link goes to the full changelog on GitHub.
+
+**Troubleshooting** — buttons that open the app data folder, the session log folder and the recordings folder in your file manager, a link to GitHub Issues, and **Copy system information**: app version, build date and commit, Electron/Chromium/Node, OS and architecture — formatted to paste into an issue. It deliberately contains **nothing about your hosts**: no addresses, no usernames, no host names. Session logs are a different matter — they hold verbatim what your terminal displayed, so read one before attaching it to anything.
+
+---
+
 ## 17. Keyboard shortcuts
 
 | Key | Action |
 |-----|--------|
+| `F1` | Help centre |
+| `Ctrl+/` | Shortcut list |
 | `Ctrl+Shift+P` | Command Palette |
 | `Ctrl+I` | AI Assistant |
 | `Ctrl+Shift+T` | New local terminal tab |
