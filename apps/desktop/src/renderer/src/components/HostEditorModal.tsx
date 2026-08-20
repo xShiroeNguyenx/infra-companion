@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type KeyboardEvent } from 'react'
 import type { AuthType, HostDto, HostInput, HostProtocol, LoginStep, SerialPortInfo } from '@infra/shared'
 import { useDataStore } from '../stores/data'
 import { envToText, textToEnv } from '../lib/env'
@@ -6,6 +6,9 @@ import { Button, ConfirmModal, Field, Modal, Select, TextArea, TextInput } from 
 import { useT } from '../i18n'
 
 const NEW_GROUP = '__new__'
+// Sentinel trong dropdown SSH key: chọn nó thì mở panel sinh/import key ngay trong form —
+// người ta hay quên tạo key TRƯỚC khi thêm host, bắt họ đóng form đi mở mục Keys là mất công nhập lại.
+const NEW_KEY = '__newkey__'
 const BAUD_RATES = [9600, 19200, 38400, 57600, 115200, 230400]
 const DEFAULT_PORT: Record<HostProtocol, number> = { ssh: 22, telnet: 23, serial: 115200, vnc: 5900, rdp: 3389 }
 
@@ -27,7 +30,7 @@ export function HostEditorModal({
   onClose: () => void
 }) {
   const t = useT()
-  const { hosts, groups, keys, snippets, saveHost, deleteHost, saveGroup } = useDataStore()
+  const { hosts, groups, keys, snippets, saveHost, deleteHost, saveGroup, generateKey, importKey } = useDataStore()
   // isEdit = đang sửa host có sẵn. Nhân bản tuy có `host` mẫu nhưng vẫn là tạo mới.
   const isEdit = host !== null && !duplicate
   const [protocol, setProtocol] = useState<HostProtocol>(host?.protocol ?? 'ssh')
@@ -40,6 +43,12 @@ export function HostEditorModal({
   const [password, setPassword] = useState('')
   const [clearPassword, setClearPassword] = useState(false)
   const [keyId, setKeyId] = useState(host?.keyId ?? '')
+  // Panel thêm key inline (hiện khi keyId === NEW_KEY)
+  const [keyMode, setKeyMode] = useState<'generate' | 'import'>('generate')
+  const [newKeyLabel, setNewKeyLabel] = useState('')
+  const [newKeyPrivate, setNewKeyPrivate] = useState('')
+  const [newKeyPassphrase, setNewKeyPassphrase] = useState('')
+  const [keyBusy, setKeyBusy] = useState(false)
   const [secretRef, setSecretRef] = useState(host?.secretRef ?? '')
   const [groupId, setGroupId] = useState(host?.groupId ?? '')
   const [newGroupName, setNewGroupName] = useState('')
@@ -85,6 +94,33 @@ export function HostEditorModal({
     if (protocol === 'serial') void window.infra.serial.listPorts().then(setSerialPorts)
   }, [protocol])
 
+  // Tạo key ngay trong form rồi tự chọn nó (panel tự đóng vì keyId đổi khỏi NEW_KEY).
+  // Lỗi sinh/import đã được store toast — ở đây chỉ cần giữ nguyên panel cho user sửa.
+  const addKey = async (): Promise<void> => {
+    const label = newKeyLabel.trim()
+    if (!label || (keyMode === 'import' && !newKeyPrivate.trim())) return
+    setKeyBusy(true)
+    const created =
+      keyMode === 'generate'
+        ? await generateKey(label)
+        : await importKey({ label, privateKey: newKeyPrivate, passphrase: newKeyPassphrase || undefined })
+    setKeyBusy(false)
+    if (created) {
+      setKeyId(created.id)
+      setNewKeyLabel('')
+      setNewKeyPrivate('')
+      setNewKeyPassphrase('')
+    }
+  }
+
+  // Enter trong ô của panel key = tạo key, KHÔNG submit form host (form đang giữ keyId sentinel)
+  const keyPanelEnter = (e: KeyboardEvent): void => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      void addKey()
+    }
+  }
+
   const changeProtocol = (next: HostProtocol): void => {
     setProtocol(next)
     // đổi port mặc định nếu user chưa nhập gì khác thường
@@ -101,6 +137,8 @@ export function HostEditorModal({
     } else if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65_535) {
       return setError(t('host.errPort'))
     }
+    // NEW_KEY = panel thêm key đang mở dở — nhắc hoàn tất thay vì lưu host với keyId sentinel
+    if (isSsh && usesKey && keyId === NEW_KEY) return setError(t('host.errKeyPending'))
     if (isSsh && usesKey && !keyId) return setError(t('host.errKey'))
     if (isSsh && authType === 'secret' && !secretRef.trim()) return setError(t('host.errSecret'))
     // TOTP seed: chuẩn hoá (bỏ space/gạch/=, viết hoa) rồi validate base32 — duplicate tối giản
@@ -270,16 +308,88 @@ export function HostEditorModal({
         )}
 
         {isSsh && usesKey && (
-          <Field label={t('host.sshKey')}>
-            <Select value={keyId} onChange={(e) => setKeyId(e.target.value)}>
-              <option value="">{t('auth.chooseKey')}</option>
-              {keys.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.label} ({k.keyType})
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <>
+            <Field label={t('host.sshKey')}>
+              <Select value={keyId} onChange={(e) => setKeyId(e.target.value)}>
+                <option value="">{t('auth.chooseKey')}</option>
+                {keys.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.label} ({k.keyType})
+                  </option>
+                ))}
+                <option value={NEW_KEY}>{t('host.newKeyOpt')}</option>
+              </Select>
+            </Field>
+            {keyId === NEW_KEY && (
+              <div className="mb-2 rounded border border-edge bg-input/50 p-2.5">
+                <div className="mb-2 flex gap-1.5">
+                  <Button
+                    type="button"
+                    variant={keyMode === 'generate' ? 'primary' : 'default'}
+                    className="!px-2 !py-1 !text-xs"
+                    onClick={() => setKeyMode('generate')}
+                  >
+                    {t('host.keyModeGen')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={keyMode === 'import' ? 'primary' : 'default'}
+                    className="!px-2 !py-1 !text-xs"
+                    onClick={() => setKeyMode('import')}
+                  >
+                    {t('host.keyModeImport')}
+                  </Button>
+                </div>
+                {keyMode === 'generate' && (
+                  <p className="mb-2 text-[10px] leading-relaxed text-subtle">{t('host.keyGenNote')}</p>
+                )}
+                <Field label={t('host.keyName')}>
+                  <TextInput
+                    autoFocus
+                    value={newKeyLabel}
+                    onChange={(e) => setNewKeyLabel(e.target.value)}
+                    onKeyDown={keyPanelEnter}
+                    placeholder={t('host.keyNamePh')}
+                  />
+                </Field>
+                {keyMode === 'import' && (
+                  <>
+                    <Field label={t('host.keyPrivate')}>
+                      <TextArea
+                        rows={4}
+                        value={newKeyPrivate}
+                        onChange={(e) => setNewKeyPrivate(e.target.value)}
+                        placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                      />
+                    </Field>
+                    <Field label={t('host.keyPassphrase')}>
+                      <TextInput
+                        type="password"
+                        value={newKeyPassphrase}
+                        onChange={(e) => setNewKeyPassphrase(e.target.value)}
+                        onKeyDown={keyPanelEnter}
+                      />
+                    </Field>
+                  </>
+                )}
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    className="!px-2 !py-1 !text-xs"
+                    disabled={keyBusy || !newKeyLabel.trim() || (keyMode === 'import' && !newKeyPrivate.trim())}
+                    onClick={() => void addKey()}
+                  >
+                    {keyBusy
+                      ? t('common.saving')
+                      : keyMode === 'generate'
+                        ? t('host.keyGenBtn')
+                        : t('host.keyImportBtn')}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {isSsh && usesPassword && (

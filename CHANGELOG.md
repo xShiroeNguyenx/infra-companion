@@ -5,6 +5,19 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.7] — 2026-08-20
+
+### Added
+
+- **Create the SSH key right where the host form asks for one.** The key dropdown in *Add host* now ends with *+ Add a new key…* — pick it and a small panel opens in place: either generate a fresh ed25519 pair or import an existing private key (OpenSSH / PEM / PuTTY .ppk, passphrase supported), and the new key is selected for the host the moment it exists. Until now the form could only turn you away with *"create one under Keys"* — and closing a half-filled host form to go make a key is exactly how people ended up without one.
+- **Pin a tunnel to the top of the list.** A tunnel list past ten entries is a scanning exercise every time, and the two or three you start daily are buried in it. Each row now has a ☆ next to Start — pinned tunnels rise to the top, marked with a gold stripe on the left edge, and the rest keep their A→Z order below. The order is the same everywhere the tunnels appear: the Tunnels panel (modal or tab), the Dashboard list and the detached always-on-top window, and pinning in the main window reorders the detached window immediately. Pins are per-machine, like host favourites.
+
+### Changed
+
+- **The ★ Favorites section in the sidebar looks like its own block now** — a soft gold tint and border around the whole section instead of a heading that renders exactly like every other group's. It sits at the top of the list, and now it also reads as the thing you put there on purpose.
+
+---
+
 ## [0.2.6] — 2026-08-13
 
 ### Added

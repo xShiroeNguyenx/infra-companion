@@ -1,5 +1,6 @@
-import { useEffect, type CSSProperties } from 'react'
+import { useEffect, useMemo, type CSSProperties } from 'react'
 import { useDataStore } from '../stores/data'
+import { pinnedFirst, useTunnelFavoritesStore } from '../stores/favorites'
 import { useT } from '../i18n'
 
 // Cửa sổ không khung → header là vùng kéo cửa sổ (drag), các nút phải là no-drag để bấm được.
@@ -13,11 +14,13 @@ const NO_DRAG = { WebkitAppRegion: 'no-drag' } as unknown as CSSProperties
  * Navicat/HeidiSQL thì cần nhìn tunnel còn sống không). KHÔNG có luồng dữ liệu riêng: gọi cùng
  * IPC như cửa sổ chính (vault đã mở khoá ở main) và `TUNNELS_EVENT` vốn broadcast tới mọi cửa sổ.
  *
- * Danh sách đã được store sắp theo TÊN nên thứ tự khớp với cửa sổ chính.
+ * Danh sách đã được store sắp theo TÊN, tunnel được GHIM nổi lên đầu — cùng thứ tự với cửa sổ
+ * chính (ghim lưu localStorage chung, đổi bên kia thì bên này nghe sự kiện `storage` mà cập nhật).
  */
 export function DetachedTunnelsApp() {
   const t = useT()
   const tunnels = useDataStore((s) => s.tunnels)
+  const favIds = useTunnelFavoritesStore((s) => s.ids)
   const tunnelStates = useDataStore((s) => s.tunnelStates)
   const hosts = useDataStore((s) => s.hosts)
   const refresh = useDataStore((s) => s.refreshAll)
@@ -31,6 +34,7 @@ export function DetachedTunnelsApp() {
   }, [refresh, applyTunnelState])
 
   const hostLabel = (id: string): string => hosts.find((h) => h.id === id)?.label ?? t('tunnel.hostDeleted')
+  const ordered = useMemo(() => pinnedFirst(tunnels, favIds), [tunnels, favIds])
   const running = tunnels.filter((r) => {
     const s = tunnelStates[r.id]?.status
     return s === 'active' || s === 'starting'
@@ -55,7 +59,7 @@ export function DetachedTunnelsApp() {
 
       <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
         {tunnels.length === 0 && <p className="text-subtle p-4 text-center text-xs">{t('tunnel.empty')}</p>}
-        {tunnels.map((rule) => {
+        {ordered.map((rule) => {
           const state = tunnelStates[rule.id]?.status ?? 'stopped'
           const detail = tunnelStates[rule.id]?.detail
           const on = state === 'active' || state === 'starting'
@@ -74,7 +78,11 @@ export function DetachedTunnelsApp() {
                 }`}
               />
               <div className="min-w-0 flex-1">
-                <div className="text-content truncate text-[11px]">{rule.label || route}</div>
+                <div className="text-content truncate text-[11px]">
+                  {/* Chỉ báo ghim (toggle ở cửa sổ chính — ở đây chật, chỉ hiện) */}
+                  {favIds.includes(rule.id) && <span className="text-warning mr-1">★</span>}
+                  {rule.label || route}
+                </div>
                 <div
                   className={`truncate text-[10px] ${detail ? 'text-danger' : 'text-subtle'}`}
                   title={detail ?? `${hostLabel(rule.hostId)} · ${route}`}

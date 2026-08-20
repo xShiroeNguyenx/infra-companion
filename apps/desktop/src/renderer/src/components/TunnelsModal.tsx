@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { TunnelRuleDto, TunnelType } from '@infra/shared'
 import { useDataStore } from '../stores/data'
+import { pinnedFirst, useTunnelFavoritesStore } from '../stores/favorites'
 import { Button, ConfirmModal, Field, ModalOrPanel, Select, TextInput } from './ui'
 import { OpenInTabButton } from './OpenInTabButton'
 import { useT } from '../i18n'
@@ -12,6 +13,21 @@ const TYPE_KEY: Record<TunnelType, I18nKey> = {
   D: 'tunnel.typeD'
 }
 
+function StarIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width="11"
+      height="11"
+      viewBox="0 0 16 16"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="1.3"
+    >
+      <path d="M8 1.7l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.9 4.2 13.5l.7-4.3-3.1-3 4.3-.6z" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 /** Mô tả route (port đi đâu) — dùng làm nhãn mặc định khi user không đặt tên riêng. */
 const routeOf = (r: Pick<TunnelRuleDto, 'type' | 'bindPort' | 'destHost' | 'destPort'>): string =>
   r.type === 'D' ? `SOCKS5 :${r.bindPort}` : `:${r.bindPort} → ${r.destHost}:${r.destPort}`
@@ -20,6 +36,10 @@ const routeOf = (r: Pick<TunnelRuleDto, 'type' | 'bindPort' | 'destHost' | 'dest
 export function TunnelsModal({ onClose, embedded }: { onClose?: () => void; embedded?: boolean }) {
   const t = useT()
   const { hosts, tunnels, tunnelStates, saveTunnel, deleteTunnel, startTunnel, stopTunnel } = useDataStore()
+  const favIds = useTunnelFavoritesStore((s) => s.ids)
+  const toggleFav = useTunnelFavoritesStore((s) => s.toggle)
+  // Tunnel được ghim nổi lên đầu; trong từng nửa vẫn giữ thứ tự A→Z của store
+  const ordered = useMemo(() => pinnedFirst(tunnels, favIds), [tunnels, favIds])
   const [mode, setMode] = useState<'list' | 'add'>('list')
   const [hostId, setHostId] = useState('')
   const [name, setName] = useState('')
@@ -120,17 +140,20 @@ export function TunnelsModal({ onClose, embedded }: { onClose?: () => void; embe
             {tunnels.length === 0 && (
               <p className="py-4 text-center text-xs text-subtle">{t('tunnel.empty')}</p>
             )}
-            {tunnels.map((rule) => {
+            {ordered.map((rule) => {
               const state = tunnelStates[rule.id]?.status ?? 'stopped'
               const detail = tunnelStates[rule.id]?.detail
               const running = state === 'active' || state === 'starting'
               const route = routeOf(rule)
               // Có tên riêng (khác route tự-sinh) → hiện route kèm ở dòng phụ để vẫn biết đi đâu
               const named = Boolean(rule.label) && rule.label !== route
+              const pinned = favIds.includes(rule.id)
               return (
                 <div
                   key={rule.id}
                   className="mb-1.5 flex items-center gap-2 rounded border border-edge bg-input px-3 py-2"
+                  // Vạch vàng trái đánh dấu tunnel được ghim — cùng ngôn ngữ với khối Yêu thích ở sidebar
+                  style={pinned ? { boxShadow: 'inset 2px 0 0 var(--c-warning)' } : undefined}
                 >
                   <span
                     className={`size-2 shrink-0 rounded-full ${
@@ -156,6 +179,16 @@ export function TunnelsModal({ onClose, embedded }: { onClose?: () => void; embe
                       {detail ? ` — ${detail}` : ''}
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    className={`shrink-0 rounded p-1 ${
+                      pinned ? 'text-warning hover:bg-hover' : 'text-subtle hover:bg-hover hover:text-warning'
+                    }`}
+                    title={pinned ? t('sidebar.unfavorite') : t('sidebar.favorite')}
+                    onClick={() => toggleFav(rule.id)}
+                  >
+                    <StarIcon filled={pinned} />
+                  </button>
                   <Button
                     type="button"
                     variant={running ? 'default' : 'primary'}

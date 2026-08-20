@@ -158,9 +158,10 @@ export function Sidebar() {
 
       <div className="flex-1 overflow-y-auto px-2 pb-2">
         {favHosts.length > 0 && (
-          <div className="mb-2">
+          /* Khối Yêu thích tô nền + viền vàng nhạt để tách hẳn khỏi các group thường bên dưới */
+          <div className="border-warning/25 bg-warning/5 mb-2 rounded-md border p-1">
             <div className="px-1 py-1">
-              <span className="text-warning/80 text-[10px] font-semibold tracking-wider uppercase">
+              <span className="text-warning text-[10px] font-semibold tracking-wider uppercase">
                 ★ {t('sidebar.favorites')}
               </span>
             </div>

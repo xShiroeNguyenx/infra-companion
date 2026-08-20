@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { GroupDto, HostDto, MetricHistoryHostDto, MetricHistoryPointDto } from '@infra/shared'
 import type { WorkspaceTab } from '../../stores/tabs'
 import { useDataStore } from '../../stores/data'
-import { useFavoritesStore } from '../../stores/favorites'
+import { pinnedFirst, useFavoritesStore, useTunnelFavoritesStore } from '../../stores/favorites'
 import { useMonitorStore } from '../../stores/monitor'
 import { useSettingsStore } from '../../stores/settings'
 import { useTabsStore } from '../../stores/tabs'
@@ -58,6 +58,7 @@ export function DashboardView({ active }: { active: boolean }) {
   const startTunnel = useDataStore((s) => s.startTunnel)
   const stopTunnel = useDataStore((s) => s.stopTunnel)
   const favIds = useFavoritesStore((s) => s.ids)
+  const tunnelFavIds = useTunnelFavoritesStore((s) => s.ids)
   const workspaces = useWorkspacesStore((s) => s.workspaces)
   const openWorkspace = useWorkspacesStore((s) => s.open)
   const { openLocal, openSsh, openSshGroup, openQuick } = useTabsStore()
@@ -82,6 +83,9 @@ export function DashboardView({ active }: { active: boolean }) {
   }, [history])
 
   const favHosts = useMemo(() => hosts.filter((h) => favIds.includes(h.id)), [hosts, favIds])
+
+  // Tunnel được ghim nổi lên đầu — cùng thứ tự với modal/tab Tunnels và cửa sổ tách rời
+  const orderedTunnels = useMemo(() => pinnedFirst(tunnels, tunnelFavIds), [tunnels, tunnelFavIds])
 
   // Chip nhóm: chỉ nhóm có host; bấm mở cả nhóm thành các pane split trong 1 tab
   const groupChips = useMemo(
@@ -275,7 +279,7 @@ export function DashboardView({ active }: { active: boolean }) {
           {tunnels.length === 0 ? (
             <p className="text-subtle text-[11px]">{t('dashboard.noTunnels')}</p>
           ) : (
-            <TwoColumnList items={tunnels}>
+            <TwoColumnList items={orderedTunnels}>
               {(rule) => {
                 const state = tunnelStates[rule.id]?.status ?? 'stopped'
                 const detail = tunnelStates[rule.id]?.detail
@@ -298,6 +302,7 @@ export function DashboardView({ active }: { active: boolean }) {
                       }`}
                     />
                     <span className="text-content min-w-0 flex-1 truncate text-xs">
+                      {tunnelFavIds.includes(rule.id) && <span className="text-warning">★ </span>}
                       [{rule.type}] {rule.label || `:${rule.bindPort}`}
                     </span>
                     <Button

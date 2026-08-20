@@ -31,8 +31,9 @@ interface DataState {
   deleteHost: (id: string) => Promise<boolean>
   saveGroup: (input: GroupInput) => Promise<GroupDto | null>
   deleteGroup: (id: string) => Promise<boolean>
-  generateKey: (label: string) => Promise<boolean>
-  importKey: (input: KeyImportInput) => Promise<boolean>
+  /** Trả về key vừa tạo (để caller auto-chọn), null nếu thất bại. */
+  generateKey: (label: string) => Promise<SshKeyDto | null>
+  importKey: (input: KeyImportInput) => Promise<SshKeyDto | null>
   deleteKey: (id: string) => Promise<void>
   saveSnippet: (input: SnippetInput) => Promise<boolean>
   deleteSnippet: (id: string) => Promise<void>
@@ -146,23 +147,23 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   generateKey: async (label) => {
     try {
-      await window.infra.data.generateKey(label)
+      const key = await window.infra.data.generateKey(label)
       set({ keys: await window.infra.data.listKeys() })
-      return true
+      return key
     } catch (error) {
       toast(error)
-      return false
+      return null
     }
   },
 
   importKey: async (input) => {
     try {
-      await window.infra.data.importKey(input)
+      const key = await window.infra.data.importKey(input)
       set({ keys: await window.infra.data.listKeys() })
-      return true
+      return key
     } catch (error) {
       toast(error)
-      return false
+      return null
     }
   },
 
