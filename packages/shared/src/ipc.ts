@@ -167,6 +167,20 @@ export const IPC = {
   SYNC_CONFIGURE: 'sync:configure',
   SYNC_NOW: 'sync:now',
   SYNC_DISABLE: 'sync:disable',
+  /** P30 — xuất hosts ra ssh_config/CSV/JSON (bản xuất KHÔNG chứa bí mật). */
+  EXPORT_HOSTS: 'export:hosts',
+  /**
+   * Xem lại bí mật đã lưu — đường DUY NHẤT mật khẩu được phép qua IPC sang renderer,
+   * và chỉ cho MỘT bản ghi mỗi lần, sau khi nhập lại master password.
+   */
+  SECRET_REVEAL: 'secret:reveal',
+  /** Chép bí mật thẳng vào clipboard TỪ MAIN — giá trị không hề đi qua renderer. */
+  SECRET_COPY: 'secret:copy',
+  SYNC_SET_AUTO: 'sync:set-auto',
+  /** Auto-sync vừa kéo về dữ liệu mới → renderer phải nạp lại, nếu không UI đứng ở bản cũ. */
+  SYNC_PULLED_EVENT: 'sync:pulled',
+  SYNC_EXPORT_FILE: 'sync:export-file',
+  SYNC_IMPORT_FILE: 'sync:import-file',
 
   PROMPT_HOSTKEY: 'prompt:hostkey',
   PROMPT_PASSWORD: 'prompt:password',

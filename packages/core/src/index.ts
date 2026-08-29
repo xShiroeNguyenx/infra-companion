@@ -176,6 +176,9 @@ export { resolveSecret, detectSecretProvider } from './secrets/SecretsService'
 export type { SecretProvider } from './secrets/SecretsService'
 export { generateTotp, isValidTotpSecret, normalizeTotpSecret, applyTotpToken, TOTP_TOKEN } from './secrets/totp'
 export { importSshConfig, parseSshConfig } from './importers/sshConfig'
+// P30 — xuất hosts ra định dạng đọc được. Bản xuất KHÔNG chứa bí mật (xem đầu file).
+export { renderExport, resolveForExport, sshAlias, toCsv, toJson, toSshConfig } from './exporters/hostExport'
+export type { ExportFormat, ExportHost } from './exporters/hostExport'
 export { VaultService } from './vault/VaultService'
 export type {
   KnownHostRecord,
@@ -184,11 +187,12 @@ export type {
   ReplRunSaveInput,
   ResolvedConnection,
   ResolvedEndpoint,
+  SyncConfig,
   SyncSnapshot
 } from './vault/VaultService'
 export { deriveSyncKey, newSyncSalt } from './vault/crypto'
-export { SyncService, createBackend } from './sync/SyncService'
-export type { SyncBackend, SyncResult } from './sync/SyncService'
+export { SyncService, createBackend, BLOB_NAME, findNearMissBlobs, isEmptySnapshot } from './sync/SyncService'
+export type { SyncBackend, SyncResult, BlobError } from './sync/SyncService'
 export { validateManifest, parseManifest } from './plugins/manifest'
 export type { PluginManifest, PluginCommandManifest, ManifestResult } from './plugins/manifest'
 export { discoverPlugins } from './plugins/discover'

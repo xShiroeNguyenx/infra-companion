@@ -31,6 +31,16 @@ pnpm test     # Core tests: crypto / sync merge / ssh_config parser (merge needs
 
 **Test**: create a vault → add a host → quit the app → reopen. If you did **not** tick remember, the app asks for the master password; a wrong one is rejected.
 
+### Reading a saved secret back
+
+You can look at a password you stored. Edit the host → **👁 Show saved password** beside the password field; for a key's passphrase, open **Keys** and use **👁 Xem pass** on the row.
+
+- **Your master password is asked for again every time, even while the vault is unlocked.** That is deliberate, not friction for its own sake: with *Remember on this machine* enabled the vault never auto-locks and unlocks itself at startup, so without this step anyone who sits down at your running app could read every credential you own. Five wrong attempts pause reveals for a minute.
+- The value is **masked until you ask for it and hides again after 20 seconds**, and it is never kept in the app's shared state.
+- **⧉ Copy directly** is the safer button: it moves the secret from the vault straight to the clipboard **without ever putting it on screen** — use it while sharing a screen. The clipboard clears itself after 30 seconds (and on quit), unless you copied something else in the meantime.
+
+> TOTP seeds are deliberately not readable this way — they never leave the main process.
+
 ---
 
 ## 1B. Dashboard (home screen)
@@ -506,9 +516,17 @@ Purely local, no SSH. Enter a host/IP then:
 1. Pick a sync folder → set a **sync passphrase** (≥8 chars, **the same on every machine**, can differ from the master password) → enable sync.
 2. On another machine: same folder + same passphrase → data converges (Last-Write-Wins merge + tombstones for deletes).
 
+**Auto-sync**: once sync is on, a dropdown sets how often it runs on its own — **off / 5 / 15 / 30 / 60 minutes**, default 15 — plus one last push when you quit the app, so a change made just before closing doesn't sit on one machine until another overwrites it. It only runs while the vault is unlocked, and it never resets the auto-lock timer, so leaving it on doesn't keep the vault open. Setting it to *off* also turns off the quit push — off means you're driving. When a round pulls something in, a toast says so and the lists reload — otherwise the window would sit on stale data.
+
+**Transfer by file** (*Transfer by file* inside the Sync dialog): **Export to file…** writes the same encrypted blob wherever you choose, and **Import from file…** reads one back and merges it. No sync client, no shared folder — the case this is for is *"I'm on someone else's machine, I only have a browser"*: download the blob from Drive's web UI, import it, work. Import is **one-way** — it pulls data in, it does not push anything back; to send changes the other way, export and upload the file yourself.
+
 **Quick single-machine test**: point at `D:\sync-test` → enable sync → open the `infra-companion-vault.blob` file there: it's all encrypted bytes, no readable host/password = zero-knowledge confirmed.
 
 > ⚠️ Forgetting the sync passphrase = the data in that folder is lost (unrecoverable).
+
+> ⚠️ **The passphrase is the only thing protecting the blob, and the blob holds your private keys and host passwords in the clear once opened.** Storage that other people can reach (a cloud drive, a shared folder, a file you emailed yourself) makes that passphrase the whole of your security — make it long and unique. On a machine that isn't yours, when you're done: **Disable sync (this machine)**, delete the file you downloaded, and remove the app's data folder.
+
+**When the app refuses to sync**: if it can't find `infra-companion-vault.blob` but something says the file *should* be there — the folder holds a near-miss name like `infra-companion-vault (1).blob` (a browser renaming a duplicate download), or this machine has synced with that folder successfully before — it stops and says so instead of writing. That write would replace every other machine's data with this one's. Fix the cause (rename the file, wait for the cloud client to finish downloading) and sync again; the ⚠ **Overwrite with this machine anyway** button is there for when you genuinely mean it.
 
 ---
 
@@ -576,6 +594,18 @@ Needs AI configured (see §14). If not, the settings form opens.
 ## 15. Import from ssh_config — `⋯` → Import
 
 Pick your `~/.ssh/config` → it creates hosts, **preserves multi-hop ProxyJump**, imports IdentityFile (dedupes keys), and warns if needed. The group is named `ssh_config (date)`.
+
+### 15B. Export hosts — `⋯` → Export hosts…
+
+The other direction: write your host list to a file you can read, as **ssh_config**, **CSV**, or **JSON**.
+
+- **ssh_config** — paste it into `~/.ssh/config` and `ssh <name>` works in any terminal. Group inheritance is resolved first, so a host that inherits its user, key, or jump chain from its group doesn't come out missing them, and `ProxyJump` is rebuilt from the jump chain. Non-SSH hosts (VNC/RDP/serial) are left out and **counted** in a comment at the top rather than vanishing quietly. Aliases are sanitised (`* ? ! #` removed — a label like `web *` would otherwise become a pattern matching *every* host) and de-duplicated with a `-2` suffix.
+- **CSV** — one row per host, RFC 4180 quoting, so a comma inside a label doesn't break the columns.
+- **JSON** — same fields, plus the sanitised alias and resolved jump chain.
+
+> ⚠️ **The export carries no secrets, by design**: no passwords, no private keys, no notes, no environment variables. It's a plain file — anyone who can open it reads all of it. Treat it as a readable inventory, **not a backup**; the backup is the encrypted blob under Sync (§13).
+
+Because keys live encrypted in the vault rather than as files on disk, the `IdentityFile` line is written **commented out** with the key's name beside it. Pointing it at a guessed path would produce a config that looks correct and then fails at connect time — export the key to `~/.ssh/` yourself, then uncomment the line.
 
 ---
 

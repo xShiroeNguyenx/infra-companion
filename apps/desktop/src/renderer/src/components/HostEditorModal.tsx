@@ -3,6 +3,7 @@ import type { AuthType, HostDto, HostInput, HostProtocol, LoginStep, SerialPortI
 import { useDataStore } from '../stores/data'
 import { envToText, textToEnv } from '../lib/env'
 import { Button, ConfirmModal, Field, Modal, Select, TextArea, TextInput } from './ui'
+import { RevealSecretModal } from './RevealSecretModal'
 import { useT } from '../i18n'
 
 const NEW_GROUP = '__new__'
@@ -42,6 +43,8 @@ export function HostEditorModal({
   const [authType, setAuthType] = useState<'' | AuthType>(host?.authType ?? '')
   const [password, setPassword] = useState('')
   const [clearPassword, setClearPassword] = useState(false)
+  /** Đang mở hộp thoại xem lại mật khẩu đã lưu (bắt nhập lại master password). */
+  const [revealing, setRevealing] = useState(false)
   const [keyId, setKeyId] = useState(host?.keyId ?? '')
   // Panel thêm key inline (hiện khi keyId === NEW_KEY)
   const [keyMode, setKeyMode] = useState<'generate' | 'import'>('generate')
@@ -411,14 +414,23 @@ export function HostEditorModal({
               </p>
             )}
             {isEdit && host?.hasPassword && (
-              <label className="mb-2.5 -mt-1 flex items-center gap-2 text-xs text-muted select-none">
-                <input
-                  type="checkbox"
-                  checked={clearPassword}
-                  onChange={(e) => setClearPassword(e.target.checked)}
-                />
-                {t('host.pwClear')}
-              </label>
+              <div className="mb-2.5 -mt-1 flex items-center justify-between gap-2">
+                <label className="flex items-center gap-2 text-xs text-muted select-none">
+                  <input
+                    type="checkbox"
+                    checked={clearPassword}
+                    onChange={(e) => setClearPassword(e.target.checked)}
+                  />
+                  {t('host.pwClear')}
+                </label>
+                <button
+                  type="button"
+                  className="text-accent text-xs hover:underline"
+                  onClick={() => setRevealing(true)}
+                >
+                  {t('reveal.button')}
+                </button>
+              </div>
             )}
           </>
         )}
@@ -714,6 +726,14 @@ export function HostEditorModal({
           </div>
         </div>
       </form>
+      {revealing && host && (
+        <RevealSecretModal
+          kind="host-password"
+          id={host.id}
+          title={host.label}
+          onClose={() => setRevealing(false)}
+        />
+      )}
     </Modal>
   )
 }

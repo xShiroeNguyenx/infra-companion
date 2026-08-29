@@ -65,6 +65,20 @@ export interface SyncSnapshot {
   tombstones: Array<{ recordId: string; table: string; deletedAt: number }>
 }
 
+/** Cấu hình sync — lưu JSON trong `meta`, không bí mật nên không cần migration khi thêm trường. */
+export interface SyncConfig {
+  backend: string
+  folderPath: string
+  saltB64: string
+  /** Tự đồng bộ mỗi N phút. 0 hoặc thiếu = tắt. */
+  autoMinutes?: number
+  /**
+   * Lần cuối THẬT SỰ đọc được blob từ backend. Có giá trị này mà lần sau blob biến mất
+   * nghĩa là thư mục hỏng/chưa tải xong, không phải "lần đầu" → không được ghi đè.
+   */
+  seenRemoteAt?: number
+}
+
 const SYNC_TABLES = ['groups', 'keys', 'hosts', 'snippets', 'tunnels', 'known_hosts']
 
 /** Chống SQL injection qua tên bảng từ tombstone. */
@@ -166,6 +180,53 @@ export class VaultService {
   /** DEK hiện tại — chỉ dùng để wrap vào safeStorage, không log/ghi ra ngoài. */
   currentDek(): Buffer {
     return this.requireDek()
+  }
+
+  /**
+   * Kiểm master password mà KHÔNG đổi trạng thái khoá/mở của vault.
+   *
+   * Dùng cho thao tác nhạy cảm cần xác thực lại (hiện mật khẩu đã lưu). `unlock()` không
+   * thay được: nó gán `this.dek` nên gọi lúc vault đang khoá sẽ MỞ vault như một tác dụng
+   * phụ — đúng thứ không nên xảy ra khi người dùng chỉ gõ sai mật khẩu ở một hộp thoại.
+   */
+  verifyMasterPassword(masterPassword: string): boolean {
+    if (this.state() === 'uninitialized') return false
+    const kdfRaw = this.readMeta('kdf')
+    const wrapped = this.readMeta('wrapped_dek')
+    if (!kdfRaw || !wrapped) return false
+    const dek = unwrapDek(wrapped, deriveKek(masterPassword, JSON.parse(kdfRaw) as KdfParams))
+    if (!dek) return false
+    dek.fill(0) // chỉ cần biết đúng/sai — không giữ lại bản sao DEK nào
+    return true
+  }
+
+  // -------------------------------------------------------------------------
+  // Xem lại bí mật đã lưu — CHỈ gọi từ main process, sau khi đã xác thực lại
+  // -------------------------------------------------------------------------
+
+  /**
+   * Mật khẩu đã lưu của một host. null = host không tồn tại hoặc chưa lưu mật khẩu.
+   *
+   * ⚠️ Trả về plaintext. Nơi gọi phải xác thực lại master password TRƯỚC, và không được
+   * đưa giá trị này vào bất kỳ DTO dạng danh sách nào (`HostDto` chỉ có cờ `hasPassword`).
+   */
+  revealHostPassword(hostId: string): string | null {
+    const dek = this.requireDek()
+    const row = this.ensureDb().prepare('SELECT password_enc FROM hosts WHERE id = ?').get(hostId) as
+      | { password_enc: string | null }
+      | undefined
+    if (!row?.password_enc) return null
+    return decryptField(dek, row.password_enc)
+  }
+
+  /** Passphrase đã lưu của một SSH key. null = key không tồn tại hoặc key không có passphrase. */
+  revealKeyPassphrase(keyId: string): string | null {
+    const dek = this.requireDek()
+    const row = this.ensureDb().prepare('SELECT passphrase_enc FROM keys WHERE id = ?').get(keyId) as
+      | { passphrase_enc: string | null }
+      | undefined
+    if (!row?.passphrase_enc) return null
+    return decryptField(dek, row.passphrase_enc)
   }
 
   lock(): void {
@@ -1110,12 +1171,12 @@ export class VaultService {
   // Sync config (lưu trong meta — không bí mật)
   // -------------------------------------------------------------------------
 
-  getSyncConfig(): { backend: string; folderPath: string; saltB64: string } | null {
+  getSyncConfig(): SyncConfig | null {
     const raw = this.readMeta('sync_config')
-    return raw ? (JSON.parse(raw) as { backend: string; folderPath: string; saltB64: string }) : null
+    return raw ? (JSON.parse(raw) as SyncConfig) : null
   }
 
-  setSyncConfig(config: { backend: string; folderPath: string; saltB64: string }): void {
+  setSyncConfig(config: SyncConfig): void {
     this.writeMeta('sync_config', JSON.stringify(config))
   }
 

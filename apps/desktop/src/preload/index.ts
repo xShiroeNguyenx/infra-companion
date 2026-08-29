@@ -135,6 +135,13 @@ const api: InfraApi = {
   importer: {
     sshConfig: () => ipcRenderer.invoke(IPC.IMPORT_SSH_CONFIG)
   },
+  exporter: {
+    hosts: (format) => ipcRenderer.invoke(IPC.EXPORT_HOSTS, format)
+  },
+  secrets: {
+    reveal: (request) => ipcRenderer.invoke(IPC.SECRET_REVEAL, request),
+    copy: (request) => ipcRenderer.invoke(IPC.SECRET_COPY, request)
+  },
   bulk: {
     run: (runId, hostIds, command) => ipcRenderer.invoke(IPC.BULK_RUN, runId, hostIds, command),
     cancel: (runId) => ipcRenderer.invoke(IPC.BULK_CANCEL, runId),
@@ -269,9 +276,13 @@ const api: InfraApi = {
   sync: {
     status: () => ipcRenderer.invoke(IPC.SYNC_STATUS),
     pickFolder: () => ipcRenderer.invoke(IPC.SYNC_PICK_FOLDER),
-    configure: (folderPath, passphrase) => ipcRenderer.invoke(IPC.SYNC_CONFIGURE, folderPath, passphrase),
-    now: () => ipcRenderer.invoke(IPC.SYNC_NOW),
-    disable: () => ipcRenderer.invoke(IPC.SYNC_DISABLE)
+    configure: (folderPath, passphrase, force) => ipcRenderer.invoke(IPC.SYNC_CONFIGURE, folderPath, passphrase, force === true),
+    now: (force) => ipcRenderer.invoke(IPC.SYNC_NOW, force === true),
+    disable: () => ipcRenderer.invoke(IPC.SYNC_DISABLE),
+    setAuto: (minutes) => ipcRenderer.invoke(IPC.SYNC_SET_AUTO, minutes),
+    exportFile: (passphrase) => ipcRenderer.invoke(IPC.SYNC_EXPORT_FILE, passphrase),
+    importFile: (passphrase) => ipcRenderer.invoke(IPC.SYNC_IMPORT_FILE, passphrase),
+    onPulled: (cb) => subscribe<number>(IPC.SYNC_PULLED_EVENT, cb)
   },
   prompts: {
     onHostKey: (cb) => subscribe<HostKeyQuestion>(IPC.PROMPT_HOSTKEY, cb),

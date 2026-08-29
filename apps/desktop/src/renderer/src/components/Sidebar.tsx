@@ -300,6 +300,7 @@ export function Sidebar() {
               <MenuItem label={t('menu.plugins')} onClick={() => { setMenuOpen(false); openAppModal('plugins') }} />
               <MenuItem label={t('menu.createGroup')} onClick={() => { setMenuOpen(false); setModal({ kind: 'group', group: null }) }} />
               <MenuItem label={t('menu.import')} onClick={() => void runImport()} />
+              <MenuItem label={t('menu.export')} onClick={() => { setMenuOpen(false); openAppModal('export-hosts') }} />
               {/* Local dev là "khu vực sản phẩm khác" (môi trường dev local, không phải SSH) nên
                   tách bằng separator; và CHỈ hiện khi user đã bật ở Cài đặt → Local dev. */}
               {localdevEnabled && (

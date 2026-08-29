@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useDataStore } from '../stores/data'
 import { useToastsStore } from '../stores/toasts'
 import { Button, ConfirmModal, Field, Modal, TextArea, TextInput } from './ui'
+import { RevealSecretModal } from './RevealSecretModal'
 
 export function KeysModal({ onClose }: { onClose: () => void }) {
   const { keys, generateKey, importKey, deleteKey } = useDataStore()
@@ -12,6 +13,8 @@ export function KeysModal({ onClose }: { onClose: () => void }) {
   const [passphrase, setPassphrase] = useState('')
   const [busy, setBusy] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; label: string } | null>(null)
+  /** Key đang mở hộp thoại xem lại passphrase (hộp thoại tự bắt nhập lại master password). */
+  const [revealing, setRevealing] = useState<{ id: string; label: string } | null>(null)
 
   const reset = (): void => {
     setMode('list')
@@ -45,6 +48,16 @@ export function KeysModal({ onClose }: { onClose: () => void }) {
                 <Button type="button" className="!px-2 !py-1 !text-xs" onClick={() => copyPublic(key.publicKey)}>
                   Copy pub
                 </Button>
+                {/* Chỉ có ý nghĩa khi key thật sự có passphrase — bấm vào phải nhập lại master password */}
+                {key.hasPassphrase && (
+                  <Button
+                    type="button"
+                    className="!px-2 !py-1 !text-xs"
+                    onClick={() => setRevealing({ id: key.id, label: key.label })}
+                  >
+                    👁 Xem pass
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="danger"
@@ -149,6 +162,15 @@ export function KeysModal({ onClose }: { onClose: () => void }) {
             </Button>
           </div>
         </form>
+      )}
+
+      {revealing && (
+        <RevealSecretModal
+          kind="key-passphrase"
+          id={revealing.id}
+          title={revealing.label}
+          onClose={() => setRevealing(null)}
+        />
       )}
     </Modal>
   )

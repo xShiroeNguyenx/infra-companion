@@ -786,12 +786,19 @@ export interface SyncStatusDto {
   folder?: string
   lastSyncAt?: number
   lastMessage?: string
+  /** Tự đồng bộ mỗi N phút; 0 = tắt. */
+  autoMinutes?: number
 }
 
 export interface SyncRunResult {
   ok: boolean
   pulled: number
   message: string
+  /**
+   * Đã bị chặn vì nghi ngờ ghi đè mất dữ liệu (không thấy blob nhưng có dấu hiệu nó phải có
+   * ở đó). Renderer hỏi lại user rồi gọi lại với `force`.
+   */
+  needsConfirm?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -919,6 +926,39 @@ export interface SshConfigImportResult {
   keysImported: number
   groupName: string
   warnings: string[]
+}
+
+/** Loại bí mật xem lại được. TOTP seed CỐ Ý không có mặt — nó không rời main process. */
+export type RevealKind = 'host-password' | 'key-passphrase'
+
+export interface RevealRequest {
+  kind: RevealKind
+  /** id của host hoặc của key, tuỳ `kind`. */
+  id: string
+  /** Xác thực lại — luôn bắt buộc, kể cả khi vault đang mở. */
+  masterPassword: string
+}
+
+export interface RevealResult {
+  ok: boolean
+  /** CHỈ có ở đường `reveal`; đường `copy` không bao giờ trả giá trị về renderer. */
+  value?: string
+  error?: string
+  /** > 0 = đang bị khoá tạm do gõ sai nhiều lần; số giây phải chờ. */
+  cooldownSec?: number
+}
+
+/** P30 — định dạng xuất hosts. Cả 3 đều KHÔNG chứa bí mật. */
+export type HostExportFormat = 'ssh_config' | 'csv' | 'json'
+
+export interface HostExportResult {
+  ok: boolean
+  /** Số host đã ghi ra file. */
+  exported: number
+  /** Host không phải SSH bị bỏ khi xuất ssh_config (0 với csv/json). */
+  skipped: number
+  path?: string
+  message: string
 }
 
 // ---------------------------------------------------------------------------
@@ -1592,6 +1632,22 @@ export interface InfraApi {
     /** Mở dialog chọn file ssh_config rồi import. null = user huỷ. */
     sshConfig(): Promise<SshConfigImportResult | null>
   }
+  exporter: {
+    /**
+     * Xuất hosts ra file do user chọn. Bản xuất chỉ có thông tin kết nối —
+     * không mật khẩu, không key, không ghi chú, không biến môi trường.
+     */
+    hosts(format: HostExportFormat): Promise<HostExportResult>
+  }
+  secrets: {
+    /** Hiện bí mật đã lưu lên màn hình. Giá trị VÀO renderer — nơi gọi phải che + tự ẩn. */
+    reveal(request: RevealRequest): Promise<RevealResult>
+    /**
+     * Chép vào clipboard mà KHÔNG đưa giá trị qua renderer (main tự giải mã rồi ghi).
+     * Clipboard tự xoá sau ~30s nếu nội dung chưa bị thay.
+     */
+    copy(request: RevealRequest): Promise<RevealResult>
+  }
   bulk: {
     /**
      * Chạy lệnh trên nhiều host song song. Kết quả stream qua onEvent.
@@ -1832,9 +1888,17 @@ export interface InfraApi {
     /** Mở dialog chọn thư mục đồng bộ. null = huỷ. */
     pickFolder(): Promise<string | null>
     /** Bật sync: dẫn xuất sync key từ passphrase, verify với blob hiện có, ghi nhớ key. */
-    configure(folderPath: string, passphrase: string): Promise<SyncRunResult>
-    now(): Promise<SyncRunResult>
+    configure(folderPath: string, passphrase: string, force?: boolean): Promise<SyncRunResult>
+    now(force?: boolean): Promise<SyncRunResult>
     disable(): Promise<SyncStatusDto>
+    /** Bật/tắt tự đồng bộ. 0 = tắt. */
+    setAuto(minutes: number): Promise<SyncStatusDto>
+    /** Ghi blob mã hoá ra file do user chọn (không cần đã bật sync). */
+    exportFile(passphrase: string): Promise<SyncRunResult>
+    /** Đọc blob từ file do user chọn rồi merge vào vault. */
+    importFile(passphrase: string): Promise<SyncRunResult>
+    /** Auto-sync vừa kéo về dữ liệu mới. Trả về hàm unsubscribe. */
+    onPulled(cb: (pulled: number) => void): () => void
   }
   prompts: {
     onHostKey(cb: (q: HostKeyQuestion) => void): () => void

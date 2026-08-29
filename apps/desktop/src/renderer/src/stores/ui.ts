@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 export type AppModal =
+  | 'export-hosts'
   | 'snippets'
   | 'tunnels'
   | 'keys'

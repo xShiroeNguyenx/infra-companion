@@ -6,12 +6,14 @@ import { registerAiIpc } from './ipc/ai'
 import { registerBulkIpc } from './ipc/bulk'
 import { registerDataIpc } from './ipc/data'
 import { registerImportIpc } from './ipc/import'
+import { registerExportIpc } from './ipc/export'
+import { flushSecretClipboard, registerRevealIpc } from './ipc/reveal'
 import { registerMonitorIpc } from './ipc/monitor'
 import { registerWatcherIpc } from './ipc/watcher'
 import { registerHostToolsIpc } from './ipc/hostTools'
 import { registerReplicationIpc } from './ipc/replication'
 import { registerNetToolsIpc } from './ipc/nettools'
-import { registerSyncIpc } from './ipc/sync'
+import { flushSyncOnQuit, registerSyncIpc } from './ipc/sync'
 import { registerPromptIpc } from './ipc/prompts'
 import { registerSftpIpc } from './ipc/sftp'
 import { registerVncIpc } from './ipc/vnc'
@@ -249,6 +251,8 @@ registerPromptIpc()
 registerVaultIpc()
 registerDataIpc()
 registerImportIpc()
+registerExportIpc()
+registerRevealIpc()
 registerBulkIpc()
 registerAiIpc()
 registerNetToolsIpc()
@@ -318,9 +322,12 @@ app.on('before-quit', (event) => {
   disposeReplication()
   disposeWatcher()
   disposeFonts()
+  flushSecretClipboard()
 
+  // Đẩy blob sync lần cuối TRƯỚC khi lock vault (`exportSnapshot` cần DEK), và nằm trong
+  // cùng cửa sổ chờ QUIT_GRACE_MS: một thư mục mạng treo không được giữ app lại mãi.
   void Promise.race([
-    localDev.dispose(),
+    Promise.all([localDev.dispose(), flushSyncOnQuit()]),
     new Promise((resolve) => setTimeout(resolve, QUIT_GRACE_MS))
   ]).finally(() => {
     getVault().lock() // lock cuối cùng, giữ đúng thứ tự cũ

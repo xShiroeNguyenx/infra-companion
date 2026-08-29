@@ -18,6 +18,7 @@ import { LocaldevTabView } from './features/localdev/LocaldevTabView'
 import { LocaldevSettingsModal } from './features/localdev/LocaldevSettingsModal'
 import { MetricsHistoryModal } from './components/MetricsHistoryModal'
 import { SyncModal } from './components/SyncModal'
+import { ExportHostsModal } from './components/ExportHostsModal'
 import { AiModal } from './components/AiModal'
 import { AiDiagnoseModal } from './components/AiDiagnoseModal'
 import { AiDiagnosePill } from './components/AiDiagnosePill'
@@ -134,6 +135,12 @@ export default function App() {
       void useFontsStore.getState().load()
     }
     const offLocked = window.infra.vault.onLocked(() => useVaultStore.getState().markLocked())
+    // Auto-sync chạy ở main: không nạp lại thì UI đứng ở bản cũ trong khi vault đã đổi
+    const offPulled = window.infra.sync.onPulled((pulled) => {
+      void useDataStore.getState().refreshAll()
+      const toastLang = useSettingsStore.getState().language
+      useToastsStore.getState().push(translate(toastLang, 'sync.autoPulled', { n: pulled }), 'info')
+    })
     const offExit = window.infra.terminal.onExit((e) =>
       useTabsStore.getState().applyExit(e.sessionId, e.exitCode, e.reason)
     )
@@ -182,6 +189,7 @@ export default function App() {
       offLdService()
       offLdRuntime()
       offLdSite()
+      offPulled()
       offLocked()
       offExit()
       offStatus()
@@ -343,6 +351,7 @@ export default function App() {
     },
     { id: 'open-recordings', label: t('menu.recordings'), run: () => setModal('recordings') },
     { id: 'open-sync', label: t('menu.sync'), run: () => setModal('sync') },
+    { id: 'export-hosts', label: t('menu.export'), run: () => setModal('export-hosts') },
     { id: 'open-snippets', label: t('menu.snippets'), run: () => setModal('snippets') },
     { id: 'open-tunnels', label: t('menu.tunnels'), run: () => setModal('tunnels') },
     {
@@ -461,6 +470,7 @@ export default function App() {
       {modal === 'net' && <NetToolboxModal onClose={() => setModal(null)} />}
       {modal === 'monitor' && <MonitorModal onClose={() => setModal(null)} />}
       {modal === 'sync' && <SyncModal onClose={() => setModal(null)} />}
+      {modal === 'export-hosts' && <ExportHostsModal onClose={() => setModal(null)} />}
       {modal === 'ai' && <AiModal onClose={() => setModal(null)} />}
       {modal === 'ai-diagnose' && (
         <AiDiagnoseModal onClose={() => setModal(null)} onMinimize={minimizeAiDiagnose} />
