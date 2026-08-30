@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { GroupDto, HostDto, MetricHistoryHostDto, MetricHistoryPointDto } from '@infra/shared'
+import {
+  collectAttention,
+  type AttentionKind,
+  type GroupDto,
+  type HostDto,
+  type MetricHistoryHostDto,
+  type MetricHistoryPointDto
+} from '@infra/shared'
 import type { WorkspaceTab } from '../../stores/tabs'
 import { useDataStore } from '../../stores/data'
 import { pinnedFirst, useFavoritesStore, useTunnelFavoritesStore } from '../../stores/favorites'
@@ -7,15 +14,24 @@ import { useMonitorStore } from '../../stores/monitor'
 import { useSettingsStore } from '../../stores/settings'
 import { useTabsStore } from '../../stores/tabs'
 import { useUiStore } from '../../stores/ui'
+import { useReplicationStore } from '../../stores/replication'
 import { useWatcherStore } from '../../stores/watcher'
 import { useWorkspacesStore } from '../../stores/workspaces'
 import { Button } from '../../components/ui'
 import { MetricChart } from '../../components/MetricsHistoryModal'
 import { ToolGrid } from './ToolGrid'
+import { GroupHostsModal } from './GroupHostsModal'
 import { APP_SHORTCUTS, terminalShortcuts } from '../../lib/shortcutList'
 import { useT } from '../../i18n'
 
 const LOCALES = { vi: 'vi-VN', en: 'en-US', ja: 'ja-JP' } as const
+
+/** Nhãn cho từng loại vấn đề trên dải "Cần chú ý". */
+const ATTENTION_LABEL: Record<AttentionKind, 'dashboard.attHostDown' | 'dashboard.attTunnel' | 'dashboard.attRepl'> = {
+  'host-down': 'dashboard.attHostDown',
+  'tunnel-error': 'dashboard.attTunnel',
+  replication: 'dashboard.attRepl'
+}
 
 // Giống Sidebar: user@host hoặc user@host:port thì coi là quick-connect target
 const QUICK_PATTERN = /^[^@\s]+@[^@\s]+$/
@@ -65,6 +81,40 @@ export function DashboardView({ active }: { active: boolean }) {
   const setModal = useUiStore((s) => s.setModal)
   const termShortcuts = useSettingsStore((s) => s.shortcuts)
   const [quick, setQuick] = useState('')
+  /** Nhóm đang mở danh sách host đầy đủ (bấm vào TÊN nhóm). null = không mở. */
+  const [groupHosts, setGroupHosts] = useState<GroupDto | null>(null)
+
+  const watcherEnabled = useWatcherStore((s) => s.enabled)
+  const hostStatuses = useWatcherStore((s) => s.statuses)
+  const replRuntime = useReplicationStore((s) => s.runtime)
+
+  /**
+   * Chỉ những slave có chẩn đoán mức `critical` mới lên dải: `warn` xuất hiện thường xuyên
+   * (trễ nhấp nhô) và đưa hết vào thì dải lúc nào cũng đỏ, tức là hết tác dụng.
+   */
+  const replicaIssues = useMemo(
+    () =>
+      Object.values(replRuntime).flatMap((pair) =>
+        Object.entries(pair.replicas).flatMap(([replicaId, entry]) => {
+          const worst = entry.snapshot.diagnoses.find((d) => d.severity === 'critical')
+          return worst ? [{ id: replicaId, label: entry.snapshot.sample.replicaLabel, detail: worst.title }] : []
+        })
+      ),
+    [replRuntime]
+  )
+
+  const attention = useMemo(
+    () =>
+      collectAttention({
+        watcherEnabled,
+        hosts,
+        hostStatus: hostStatuses,
+        tunnels,
+        tunnelState: tunnelStates,
+        replicaIssues
+      }),
+    [watcherEnabled, hosts, hostStatuses, tunnels, tunnelStates, replicaIssues]
+  )
 
   // Cheat sheet: phím app (cố định) + 4 phím terminal theo đúng giá trị user đang đặt
   const shortcuts = useMemo(
@@ -163,6 +213,28 @@ export function DashboardView({ active }: { active: boolean }) {
           <StatTile label={t('dashboard.stats.week')} value={stats.week} />
         </div>
 
+        {/* Dải "Cần chú ý" — CHỈ hiện khi thật sự có vấn đề. Luôn hiện một khối kể cả khi
+            trống thì mắt sẽ học cách bỏ qua nó, và lúc có chuyện thật cũng không ai nhìn. */}
+        {attention.length > 0 && (
+          <section className="border-danger/50 bg-danger/10 rounded-md border px-3 py-2.5">
+            <h2 className="text-danger mb-2 text-[10px] font-semibold tracking-wider uppercase">
+              ⚠ {t('dashboard.attention', { n: attention.length })}
+            </h2>
+            <div className="flex flex-wrap gap-1.5">
+              {attention.map((item) => (
+                <span
+                  key={item.id}
+                  className="border-danger/40 bg-app text-content rounded border px-2 py-1 text-[11px]"
+                  title={item.detail}
+                >
+                  {t(ATTENTION_LABEL[item.kind])} <span className="font-medium">{item.label}</span>
+                  {item.detail && <span className="text-subtle"> · {item.detail}</span>}
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section>
           <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">
             ★ {t('dashboard.favorites')}
@@ -202,7 +274,9 @@ export function DashboardView({ active }: { active: boolean }) {
                   key={group.id}
                   group={group}
                   hosts={hosts.filter((h) => h.groupId === group.id)}
-                  onOpen={() => void openSshGroup(hostIds)}
+                  onOpenAll={() => void openSshGroup(hostIds)}
+                  onOpenHost={(hostId) => void openSsh(hostId)}
+                  onShowHosts={() => setGroupHosts(group)}
                 />
               ))}
             </div>
@@ -330,6 +404,14 @@ export function DashboardView({ active }: { active: boolean }) {
           <p className="text-subtle mt-1.5 text-[10px]">{t('dashboard.sc.mouseTip')}</p>
         </section>
       </div>
+
+      {groupHosts && (
+        <GroupHostsModal
+          group={groupHosts}
+          hosts={hosts.filter((h) => h.groupId === groupHosts.id)}
+          onClose={() => setGroupHosts(null)}
+        />
+      )}
     </div>
   )
 }
@@ -473,25 +555,34 @@ function TwoColumnList<T>({ items, children }: { readonly items: readonly T[]; r
   )
 }
 
-/** Số host tối đa hiện tên trong card nhóm — quá số này thì gộp thành "+N". */
-const GROUP_PREVIEW_HOSTS = 4
-/** Số chấm trạng thái tối đa; nhóm lớn hơn thì phần dư gộp thành "+N" cho khỏi tràn hàng. */
-const GROUP_DOTS_MAX = 10
+/**
+ * Số chip host tối đa trong card; dư ra thì gộp thành "+N" bấm được để mở danh sách đầy đủ.
+ * Chip có tên nên rộng hơn chấm trạng thái cũ — 6 là mức card còn cao đều trong lưới 4 cột.
+ */
+const GROUP_PREVIEW_HOSTS = 6
 
 /**
- * Card một nhóm host: bấm là mở CẢ nhóm thành các pane trong 1 tab.
- * Thay cho chip nhỏ trước đây — card đủ chỗ để nói thêm những thứ quyết định "có nên mở
- * nhóm này không": bao nhiêu host, mấy con đang sống (khi watcher đang bật), user SSH mặc
- * định của nhóm, và tên vài host đầu.
+ * Card một nhóm host — BA vùng bấm riêng, mỗi vùng một việc:
+ *  · tên nhóm  → mở danh sách đầy đủ ({@link GroupHostsModal}), chỗ duy nhất xem được hết
+ *    host khi nhóm đông hơn số chip vừa card;
+ *  · từng chip host → mở LẺ đúng host đó;
+ *  · dòng chân   → mở CẢ nhóm thành các pane trong 1 tab (hành vi cũ, giữ nguyên).
+ *
+ * ⚠️ Vì thế card KHÔNG còn là một `<button>` bọc ngoài như trước: `<button>` lồng `<button>`
+ * là HTML không hợp lệ và trình duyệt sẽ tự gỡ lồng, mất luôn nút con.
  */
 function GroupCard({
   group,
   hosts,
-  onOpen
+  onOpenAll,
+  onOpenHost,
+  onShowHosts
 }: {
   readonly group: GroupDto
   readonly hosts: HostDto[]
-  readonly onOpen: () => void
+  readonly onOpenAll: () => void
+  readonly onOpenHost: (hostId: string) => void
+  readonly onShowHosts: () => void
 }) {
   const t = useT()
   const watcherEnabled = useWatcherStore((s) => s.enabled)
@@ -506,15 +597,9 @@ function GroupCard({
 
   const preview = hosts.slice(0, GROUP_PREVIEW_HOSTS)
   const rest = hosts.length - preview.length
-  const dots = hosts.slice(0, GROUP_DOTS_MAX)
-  const dotsRest = hosts.length - dots.length
 
   return (
-    <button
-      onClick={onOpen}
-      title={t('sidebar.openGroup', { n: hosts.length })}
-      className="border-edge-strong bg-elevated hover:border-accent/60 hover:bg-hover group relative flex w-full flex-col gap-1.5 overflow-hidden rounded-md border py-3 pr-3 pl-4 text-left"
-    >
+    <div className="border-edge-strong bg-elevated hover:border-accent/60 group relative flex w-full flex-col gap-1.5 overflow-hidden rounded-md border py-3 pr-3 pl-4 text-left">
       {/* Dải màu CHẠY HẾT chiều cao (không phải vạch nhỏ cạnh tên): đây là tín hiệu chính
           phân biệt "một nhóm" với card một host ở mục Yêu thích. Không đặt màu thì dùng
           màu viền cho vẫn thấy dải. */}
@@ -524,39 +609,80 @@ function GroupCard({
       />
 
       <div className="flex items-center gap-2">
-        <span className="text-content min-w-0 flex-1 truncate text-sm font-semibold">{group.name}</span>
-        {/* Số host thành CHIP: nói ngay "nhiều máy", thay vì lẫn trong dòng chữ nhỏ */}
-        <span className="border-edge bg-app text-muted shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-medium">
+        <button
+          type="button"
+          onClick={onShowHosts}
+          title={t('dashboard.groupShowHosts', { name: group.name })}
+          className="text-content hover:text-accent min-w-0 flex-1 truncate text-left text-sm font-semibold hover:underline"
+        >
+          {group.name}
+        </button>
+        {/* Số host thành CHIP: nói ngay "nhiều máy", thay vì lẫn trong dòng chữ nhỏ.
+            Bấm được luôn — "5" thì việc muốn làm tiếp gần như chắc chắn là "cho xem 5 con đó". */}
+        <button
+          type="button"
+          onClick={onShowHosts}
+          title={t('dashboard.groupShowHosts', { name: group.name })}
+          className="border-edge bg-app text-muted hover:border-accent/60 hover:text-content shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-medium"
+        >
           ⊞ {hosts.length}
-        </span>
+        </button>
       </div>
 
-      {/* Một chấm cho MỖI host — thấy ngay nhóm này gồm mấy máy và máy nào đang chết.
-          Chưa có kết quả check (watcher tắt / mới bật) thì chấm xám = chưa biết, KHÔNG tô đỏ. */}
+      {(showUptime || group.username) && (
+        <div className="flex items-center gap-2">
+          {showUptime && (
+            <span className={`text-[11px] ${allUp ? 'text-subtle' : 'text-warning'}`}>
+              {t('dashboard.groupUp', { up, n: checked.length })}
+            </span>
+          )}
+          {group.username && <span className="text-subtle truncate text-[11px]">{group.username}</span>}
+        </div>
+      )}
+
+      {/* MỖI host một chip bấm được, kèm chấm trạng thái của CHÍNH nó. Trước đây là một dãy
+          chấm vô danh + một chuỗi tên ghép bằng "·": nhìn thấy "có máy chết" nhưng không biết
+          máy nào, và không mở lẻ được con nào. Chấm xám = chưa có kết quả check, KHÔNG phải chết. */}
       <div className="flex flex-wrap items-center gap-1">
-        {dots.map((h) => {
+        {preview.map((h) => {
           const st = statuses[h.id]
           const tone = !watcherEnabled || st === undefined ? 'bg-edge-strong' : st.ok ? 'bg-success' : 'bg-danger'
-          return <span key={h.id} className={`size-1.5 rounded-full ${tone}`} title={h.label} />
+          return (
+            <button
+              key={h.id}
+              type="button"
+              onClick={() => onOpenHost(h.id)}
+              title={t('sidebar.connectTo', { target: h.label })}
+              className="border-edge bg-app text-muted hover:border-accent/60 hover:text-content flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 text-[11px]"
+            >
+              <span className={`size-1.5 shrink-0 rounded-full ${tone}`} />
+              <span className="truncate">{h.label}</span>
+            </button>
+          )
         })}
-        {dotsRest > 0 && <span className="text-subtle text-[10px]">+{dotsRest}</span>}
-        {showUptime && (
-          <span className={`ml-1 text-[11px] ${allUp ? 'text-subtle' : 'text-warning'}`}>
-            {t('dashboard.groupUp', { up, n: checked.length })}
-          </span>
+        {rest > 0 && (
+          <button
+            type="button"
+            onClick={onShowHosts}
+            title={t('dashboard.groupShowHosts', { name: group.name })}
+            className="text-subtle hover:text-accent px-1 text-[11px] hover:underline"
+          >
+            +{rest}
+          </button>
         )}
-        {group.username && <span className="text-subtle ml-1 truncate text-[11px]">{group.username}</span>}
       </div>
 
-      <div className="text-muted truncate text-[11px]">
-        {preview.map((h) => h.label).join(' · ')}
-        {rest > 0 && <span className="text-subtle"> +{rest}</span>}
-      </div>
-
-      {/* Nói thẳng bấm vào thì XẢY RA GÌ — khác hẳn card Yêu thích (mở 1 tab) */}
-      <div className="border-edge/70 text-subtle group-hover:text-accent mt-0.5 border-t pt-1.5 text-[10px]">
+      {/* Nói thẳng bấm vào thì XẢY RA GÌ — khác hẳn card Yêu thích (mở 1 tab).
+          `mt-auto` NEO XUỐNG ĐÁY: card trong cùng hàng lưới bị kéo cao bằng nhau, không neo
+          thì dòng này lửng lơ giữa card và mỗi card một chỗ. */}
+      <button
+        type="button"
+        onClick={onOpenAll}
+        title={t('sidebar.openGroup', { n: hosts.length })}
+        className="border-edge/70 text-subtle hover:text-accent mt-auto border-t pt-1.5 text-left text-[10px]"
+      >
         ⊞ {t('dashboard.groupOpenPanes', { n: hosts.length })}
-      </div>
-    </button>
+      </button>
+    </div>
   )
 }

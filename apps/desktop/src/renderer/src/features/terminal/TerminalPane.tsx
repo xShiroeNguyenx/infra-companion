@@ -10,11 +10,13 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import { saveTermSnapshot, subscribeTermData, takeTermSnapshot } from '../../lib/termBus'
 import { matchGuard } from '../../lib/commandGuard'
 import { matchesCombo } from '../../lib/shortcuts'
+import { guardScope, resolveProduction, typePhraseMatches, type CommandTarget, type GuardScope } from '@infra/shared'
 import { useTabsStore, type Pane } from '../../stores/tabs'
 import { useAiExplainStore } from '../../stores/aiExplain'
+import { useDataStore } from '../../stores/data'
 import { useSettingsStore, type CommandAlias } from '../../stores/settings'
 import { useT } from '../../i18n'
-import { Button, Modal } from '../../components/ui'
+import { Button, Modal, TextInput } from '../../components/ui'
 import { terminalTheme } from './theme'
 
 /**
@@ -116,7 +118,9 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: Term
   const [hasSelection, setHasSelection] = useState(false)
   const [copied, setCopied] = useState(false)
   /** Lệnh nhạy cảm đang chờ xác nhận (guard đã chặn Enter); null = không có. */
-  const [guardPrompt, setGuardPrompt] = useState<{ command: string; pattern: string } | null>(null)
+  const [guardPrompt, setGuardPrompt] = useState<{ command: string; pattern: string; scope: GuardScope } | null>(null)
+  /** F27: chuỗi user gõ lại để xác nhận khi đích có máy production. */
+  const [guardTyped, setGuardTyped] = useState('')
   const [suggest, setSuggest] = useState<SuggestState | null>(null)
   const suggestRef = useRef<SuggestState | null>(null)
   const paneActiveRef = useRef(paneActive)
@@ -437,6 +441,36 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: Term
     term.focus()
   }
 
+  /**
+   * F27 — những pane THẬT SỰ sẽ nhận lệnh này, kèm cờ production đã kế thừa từ chuỗi group.
+   *
+   * Phải tính đúng lúc bấm Enter chứ không phải lúc mở pane: Broadcast bật/tắt được giữa
+   * chừng, và một pane có thể đã thoát. Đây là khác biệt giữa "xác nhận chạy trên 1 máy" và
+   * "xác nhận chạy trên 5 máy, trong đó 2 con là production".
+   */
+  function commandTargets(): CommandTarget[] {
+    const tab = useTabsStore.getState().tabs.find((x) => x.id === tabId)
+    const broadcasting = tab?.broadcast === true && tab.panes.length > 1
+    const targetPanes = broadcasting ? tab.panes.filter((p) => p.status !== 'exited') : [pane]
+    const { hosts, groups } = useDataStore.getState()
+    const groupById = new Map(groups.map((g) => [g.id, g]))
+    return targetPanes.map((p) => {
+      const hostId = p.origin?.kind === 'host' ? p.origin.hostId : null
+      const host = hostId ? hosts.find((h) => h.id === hostId) : undefined
+      return {
+        // Không phải pane nào cũng là host đã lưu (local shell, quick-connect) → dùng tiêu đề pane
+        label: host?.label ?? p.title,
+        production: host
+          ? resolveProduction(
+              host.groupId,
+              (id) => groupById.get(id)?.production === true,
+              (id) => groupById.get(id)?.parentId ?? null
+            )
+          : false
+      }
+    })
+  }
+
   /** Input từ xterm. Guard lệnh nhạy cảm chặn Enter đơn (\r) nếu dòng lệnh khớp whitelist. */
   function handleInput(data: string): void {
     if (data === '\r') {
@@ -447,7 +481,8 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: Term
         const matched = command ? matchGuard(command, commandGuardPatterns) : null
         if (matched) {
           // Chưa gửi \r — server chưa nhận Enter, lệnh còn nguyên ở prompt để user sửa nếu huỷ
-          setGuardPrompt({ command: command.trim(), pattern: matched })
+          setGuardTyped('')
+          setGuardPrompt({ command: command.trim(), pattern: matched, scope: guardScope(commandTargets()) })
           return
         }
       }
@@ -640,12 +675,43 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: Term
           <div className="border-danger/50 bg-input text-content mb-2 max-w-96 rounded border px-3 py-2 font-mono text-xs break-all">
             {guardPrompt.command}
           </div>
-          <p className="text-subtle mb-3 text-[11px]">{t('guard.matched', { pattern: guardPrompt.pattern })}</p>
+          <p className="text-subtle mb-2 text-[11px]">{t('guard.matched', { pattern: guardPrompt.pattern })}</p>
+
+          {/* F27 — PHẠM VI. Broadcast biến một lần gõ thành N máy; hộp thoại cũ không nói gì
+              về chuyện đó nên nhìn y hệt nhau dù đích là 1 máy nháp hay 5 con production. */}
+          {guardPrompt.scope.targetCount > 1 && (
+            <p className="text-warning mb-2 max-w-96 text-[11px]">
+              ⚠ {t('guard.scopeMany', { n: guardPrompt.scope.targetCount })}
+            </p>
+          )}
+          {guardPrompt.scope.productionLabels.length > 0 && (
+            <div className="border-danger/50 bg-danger/10 mb-3 max-w-96 rounded border px-3 py-2">
+              <p className="text-danger mb-1 text-[11px] font-medium">
+                {t('guard.prodWarn', { list: guardPrompt.scope.productionLabels.join(', ') })}
+              </p>
+              <p className="text-muted mb-1.5 text-[11px]">
+                {t('guard.typeToConfirm', { name: guardPrompt.scope.typePhrase ?? '' })}
+              </p>
+              <TextInput
+                autoFocus
+                value={guardTyped}
+                onChange={(e) => setGuardTyped(e.target.value)}
+                placeholder={guardPrompt.scope.typePhrase ?? ''}
+              />
+            </div>
+          )}
+
           <div className="flex justify-end gap-2">
-            <Button autoFocus onClick={cancelGuard}>
+            {/* Nút Huỷ autoFocus khi KHÔNG phải gõ xác nhận → bấm Enter theo phản xạ sẽ huỷ
+                (an toàn). Có ô gõ thì ô đó giữ focus, nên bỏ autoFocus ở đây. */}
+            <Button autoFocus={guardPrompt.scope.level === 'confirm'} onClick={cancelGuard}>
               {t('guard.cancel')}
             </Button>
-            <Button variant="danger" onClick={confirmGuard}>
+            <Button
+              variant="danger"
+              disabled={!typePhraseMatches(guardTyped, guardPrompt.scope.typePhrase)}
+              onClick={confirmGuard}
+            >
               {t('guard.run')}
             </Button>
           </div>

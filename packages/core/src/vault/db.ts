@@ -274,6 +274,22 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX idx_repl_runs_time ON repl_runs(created_at DESC);
   CREATE INDEX idx_repl_runs_pair ON repl_runs(pair_id, created_at DESC);
+  `,
+
+  // v17 — F27: đánh dấu nhóm là PRODUCTION.
+  //
+  // Guard lệnh nguy hiểm trước đây chỉ khớp mẫu chuỗi: hộp thoại xác nhận `rm -rf …` trông y
+  // hệt nhau dù lệnh sắp đi tới một máy nháp hay năm con DB production. Mà đường dùng nhiều
+  // nhất lại là "mở cả nhóm thành N pane rồi broadcast" — gõ một lần, chạy trên N máy.
+  //
+  // Cờ đặt ở GROUP chứ không phải host: người ta phân production/staging theo nhóm, và đánh
+  // dấu từng host thì thêm host mới vào nhóm là quên. Host kế thừa qua chuỗi group như
+  // username/keyId (xem `resolveConnection`) — nhóm cha production thì nhóm con cũng vậy.
+  //
+  // Nằm ở cột THƯỜNG, không mã hoá: đây không phải bí mật, và guard phải đọc được nó nhanh
+  // ngay lúc bấm Enter.
+  `
+  ALTER TABLE groups ADD COLUMN production INTEGER NOT NULL DEFAULT 0;
   `
 ]
 

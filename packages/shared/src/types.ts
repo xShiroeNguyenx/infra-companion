@@ -47,6 +47,11 @@ export interface GroupDto {
   jumpChain: string[] | null
   /** Màu nhận diện (hex) — tô tab/pane/sidebar của host trong group (vd production đỏ). null = không màu. */
   color: string | null
+  /**
+   * F27 — nhóm này là PRODUCTION: guard lệnh nguy hiểm siết chặt hơn (bắt gõ xác nhận thay vì
+   * bấm một nút). Host kế thừa qua chuỗi group giống username/keyId.
+   */
+  production: boolean
 }
 
 export interface GroupInput {
@@ -60,6 +65,7 @@ export interface GroupInput {
   startupSnippetId?: string | null
   jumpChain?: string[] | null
   color?: string | null
+  production?: boolean
 }
 
 /**
@@ -928,6 +934,29 @@ export interface SshConfigImportResult {
   warnings: string[]
 }
 
+/** F44 — một fingerprint đã TOFU. `hostPattern` dạng `host` hoặc `[host]:port`. */
+export interface KnownHostDto {
+  id: string
+  hostPattern: string
+  keyType: string
+  fingerprintSha256: string
+  firstSeen: number
+  lastSeen: number
+}
+
+/** F43 — đẩy public key lên authorized_keys của một host. */
+export interface CopyIdRequest {
+  hostId: string
+  keyId: string
+}
+
+export interface CopyIdResult {
+  ok: boolean
+  /** 'added' | 'already-present' khi ok; 'not-verified' = ghi được nhưng login bằng key vẫn hỏng. */
+  outcome: 'added' | 'already-present' | 'not-verified' | 'error'
+  message: string
+}
+
 /** Loại bí mật xem lại được. TOTP seed CỐ Ý không có mặt — nó không rời main process. */
 export type RevealKind = 'host-password' | 'key-passphrase'
 
@@ -1638,6 +1667,15 @@ export interface InfraApi {
      * không mật khẩu, không key, không ghi chú, không biến môi trường.
      */
     hosts(format: HostExportFormat): Promise<HostExportResult>
+  }
+  keys: {
+    /** Đẩy public key lên `~/.ssh/authorized_keys` của host rồi đăng nhập thử bằng key đó. */
+    copyId(request: CopyIdRequest): Promise<CopyIdResult>
+  }
+  knownHosts: {
+    list(): Promise<KnownHostDto[]>
+    /** Quên một fingerprint — lần nối sau host đó hỏi lại như máy lạ. Trả danh sách còn lại. */
+    forget(id: string): Promise<KnownHostDto[]>
   }
   secrets: {
     /** Hiện bí mật đã lưu lên màn hình. Giá trị VÀO renderer — nơi gọi phải che + tự ẩn. */

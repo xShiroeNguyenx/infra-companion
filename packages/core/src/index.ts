@@ -181,6 +181,7 @@ export { renderExport, resolveForExport, sshAlias, toCsv, toJson, toSshConfig } 
 export type { ExportFormat, ExportHost } from './exporters/hostExport'
 export { VaultService } from './vault/VaultService'
 export type {
+  KnownHostEntry,
   KnownHostRecord,
   ReplCreds,
   ReplCredentialsResolved,
@@ -350,3 +351,12 @@ export type { SpawnFn, SpawnOptions, SpawnedProcess, SupervisorDeps } from './lo
 export type { PlatformAdapter } from './localdev/platform/PlatformAdapter'
 export { WindowsAdapter, parseExcludedPortRanges, parseStrayJson } from './localdev/platform/WindowsAdapter'
 export { PosixAdapter, createPlatformAdapter } from './localdev/platform/PosixAdapter'
+// F43 — đẩy public key lên authorized_keys (phần quyết định; phần chạy lệnh ở main).
+export {
+  appendAuthorizedKeyCommand,
+  authorizedKeysHas,
+  planCopyId,
+  publicKeyIdentity,
+  readAuthorizedKeysCommand
+} from './keys/authorizedKeys'
+export type { CopyIdOutcome } from './keys/authorizedKeys'

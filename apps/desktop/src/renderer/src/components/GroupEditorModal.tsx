@@ -19,6 +19,7 @@ export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; o
   const [envText, setEnvText] = useState(envToText(group?.env ?? null))
   const [startupSnippetId, setStartupSnippetId] = useState(group?.startupSnippetId ?? '')
   const [color, setColor] = useState<string | null>(group?.color ?? null)
+  const [production, setProduction] = useState(group?.production ?? false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -38,7 +39,8 @@ export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; o
       keyId: usesKey ? keyId : null,
       env: textToEnv(envText),
       startupSnippetId: startupSnippetId || null,
-      color
+      color,
+      production
     })
     setBusy(false)
     if (saved) onClose()
@@ -83,6 +85,21 @@ export function GroupEditorModal({ group, onClose }: { group: GroupDto | null; o
           </div>
           <p className="text-subtle mt-1 text-[10px] leading-relaxed">{t('group.colorHint')}</p>
         </Field>
+
+        {/* F27 — đánh dấu ở GROUP chứ không phải từng host: người ta phân production/staging
+            theo nhóm, mà đánh dấu từng host thì thêm host mới vào nhóm là quên. */}
+        <label className="border-warning/40 bg-warning/10 mb-3 flex items-start gap-2 rounded border px-3 py-2 select-none">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={production}
+            onChange={(e) => setProduction(e.target.checked)}
+          />
+          <span>
+            <span className="text-content block text-xs font-medium">{t('group.production')}</span>
+            <span className="text-subtle block text-[10px] leading-relaxed">{t('group.productionHint')}</span>
+          </span>
+        </label>
 
         <p className="text-subtle mb-2 text-[11px] leading-relaxed">{t('group.inheritNote')}</p>
 

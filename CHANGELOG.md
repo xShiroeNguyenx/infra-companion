@@ -5,6 +5,21 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.9] — 2026-08-29
+
+### Added
+
+- **The dangerous-command guard now knows *where* the command is about to run.** It only ever matched patterns, so the confirmation for `rm -rf …` looked identical whether it was going to one scratch box or five production database servers — and the most-used path in this app is *open a group as N panes and turn Broadcast on*, which turns one keystroke into N machines. A group can now be marked **PRODUCTION** (inherited by every group under it, like the default user or key). The confirmation says how many machines will receive the command and names the production ones among them, and when a production machine is in scope it asks you to **retype that machine's name** rather than accepting a single click. Nothing changes for a group you haven't marked.
+- **Push a public key to a host, from one button.** A host that logs in with a password now has *Push public key to host* next to its password field: pick a key from the vault, and the app appends it to `~/.ssh/authorized_keys` and then **logs in with that key to prove it worked** before reporting success — with the wrong permissions on `~/.ssh`, sshd ignores the key silently, so "pushed successfully" without that check is a claim that is very easy to believe and often wrong. It skips the write if the key is already there (comparing the key itself, not the comment, so pushing from a second machine doesn't duplicate the line), and only offers to switch the host over to key auth *after* the test login passes.
+- **A list of the SSH fingerprints you've trusted** (`⋯` → *Trusted fingerprints*). The app has always remembered a host's key on first connect and warned when it changed, but there was no way to see what you had trusted or to remove an entry. After rebuilding a server, the only option was to click past a red warning every single time — and a warning you dismiss by reflex has stopped working. Forgetting an entry makes the next connection ask again as if the host were new, and the removal syncs to your other machines instead of leaving them warning forever.
+- **A "Needs attention" strip at the top of the Dashboard**, listing hosts that aren't responding, tunnels that failed, and replicas with a critical diagnosis. It appears **only when something is actually wrong** — a panel that is always present is a panel you stop reading. Hosts with no check result yet are not counted as down, and it stays quiet entirely while the watcher is off, because silence there means "no data", not "all clear".
+
+### Changed
+
+- **A host-group card on the Dashboard is no longer one big button.** It did exactly one thing — open every host in the group as split panes — so reaching a single machine in a group meant going to the sidebar instead, and the row of anonymous status dots could tell you *a* machine was down without telling you *which*. The card now has three separate targets. **Each host is its own chip** carrying its own status dot, and clicking one connects to just that host. **The group name** (or the `⊞ N` count) opens the group's **full host list** — every host with its `user@host:port` and status, SSH or SFTP one at a time, and *open all N panes* at the bottom — which is the only place a group with more machines than fit on the card was ever visible. **The footer keeps the original behaviour**, unchanged: open the whole group as panes in one tab. Cards show up to six host chips before folding the rest into a `+N` that opens the same list, and the footer line is now anchored to the bottom of the card so the cards in a row line up instead of each ending wherever its content happened to stop.
+
+---
+
 ## [0.2.8] — 2026-08-28
 
 ### Added

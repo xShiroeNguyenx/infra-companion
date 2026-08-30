@@ -31,6 +31,18 @@ pnpm test     # Core tests: crypto / sync merge / ssh_config parser (merge needs
 
 **Test**: create a vault → add a host → quit the app → reopen. If you did **not** tick remember, the app asks for the master password; a wrong one is rejected.
 
+### Marking a group PRODUCTION (and what the guard does about it)
+
+In the group editor, tick **This group is PRODUCTION**. Every group beneath it inherits the mark, the same way the default user and key are inherited.
+
+It changes one thing, and it changes it where it matters: the confirmation for a dangerous command. That dialog used to look identical no matter where the command was going. Now it tells you **how many machines will receive it** — the most-used path in this app is *open a group as N panes and turn Broadcast on*, which makes one keystroke into N machines — and names the **production** ones among them. When a production machine is in scope, the dialog asks you to **retype that machine's name**; a single click is too easy to give by reflex. Groups you haven't marked behave exactly as before.
+
+### Pushing a public key to a host — the host editor, next to the password
+
+For a host that logs in with a password, **🔑 Push public key to host** picks a key from your vault, appends it to the host's `~/.ssh/authorized_keys`, and then **logs in with that key** before telling you it worked.
+
+That last step is the point. With the wrong permissions on `~/.ssh` or the file, sshd ignores the key and says nothing — the write succeeds, the command exits 0, and you find out only when the password prompt comes back. The app sets `700`/`600` on the way in and then proves the result by connecting. If the key is already on the host it skips the write (it compares the key itself, not the trailing comment, so pushing again from a second machine doesn't add a duplicate line). Only after the test login passes does it offer to switch the host over to key auth — and even then it just changes the form, so you still review and save.
+
 ### Reading a saved secret back
 
 You can look at a password you stored. Edit the host → **👁 Show saved password** beside the password field; for a key's passphrase, open **Keys** and use **👁 Xem pass** on the row.
@@ -52,7 +64,13 @@ You can look at a password you stored. Edit the host → **👁 Show saved passw
 - **Quick connect** — in the **header row next to *+ New terminal***: type `user@host[:port]` and press Enter. A confirmation drops down under the box once what you typed looks like a target.
 - **Stats** — hosts, groups, connections today / last 7 days (derived from Quick-Connect history)
 - **★ Favorites** — one click opens an SSH tab
-- **Host group cards** — one click opens the whole group as split panes in a single tab (ready to broadcast). Built to look clearly unlike the single-host cards above them: a **full-height band in the group's colour**, a `⊞ N` count chip, **one dot per host**, the group's default SSH user if it has one, the first few host names with `+N`, and a footer spelling out the action — *open N panes in one tab*.
+- **A "Needs attention" strip** at the very top — hosts that aren't responding, tunnels that failed, and replicas with a critical diagnosis. It shows up **only when there is something wrong**; a panel that is always there is a panel you stop reading. A host with no check result yet is not counted as down, and while the watcher is off the strip stays quiet entirely, because silence there means "no data", not "all clear".
+- **Host group cards** — three separate things to click, so the group isn't all-or-nothing:
+  - **the group name** (or the `⊞ N` chip) opens the **full host list** for that group — every host with its `user@host:port` and status, connect over SSH or SFTP one at a time, and *open all N panes* at the bottom. This is where you go when the group has more machines than fit on the card.
+  - **each host chip** connects to **just that host**. Every chip carries its own status dot, so you can see *which* machine is down, not merely that one is.
+  - **the footer** opens the whole group as split panes in one tab, ready to broadcast — the original one-click behaviour, unchanged.
+
+  The card still reads clearly as a group rather than a single host: a **full-height band in the group's colour**, the `⊞ N` count, and the group's default SSH user when it has one. Groups larger than six hosts show `+N`, which opens the same full list.
   - Dot colours: green = up, red = not answering, **grey = not checked yet**. The dots and the `x/y up` ratio come from the 📡 uptime watcher, so a group it hasn't reached yet stays grey with no ratio instead of looking like everything is down.
 - **Recent connections** — click to reconnect (ad-hoc targets reconnect via Quick Connect)
 - **🗂 Workspaces** — restore a saved tab/split layout in one click (*Manage* opens the full modal)
@@ -594,6 +612,12 @@ Needs AI configured (see §14). If not, the settings form opens.
 ## 15. Import from ssh_config — `⋯` → Import
 
 Pick your `~/.ssh/config` → it creates hosts, **preserves multi-hop ProxyJump**, imports IdentityFile (dedupes keys), and warns if needed. The group is named `ssh_config (date)`.
+
+### 15C. Trusted fingerprints — `⋯` → Trusted fingerprints
+
+Every host key you've accepted, newest-seen first, with the full SHA-256 fingerprint (not truncated — comparing it against `ssh-keygen -lf` on the server is the only thing you'd want it for), the key type, when you first trusted it and when it was last seen. Filter by host or fingerprint.
+
+**Forget** removes an entry: the next connection to that host asks again as if it were new, instead of raising a host-key-changed alarm. Use it when you know why the key changed — a rebuilt server, a replaced machine. The alternative is clicking past a red warning every time, and a warning you dismiss by reflex has stopped being a warning. If you *don't* know why it changed, that alarm is doing its job; leave it. Forgetting also propagates to your other machines through sync, so they don't keep warning about a host you've already dealt with.
 
 ### 15B. Export hosts — `⋯` → Export hosts…
 

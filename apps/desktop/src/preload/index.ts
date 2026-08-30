@@ -138,6 +138,13 @@ const api: InfraApi = {
   exporter: {
     hosts: (format) => ipcRenderer.invoke(IPC.EXPORT_HOSTS, format)
   },
+  keys: {
+    copyId: (request) => ipcRenderer.invoke(IPC.KEY_COPY_ID, request)
+  },
+  knownHosts: {
+    list: () => ipcRenderer.invoke(IPC.KNOWN_HOSTS_LIST),
+    forget: (id) => ipcRenderer.invoke(IPC.KNOWN_HOSTS_DELETE, id)
+  },
   secrets: {
     reveal: (request) => ipcRenderer.invoke(IPC.SECRET_REVEAL, request),
     copy: (request) => ipcRenderer.invoke(IPC.SECRET_COPY, request)

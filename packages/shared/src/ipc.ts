@@ -173,6 +173,11 @@ export const IPC = {
    * Xem lại bí mật đã lưu — đường DUY NHẤT mật khẩu được phép qua IPC sang renderer,
    * và chỉ cho MỘT bản ghi mỗi lần, sau khi nhập lại master password.
    */
+  /** F43 — đẩy public key lên host rồi đăng nhập thử bằng chính key đó. */
+  KEY_COPY_ID: 'key:copy-id',
+  /** F44 — xem / quên fingerprint đã TOFU. */
+  KNOWN_HOSTS_LIST: 'known-hosts:list',
+  KNOWN_HOSTS_DELETE: 'known-hosts:delete',
   SECRET_REVEAL: 'secret:reveal',
   /** Chép bí mật thẳng vào clipboard TỪ MAIN — giá trị không hề đi qua renderer. */
   SECRET_COPY: 'secret:copy',

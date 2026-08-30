@@ -37,6 +37,7 @@ function group(over: Partial<GroupDto> & { id: string; name: string }): GroupDto
     startupSnippetId: null,
     jumpChain: null,
     color: null,
+    production: false,
     ...over
   }
 }

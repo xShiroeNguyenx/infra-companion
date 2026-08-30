@@ -19,6 +19,7 @@ import { LocaldevSettingsModal } from './features/localdev/LocaldevSettingsModal
 import { MetricsHistoryModal } from './components/MetricsHistoryModal'
 import { SyncModal } from './components/SyncModal'
 import { ExportHostsModal } from './components/ExportHostsModal'
+import { KnownHostsModal } from './components/KnownHostsModal'
 import { AiModal } from './components/AiModal'
 import { AiDiagnoseModal } from './components/AiDiagnoseModal'
 import { AiDiagnosePill } from './components/AiDiagnosePill'
@@ -352,6 +353,7 @@ export default function App() {
     { id: 'open-recordings', label: t('menu.recordings'), run: () => setModal('recordings') },
     { id: 'open-sync', label: t('menu.sync'), run: () => setModal('sync') },
     { id: 'export-hosts', label: t('menu.export'), run: () => setModal('export-hosts') },
+    { id: 'known-hosts', label: t('menu.knownHosts'), run: () => setModal('known-hosts') },
     { id: 'open-snippets', label: t('menu.snippets'), run: () => setModal('snippets') },
     { id: 'open-tunnels', label: t('menu.tunnels'), run: () => setModal('tunnels') },
     {
@@ -471,6 +473,7 @@ export default function App() {
       {modal === 'monitor' && <MonitorModal onClose={() => setModal(null)} />}
       {modal === 'sync' && <SyncModal onClose={() => setModal(null)} />}
       {modal === 'export-hosts' && <ExportHostsModal onClose={() => setModal(null)} />}
+      {modal === 'known-hosts' && <KnownHostsModal onClose={() => setModal(null)} />}
       {modal === 'ai' && <AiModal onClose={() => setModal(null)} />}
       {modal === 'ai-diagnose' && (
         <AiDiagnoseModal onClose={() => setModal(null)} onMinimize={minimizeAiDiagnose} />

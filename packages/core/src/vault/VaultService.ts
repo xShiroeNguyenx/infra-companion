@@ -53,6 +53,12 @@ export interface KnownHostRecord {
   fingerprintSha256: string
 }
 
+/** F44 — bản ghi TOFU kèm mốc thời gian, để UI trả lời "tin từ bao giờ, gặp lần cuối khi nào". */
+export interface KnownHostEntry extends KnownHostRecord {
+  firstSeen: number
+  lastSeen: number
+}
+
 /** Ảnh chụp vault để sync — secret đã giải mã (chỉ tồn tại trong main, sẽ mã hoá bằng sync key). */
 export interface SyncSnapshot {
   version: number
@@ -263,7 +269,7 @@ export class VaultService {
     if (input.id) {
       db.prepare(
         `UPDATE groups SET name=?, parent_id=?, username=?, auth_type=?, key_id=?, env_enc=?,
-         startup_snippet_id=?, jump_chain=?, color=?, updated_at=? WHERE id=?`
+         startup_snippet_id=?, jump_chain=?, color=?, production=?, updated_at=? WHERE id=?`
       ).run(
         input.name,
         input.parentId ?? null,
@@ -274,13 +280,15 @@ export class VaultService {
         input.startupSnippetId ?? null,
         jumpChain,
         input.color ?? null,
+        input.production ? 1 : 0,
         now,
         id
       )
     } else {
       db.prepare(
         `INSERT INTO groups (id, parent_id, name, username, auth_type, key_id, env_enc,
-         startup_snippet_id, jump_chain, color, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+         startup_snippet_id, jump_chain, color, production, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
       ).run(
         id,
         input.parentId ?? null,
@@ -292,6 +300,7 @@ export class VaultService {
         input.startupSnippetId ?? null,
         jumpChain,
         input.color ?? null,
+        input.production ? 1 : 0,
         now,
         now
       )
@@ -1033,6 +1042,43 @@ export class VaultService {
       .run(Date.now(), hostPattern(host, port), keyType)
   }
 
+  /** F44 — toàn bộ fingerprint đã TOFU, mới thấy gần nhất lên đầu. */
+  listKnownHosts(): KnownHostEntry[] {
+    const rows = this.ensureDb()
+      .prepare(
+        `SELECT id, host_pattern, key_type, fingerprint_sha256, first_seen, last_seen
+         FROM known_hosts ORDER BY last_seen DESC`
+      )
+      .all() as unknown as Array<{
+      id: string
+      host_pattern: string
+      key_type: string
+      fingerprint_sha256: string
+      first_seen: number
+      last_seen: number
+    }>
+    return rows.map((r) => ({
+      id: r.id,
+      hostPattern: r.host_pattern,
+      keyType: r.key_type,
+      fingerprintSha256: r.fingerprint_sha256,
+      firstSeen: r.first_seen,
+      lastSeen: r.last_seen
+    }))
+  }
+
+  /**
+   * Quên một fingerprint đã TOFU. Lần nối sau host đó sẽ hỏi lại như máy lạ (kind='unknown')
+   * thay vì báo mismatch — đúng thứ cần sau khi dựng lại server.
+   *
+   * Ghi tombstone để việc quên LAN được sang máy khác: không có nó thì máy kia sync về vẫn
+   * giữ fingerprint cũ và tiếp tục báo mismatch.
+   */
+  deleteKnownHost(id: string): void {
+    this.ensureDb().prepare('DELETE FROM known_hosts WHERE id = ?').run(id)
+    this.tombstone(id, 'known_hosts')
+  }
+
   // -------------------------------------------------------------------------
   // History (Quick Connect)
   // -------------------------------------------------------------------------
@@ -1306,7 +1352,7 @@ export class VaultService {
         // Snapshot từ máy cũ (trước v11) không có 'color' → null
         upsertRow('groups', 'id', 'updated_at', { ...g, env_enc: enc(g.env_plain as string), color: g.color ?? null }, [
           'id', 'parent_id', 'name', 'sort_order', 'username', 'auth_type', 'key_id', 'env_enc',
-          'startup_snippet_id', 'jump_chain', 'color', 'created_at', 'updated_at'
+          'startup_snippet_id', 'jump_chain', 'color', 'production', 'created_at', 'updated_at'
         ])
       }
       for (const k of remote.keys) {
@@ -1418,7 +1464,8 @@ export class VaultService {
       env: this.dek ? nullIfEmpty(this.decryptEnv(this.dek, row.env_enc)) : null,
       startupSnippetId: row.startup_snippet_id,
       jumpChain: row.jump_chain ? (JSON.parse(row.jump_chain) as string[]) : null,
-      color: row.color ?? null
+      color: row.color ?? null,
+      production: row.production === 1
     }
   }
 
@@ -1479,6 +1526,7 @@ interface GroupRow {
   startup_snippet_id: string | null
   jump_chain: string | null
   color: string | null
+  production: number
 }
 
 interface HostRow {

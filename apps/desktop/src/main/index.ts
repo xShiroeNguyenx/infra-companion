@@ -8,6 +8,8 @@ import { registerDataIpc } from './ipc/data'
 import { registerImportIpc } from './ipc/import'
 import { registerExportIpc } from './ipc/export'
 import { flushSecretClipboard, registerRevealIpc } from './ipc/reveal'
+import { registerCopyIdIpc } from './ipc/copyId'
+import { registerKnownHostsIpc } from './ipc/knownHosts'
 import { registerMonitorIpc } from './ipc/monitor'
 import { registerWatcherIpc } from './ipc/watcher'
 import { registerHostToolsIpc } from './ipc/hostTools'
@@ -253,6 +255,8 @@ registerDataIpc()
 registerImportIpc()
 registerExportIpc()
 registerRevealIpc()
+registerCopyIdIpc()
+registerKnownHostsIpc()
 registerBulkIpc()
 registerAiIpc()
 registerNetToolsIpc()

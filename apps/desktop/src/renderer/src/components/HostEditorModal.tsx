@@ -4,6 +4,7 @@ import { useDataStore } from '../stores/data'
 import { envToText, textToEnv } from '../lib/env'
 import { Button, ConfirmModal, Field, Modal, Select, TextArea, TextInput } from './ui'
 import { RevealSecretModal } from './RevealSecretModal'
+import { CopyIdModal } from './CopyIdModal'
 import { useT } from '../i18n'
 
 const NEW_GROUP = '__new__'
@@ -45,6 +46,8 @@ export function HostEditorModal({
   const [clearPassword, setClearPassword] = useState(false)
   /** Đang mở hộp thoại xem lại mật khẩu đã lưu (bắt nhập lại master password). */
   const [revealing, setRevealing] = useState(false)
+  /** F43 — đang mở hộp thoại đẩy public key lên host. */
+  const [copyingId, setCopyingId] = useState(false)
   const [keyId, setKeyId] = useState(host?.keyId ?? '')
   // Panel thêm key inline (hiện khi keyId === NEW_KEY)
   const [keyMode, setKeyMode] = useState<'generate' | 'import'>('generate')
@@ -423,13 +426,25 @@ export function HostEditorModal({
                   />
                   {t('host.pwClear')}
                 </label>
-                <button
-                  type="button"
-                  className="text-accent text-xs hover:underline"
-                  onClick={() => setRevealing(true)}
-                >
-                  {t('reveal.button')}
-                </button>
+                <div className="flex items-center gap-3">
+                  {/* F43 — chỉ có nghĩa với host ĐÃ LƯU: cần nối được vào mới đẩy key lên được */}
+                  {isEdit && (
+                    <button
+                      type="button"
+                      className="text-accent text-xs hover:underline"
+                      onClick={() => setCopyingId(true)}
+                    >
+                      {t('copyId.button')}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="text-accent text-xs hover:underline"
+                    onClick={() => setRevealing(true)}
+                  >
+                    {t('reveal.button')}
+                  </button>
+                </div>
               </div>
             )}
           </>
@@ -732,6 +747,18 @@ export function HostEditorModal({
           id={host.id}
           title={host.label}
           onClose={() => setRevealing(false)}
+        />
+      )}
+      {copyingId && host && (
+        <CopyIdModal
+          host={host}
+          keys={keys}
+          onClose={() => setCopyingId(false)}
+          onInstalled={(installedKeyId) => {
+            // Chỉ đổi trong FORM — user vẫn phải bấm Lưu, và vẫn thấy trước mình sắp đổi gì
+            setAuthType('key')
+            setKeyId(installedKeyId)
+          }}
         />
       )}
     </Modal>
