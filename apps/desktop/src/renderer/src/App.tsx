@@ -40,10 +40,11 @@ import { SftpView } from './features/sftp/SftpView'
 import { VncView } from './features/vnc/VncView'
 import { RdpDock } from './components/RdpDock'
 import { DashboardView } from './features/dashboard/DashboardView'
+import { FeaturesTabView } from './components/FeaturesTabView'
 import { translate, useT } from './i18n'
 import { TerminalTabView } from './features/terminal/TerminalTabView'
 import { useDataStore } from './stores/data'
-import { useTabsStore } from './stores/tabs'
+import { TOOL_TAB_KINDS, useTabsStore, type ToolTabKind } from './stores/tabs'
 import { useSettingsStore } from './stores/settings'
 import { useToastsStore } from './stores/toasts'
 import { useUiStore } from './stores/ui'
@@ -356,6 +357,7 @@ export default function App() {
       run: () => useTabsStore.getState().openToolTab('replication')
     },
     { id: 'open-recordings', label: t('menu.recordings'), run: () => setModal('recordings') },
+    { id: 'open-features', label: t('menu.features'), run: () => useTabsStore.getState().openToolTab('features') },
     { id: 'open-sync', label: t('menu.sync'), run: () => setModal('sync') },
     { id: 'export-hosts', label: t('menu.export'), run: () => setModal('export-hosts') },
     { id: 'known-hosts', label: t('menu.knownHosts'), run: () => setModal('known-hosts') },
@@ -455,15 +457,15 @@ export default function App() {
                 if (tab.kind === 'monitor') return <MonitorTabView key={tab.id} tab={tab} active={tab.id === activeId} />
                 if (tab.kind === 'compare') return <CompareTabView key={tab.id} active={tab.id === activeId} />
                 if (tab.kind === 'localdev') return <LocaldevTabView key={tab.id} active={tab.id === activeId} />
-                if (
-                  tab.kind === 'tunnels' ||
-                  tab.kind === 'processes' ||
-                  tab.kind === 'services' ||
-                  tab.kind === 'ai-diagnose' ||
-                  tab.kind === 'replication' ||
-                  tab.kind === 'help'
-                ) {
-                  return <ToolTabView key={tab.id} kind={tab.kind} active={tab.id === activeId} />
+                if (tab.kind === 'features') return <FeaturesTabView key={tab.id} active={tab.id === activeId} />
+                {
+                  /* Mọi tab công cụ CÒN LẠI đều do ToolTabView vẽ. Kiểm theo danh sách chứ
+                     không viết tay từng `kind ===`: thêm công cụ mới mà quên nối vào đây thì
+                     tab mở ra lại là một terminal, và lỗi đó chỉ lộ khi có người bấm thử.
+                     Các kind có view riêng (monitor/compare/localdev/features) đã return ở trên. */
+                }
+                if ((TOOL_TAB_KINDS as readonly string[]).includes(tab.kind)) {
+                  return <ToolTabView key={tab.id} kind={tab.kind as ToolTabKind} active={tab.id === activeId} />
                 }
                 return <TerminalTabView key={tab.id} tab={tab} active={tab.id === activeId} />
               })}

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { DiskUsageResultDto, HostDto } from '@infra/shared'
-import { Button, Modal, Select } from './ui'
+import { diskVerdict, type DiskUsageDto, type DiskUsageResultDto, type FilesystemDto, type HostDto } from '@infra/shared'
+import { Button, ModalOrPanel, Select } from './ui'
+import { OpenInTabButton } from './OpenInTabButton'
 import { useDataStore } from '../stores/data'
-import { useT } from '../i18n'
+import { useT, type I18nKey } from '../i18n'
 
 /** KB → chuỗi đọc được. Bản nhỏ viết lại ở renderer vì không import được `@infra/core` (§5). */
 function formatKb(sizeKb: number): string {
@@ -24,21 +25,119 @@ function parentOf(path: string): string | null {
   return idx < 0 ? null : idx === 0 ? '/' : clean.slice(0, idx)
 }
 
+/** Câu gợi ý ứng với mỗi kết luận. Bảng tra tường minh, không ghép chuỗi khoá i18n. */
+const ADVICE_KEY = {
+  drillDown: 'disk.adviceDrillDown',
+  filesHere: 'disk.adviceFilesHere',
+  spread: 'disk.adviceSpread',
+  wrongBranch: 'disk.adviceWrongBranch',
+  leaf: 'disk.adviceLeaf'
+} as const satisfies Record<string, I18nKey>
+
+/**
+ * Khối kết luận đặt trên danh sách: *phân vùng còn bao nhiêu*, *thư mục này chiếm bao nhiêu
+ * phần đã dùng*, và **một việc nên làm** — kèm nút làm luôn việc đó.
+ *
+ * Danh sách `du` một mình chỉ trả lời "cái gì chiếm chỗ". Câu người ta thật sự cần là "giờ làm
+ * gì": đi tiếp vào đâu, hay là đang đào nhầm nhánh vì chỗ đầy nằm ở phân vùng khác.
+ */
+function Verdict({
+  usage,
+  filesystems,
+  t,
+  onGo,
+  onUp,
+  busy
+}: {
+  readonly usage: DiskUsageDto
+  readonly filesystems: readonly FilesystemDto[]
+  readonly t: (key: I18nKey, params?: Record<string, string | number>) => string
+  readonly onGo: (path: string) => void
+  readonly onUp: () => void
+  readonly busy: boolean
+}) {
+  const v = diskVerdict(usage, filesystems)
+  const tint =
+    v.level === 'critical'
+      ? 'border-danger/50 bg-danger/10'
+      : v.level === 'warn'
+        ? 'border-warning/40 bg-warning/10'
+        : 'border-edge bg-hover'
+
+  return (
+    <div className={`mb-2 rounded border px-3 py-2 ${tint}`}>
+      <div className="text-content text-xs font-medium">
+        {v.filesystem
+          ? t('disk.verdictFs', {
+              mount: v.filesystem.mountedOn,
+              percent: v.filesystem.usePercent,
+              free: formatKb(v.filesystem.availKb)
+            })
+          : t('disk.verdictNoFs', { size: formatKb(usage.totalKb) })}
+        {v.shareOfUsedPercent !== null && (
+          <span className="text-muted font-normal">
+            {' · '}
+            {t('disk.verdictShare', { size: formatKb(usage.totalKb), percent: v.shareOfUsedPercent })}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <span className="text-muted min-w-0 flex-1 text-[11px] leading-relaxed">
+          →{' '}
+          {t(ADVICE_KEY[v.advice], {
+            name: v.top?.name ?? '',
+            percent: v.top?.percent ?? 0,
+            size: formatKb(v.looseKb),
+            loose: v.loosePercent
+          })}
+        </span>
+        {/* Gợi ý mà bấm được luôn: đọc xong không phải tự tìm lại dòng đó trong danh sách */}
+        {v.advice === 'drillDown' && v.top && (
+          <Button type="button" className="!px-2 !py-1 !text-xs" disabled={busy} onClick={() => onGo(v.top!.path)}>
+            {t('disk.goInto', { name: v.top.name })}
+          </Button>
+        )}
+        {v.advice === 'wrongBranch' && (
+          <Button type="button" className="!px-2 !py-1 !text-xs" disabled={busy} onClick={onUp}>
+            {t('disk.goUp')}
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /**
  * F36 — "thư mục nào đang ăn dung lượng", kiểu ncdu.
  *
  * Đi từng cấp một (`du -d 1`) chứ không quét cả cây: trên máy production cây `/` có thể mất
  * nhiều phút và phần lớn kết quả không ai đọc. Bấm vào một dòng là đi xuống, có nút lên cấp.
  */
-export function DiskUsageModal({ host, onClose }: { readonly host: HostDto | null; readonly onClose: () => void }) {
+export function DiskUsageModal({
+  host,
+  onClose,
+  embedded
+}: {
+  readonly host: HostDto | null
+  readonly onClose?: () => void
+  readonly embedded?: boolean
+}) {
   const t = useT()
   const hosts = useDataStore((s) => s.hosts)
-  const [hostId, setHostId] = useState(host?.id ?? hosts[0]?.id ?? '')
+  // Rỗng = CHƯA chọn máy. Cố ý không lấy host đầu tiên: mở hộp thoại lên mà tự chạy `du` trên
+  // một máy mình không chọn vừa tốn kết nối SSH vừa có thể là máy production.
+  const [hostId, setHostId] = useState(host?.id ?? '')
   const [path, setPath] = useState('/')
   const [result, setResult] = useState<DiskUsageResultDto | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  /**
+   * ⚠️ KHÔNG đưa `t` vào dependency: `useT()` trả hàm MỚI mỗi render, nên `scan` sẽ đổi
+   * identity liên tục và effect bên dưới chạy lại sau mỗi `setState` → quét `du`/`df` qua SSH
+   * trong vòng lặp vô hạn. Lỗi vì thế lưu dạng THÔ ('' = không có mô tả), dịch lúc render.
+   */
   const scan = useCallback(
     async (targetPath: string): Promise<void> => {
       if (!hostId) return
@@ -50,7 +149,7 @@ export function DiskUsageModal({ host, onClose }: { readonly host: HostDto | nul
           setResult(res)
           setPath(res.usage?.path ?? targetPath)
         } else {
-          setError(res.error ?? t('disk.failed'))
+          setError(res.error ?? '')
         }
       } catch (err) {
         // invoke có thể reject (huỷ nhập mật khẩu login-script, host không nối được…)
@@ -59,22 +158,33 @@ export function DiskUsageModal({ host, onClose }: { readonly host: HostDto | nul
         setBusy(false)
       }
     },
-    [hostId, t]
+    [hostId]
   )
 
+  // Đổi host thì quét lại từ gốc — giữ path cũ của máy khác là vô nghĩa.
+  // Chưa chọn host thì KHÔNG nối gì cả (xem ghi chú ở khai báo `hostId`).
   useEffect(() => {
+    if (!hostId) {
+      setResult(null)
+      return
+    }
     void scan('/')
-    // Đổi host thì quét lại từ gốc — giữ path cũ của máy khác là vô nghĩa
   }, [hostId, scan])
 
   const parent = parentOf(path)
   const usage = result?.usage ?? null
 
   return (
-    <Modal title={t('disk.title')} onClose={onClose}>
-      <div className="w-[640px] max-w-full">
+    <ModalOrPanel
+      embedded={embedded}
+      title={t('disk.title')}
+      onClose={onClose}
+      headerExtra={embedded ? undefined : <OpenInTabButton kind="disk-usage" onDone={onClose} />}
+    >
+      <div className={embedded ? 'w-full' : 'w-[640px] max-w-full'}>
         <div className="mb-2 flex items-center gap-2">
           <Select value={hostId} onChange={(e) => setHostId(e.target.value)} className="max-w-56">
+            <option value="">{t('common.pickHost')}</option>
             {hosts.map((h) => (
               <option key={h.id} value={h.id}>
                 {h.label}
@@ -110,12 +220,24 @@ export function DiskUsageModal({ host, onClose }: { readonly host: HostDto | nul
           </div>
         )}
 
-        {error && <p className="text-danger mb-2 text-xs leading-relaxed">{error}</p>}
+        {/* '' = lỗi không kèm mô tả → dịch lúc render (xem ghi chú ở `scan`) */}
+        {error !== null && <p className="text-danger mb-2 text-xs leading-relaxed">{error || t('disk.failed')}</p>}
 
-        {busy && !usage ? (
+        {!hostId ? (
+          <p className="text-subtle py-6 text-center text-xs">{t('common.pickHostHint')}</p>
+        ) : busy && !usage ? (
           <p className="text-subtle py-6 text-center text-xs">{t('disk.scanning')}</p>
         ) : usage ? (
           <>
+            {/* Kết luận TRƯỚC danh sách: câu đầu tiên phải là "làm gì", không phải cột số */}
+            <Verdict
+              usage={usage}
+              filesystems={result?.filesystems ?? []}
+              t={t}
+              busy={busy}
+              onGo={(p) => void scan(p)}
+              onUp={() => void scan(parent ?? '/')}
+            />
             <div className="text-subtle mb-1.5 text-[11px]">
               {t('disk.total', { size: formatKb(usage.totalKb) })}
             </div>
@@ -149,6 +271,6 @@ export function DiskUsageModal({ host, onClose }: { readonly host: HostDto | nul
           </>
         ) : null}
       </div>
-    </Modal>
+    </ModalOrPanel>
   )
 }

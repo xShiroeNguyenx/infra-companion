@@ -25,6 +25,43 @@ export function tailCommand(path: string, lines = TAIL_INITIAL_LINES): string {
   return `tail -n ${Math.max(0, Math.floor(lines))} -F ${shq(path)}`
 }
 
+/**
+ * Đường dẫn log mặc định của các phần mềm hay gặp — để chọn thay vì phải nhớ.
+ *
+ * Cố ý liệt kê CẢ hai họ distro cho cùng một phần mềm (`apache2` của Debian/Ubuntu và `httpd`
+ * của RHEL/CentOS; `syslog` và `messages`; `auth.log` và `secure`): app không biết máy bên kia
+ * chạy distro nào, và đoán sai thì user lại phải gõ tay — đúng thứ danh sách này định bỏ.
+ *
+ * Đây chỉ là gợi ý: ô đường dẫn vẫn nhập tự do, vì bản cài tự dựng để log ở đâu cũng được.
+ */
+export interface LogPathGroup {
+  /** Tên phần mềm — hiện làm `<optgroup>`, không cần dịch (đều là danh từ riêng). */
+  software: string
+  paths: readonly string[]
+}
+
+export const COMMON_LOG_PATHS: readonly LogPathGroup[] = [
+  { software: 'System', paths: ['/var/log/syslog', '/var/log/messages', '/var/log/kern.log', '/var/log/dmesg'] },
+  { software: 'Auth', paths: ['/var/log/auth.log', '/var/log/secure'] },
+  { software: 'Nginx', paths: ['/var/log/nginx/error.log', '/var/log/nginx/access.log'] },
+  {
+    software: 'Apache',
+    paths: [
+      '/var/log/apache2/error.log',
+      '/var/log/apache2/access.log',
+      '/var/log/httpd/error_log',
+      '/var/log/httpd/access_log'
+    ]
+  },
+  { software: 'Tomcat', paths: ['/var/log/tomcat/catalina.out', '/opt/tomcat/logs/catalina.out'] },
+  { software: 'PHP-FPM', paths: ['/var/log/php-fpm/error.log', '/var/log/php-fpm.log'] },
+  { software: 'MySQL / MariaDB', paths: ['/var/log/mysql/error.log', '/var/log/mysqld.log', '/var/log/mariadb/mariadb.log'] },
+  { software: 'PostgreSQL', paths: ['/var/log/postgresql/postgresql.log'] },
+  { software: 'Redis', paths: ['/var/log/redis/redis-server.log'] },
+  { software: 'Mail', paths: ['/var/log/mail.log', '/var/log/maillog'] },
+  { software: 'Cron', paths: ['/var/log/cron', '/var/log/cron.log'] }
+]
+
 /** Một dòng log đã nhận. */
 export interface LogLine {
   /** Số thứ tự tăng dần — khoá React ổn định, và dòng trùng nội dung vẫn phân biệt được. */

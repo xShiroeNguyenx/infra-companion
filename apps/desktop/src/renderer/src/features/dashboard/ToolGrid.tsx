@@ -3,6 +3,7 @@ import { useLocaldevStore } from '../../stores/localdev'
 import { useTabsStore } from '../../stores/tabs'
 import { useUiStore, type AppModal } from '../../stores/ui'
 import { useWatcherStore } from '../../stores/watcher'
+import { TOOLS, splitMenuLabel } from '../../lib/toolCatalog'
 
 /**
  * Lưới công cụ ở đầu Dashboard — cùng danh sách với menu `⋯` của Sidebar, xếp đúng **2 hàng**,
@@ -13,35 +14,14 @@ import { useWatcherStore } from '../../stores/watcher'
  * lại emoji ở đây, để đổi emoji trong `dict.ts` là dashboard đổi theo, không lệch hai nơi.
  */
 
-/** Tách nhãn dạng "<icon> <tên>". Icon luôn là cụm đầu tiên trước dấu cách. */
-function splitMenuLabel(label: string): { icon: string; name: string } {
-  const at = label.indexOf(' ')
-  if (at <= 0) return { icon: label, name: label }
-  return { icon: label.slice(0, at), name: label.slice(at + 1).trim() }
-}
-
-/** Công cụ mở bằng modal/panel — phần lớn danh sách. */
-const MODAL_TOOLS: ReadonlyArray<{ key: I18nKey; modal: AppModal }> = [
-  { key: 'menu.workspaces', modal: 'workspaces' },
-  { key: 'menu.bulk', modal: 'bulk' },
-  { key: 'menu.monitor', modal: 'monitor' },
-  { key: 'menu.processes', modal: 'processes' },
-  { key: 'menu.services', modal: 'services' },
-  { key: 'menu.compare', modal: 'compare' },
-  { key: 'menu.replication', modal: 'replication' },
-  { key: 'menu.hostmap', modal: 'hostmap' },
-  { key: 'menu.tunnels', modal: 'tunnels' },
-  { key: 'menu.ai', modal: 'ai' },
-  { key: 'menu.aiDiagnose', modal: 'ai-diagnose' },
-  { key: 'menu.recordings', modal: 'recordings' },
-  { key: 'menu.net', modal: 'net' },
-  { key: 'menu.sync', modal: 'sync' },
-  { key: 'menu.snippets', modal: 'snippets' },
-  { key: 'menu.plugins', modal: 'plugins' },
-  { key: 'menu.keys', modal: 'keys' },
-  { key: 'menu.settings', modal: 'settings' },
-  { key: 'menu.help', modal: 'help' }
-]
+/**
+ * Danh sách công cụ lấy từ `lib/toolCatalog` — CÙNG nguồn với menu `⋯` và tab "Tất cả tính
+ * năng". Trước đây file này khai danh sách riêng, nên thêm một công cụ là phải nhớ sửa hai chỗ.
+ */
+const MODAL_TOOLS: ReadonlyArray<{ key: I18nKey; modal: AppModal }> = TOOLS.map((tool) => ({
+  key: tool.menuKey,
+  modal: tool.modal
+}))
 
 /**
  * Vài công cụ có tên menu quá dài cho một ô (dropdown thì rộng bao nhiêu cũng được, ô này thì
@@ -134,9 +114,11 @@ export function ToolGrid() {
     })
   }
 
-  // Ép đúng 2 hàng: số cột = nửa số mục (làm tròn lên). Cột `1fr` + `w-full` để các ô
-  // DÀN ĐỀU hết chiều rộng dashboard, không dồn cục về một bên.
-  const cols = Math.ceil(items.length / 2)
+  // Dàn đều hết chiều rộng dashboard (cột `1fr` + `w-full`), nhưng KHÔNG ép cứng 2 hàng nữa:
+  // danh sách công cụ chỉ dài thêm, mà 2 hàng thì mỗi thêm một công cụ là mọi ô hẹp lại. Quá
+  // 24 mục thì xuống 3 hàng — ô giữ được bề ngang đọc được thay vì teo dần theo thời gian.
+  const rows = items.length > 24 ? 3 : 2
+  const cols = Math.ceil(items.length / rows)
 
   return (
     <section>

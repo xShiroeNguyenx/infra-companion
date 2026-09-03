@@ -17,7 +17,14 @@ const TOOL_TAB_META: Record<ToolTabKind, { label: string; icon: string }> = {
   services: { label: 'Services', icon: '⚙' },
   'ai-diagnose': { label: 'AI diagnose', icon: '🩺' },
   replication: { label: 'Replication', icon: '🔁' },
-  help: { label: 'Help', icon: '❓' }
+  help: { label: 'Help', icon: '❓' },
+  features: { label: 'Tính năng', icon: '⊞' },
+  'log-tail': { label: 'Log', icon: '🪵' },
+  cron: { label: 'Cron', icon: '⏰' },
+  'key-rotate': { label: 'Key rotate', icon: '🔄' },
+  'disk-usage': { label: 'Disk', icon: '💾' },
+  'pkg-updates': { label: 'Updates', icon: '📦' },
+  'known-hosts': { label: 'Fingerprints', icon: '🔏' }
 }
 
 function toolMeta(kind: AppTab['kind']): { label: string; icon: string } | undefined {

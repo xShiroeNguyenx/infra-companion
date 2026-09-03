@@ -46,7 +46,17 @@ export const TOOL_TAB_KINDS = [
   'services',
   'ai-diagnose',
   'replication',
-  'help'
+  'help',
+  /** Danh sách đầy đủ mọi công cụ — menu `⋯` chỉ giữ thứ dùng hằng ngày. */
+  'features',
+  // Công cụ chẩn đoán/vận hành thêm ở v0.2.10–0.2.12: đều là việc CHẠY LÂU (quét cả fleet,
+  // theo dõi log, xoay key tuần tự) nên mở dạng popup là khoá cả app trong lúc chờ.
+  'log-tail',
+  'cron',
+  'key-rotate',
+  'disk-usage',
+  'pkg-updates',
+  'known-hosts'
 ] as const
 export type ToolTabKind = (typeof TOOL_TAB_KINDS)[number]
 

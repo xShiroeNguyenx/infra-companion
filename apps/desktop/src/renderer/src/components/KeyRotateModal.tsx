@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { RotateResult } from '@infra/shared'
-import { Button, Field, Modal, Select } from './ui'
+import { Button, Field, ModalOrPanel, Select } from './ui'
+import { OpenInTabButton } from './OpenInTabButton'
 import { useDataStore } from '../stores/data'
 import { useT } from '../i18n'
 
@@ -14,7 +15,7 @@ import { useT } from '../i18n'
  * Chạy TUẦN TỰ chứ không song song: đây là thao tác ghi vào quyền đăng nhập, thấy hỏng ở máy
  * đầu tiên thì phải dừng được ngay chứ không phải sau khi đã đụng vào cả hai chục máy.
  */
-export function KeyRotateModal({ onClose }: { onClose: () => void }) {
+export function KeyRotateModal({ onClose, embedded }: { onClose?: () => void; embedded?: boolean }) {
   const t = useT()
   const hosts = useDataStore((s) => s.hosts).filter((h) => h.protocol === 'ssh')
   const keys = useDataStore((s) => s.keys)
@@ -65,8 +66,15 @@ export function KeyRotateModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title={t('rotate.title')} onClose={onClose} closeOnBackdrop={false}>
-      <div className="w-[620px] max-w-full">
+    <ModalOrPanel
+      embedded={embedded}
+      title={t('rotate.title')}
+      onClose={onClose}
+      closeOnBackdrop={false}
+      headerExtra={embedded ? undefined : <OpenInTabButton kind="key-rotate" onDone={onClose} />}
+    >
+      {/* Xoay key chạy tuần tự qua từng máy — việc dài nhất trong nhóm này, rất nên ở tab */}
+      <div className={embedded ? 'w-full' : 'w-[620px] max-w-full'}>
         <p className="text-muted mb-3 text-xs leading-relaxed">{t('rotate.desc')}</p>
 
         {keys.length === 0 ? (
@@ -137,6 +145,6 @@ export function KeyRotateModal({ onClose }: { onClose: () => void }) {
         </div>
         <p className="text-subtle mt-2 text-[10px] leading-relaxed">{t('rotate.note')}</p>
       </div>
-    </Modal>
+    </ModalOrPanel>
   )
 }

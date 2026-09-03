@@ -5,9 +5,9 @@ import { useTabsStore } from '../stores/tabs'
 import { useToastsStore } from '../stores/toasts'
 import { useRdpStore } from '../stores/rdp'
 import { useWatcherStore } from '../stores/watcher'
-import { useLocaldevStore } from '../stores/localdev'
 import { useFavoritesStore } from '../stores/favorites'
 import { useUiStore, type AppModal } from '../stores/ui'
+import { TOOLS } from '../lib/toolCatalog'
 import { GroupEditorModal } from './GroupEditorModal'
 import { HostEditorModal } from './HostEditorModal'
 import { NotesModal } from './NotesModal'
@@ -33,7 +33,7 @@ export function Sidebar() {
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
   const watcherEnabled = useWatcherStore((s) => s.enabled)
   const setWatcherEnabled = useWatcherStore((s) => s.setEnabled)
-  const localdevEnabled = useLocaldevStore((s) => s.enabled)
+  // (Local dev đã rời menu — vào tab "Tất cả tính năng"; nơi đó tự đọc cờ enabled của nó.)
   const favIds = useFavoritesStore((s) => s.ids)
   const [query, setQuery] = useState('')
   const [modal, setModal] = useState<OpenModal>(null)
@@ -277,47 +277,32 @@ export function Sidebar() {
           </Button>
           {menuOpen && (
             <div className="border-edge-strong bg-elevated absolute right-0 bottom-9 z-50 min-w-44 rounded-md border py-1 shadow-xl">
-              <MenuItem label={t('menu.workspaces')} onClick={() => { setMenuOpen(false); openAppModal('workspaces') }} />
-              <MenuItem label={t('menu.bulk')} onClick={() => { setMenuOpen(false); openAppModal('bulk') }} />
-              <MenuItem label={t('menu.monitor')} onClick={() => { setMenuOpen(false); openAppModal('monitor') }} />
+              {/* Menu CHỈ giữ thứ dùng hằng ngày (`common` trong toolCatalog) — nó là đường vào
+                  duy nhất khi đang ở tab terminal, mà một dropdown hai chục dòng là dropdown
+                  không ai đọc. Toàn bộ danh sách nằm ở tab "Tất cả tính năng" bên dưới; công cụ
+                  MỚI vào thẳng đó, không chen vào đây. */}
+              {TOOLS.filter((tool) => tool.common).map((tool) => (
+                <MenuItem
+                  key={tool.id}
+                  label={t(tool.menuKey)}
+                  onClick={() => { setMenuOpen(false); openAppModal(tool.modal) }}
+                />
+              ))}
               {/* F39: toggle watcher nền — ✓ khi đang bật (chấm xanh/đỏ cạnh host) */}
               <MenuItem
                 label={`${watcherEnabled ? '✓ ' : ''}${t('menu.watcher')}`}
                 onClick={() => { setMenuOpen(false); setWatcherEnabled(!watcherEnabled) }}
               />
-              <MenuItem label={t('menu.processes')} onClick={() => { setMenuOpen(false); openAppModal('processes') }} />
-              <MenuItem label={t('menu.services')} onClick={() => { setMenuOpen(false); openAppModal('services') }} />
-              <MenuItem label={t('menu.compare')} onClick={() => { setMenuOpen(false); openAppModal('compare') }} />
-              <MenuItem label={t('menu.replication')} onClick={() => { setMenuOpen(false); openAppModal('replication') }} />
-              <MenuItem label={t('menu.hostmap')} onClick={() => { setMenuOpen(false); openAppModal('hostmap') }} />
-              <MenuItem label={t('menu.ai')} onClick={() => { setMenuOpen(false); openAppModal('ai') }} />
-              <MenuItem label={t('menu.aiDiagnose')} onClick={() => { setMenuOpen(false); openAppModal('ai-diagnose') }} />
-              <MenuItem label={t('menu.recordings')} onClick={() => { setMenuOpen(false); openAppModal('recordings') }} />
-              <MenuItem label={t('menu.net')} onClick={() => { setMenuOpen(false); openAppModal('net') }} />
-              <MenuItem label={t('menu.sync')} onClick={() => { setMenuOpen(false); openAppModal('sync') }} />
-              <MenuItem label={t('menu.snippets')} onClick={() => { setMenuOpen(false); openAppModal('snippets') }} />
-              <MenuItem label={t('menu.tunnels')} onClick={() => { setMenuOpen(false); openAppModal('tunnels') }} />
-              <MenuItem label={t('menu.plugins')} onClick={() => { setMenuOpen(false); openAppModal('plugins') }} />
               <MenuItem label={t('menu.createGroup')} onClick={() => { setMenuOpen(false); setModal({ kind: 'group', group: null }) }} />
               <MenuItem label={t('menu.import')} onClick={() => void runImport()} />
-              <MenuItem label={t('menu.export')} onClick={() => { setMenuOpen(false); openAppModal('export-hosts') }} />
-              <MenuItem label={t('menu.knownHosts')} onClick={() => { setMenuOpen(false); openAppModal('known-hosts') }} />
-              <MenuItem label={t('menu.diskUsage')} onClick={() => { setMenuOpen(false); openAppModal('disk-usage') }} />
-              <MenuItem label={t('menu.logTail')} onClick={() => { setMenuOpen(false); openAppModal('log-tail') }} />
-              <MenuItem label={t('menu.cron')} onClick={() => { setMenuOpen(false); openAppModal('cron') }} />
-              <MenuItem label={t('menu.keyRotate')} onClick={() => { setMenuOpen(false); openAppModal('key-rotate') }} />
-              <MenuItem label={t('menu.pkgUpdates')} onClick={() => { setMenuOpen(false); openAppModal('pkg-updates') }} />
-              {/* Local dev là "khu vực sản phẩm khác" (môi trường dev local, không phải SSH) nên
-                  tách bằng separator; và CHỈ hiện khi user đã bật ở Cài đặt → Local dev. */}
-              {localdevEnabled && (
-                <>
-                  <div className="border-edge my-1 border-t" />
-                  <MenuItem
-                    label={t('menu.localdev')}
-                    onClick={() => { setMenuOpen(false); useTabsStore.getState().openLocaldevTab() }}
-                  />
-                </>
-              )}
+              <div className="border-edge my-1 border-t" />
+              <MenuItem
+                label={t('menu.features')}
+                onClick={() => { setMenuOpen(false); useTabsStore.getState().openToolTab('features') }}
+              />
+              {/* Local dev KHÔNG còn ở menu: nó là "khu vực sản phẩm khác" (môi trường dev
+                  local, không phải SSH) và không dùng hằng ngày → sống ở tab "Tất cả tính năng"
+                  và lưới công cụ Dashboard, cùng chỗ với mọi công cụ không-thường-dùng khác. */}
               <div className="border-edge my-1 border-t" />
               <MenuItem label={t('menu.settings')} onClick={() => { setMenuOpen(false); openAppModal('settings') }} />
               <MenuItem label={t('menu.help')} onClick={() => { setMenuOpen(false); openAppModal('help') }} />

@@ -1,10 +1,13 @@
 import { describe, expect, test } from 'vitest'
+import { detectUserColumn } from '@infra/shared'
 import {
   CRON_OK_MARKER,
   buildCrontab,
   describeSchedule,
   parseCrontab,
+  isScopeWritable,
   readCrontabCommand,
+  sudoDenied,
   writeCrontabCommand,
   writeSucceeded
 } from './crontab'
@@ -107,6 +110,107 @@ describe('describeSchedule', () => {
   test('không đủ 5 trường → null, không ném', () => {
     expect(describeSchedule('0 3 * *')).toBeNull()
     expect(describeSchedule('')).toBeNull()
+  })
+})
+
+describe('phạm vi (scope) — lỗi user gặp thật: đọc đúng lệnh nhưng SAI CHỖ', () => {
+  // Máy có job chạy thật, mà `crontab -l` của user đăng nhập lại trống: job nằm ở root
+  // và ở /etc/crontab — hai chỗ `crontab -l` không đụng tới.
+  const SYSTEM = `==> /etc/crontab <==
+0 5 * * * deploy /usr/local/cron/backup.sh
+30 1 * * * root /usr/local/cron/httpd_log_rotate.sh
+
+==> /etc/cron.d/oem <==
+*/10 * * * * deploy sh /usr/local/cron/update.sh 2>&1
+`
+
+  test('scope system tách được cột USER — thiếu bước này thì lệnh hiện ra kèm cả tên user', () => {
+    const jobs = parseCrontab(SYSTEM, 'system').filter((l) => l.kind === 'job')
+    expect(jobs[0]).toMatchObject({
+      schedule: '0 5 * * *',
+      user: 'deploy',
+      command: '/usr/local/cron/backup.sh'
+    })
+    expect(jobs[1]).toMatchObject({ user: 'root', command: '/usr/local/cron/httpd_log_rotate.sh' })
+  })
+
+  test('cùng nội dung đọc ở scope user thì KHÔNG tách cột (crontab cá nhân vốn 5 trường)', () => {
+    const job = parseCrontab('0 5 * * * deploy /usr/local/cron/x.sh\n', 'user').find((l) => l.kind === 'job')!
+    expect(job.user).toBeUndefined()
+    expect(job.command).toBe('deploy /usr/local/cron/x.sh')
+  })
+
+  test('dấu phân cách file của tail thành dòng riêng, không bị coi là job', () => {
+    const files = parseCrontab(SYSTEM, 'system').filter((l) => l.kind === 'file')
+    expect(files.map((f) => f.path)).toEqual(['/etc/crontab', '/etc/cron.d/oem'])
+  })
+
+  test('@special ở scope system cũng có cột user', () => {
+    const job = parseCrontab('@reboot root /usr/local/bin/warm.sh\n', 'system').find((l) => l.kind === 'job')!
+    expect(job).toMatchObject({ schedule: '@reboot', user: 'root', command: '/usr/local/bin/warm.sh' })
+  })
+
+  test('lệnh đọc khác nhau theo scope, và root PHẢI dùng sudo -n', () => {
+    // Kênh exec không có TTY → `sudo` không -n sẽ treo chờ mật khẩu tới lúc timeout
+    expect(readCrontabCommand('user')).toContain('crontab -l')
+    expect(readCrontabCommand('root')).toContain('sudo -n crontab -l')
+    expect(readCrontabCommand('system')).toContain('/etc/crontab')
+    expect(readCrontabCommand('system')).toContain('/etc/cron.d/')
+  })
+
+  test('lệnh system dùng tail -n +1 (tự in dấu file) chứ không vòng for', () => {
+    const cmd = readCrontabCommand('system')
+    expect(cmd).toContain('tail -n +1')
+    expect(cmd).not.toContain('for ')
+    expect(cmd).not.toContain('$(')
+  })
+
+  test('nhận ra sudo từ chối, để không báo nhầm thành "chưa có crontab"', () => {
+    expect(sudoDenied('sudo: a password is required')).toBe(true)
+    expect(sudoDenied('sudo: no tty present and no askpass program specified')).toBe(true)
+    expect(sudoDenied('deploy is not allowed to run sudo on app-01')).toBe(true)
+    expect(sudoDenied('0 5 * * * /usr/local/bin/x.sh')).toBe(false)
+    expect(sudoDenied('')).toBe(false)
+  })
+
+  test('dò được cột user trong crontab của ROOT viết theo định dạng hệ thống', () => {
+    // Ca thật trên máy user: `sudo crontab -l` trả về 6 trường dù crontab cá nhân vốn 5 trường
+    const rootCrontab = `0 5 * * * deploy /usr/local/cron/backup.sh
+30 1 * * * root /usr/local/cron/rotate.sh
+0 23 * * * root /usr/local/cron/cleanup.sh
+`
+    expect(detectUserColumn(rootCrontab)).toBe(true)
+  })
+
+  test('crontab 5 trường bình thường KHÔNG bị nhận nhầm là có cột user', () => {
+    // `sh`, `php`… đứng đầu lệnh trông y hệt một tên user — nên phải thấy `root` mới kết luận
+    expect(detectUserColumn('*/5 * * * * sh /usr/local/bin/check.sh\n0 3 * * * php /srv/app/cron.php\n')).toBe(false)
+  })
+
+  test('lệnh là đường dẫn tuyệt đối → không có cột user', () => {
+    expect(detectUserColumn('0 3 * * * /usr/local/bin/backup.sh --full\n')).toBe(false)
+  })
+
+  test('rỗng / chỉ comment → false, không ném', () => {
+    expect(detectUserColumn('')).toBe(false)
+    expect(detectUserColumn('# chi co comment\nMAILTO=admin@example.com\n')).toBe(false)
+  })
+
+  test('chỉ một dòng lẻ có "root" giữa nhiều dòng 5 trường thì KHÔNG đủ để kết luận', () => {
+    const mixed = `0 1 * * * /usr/local/bin/a.sh
+0 2 * * * /usr/local/bin/b.sh
+0 3 * * * /usr/local/bin/c.sh
+0 4 * * * root /usr/local/bin/d.sh
+`
+    expect(detectUserColumn(mixed)).toBe(false)
+  })
+
+  test('ghi được ở user/root, KHÔNG ghi ở system (nhiều file)', () => {
+    expect(isScopeWritable('user')).toBe(true)
+    expect(isScopeWritable('root')).toBe(true)
+    expect(isScopeWritable('system')).toBe(false)
+    expect(writeCrontabCommand('x\n', 'root')).toContain('sudo -n crontab')
+    expect(() => writeCrontabCommand('x\n', 'system')).toThrow()
   })
 })
 

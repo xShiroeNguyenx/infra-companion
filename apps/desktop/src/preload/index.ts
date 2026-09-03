@@ -151,8 +151,8 @@ const api: InfraApi = {
   diag: {
     disk: (hostId, path) => ipcRenderer.invoke(IPC.DIAG_DISK, hostId, path),
     updates: (hostId) => ipcRenderer.invoke(IPC.DIAG_UPDATES, hostId),
-    cronRead: (hostId) => ipcRenderer.invoke(IPC.CRON_READ, hostId),
-    cronWrite: (hostId, content) => ipcRenderer.invoke(IPC.CRON_WRITE, hostId, content)
+    cronRead: (hostId, scope) => ipcRenderer.invoke(IPC.CRON_READ, hostId, scope),
+    cronWrite: (hostId, content, scope) => ipcRenderer.invoke(IPC.CRON_WRITE, hostId, content, scope)
   },
   knownHosts: {
     list: () => ipcRenderer.invoke(IPC.KNOWN_HOSTS_LIST),

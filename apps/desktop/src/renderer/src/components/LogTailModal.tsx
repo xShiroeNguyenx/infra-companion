@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { highlightSegments, lineMatches, type LogFilter, type LogLine } from '@infra/shared'
-import { Button, Modal, Select, TextInput } from './ui'
+import { COMMON_LOG_PATHS, highlightSegments, lineMatches, type LogFilter, type LogLine } from '@infra/shared'
+import { Button, ModalOrPanel, Select, TextInput } from './ui'
+import { OpenInTabButton } from './OpenInTabButton'
 import { useDataStore } from '../stores/data'
 import { useT } from '../i18n'
 
@@ -17,10 +18,12 @@ const MAX_LINES = 5000
  * Panel này chạy qua kênh exec riêng: lọc/tô màu tại chỗ, tự cuộn khi đang ở đáy, và dừng
  * dứt khoát khi đóng.
  */
-export function LogTailModal({ onClose }: { onClose: () => void }) {
+export function LogTailModal({ onClose, embedded }: { onClose?: () => void; embedded?: boolean }) {
   const t = useT()
   const hosts = useDataStore((s) => s.hosts).filter((h) => h.protocol === 'ssh')
-  const [hostId, setHostId] = useState(hosts[0]?.id ?? '')
+  // Rỗng = chưa chọn. Panel này không tự nối, nhưng mặc định sẵn một máy thì rất dễ bấm
+  // Bắt đầu nhầm máy — giữ nhất quán với các hộp thoại khác: phải chọn tường minh.
+  const [hostId, setHostId] = useState('')
   const [path, setPath] = useState('/var/log/syslog')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [lines, setLines] = useState<LogLine[]>([])
@@ -92,10 +95,17 @@ export function LogTailModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title={t('tail.title')} onClose={onClose}>
-      <div className="w-[760px] max-w-full">
+    <ModalOrPanel
+      embedded={embedded}
+      title={t('tail.title')}
+      onClose={onClose}
+      headerExtra={embedded ? undefined : <OpenInTabButton kind="log-tail" onDone={onClose} />}
+    >
+      {/* Trong tab thì dùng hết chiều rộng — log dài, càng rộng càng đỡ phải cuộn ngang */}
+      <div className={embedded ? 'w-full' : 'w-[760px] max-w-full'}>
         <div className="mb-2 flex items-center gap-2">
           <Select value={hostId} onChange={(e) => setHostId(e.target.value)} className="max-w-48" disabled={!!sessionId}>
+            <option value="">{t('common.pickHost')}</option>
             {hosts.map((h) => (
               <option key={h.id} value={h.id}>
                 {h.label}
@@ -112,6 +122,27 @@ export function LogTailModal({ onClose }: { onClose: () => void }) {
               if (e.key === 'Enter' && !sessionId && !busy) void start()
             }}
           />
+          {/* Gợi ý đường dẫn mặc định của phần mềm hay gặp — ô nhập vẫn tự do, vì bản cài tự
+              dựng để log ở đâu cũng được. Chọn xong tự về '' để lần sau còn chọn lại được. */}
+          <Select
+            value=""
+            className="max-w-40"
+            disabled={!!sessionId}
+            onChange={(e) => {
+              if (e.target.value) setPath(e.target.value)
+            }}
+          >
+            <option value="">{t('tail.presets')}</option>
+            {COMMON_LOG_PATHS.map((group) => (
+              <optgroup key={group.software} label={group.software}>
+                {group.paths.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </Select>
           {sessionId ? (
             <Button variant="danger" onClick={() => void stop()}>
               {t('tail.stop')}
@@ -161,7 +192,9 @@ export function LogTailModal({ onClose }: { onClose: () => void }) {
             const el = e.currentTarget
             setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 24)
           }}
-          className="border-edge bg-app h-96 overflow-auto rounded border p-2 font-mono text-[11px] leading-relaxed"
+          className={`border-edge bg-app overflow-auto rounded border p-2 font-mono text-[11px] leading-relaxed ${
+            embedded ? 'h-[calc(100vh-16rem)]' : 'h-96'
+          }`}
         >
           {shown.length === 0 ? (
             <p className="text-subtle py-8 text-center">{sessionId ? t('tail.waiting') : t('tail.idle')}</p>
@@ -188,6 +221,6 @@ export function LogTailModal({ onClose }: { onClose: () => void }) {
           <span>{t('tail.note')}</span>
         </div>
       </div>
-    </Modal>
+    </ModalOrPanel>
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { KnownHostDto } from '@infra/shared'
-import { Button, ConfirmModal, Modal, TextInput } from './ui'
+import { Button, ConfirmModal, ModalOrPanel, TextInput } from './ui'
+import { OpenInTabButton } from './OpenInTabButton'
 import { useT } from '../i18n'
 
 /**
@@ -10,7 +11,7 @@ import { useT } from '../i18n'
  * đây không có đường nào nhìn lại mình đã tin những gì, và sau khi dựng lại server thì mỗi
  * lần nối phải bấm qua một cảnh báo đỏ. Cảnh báo bị bấm quen tay là cảnh báo đã hỏng.
  */
-export function KnownHostsModal({ onClose }: { onClose: () => void }) {
+export function KnownHostsModal({ onClose, embedded }: { onClose?: () => void; embedded?: boolean }) {
   const t = useT()
   const [entries, setEntries] = useState<KnownHostDto[]>([])
   const [filter, setFilter] = useState('')
@@ -41,8 +42,13 @@ export function KnownHostsModal({ onClose }: { onClose: () => void }) {
     : entries
 
   return (
-    <Modal title={t('knownHosts.title')} onClose={onClose}>
-      <div className="w-[560px] max-w-full">
+    <ModalOrPanel
+      embedded={embedded}
+      title={t('knownHosts.title')}
+      onClose={onClose}
+      headerExtra={embedded ? undefined : <OpenInTabButton kind="known-hosts" onDone={onClose} />}
+    >
+      <div className={embedded ? 'w-full' : 'w-[560px] max-w-full'}>
         <p className="text-muted mb-3 text-xs leading-relaxed">{t('knownHosts.desc')}</p>
 
         {entries.length > 0 && (
@@ -101,6 +107,6 @@ export function KnownHostsModal({ onClose }: { onClose: () => void }) {
           />
         )}
       </div>
-    </Modal>
+    </ModalOrPanel>
   )
 }

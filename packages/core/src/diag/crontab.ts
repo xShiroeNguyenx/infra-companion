@@ -19,7 +19,28 @@ export const CRON_OK_MARKER = 'IC_CRON_OK'
 /** File tạm trên remote. Trong `~` để không đụng quyền `/tmp` bị hạn chế của một số hệ. */
 const TMP_FILE = '~/.infra-companion-crontab.tmp'
 
-export type CronLineKind = 'job' | 'env' | 'comment' | 'blank'
+export type CronLineKind = 'job' | 'env' | 'comment' | 'blank' | 'file'
+
+/**
+ * Cron nằm ở BA chỗ khác nhau, và đọc nhầm chỗ thì thấy trống trong khi máy vẫn đang chạy job:
+ *
+ * · `user`   — crontab của chính user đang đăng nhập (`crontab -l`). Định dạng **5 trường + lệnh**.
+ * · `root`   — crontab của root (`sudo crontab -l`). Cũng 5 trường.
+ * · `system` — `/etc/crontab` và `/etc/cron.d/*`. Định dạng **6 trường**: sau 5 trường lịch còn
+ *              một cột USER rồi mới tới lệnh. Đây là chỗ các job hệ thống thật sự nằm, và là
+ *              chỗ hay bị bỏ sót nhất vì `crontab -l` không đụng tới nó.
+ */
+export type CronScope = 'user' | 'root' | 'system'
+
+/** Scope `system` gồm nhiều file → chỉ ĐỌC. Ghi nhiều file qua một ô text là cái bẫy. */
+export function isScopeWritable(scope: CronScope): boolean {
+  return scope !== 'system'
+}
+
+/** Scope `system` LUÔN là 6 trường. Các scope khác thì phải dò — xem {@link detectUserColumn}. */
+export function scopeHasUserColumn(scope: CronScope): boolean {
+  return scope === 'system'
+}
 
 export interface CronLine {
   kind: CronLineKind
@@ -29,9 +50,13 @@ export interface CronLine {
   schedule?: string
   /** kind='job': phần lệnh. */
   command?: string
+  /** kind='job' ở scope `system`: cột user giữa lịch và lệnh. */
+  user?: string
   /** kind='env': `FOO=bar`. */
   name?: string
   value?: string
+  /** kind='file': đường dẫn file, từ dấu phân cách `==> … <==` của `tail -n +1`. */
+  path?: string
 }
 
 /**
@@ -41,12 +66,19 @@ export interface CronLine {
  * trường (`MAILTO=`, `PATH=`) và cú pháp lạ. Dựng lại file từ những gì mình hiểu là cách chắc
  * chắn để xoá mất thứ của người khác.
  */
-export function parseCrontab(content: string): CronLine[] {
+export function parseCrontab(content: string, scope: CronScope = 'user'): CronLine[] {
+  const withUser = scopeHasUserColumn(scope)
   const out: CronLine[] = []
   for (const raw of content.replace(/\r\n?/g, '\n').split('\n')) {
     const trimmed = raw.trim()
     if (trimmed === '') {
       out.push({ kind: 'blank', raw })
+      continue
+    }
+    // Dấu phân cách file của `tail -n +1` khi đọc nhiều file (scope `system`)
+    const fileHeader = trimmed.match(/^==>\s+(.+?)\s+<==$/)
+    if (fileHeader) {
+      out.push({ kind: 'file', raw, path: fileHeader[1]! })
       continue
     }
     if (trimmed.startsWith('#')) {
@@ -59,16 +91,35 @@ export function parseCrontab(content: string): CronLine[] {
       out.push({ kind: 'env', raw, name: env[1]!, value: env[2]! })
       continue
     }
-    // Dạng @reboot / @daily…
+    // Dạng @reboot / @daily… (scope system vẫn có cột user sau phần @special)
     const special = trimmed.match(/^(@\w+)\s+(.+)$/)
     if (special) {
-      out.push({ kind: 'job', raw, schedule: special[1]!, command: special[2]! })
+      const rest = special[2]!
+      if (withUser) {
+        const split = rest.match(/^(\S+)\s+(.+)$/)
+        if (split) {
+          out.push({ kind: 'job', raw, schedule: special[1]!, user: split[1]!, command: split[2]! })
+          continue
+        }
+      }
+      out.push({ kind: 'job', raw, schedule: special[1]!, command: rest })
       continue
     }
-    // 5 trường lịch rồi tới lệnh
+    // 5 trường lịch → (scope system: cột USER) → lệnh.
+    // Thiếu bước tách cột user thì lệnh hiện ra là "deploy /usr/local/cron/x.sh" — sai, và
+    // sai kiểu khó thấy vì phần lịch vẫn đúng nên nhìn qua tưởng ổn.
     const five = trimmed.match(/^(\S+\s+\S+\s+\S+\s+\S+\s+\S+)\s+(.+)$/)
     if (five) {
-      out.push({ kind: 'job', raw, schedule: five[1]!.replace(/\s+/g, ' '), command: five[2]! })
+      const schedule = five[1]!.replace(/\s+/g, ' ')
+      const rest = five[2]!
+      if (withUser) {
+        const split = rest.match(/^(\S+)\s+(.+)$/)
+        if (split) {
+          out.push({ kind: 'job', raw, schedule, user: split[1]!, command: split[2]! })
+          continue
+        }
+      }
+      out.push({ kind: 'job', raw, schedule, command: rest })
       continue
     }
     // Không nhận ra → giữ như comment để ghi ngược không mất
@@ -145,9 +196,36 @@ export function describeSchedule(schedule: string): ScheduleDescription | null {
   return null // biểu thức phức tạp — UI hiện nguyên văn, đoán sai còn tệ hơn không đoán
 }
 
-/** Lệnh đọc crontab. `2>/dev/null` + `true`: không có crontab thì `crontab -l` trả mã lỗi. */
-export function readCrontabCommand(): string {
+/**
+ * Lệnh đọc crontab theo phạm vi.
+ *
+ * · `user` — `2>/dev/null` + `true` vì `crontab -l` trả mã lỗi khi user chưa có crontab, mà
+ *   "chưa có" là trạng thái hợp lệ chứ không phải lỗi.
+ * · `root` — **`sudo -n`** (non-interactive): kênh exec này KHÔNG có TTY, nên `sudo` thường
+ *   sẽ treo chờ mật khẩu tới lúc timeout. `-n` làm nó fail ngay với một câu nói được lý do,
+ *   và `2>&1` giữ lại câu đó để hiện cho user thay vì báo "không có crontab".
+ * · `system` — `/etc/crontab` + `/etc/cron.d/*`. Dùng `tail -n +1` với NHIỀU file: nó tự in
+ *   dấu `==> đường/dẫn <==` trước mỗi file, nên không cần vòng `for` (mỗi hop login-script bọc
+ *   thêm một lớp quote, càng ít cú pháp shell càng ít chỗ vỡ — §4).
+ */
+export function readCrontabCommand(scope: CronScope = 'user'): string {
+  if (scope === 'root') return 'sudo -n crontab -l 2>&1; true'
+  if (scope === 'system') return 'tail -n +1 /etc/crontab /etc/cron.d/* 2>/dev/null; true'
   return 'crontab -l 2>/dev/null; true'
+}
+
+/**
+ * Output có phải là `sudo` từ chối vì cần mật khẩu / không có quyền không.
+ * Không nhận ra thì UI sẽ báo "máy này chưa có crontab nào" — sai và gây hiểu lầm hẳn.
+ */
+export function sudoDenied(output: string): boolean {
+  // KHÔNG ràng buộc thứ tự: sudo báo cả hai kiểu — "sudo: a password is required" (lý do sau)
+  // lẫn "deploy is not allowed to run sudo on host" (lý do TRƯỚC). Regex bắt theo thứ tự sẽ
+  // bỏ sót đúng một nửa số ca.
+  return (
+    /\bsudo\b/i.test(output) &&
+    /(password is required|no tty present|not allowed|may not run|incident will be reported)/i.test(output)
+  )
 }
 
 /**
@@ -159,11 +237,13 @@ export function readCrontabCommand(): string {
  * `rm -f` chạy vô điều kiện ở cuối nên thất bại cũng không để lại rác.
  * Thành công nhận biết bằng {@link CRON_OK_MARKER} trong stdout.
  */
-export function writeCrontabCommand(content: string): string {
+export function writeCrontabCommand(content: string, scope: CronScope = 'user'): string {
+  if (!isScopeWritable(scope)) throw new Error(`Không ghi được ở phạm vi "${scope}"`)
   const normalized = content.endsWith('\n') ? content : `${content}\n`
+  const install = scope === 'root' ? `sudo -n crontab ${TMP_FILE}` : `crontab ${TMP_FILE}`
   return (
     `umask 077; printf '%s' ${shq(normalized)} > ${TMP_FILE} && ` +
-    `crontab ${TMP_FILE} && echo ${CRON_OK_MARKER}; rm -f ${TMP_FILE}`
+    `${install} && echo ${CRON_OK_MARKER}; rm -f ${TMP_FILE}`
   )
 }
 

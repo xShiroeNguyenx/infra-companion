@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Button, ConfirmModal, Modal, Select, TextArea } from './ui'
+import { detectUserColumn, type CronScopeDto } from '@infra/shared'
+import { Button, ConfirmModal, ModalOrPanel, Select, TextArea } from './ui'
+import { OpenInTabButton } from './OpenInTabButton'
 import { useDataStore } from '../stores/data'
 import { useT } from '../i18n'
 
@@ -52,14 +54,34 @@ function describe(schedule: string): { key: string; params?: Record<string, stri
 }
 
 /** Tách một dòng crontab thành lịch + lệnh để hiện bảng. null khi không phải dòng job. */
-function splitJob(raw: string): { schedule: string; command: string } | null {
+interface CronJobRow {
+  schedule: string
+  /** Chỉ ở phạm vi `system`: cột USER giữa lịch và lệnh. */
+  user?: string
+  command: string
+}
+
+function splitJob(raw: string, withUser: boolean): CronJobRow | null {
   const trimmed = raw.trim()
   if (trimmed === '' || trimmed.startsWith('#')) return null
+  if (/^==>\s.+\s<==$/.test(trimmed)) return null // dấu phân cách file của `tail -n +1`
   if (/^[A-Za-z_][A-Za-z0-9_]*\s*=/.test(trimmed)) return null
+  /**
+   * `/etc/crontab` và `/etc/cron.d/*` có SÁU trường: sau 5 trường lịch còn một cột USER rồi
+   * mới tới lệnh. Không tách thì lệnh hiện ra thành "deploy /usr/local/cron/x.sh" — sai kiểu
+   * khó thấy, vì phần lịch vẫn đúng nên nhìn qua tưởng ổn.
+   */
+  const take = (schedule: string, rest: string): CronJobRow => {
+    if (withUser) {
+      const split = rest.match(/^(\S+)\s+(.+)$/)
+      if (split) return { schedule, user: split[1]!, command: split[2]! }
+    }
+    return { schedule, command: rest }
+  }
   const special = trimmed.match(/^(@\w+)\s+(.+)$/)
-  if (special) return { schedule: special[1]!, command: special[2]! }
+  if (special) return take(special[1]!, special[2]!)
   const five = trimmed.match(/^(\S+\s+\S+\s+\S+\s+\S+\s+\S+)\s+(.+)$/)
-  return five ? { schedule: five[1]!.replace(/\s+/g, ' '), command: five[2]! } : null
+  return five ? take(five[1]!.replace(/\s+/g, ' '), five[2]!) : null
 }
 
 /**
@@ -71,11 +93,25 @@ function splitJob(raw: string): { schedule: string; command: string } | null {
  *
  * ⚠️ Lưu là ghi đè crontab trên production → luôn hỏi xác nhận, và luôn hiện lại nội dung cũ.
  */
-export function CronModal({ onClose }: { onClose: () => void }) {
+export function CronModal({ onClose, embedded }: { onClose?: () => void; embedded?: boolean }) {
   const t = useT()
   const hosts = useDataStore((s) => s.hosts).filter((h) => h.protocol === 'ssh')
   const groups = useDataStore((s) => s.groups)
-  const [hostId, setHostId] = useState(hosts[0]?.id ?? '')
+  // Rỗng = CHƯA chọn máy. Cố ý không lấy host đầu tiên: mở hộp thoại lên mà tự động mở kết
+  // nối SSH tới một máy mình không chọn là hành vi không ai muốn, nhất là khi máy đó production.
+  const [hostId, setHostId] = useState('')
+  /**
+   * Cron nằm ở BA chỗ. Mặc định `user` như lệnh `crontab -l`, nhưng phải chọn được chỗ khác:
+   * job hệ thống thường nằm ở root hoặc `/etc/crontab`, và `crontab -l` không đụng tới chúng —
+   * nên màn hình báo "chưa có crontab nào" trong khi máy vẫn đang chạy job đều đặn.
+   */
+  const [scope, setScope] = useState<CronScopeDto>('user')
+  /**
+   * Có cột USER (6 trường) hay không. `null` = để app tự dò từ nội dung; true/false = user đã
+   * ép tay. Cần ép tay được vì việc dò KHÔNG thể chắc chắn: `0 5 * * * sh /x.sh` và
+   * `0 5 * * * deploy /x.sh` giống hệt nhau về hình dạng.
+   */
+  const [forceUserColumn, setForceUserColumn] = useState<boolean | null>(null)
   const [original, setOriginal] = useState('')
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
@@ -100,24 +136,51 @@ export function CronModal({ onClose }: { onClose: () => void }) {
     return false
   })()
 
+  /**
+   * Đổi máy hoặc đổi phạm vi thì XOÁ kết quả cũ, nhưng KHÔNG tự đọc lại.
+   *
+   * Ở đây có HAI lựa chọn phải đặt xong mới đọc được (máy + phạm vi). Tự chạy ngay sau lựa
+   * chọn đầu tiên nghĩa là lần nào cũng tốn một lượt SSH vô ích rồi báo "chưa có crontab nào" —
+   * đúng lúc user còn chưa kịp chọn phạm vi. Nên đọc là do bấm nút.
+   *
+   * Xoá kết quả cũ thì bắt buộc: giữ lại nội dung của máy trước mà đầu trang đã đổi tên máy
+   * khác là hiển thị sai một cách rất dễ tin.
+   */
   useEffect(() => {
-    if (!hostId) return
     setLoaded(false)
+    setOriginal('')
+    setDraft('')
     setError(null)
     setMessage(null)
-    void window.infra.diag
-      .cronRead(hostId)
-      .then((res) => {
-        if (res.ok) {
-          setOriginal(res.content)
-          setDraft(res.content)
-          setLoaded(true)
-        } else {
-          setError(res.error ?? t('cron.readFailed'))
-        }
-      })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
-  }, [hostId, t])
+    setForceUserColumn(null)
+  }, [hostId, scope])
+
+  /**
+   * ⚠️ KHÔNG bao giờ đưa `t` vào dependency của effect có IO: `useT()` trả về một hàm MỚI mỗi
+   * lần render, nên effect sẽ chạy lại sau mỗi `setState` → đọc crontab qua SSH trong vòng lặp
+   * vô hạn. Vì thế lỗi lưu ở dạng THÔ ('' = lỗi không có mô tả) và chỉ dịch lúc render — cũng
+   * đúng hơn: đổi ngôn ngữ thì thông báo đổi theo.
+   */
+  const read = async (): Promise<void> => {
+    if (!hostId) return
+    setBusy(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const res = await window.infra.diag.cronRead(hostId, scope)
+      if (res.ok) {
+        setOriginal(res.content)
+        setDraft(res.content)
+        setLoaded(true)
+      } else {
+        setError(res.error ?? '')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const save = async (): Promise<void> => {
     setConfirming(false)
@@ -125,7 +188,7 @@ export function CronModal({ onClose }: { onClose: () => void }) {
     setError(null)
     setMessage(null)
     try {
-      const res = await window.infra.diag.cronWrite(hostId, draft)
+      const res = await window.infra.diag.cronWrite(hostId, draft, scope)
       if (res.ok) {
         setOriginal(draft)
         setMessage(t('cron.saved'))
@@ -139,32 +202,73 @@ export function CronModal({ onClose }: { onClose: () => void }) {
     }
   }
 
+  // `system` gồm NHIỀU file (/etc/crontab + /etc/cron.d/*) → chỉ đọc; ghi nhiều file qua một
+  // ô text là cái bẫy, và đó là các file quyết định máy chạy gì lúc nửa đêm.
+  const writable = scope !== 'system'
   const dirty = draft !== original
+  // `system` chắc chắn 6 trường; hai scope kia phải DÒ, vì crontab của root trên máy thật hay
+  // được viết theo định dạng hệ thống. User ép tay được khi dò sai.
+  const hasUserColumn = forceUserColumn ?? (scope === 'system' || detectUserColumn(original))
   const jobs = original
     .split('\n')
-    .map(splitJob)
-    .filter((j): j is { schedule: string; command: string } => j !== null)
+    .map((line) => splitJob(line, hasUserColumn))
+    .filter((j): j is CronJobRow => j !== null)
 
   return (
-    <Modal title={t('cron.title')} onClose={onClose} closeOnBackdrop={false}>
-      <div className="w-[700px] max-w-full">
+    <ModalOrPanel
+      embedded={embedded}
+      title={t('cron.title')}
+      onClose={onClose}
+      closeOnBackdrop={false}
+      headerExtra={embedded ? undefined : <OpenInTabButton kind="cron" onDone={onClose} />}
+    >
+      <div className={embedded ? 'w-full' : 'w-[700px] max-w-full'}>
         <div className="mb-2 flex items-center gap-2">
           <Select value={hostId} onChange={(e) => setHostId(e.target.value)} className="max-w-56">
+            <option value="">{t('common.pickHost')}</option>
             {hosts.map((h) => (
               <option key={h.id} value={h.id}>
                 {h.label}
               </option>
             ))}
           </Select>
+          <Select value={scope} onChange={(e) => setScope(e.target.value as CronScopeDto)} className="max-w-56">
+            <option value="user">{t('cron.scopeUser')}</option>
+            <option value="root">{t('cron.scopeRoot')}</option>
+            <option value="system">{t('cron.scopeSystem')}</option>
+          </Select>
           {isProduction && (
             <span className="border-danger/50 bg-danger/10 text-danger rounded border px-1.5 py-0.5 text-[10px] font-medium">
               {t('cron.production')}
             </span>
           )}
+          {/* Đọc là do BẤM: hai lựa chọn ở trên phải đặt xong đã (xem ghi chú ở effect xoá) */}
+          <Button variant="primary" className="ml-auto" disabled={!hostId || busy} onClick={() => void read()}>
+            {busy ? t('cron.reading') : loaded ? t('cron.reread') : t('cron.read')}
+          </Button>
         </div>
+        <p className="text-subtle mb-2 text-[11px] leading-relaxed">{t(`cron.scopeHint.${scope}` as 'cron.scopeHint.user')}</p>
 
-        {!loaded && !error ? (
+        {/* Việc dò cột user không thể chắc chắn → luôn cho ép tay, và nói rõ đang tự dò hay
+            đang bị ép. Đoán thầm rồi hiện sai là kiểu lỗi người dùng không có cách nào sửa. */}
+        {loaded && jobs.length > 0 && (
+          <label className="text-muted mb-2 flex items-center gap-2 text-[11px] select-none">
+            <input
+              type="checkbox"
+              checked={hasUserColumn}
+              onChange={(e) => setForceUserColumn(e.target.checked)}
+            />
+            {t('cron.userColumn')}
+            {forceUserColumn === null && <span className="text-subtle">({t('cron.autoDetected')})</span>}
+          </label>
+        )}
+
+        {!hostId ? (
+          <p className="text-subtle py-8 text-center text-xs">{t('common.pickHostHint')}</p>
+        ) : busy ? (
           <p className="text-subtle py-8 text-center text-xs">{t('cron.loading')}</p>
+        ) : !loaded && error === null ? (
+          <p className="text-subtle py-8 text-center text-xs">{t('cron.pressRead')}</p>
         ) : (
           <>
             {jobs.length > 0 && (
@@ -176,6 +280,9 @@ export function CronModal({ onClose }: { onClose: () => void }) {
                       <span className="text-accent w-40 shrink-0 truncate">
                         {desc ? t(desc.key as 'cron.daily', desc.params) : <code>{job.schedule}</code>}
                       </span>
+                      {/* Cột user chỉ có ở /etc/crontab + /etc/cron.d — hiện riêng, vì "job này
+                          chạy dưới quyền ai" là nửa còn lại của câu trả lời */}
+                      {job.user && <span className="text-warning shrink-0 font-mono">{job.user}</span>}
                       <span className="text-muted min-w-0 flex-1 truncate font-mono">{job.command}</span>
                     </div>
                   )
@@ -189,22 +296,28 @@ export function CronModal({ onClose }: { onClose: () => void }) {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder={t('cron.empty')}
+              readOnly={!writable}
             />
-            <p className="text-subtle mt-1 text-[10px] leading-relaxed">{t('cron.note')}</p>
+            <p className="text-subtle mt-1 text-[10px] leading-relaxed">
+              {writable ? t('cron.note') : t('cron.noteReadOnly')}
+            </p>
           </>
         )}
 
-        {error && <p className="text-danger mt-2 text-xs leading-relaxed">{error}</p>}
+        {/* '' = lỗi không kèm mô tả → dịch lúc render (xem ghi chú ở effect đọc crontab) */}
+        {error !== null && <p className="text-danger mt-2 text-xs leading-relaxed">{error || t('cron.readFailed')}</p>}
         {message && <p className="text-success mt-2 text-xs">{message}</p>}
 
-        <div className="mt-3 flex justify-end gap-2">
-          <Button type="button" disabled={!dirty} onClick={() => setDraft(original)}>
-            {t('cron.revert')}
-          </Button>
-          <Button variant="danger" disabled={busy || !dirty || !loaded} onClick={() => setConfirming(true)}>
-            {busy ? t('cron.saving') : t('cron.save')}
-          </Button>
-        </div>
+        {writable && (
+          <div className="mt-3 flex justify-end gap-2">
+            <Button type="button" disabled={!dirty} onClick={() => setDraft(original)}>
+              {t('cron.revert')}
+            </Button>
+            <Button variant="danger" disabled={busy || !dirty || !loaded} onClick={() => setConfirming(true)}>
+              {busy ? t('cron.saving') : t('cron.save')}
+            </Button>
+          </div>
+        )}
 
         {confirming && (
           <ConfirmModal
@@ -221,6 +334,6 @@ export function CronModal({ onClose }: { onClose: () => void }) {
           />
         )}
       </div>
-    </Modal>
+    </ModalOrPanel>
   )
 }

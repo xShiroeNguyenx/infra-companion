@@ -1,11 +1,16 @@
 import { describe, expect, test } from 'vitest'
+import { groupOf, needsReboot, summarizeFleet, summarizeUpdates } from '@infra/shared'
 import {
+  applySecurityNames,
   detectManagerCommand,
   parseManager,
+  parseSecurityNames,
   parseUpdates,
   securityCount,
+  securityListCommand,
   updatesCommand,
-  type PackageManager
+  type PackageManager,
+  type PackageUpdate
 } from './packageUpdates'
 
 describe('dò package manager', () => {
@@ -48,6 +53,19 @@ describe('dò package manager', () => {
     for (const m of ['apt', 'dnf', 'yum', 'apk'] as const) {
       const cmd = updatesCommand(m)!
       expect(cmd).not.toMatch(/\b(install|upgrade|dist-upgrade)\b/)
+    }
+  })
+
+  test('dnf/yum PHẢI có -C — không thì nó tự đi mạng tải metadata và chết vì timeout', () => {
+    // Đã dính thật: `dnf check-update` trần refresh cache hết hạn → vượt 60s trên máy nhiều repo
+    expect(updatesCommand('dnf')).toContain('-C')
+    expect(updatesCommand('yum')).toContain('-C')
+  })
+
+  test('không lệnh nào tự làm mới metadata', () => {
+    for (const m of ['apt', 'dnf', 'yum', 'apk'] as const) {
+      expect(updatesCommand(m)!).not.toMatch(/\b(makecache|refresh)\b/)
+      expect(updatesCommand(m)!).not.toMatch(/\b(apt|apt-get|apk) update\b/)
     }
   })
 })
@@ -116,6 +134,94 @@ describe('parseUpdates — apk', () => {
   })
 })
 
+describe('bảo mật trên dnf — tên repo KHÔNG nói được', () => {
+  test('dnf/yum có lệnh updateinfo riêng, apt/apk thì không cần', () => {
+    // Repo RHEL chỉ là baseos/appstream → dò theo tên repo cho ra "435 gói, 0 bảo mật"
+    expect(securityListCommand('dnf')).toContain('updateinfo list --security')
+    expect(securityListCommand('yum')).toContain('updateinfo list --security')
+    expect(securityListCommand('apt')).toBeNull()
+    expect(securityListCommand('apk')).toBeNull()
+  })
+
+  test('lệnh updateinfo cũng phải -C, không đi mạng', () => {
+    expect(securityListCommand('dnf')).toContain('-C')
+  })
+
+  test('bóc được tên gói khỏi NEVRA', () => {
+    const out = `RHSA-2024:1234 Important/Sec. openssl-1:3.0.7-24.el9.x86_64
+RHSA-2024:5678 Moderate/Sec.  kernel-core-5.14.0-427.el9.x86_64
+`
+    expect([...parseSecurityNames(out)].sort()).toEqual(['kernel-core', 'openssl'])
+  })
+
+  test('output rỗng / rác → tập rỗng, không ném', () => {
+    expect(parseSecurityNames('').size).toBe(0)
+    expect(parseSecurityNames('Khong co gi\n').size).toBe(0)
+  })
+
+  test('gán cờ security theo tên, gói khác giữ nguyên', () => {
+    const updates = parseUpdates('dnf', 'openssl.x86_64 1:3.0.7-24.el9 baseos\nacl.x86_64 2.3.1-4.el9 baseos\n')
+    const marked = applySecurityNames(updates, new Set(['openssl']))
+    expect(marked.find((u) => u.name === 'openssl')!.security).toBe(true)
+    expect(marked.find((u) => u.name === 'acl')!.security).toBe(false)
+  })
+
+  test('danh sách rỗng thì trả về nguyên mảng cũ', () => {
+    const updates = parseUpdates('dnf', 'acl.x86_64 2.3.1-4.el9 baseos\n')
+    expect(applySecurityNames(updates, new Set())).toBe(updates)
+  })
+})
+
+describe('summarizeUpdates — trả lời "tình hình thế nào"', () => {
+  const make = (names: string[], security: string[] = []): PackageUpdate[] =>
+    names.map((name) => ({ name, current: null, candidate: '1.0', security: security.includes(name) }))
+
+  test('xếp gói vào nhóm theo tên, nhận cả tên Debian lẫn RHEL', () => {
+    expect(groupOf('kernel-core')).toBe('kernel')
+    expect(groupOf('linux-image-amd64')).toBe('kernel')
+    expect(groupOf('glibc')).toBe('core')
+    expect(groupOf('libc6')).toBe('core')
+    expect(groupOf('openssl')).toBe('core')
+    expect(groupOf('nginx')).toBe('web')
+    expect(groupOf('php-fpm')).toBe('web')
+    expect(groupOf('mariadb-server')).toBe('db')
+    expect(groupOf('python3-libs')).toBe('runtime')
+    expect(groupOf('acl')).toBe('other')
+  })
+
+  test('kernel → phải khởi động lại; glibc/systemd cũng vậy', () => {
+    // Vá kernel mà không reboot thì máy vẫn chạy bản cũ — tức là "đã vá" nhưng chưa hết lỗ hổng
+    expect(needsReboot(make(['kernel-core']))).toBe(true)
+    expect(needsReboot(make(['glibc']))).toBe(true)
+    expect(needsReboot(make(['systemd']))).toBe(true)
+    expect(needsReboot(make(['acl', 'nginx']))).toBe(false)
+  })
+
+  test('nhóm xếp theo mức đáng chú ý, kernel trước, other cuối', () => {
+    const s = summarizeUpdates(make(['acl', 'nginx', 'kernel-core', 'glibc']))
+    expect(s.groups.map((g) => g.group)).toEqual(['kernel', 'core', 'web', 'other'])
+  })
+
+  test('nhóm rỗng KHÔNG xuất hiện', () => {
+    expect(summarizeUpdates(make(['acl'])).groups.map((g) => g.group)).toEqual(['other'])
+  })
+
+  test('đếm tổng và đếm bảo mật', () => {
+    const s = summarizeUpdates(make(['openssl', 'acl', 'nginx'], ['openssl']))
+    expect(s.total).toBe(3)
+    expect(s.security).toBe(1)
+  })
+
+  test('tên trong mỗi nhóm sắp xếp ổn định', () => {
+    const s = summarizeUpdates(make(['zlib', 'acl', 'bash']))
+    expect(s.groups[0]!.names).toEqual(['acl', 'bash', 'zlib'])
+  })
+
+  test('không có gói nào → tóm tắt rỗng, không ném', () => {
+    expect(summarizeUpdates([])).toEqual({ total: 0, security: 0, needsReboot: false, groups: [] })
+  })
+})
+
 describe('parseUpdates — chung', () => {
   test('cùng gói ở nhiều repo chỉ tính một lần', () => {
     const dup = `nginx/jammy-updates 1.18.0-2 amd64 [upgradable from: 1.18.0-1]
@@ -139,5 +245,40 @@ nginx/jammy-backports 1.18.0-3 amd64 [upgradable from: 1.18.0-1]
 
   test('không có bản bảo mật nào → securityCount = 0', () => {
     expect(securityCount(parseUpdates('apt', 'curl/jammy 1.2.3 amd64\n'))).toBe(0)
+  })
+})
+
+describe('summarizeFleet — mấy con số đứng đầu màn hình', () => {
+  const host = (names: string[], security: string[] = [], error?: string) => ({
+    updates: names.map((name) => ({ name, current: null, candidate: '1.0', security: security.includes(name) })),
+    error
+  })
+
+  test('đếm máy cần vá / đã đủ / lỗi tách bạch', () => {
+    const s = summarizeFleet([host(['acl']), host([]), host([], [], 'mất kết nối')])
+    expect(s).toMatchObject({ scanned: 3, needPatch: 1, clean: 1, failed: 1 })
+  })
+
+  test('máy lỗi KHÔNG bị tính là "đã cập nhật đủ"', () => {
+    // Máy lỗi có updates = [] nên nếu chỉ xét độ dài mảng thì nó thành "đã đủ" — sai theo
+    // hướng làm người ta yên tâm, đúng loại sai tệ nhất ở một màn hình về vá lỗi
+    const s = summarizeFleet([host([], [], 'không dò được package manager')])
+    expect(s.clean).toBe(0)
+    expect(s.failed).toBe(1)
+  })
+
+  test('đếm cả số MÁY và số GÓI bảo mật', () => {
+    const s = summarizeFleet([host(['openssl', 'acl'], ['openssl']), host(['glibc'], ['glibc']), host(['acl'])])
+    expect(s.securityHosts).toBe(2)
+    expect(s.securityPackages).toBe(2)
+  })
+
+  test('đếm số máy phải khởi động lại', () => {
+    const s = summarizeFleet([host(['kernel-core']), host(['nginx']), host(['systemd'])])
+    expect(s.rebootHosts).toBe(2)
+  })
+
+  test('chưa quét gì → toàn số 0, không ném', () => {
+    expect(summarizeFleet([])).toMatchObject({ scanned: 0, needPatch: 0, clean: 0, failed: 0 })
   })
 })

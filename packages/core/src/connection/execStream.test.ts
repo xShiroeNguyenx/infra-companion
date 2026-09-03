@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { LineBuffer } from './execStream'
-import { highlightSegments, lineMatches, tailCommand, type LogFilter } from '@infra/shared'
+import { COMMON_LOG_PATHS, highlightSegments, lineMatches, tailCommand, type LogFilter } from '@infra/shared'
 
 function filter(over: Partial<LogFilter> = {}): LogFilter {
   return { query: '', invert: false, caseSensitive: false, ...over }
@@ -69,6 +69,33 @@ describe('tailCommand', () => {
   test('số dòng âm/lẻ được chuẩn hoá, không đẩy rác vào lệnh', () => {
     expect(tailCommand('/x', -5)).toContain('-n 0')
     expect(tailCommand('/x', 10.7)).toContain('-n 10')
+  })
+})
+
+describe('COMMON_LOG_PATHS', () => {
+  const all = COMMON_LOG_PATHS.flatMap((g) => g.paths)
+
+  test('đều là đường dẫn tuyệt đối — dán vào lệnh tail phải chạy được ngay', () => {
+    expect(all.every((p) => p.startsWith('/'))).toBe(true)
+  })
+
+  test('không trùng lặp — dropdown hiện hai dòng y hệt là lỗi gõ', () => {
+    expect(new Set(all).size).toBe(all.length)
+  })
+
+  test('có CẢ hai họ distro cho cùng phần mềm (app không biết máy bên kia chạy gì)', () => {
+    expect(all).toContain('/var/log/syslog') // Debian/Ubuntu
+    expect(all).toContain('/var/log/messages') // RHEL/CentOS
+    expect(all).toContain('/var/log/apache2/error.log')
+    expect(all).toContain('/var/log/httpd/error_log')
+  })
+
+  test('không nhóm nào rỗng', () => {
+    expect(COMMON_LOG_PATHS.every((g) => g.software !== '' && g.paths.length > 0)).toBe(true)
+  })
+
+  test('dùng được thẳng với tailCommand', () => {
+    for (const path of all) expect(tailCommand(path)).toContain(`'${path}'`)
   })
 })
 

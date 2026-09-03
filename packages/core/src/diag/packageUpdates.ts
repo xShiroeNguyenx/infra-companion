@@ -50,20 +50,25 @@ export function parseManager(stdout: string): PackageManager {
 }
 
 /**
- * Lệnh liệt kê bản cập nhật, KHÔNG cài gì.
+ * Lệnh liệt kê bản cập nhật, KHÔNG cài gì và KHÔNG đi mạng.
  *
- * `apt list --upgradable` đọc cache có sẵn — cố ý KHÔNG chạy `apt update` trước: nó cần root
- * và ghi vào máy, tức là biến một lệnh chẩn đoán thành một lệnh sửa. Đổi lại, kết quả cũ đúng
- * bằng lần `apt update` gần nhất của máy đó — đã ghi rõ trên UI.
+ * Cố ý không làm mới metadata trước: `apt update` / `dnf makecache` cần root và ghi vào máy,
+ * tức biến một lệnh chẩn đoán thành một lệnh sửa. Đổi lại, kết quả cũ đúng bằng lần refresh
+ * cache gần nhất của chính máy đó — đã ghi rõ trên UI.
+ *
+ * ⚠️ **`-C` (cacheonly) với dnf/yum là bắt buộc, không phải tối ưu.** `dnf check-update` trần
+ * sẽ TỰ tải lại metadata repo khi cache hết hạn — trên máy nhiều repo hoặc mirror chậm thì mất
+ * hàng phút và lệnh chết vì timeout, dù người dùng không hề yêu cầu đi mạng. Đã dính thật
+ * (timeout 60s trên một máy dnf). `apt list --upgradable` thì vốn chỉ đọc cache nên không cần.
  */
 export function updatesCommand(manager: PackageManager): string | null {
   switch (manager) {
     case 'apt':
       return 'apt list --upgradable 2>/dev/null'
     case 'dnf':
-      return 'dnf --quiet check-update 2>/dev/null; true'
+      return 'dnf -C --quiet check-update 2>/dev/null; true'
     case 'yum':
-      return 'yum --quiet check-update 2>/dev/null; true'
+      return 'yum -C --quiet check-update 2>/dev/null; true'
     case 'apk':
       return 'apk version -l "<" 2>/dev/null'
     default:
@@ -129,4 +134,40 @@ export function parseUpdates(manager: PackageManager, stdout: string): PackageUp
 /** Số bản vá bảo mật trong một kết quả — con số đáng nhìn trước tiên. */
 export function securityCount(updates: PackageUpdate[]): number {
   return updates.filter((u) => u.security).length
+}
+
+/**
+ * Lệnh hỏi RIÊNG danh sách bản vá bảo mật cho dnf/yum.
+ *
+ * Cần bước riêng vì với họ RHEL, **tên repo không nói được gói nào là bản vá bảo mật**: repo
+ * chỉ là `baseos`/`appstream`, còn thông tin an ninh nằm ở metadata `updateinfo`. Dò theo tên
+ * repo như bên Debian sẽ cho ra "435 gói, 0 bảo mật" — con số vô hại một cách sai lệch.
+ * Vẫn `-C`: chỉ đọc cache, không đi mạng.
+ */
+export function securityListCommand(manager: PackageManager): string | null {
+  if (manager !== 'dnf' && manager !== 'yum') return null
+  return `${manager} -C --quiet updateinfo list --security 2>/dev/null; true`
+}
+
+/**
+ * Đọc output `updateinfo list --security`, trả về TÊN gói.
+ * Mỗi dòng dạng `RHSA-2024:1234 Important/Sec. openssl-1:3.0.7-24.el9.x86_64`.
+ */
+export function parseSecurityNames(stdout: string): Set<string> {
+  const names = new Set<string>()
+  for (const line of stdout.split('\n')) {
+    const parts = line.trim().split(/\s+/)
+    if (parts.length < 3) continue
+    const nevra = parts[parts.length - 1]!
+    // Bóc `-version-release.arch` ở đuôi: cắt từ dấu `-` đứng trước cụm bắt đầu bằng chữ số
+    const m = nevra.match(/^(.+?)-\d[^-]*-[^-]*$/)
+    if (m) names.add(m[1]!)
+  }
+  return names
+}
+
+/** Gán cờ security cho các gói có tên nằm trong danh sách `updateinfo`. */
+export function applySecurityNames(updates: PackageUpdate[], names: Set<string>): PackageUpdate[] {
+  if (names.size === 0) return updates
+  return updates.map((u) => (names.has(u.name) ? { ...u, security: true } : u))
 }

@@ -981,6 +981,12 @@ export interface HostUpdatesDto {
   error?: string
 }
 
+/**
+ * F35 — cron nằm ở ba chỗ; đọc nhầm chỗ thì thấy trống trong khi máy vẫn đang chạy job.
+ * `system` là định dạng 6 trường (có cột user) và CHỈ ĐỌC (gồm nhiều file).
+ */
+export type CronScopeDto = 'user' | 'root' | 'system'
+
 /** F35 — đọc/ghi crontab của một host. */
 export interface CronReadResult {
   ok: boolean
@@ -1771,10 +1777,14 @@ export interface InfraApi {
     disk(hostId: string, path: string): Promise<DiskUsageResultDto>
     /** Liệt kê bản cập nhật đang chờ. CHỈ ĐỌC — không chạy `apt update`, không cài gì. */
     updates(hostId: string): Promise<HostUpdatesDto>
-    /** Đọc crontab của user đang đăng nhập. Rỗng = chưa có crontab, không phải lỗi. */
-    cronRead(hostId: string): Promise<CronReadResult>
+    /**
+     * Đọc crontab theo phạm vi: `user` (đang đăng nhập) · `root` (qua `sudo -n`) ·
+     * `system` (`/etc/crontab` + `/etc/cron.d/*`, định dạng 6 trường có cột user).
+     * Rỗng = phạm vi đó chưa có crontab, không phải lỗi.
+     */
+    cronRead(hostId: string, scope: CronScopeDto): Promise<CronReadResult>
     /** ⚠️ GHI ĐÈ crontab. Nơi gọi phải xác nhận trước — đây là thay đổi trên production. */
-    cronWrite(hostId: string, content: string): Promise<CronWriteResult>
+    cronWrite(hostId: string, content: string, scope: CronScopeDto): Promise<CronWriteResult>
   }
   knownHosts: {
     list(): Promise<KnownHostDto[]>

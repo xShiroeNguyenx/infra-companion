@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, **a self-managed local PHP/WordPress dev stack**, and more.
 
-**Current release: v0.2.11 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.2.12 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -50,7 +50,8 @@
 - **Split layouts** — arrange panes as auto grid, side-by-side columns, stacked rows, main-left, or main-top; switch from the **▼** next to Split ON or set the default in Settings → Terminal
 - **Pane frame styles** — Compact bar (default) or Mac style (rounded corners + round red close button), in Settings → Terminal
 - **Command palette button** — a toolbar button opens the palette for people who don't know the `Ctrl+Shift+P` shortcut
-- **Tools in tabs, not blocking popups** — Monitoring, Compare, Local dev, **Tunnels**, **Processes**, **Services** and the **AI troubleshooter** all open in a tab (⊞ in the popup header, or the palette), so a long-running diagnosis or a tunnel you're watching never freezes the rest of the app; Monitoring and Tunnels can also **detach into an always-on-top window**
+- **Tools in tabs, not blocking popups** — Monitoring, Compare, Local dev, **Tunnels**, **Processes**, **Services**, the **AI troubleshooter**, plus **Watch a log**, **Scheduled jobs**, **Rotate SSH keys**, **Disk usage**, **What needs patching** and **Trusted fingerprints** all open in a tab (⊞ in the popup header, or the palette), so a fleet-wide scan or a log you're following never freezes the rest of the app; Monitoring and Tunnels can also **detach into an always-on-top window**
+- **All features tab** — the `⋯` menu keeps only the daily tools and ends with **⊞ All features…**: every tool grouped by area with a one-line description and a search box, so the menu stops growing without bound
 - **Open a group as split panes** — one click on a group header opens every host in it side by side, ready to broadcast
 - **Workspaces** — save a layout (tabs + split panes + broadcast) and restore it in one click (⋯ → Workspaces)
 - **Broadcast input** — type once, send to all open panes simultaneously (Ctrl+Shift+B)
@@ -163,8 +164,8 @@
 - **Rotate SSH keys across machines** — push the new key, **log in with it**, and only then remove the old one; if the new key can't log in, the old one stays. One machine at a time
 
 ### Fleet diagnostics (read-only)
-- **What is filling the disk** — every filesystem's usage, then walk the tree one level at a time with a bar per directory. `du -x -d 1`: one level per step, never crossing filesystems, unreadable directories skipped rather than failing the scan
-- **What needs patching** — tick hosts, scan once, get packages-waiting and security-updates per machine (`apt` / `dnf` / `yum` / `apk`, detected per host). It does **not** run `apt update` (root, and a write), and there is deliberately **no button to install anything**
+- **What is filling the disk** — every filesystem's usage, then walk the tree one level at a time with a bar per directory, **and a verdict above the list**: which filesystem this directory is on, what share of the used space it accounts for, and one sentence on the next move (*go into `log`, it holds 95.5%* — with a button; or *the space is in files sitting directly here, going deeper won't find it*; or *this branch is tiny, you're digging in the wrong place*). `du -x -d 1`: one level per step, never crossing filesystems, unreadable directories skipped rather than failing the scan
+- **What needs patching** — tick hosts, scan once, and read the fleet in one line: how many machines need patching, how many have **security patches** waiting, how many need a **reboot** before the new build actually runs. Per machine, a sentence and counts by area (kernel / system core / web / databases / runtimes) with the package names one toggle away. Security labels come from `updateinfo` on RHEL-family hosts, where the repository name doesn't carry them. **Offline**: reads only the cache already on the machine (`dnf -C`), never refreshes metadata (root, and a write), and there is deliberately **no button to install anything**
 
 ### Import / Export
 - **Read a saved secret back** — show a stored host password or key passphrase, or copy it to the clipboard without it ever appearing on screen. Requires the master password **again**, every time, even while the vault is unlocked; masked, auto-hides, clipboard self-clears
@@ -236,7 +237,7 @@ pnpm test         # unit tests (crypto, sync-merge, ssh_config parser)
 
 ```bash
 pnpm test
-# 1291 tests; on Node 20 the node:sqlite suites (vault-merge, replication clusters, local-dev
+# 1344 tests; on Node 20 the node:sqlite suites (vault-merge, replication clusters, local-dev
 # store) are skipped — they need Node ≥ 22.5.
 # To run those too, use Electron's bundled Node 24 runtime — from packages/core, not the
 # repo root: run it at the root and vitest never sees packages/core/vitest.config.ts, so the
@@ -326,7 +327,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.2.11)
+## Known Limitations (v0.2.12)
 
 - **Local dev stack is Windows-only** for now (OS-specific work is isolated behind a single adapter, so other platforms are a matter of writing one). `.test` domains and local HTTPS are **not wired up yet** — mkcert installs and lands on `PATH`, but issuing/trusting a certificate is still a manual `mkcert -install`. There is no WordPress downloader (point it at a folder you already have), and no local↔server deploy or public-share link yet. phpMyAdmin 5.2 does not support PHP 8.4, so the app serves it with PHP 8.3 when both are installed
 - **Domain → server mapping needs a Chromium browser** (Chrome/Edge/Brave/Vivaldi); Firefox has no equivalent flag, and the override has no effect when the machine routes through a system proxy (the proxy resolves DNS itself). Non-browser clients (Postman, MySQL clients) aren't covered — use a tunnel or the `curl --resolve` command instead

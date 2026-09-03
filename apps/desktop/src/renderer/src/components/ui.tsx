@@ -29,6 +29,8 @@ export function Modal({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  const closeLabel = useT()('common.close')
+
   return (
     <div
       className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
@@ -48,6 +50,20 @@ export function Modal({
         >
           <span className="min-w-0 flex-1 truncate">{title}</span>
           {headerExtra}
+          {/* Nút đóng nằm ở ĐÂY chứ không ở từng modal: trước đó không modal nào có, và những
+              hộp thoại đặt `closeOnBackdrop={false}` (form dài, prompt bảo mật) thành ra không
+              có đường đóng nào ngoài phím Esc — người không biết Esc thì bị kẹt hẳn. */}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              title={`${closeLabel} (Esc)`}
+              aria-label={closeLabel}
+              className="text-subtle hover:bg-hover hover:text-content -mr-1 shrink-0 rounded px-1.5 py-0.5 text-base leading-none"
+            >
+              ×
+            </button>
+          )}
         </div>
         <div className="overflow-y-auto px-4 py-3">{children}</div>
       </div>

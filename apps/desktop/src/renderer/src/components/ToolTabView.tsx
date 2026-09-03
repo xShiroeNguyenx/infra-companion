@@ -5,6 +5,12 @@ import { ProcessesModal } from './ProcessesModal'
 import { ReplicationModal } from './ReplicationModal'
 import { ServicesModal } from './ServicesModal'
 import { TunnelsModal } from './TunnelsModal'
+import { LogTailModal } from './LogTailModal'
+import { CronModal } from './CronModal'
+import { KeyRotateModal } from './KeyRotateModal'
+import { DiskUsageModal } from './DiskUsageModal'
+import { PackageUpdatesModal } from './PackageUpdatesModal'
+import { KnownHostsModal } from './KnownHostsModal'
 import { useT } from '../i18n'
 import type { I18nKey } from '../i18n/dict'
 import type { ToolTabKind } from '../stores/tabs'
@@ -23,7 +29,13 @@ const TOOLS: Partial<Record<ToolTabKind, { icon: string; titleKey: I18nKey; rend
   services: { icon: '⚙', titleKey: 'svc.title', render: () => <ServicesModal embedded /> },
   'ai-diagnose': { icon: '🩺', titleKey: 'ai.diagnose.title', render: () => <AiDiagnoseModal embedded /> },
   replication: { icon: '🔁', titleKey: 'repl.title', render: () => <ReplicationModal embedded /> },
-  help: { icon: '❓', titleKey: 'help.title', render: () => <HelpModal embedded /> }
+  help: { icon: '❓', titleKey: 'help.title', render: () => <HelpModal embedded /> },
+  'log-tail': { icon: '🪵', titleKey: 'tail.title', render: () => <LogTailModal embedded /> },
+  cron: { icon: '⏰', titleKey: 'cron.title', render: () => <CronModal embedded /> },
+  'key-rotate': { icon: '🔄', titleKey: 'rotate.title', render: () => <KeyRotateModal embedded /> },
+  'disk-usage': { icon: '💾', titleKey: 'disk.title', render: () => <DiskUsageModal host={null} embedded /> },
+  'pkg-updates': { icon: '📦', titleKey: 'pkg.title', render: () => <PackageUpdatesModal embedded /> },
+  'known-hosts': { icon: '🔏', titleKey: 'knownHosts.title', render: () => <KnownHostsModal embedded /> }
 }
 
 export function ToolTabView({ kind, active }: { kind: ToolTabKind; active: boolean }) {

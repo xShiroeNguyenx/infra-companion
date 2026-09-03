@@ -64,6 +64,8 @@ You can look at a password you stored. Edit the host → **👁 Show saved passw
 - **Quick connect** — in the **header row next to *+ New terminal***: type `user@host[:port]` and press Enter. A confirmation drops down under the box once what you typed looks like a target.
 - **Stats** — hosts, groups, connections today / last 7 days (derived from Quick-Connect history)
 - **★ Favorites** — one click opens an SSH tab
+- **Finding a tool**: the sidebar `⋯` menu keeps only what you reach for daily and ends with **⊞ All features…**, which opens a tab listing every tool grouped by area, each with a one-line description, and a search box. The Dashboard's icon grid still shows everything at a glance. Every dialog has a **×** in its header (and `Esc` still works).
+- **Anything long-running belongs in a tab.** A dialog blocks the whole app while it's open, so the tools that take time — *Watch a log*, *Scheduled jobs*, *Rotate SSH keys*, *What is filling the disk*, *What needs patching*, *Trusted fingerprints*, alongside Monitoring, Tunnels, Processes and Services — carry a **⊞** button in their header that moves them into a tab. Moving restarts the tool, so a log you intend to watch for a while is best opened as a tab from the start.
 - **A "Needs attention" strip** at the very top — hosts that aren't responding, tunnels that failed, and replicas with a critical diagnosis. It shows up **only when there is something wrong**; a panel that is always there is a panel you stop reading. A host with no check result yet is not counted as down, and while the watcher is off the strip stays quiet entirely, because silence there means "no data", not "all clear".
 - **Host group cards** — three separate things to click, so the group isn't all-or-nothing:
   - **the group name** (or the `⊞ N` chip) opens the **full host list** for that group — every host with its `user@host:port` and status, connect over SSH or SFTP one at a time, and *open all N panes* at the bottom. This is where you go when the group has more machines than fit on the card.
@@ -623,6 +625,16 @@ It keeps the last **5000 lines** — this is a window for watching, not an archi
 
 ### 15G. Scheduled jobs — `⋯` → Scheduled jobs
 
+Pick the machine **and** the scope, then press **Read**. Nothing is fetched until you do — there are two choices to make here, and running after the first one would mean an SSH round trip and an "no crontab" answer every single time before you'd even chosen where to look.
+
+**The scope matters.** Cron lives in three places and looking in the wrong one shows an empty screen on a machine that is running jobs every night:
+
+- **Logged-in user** — `crontab -l` for the account you connect as. System jobs are usually *not* here.
+- **`sudo crontab -l`** — root's crontab. You do **not** log in as root; it just puts `sudo` in front the way you would by hand. It uses `sudo -n` because this channel has no terminal: without it, `sudo` would sit waiting for a password nobody can type until it timed out. With it, a machine that requires a sudo password says so immediately instead of pretending there is no crontab.
+- **System** — `/etc/crontab` and `/etc/cron.d/*`. Read-only, because the scope spans several files and editing them through one text box is too easy to get wrong.
+
+**The six-field format.** System files put a USER column between the schedule and the command. So do many root crontabs, even though `crontab -l` is nominally five fields. The app **detects it from the content** rather than assuming it from the scope, and shows the result as a checkbox you can flip — one line alone cannot settle it, since `0 5 * * * sh /x.sh` and `0 5 * * * deploy /x.sh` have exactly the same shape. Get it wrong and the command reads as `deploy /usr/local/cron/backup.sh`, which is easy to miss because the schedule next to it still looks right.
+
 Shows the machine's crontab: each job's schedule in words (*every 5 minutes*, *daily at 03:00*) next to its command. Anything too complex to describe honestly — `0 2,14 * * 1-5` — is shown as the raw expression instead, because guessing wrong about when a job runs is worse than not guessing.
 
 You edit the crontab **as text**, not through a per-row form. Real crontabs carry comments and environment variables (`MAILTO`, `PATH`) that do real work, and rebuilding the file from only the parts a form understands is exactly how a colleague's line disappears.
@@ -643,15 +655,38 @@ Still: try it on an unimportant machine first, and keep a session open to it whi
 
 Pick a host. The top strip lists every filesystem with how full it is (red past 90%) and how much is left — that is the question you actually have first: *which partition is running out*. Below it, the directory you're in, one row per child, with a bar sized to its share of that level. Click a row to go down, **↑** to go back up, **↻** to rescan.
 
+**The verdict, above the list.** A row of numbers tells you what is big; it doesn't tell you what to do. So the scan is summarised into which filesystem this directory sits on, how full that is, what share of the used space this directory accounts for, and **one sentence on the next move** — with a button that makes it:
+
+| What the numbers say | What you get told |
+|---|---|
+| One subdirectory holds 60%+ | *Go into `log` — it holds 95.5% here, and everything else together is rounding error.* Plus a button that opens it. |
+| Most of the space is in **files sitting directly here** | Going deeper won't find it — `du -d 1` counts directories, so a single enormous `catalina.out` never shows up as a row. You need to look at individual files. |
+| Nothing dominates | *The space is spread out* — said plainly, rather than implying there's a culprit to chase. |
+| This branch is tiny next to what the filesystem has used | You're digging in the wrong place; here's the way back up. |
+
+> The filesystem is matched by **longest mount point, at a path boundary** — so `/bootstrap` isn't reported as living on `/boot`, and a directory under `/var/lib/docker` is measured against that mount instead of `/`. If `df` gave nothing back, the verdict says only what it actually knows rather than inventing an urgency level.
+
 It walks **one level per step** (`du -d 1`) rather than scanning the whole tree, because scanning `/` on a production box takes minutes and most of the output is never read. It uses `-x`, so it never wanders into another filesystem — without that, `du /` disappears into `/proc`, `/sys` and network mounts and comes back with a number that answers nothing.
 
 > Directories you don't have permission to read are skipped instead of failing the whole scan. When that happens the parent's total is larger than the rows listed beneath it — that gap *is* the unreadable part.
 
 ### 15E. What needs patching — `⋯` → What needs patching
 
-Tick the hosts and scan once. Each machine comes back as a row: how many packages are waiting, how many of those are security updates, and the package names. Machines with security updates sort to the top; ones already current say so. It detects `apt` / `dnf` / `yum` / `apk` per host, and scans in small batches rather than opening every connection at once, which through a single gate is a reliable way to get throttled.
+Nothing is selected when you open it — tick the machines you want (or press **Select all**) and scan once. It detects `apt` / `dnf` / `yum` / `apk` per host, and scans in small batches rather than opening every connection at once, which through a single gate is a reliable way to get throttled.
 
-> **Read-only, deliberately.** It does not run `apt update` first — that needs root and writes to the machine, which turns a diagnostic into a change. So the results are exactly as fresh as each machine's own last cache refresh. And there is **no button to install anything**: patching is something you want to be watching, and a "patch the whole fleet" button only has to be misclicked once.
+The result reads top-down, widest first:
+
+- **The fleet in one line** — how many machines were scanned, how many need patching, how many are already current, and how many couldn't be scanned at all. A machine that failed to scan is counted separately and never as "up to date".
+- **The two lines that decide what you do next** — how many machines have **security patches** waiting, and how many will need a **reboot** afterwards. The second one matters more than it looks: a kernel or `glibc` update that isn't followed by a restart leaves the machine running the old build, so it's patched on paper and not in fact.
+- **A sentence per machine**, not a list — *Patch soon: 12 security patches waiting*, or *Ordinary updates only*. Machines with security patches sort to the top.
+- **Counts by area** — kernel, system core, web/PHP, databases, runtimes, other — so you can see what the batch actually touches without reading names. Kernel and system core are tinted, because those are the ones that decide whether you need a maintenance window.
+- **The package names**, all of them, behind a **Show N package names** toggle that starts closed. Security packages are pulled out and listed first, since that's the list you'd copy out.
+
+> **Why "0 security updates" used to be wrong on RHEL.** Debian and Ubuntu put the word in the repository name (`jammy-security`). RHEL, Rocky, Alma and CentOS don't — the repository is just `baseos` or `appstream`, and the security information sits in separate `updateinfo` metadata. The scan asks for that separately now (still cache-only). If it can't be read, you get the package list without the security labels rather than no list at all.
+
+> **Read-only and offline, deliberately.** It never refreshes package metadata — that needs root and writes to the machine, which turns a diagnostic into a change. So the results are exactly as fresh as each machine's own last cache refresh. And there is **no button to install anything**: patching is something you want to be watching, and a "patch the whole fleet" button only has to be misclicked once.
+
+> On RHEL-family machines this needs `dnf -C` explicitly: a plain `dnf check-update` quietly re-downloads repository metadata when the cache has expired, which turns an offline read into a network round trip and can take minutes on a box with several repos.
 
 ### 15C. Trusted fingerprints — `⋯` → Trusted fingerprints
 

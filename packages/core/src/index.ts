@@ -382,9 +382,16 @@ export {
   CRON_OK_MARKER,
   buildCrontab,
   describeSchedule,
+  isScopeWritable,
   parseCrontab,
   readCrontabCommand,
+  scopeHasUserColumn,
+  sudoDenied,
   writeCrontabCommand,
   writeSucceeded
 } from './diag/crontab'
-export type { CronLine, CronLineKind, ScheduleDescription } from './diag/crontab'
+export type { CronLine, CronLineKind, CronScope, ScheduleDescription } from './diag/crontab'
+// F37 — đọc nhãn bảo mật từ `updateinfo` (họ RHEL không dò được qua tên repo).
+// Phần TÓM TẮT (`groupOf`/`summarizeUpdates`/`summarizeFleet`) nằm ở `@infra/shared` vì
+// renderer là nơi vẽ nó, mà renderer không import được `@infra/core` (CLAUDE.md §5).
+export { applySecurityNames, parseSecurityNames, securityListCommand } from './diag/packageUpdates'
