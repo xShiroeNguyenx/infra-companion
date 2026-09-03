@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, **a self-managed local PHP/WordPress dev stack**, and more.
 
-**Current release: v0.2.10 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.2.11 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -157,6 +157,11 @@
 - **Transfer by file** — export the encrypted blob to a file and import it elsewhere, for when you're on a borrowed machine with nothing but a browser
 - **It refuses to overwrite the folder when it can't see the blob** but something says it should be there — a browser-renamed duplicate (`… (1).blob`), or a cloud client that hasn't finished downloading. That write would replace every other machine's data
 
+### Fleet operations
+- **Watch a log without a terminal tab** — `tail -F` (survives logrotate) in a filterable, highlightable panel; keeps the last 5000 lines, and follow-the-bottom releases the moment you scroll up
+- **Scheduled jobs (cron)** — each line's schedule in words, edit the crontab text itself (comments and `MAILTO`/`PATH` survive), confirm before replacing — louder on a **PRODUCTION** group
+- **Rotate SSH keys across machines** — push the new key, **log in with it**, and only then remove the old one; if the new key can't log in, the old one stays. One machine at a time
+
 ### Fleet diagnostics (read-only)
 - **What is filling the disk** — every filesystem's usage, then walk the tree one level at a time with a bar per directory. `du -x -d 1`: one level per step, never crossing filesystems, unreadable directories skipped rather than failing the scan
 - **What needs patching** — tick hosts, scan once, get packages-waiting and security-updates per machine (`apt` / `dnf` / `yum` / `apk`, detected per host). It does **not** run `apt update` (root, and a write), and there is deliberately **no button to install anything**
@@ -231,7 +236,7 @@ pnpm test         # unit tests (crypto, sync-merge, ssh_config parser)
 
 ```bash
 pnpm test
-# 1235 tests; on Node 20 the node:sqlite suites (vault-merge, replication clusters, local-dev
+# 1291 tests; on Node 20 the node:sqlite suites (vault-merge, replication clusters, local-dev
 # store) are skipped — they need Node ≥ 22.5.
 # To run those too, use Electron's bundled Node 24 runtime — from packages/core, not the
 # repo root: run it at the root and vitest never sees packages/core/vitest.config.ts, so the
@@ -321,7 +326,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.2.10)
+## Known Limitations (v0.2.11)
 
 - **Local dev stack is Windows-only** for now (OS-specific work is isolated behind a single adapter, so other platforms are a matter of writing one). `.test` domains and local HTTPS are **not wired up yet** — mkcert installs and lands on `PATH`, but issuing/trusting a certificate is still a manual `mkcert -install`. There is no WordPress downloader (point it at a folder you already have), and no local↔server deploy or public-share link yet. phpMyAdmin 5.2 does not support PHP 8.4, so the app serves it with PHP 8.3 when both are installed
 - **Domain → server mapping needs a Chromium browser** (Chrome/Edge/Brave/Vivaldi); Firefox has no equivalent flag, and the override has no effect when the machine routes through a system proxy (the proxy resolves DNS itself). Non-browser clients (Postman, MySQL clients) aren't covered — use a tunnel or the `curl --resolve` command instead

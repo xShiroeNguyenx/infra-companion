@@ -5,6 +5,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.11] — 2026-08-30
+
+### Added
+
+- **Watch a log without giving up a terminal tab** (`⋯` → *Watch a log*). Pick a host and a path and the lines arrive in a panel you can filter (plain text or `/regex/`), invert to push noise out of the way, and highlight in place — while your terminals stay free for actual work. Until now `tail -f` cost you a whole tab that then did nothing else. It runs **`tail -F`**, not `-f`: logrotate renames the file out from under you at midnight, and `-f` follows the old inode and goes silent forever while still looking alive. It keeps the last 5000 lines — this is a window, not an archive — and follow-the-bottom turns itself off the moment you scroll up, so reading something doesn't yank you back down. Behind it is the app's first general **streaming exec channel**; the same plumbing is what a "tell me when the long command finishes" feature would need.
+- **Read and edit a machine's scheduled jobs** (`⋯` → *Scheduled jobs*). Shows each cron line with its schedule in words — *every 5 minutes*, *daily at 03:00* — and the raw expression for anything too complex to describe honestly, because a wrong guess about when a job runs is worse than no guess. Editing is the crontab text itself rather than a per-row form: real crontabs carry comments and environment variables (`MAILTO`, `PATH`) that do real work, and rebuilding the file from only the parts a form understands is how you delete someone else's line. Saving replaces the whole crontab, so it always asks first — and says so louder when the host is in a group you marked **PRODUCTION**.
+- **Rotate an SSH key across many machines** (`⋯` → *Rotate SSH keys*). Pick the new key, optionally the old one to retire, tick the hosts. Per machine it pushes the new key, **logs in with it**, and only then removes the old one. The invariant that makes this safe to run at all: if the new key cannot log in, the old key is kept — no exceptions, on every failure path. It runs one machine at a time so you can stop the moment something looks wrong, and the old key is removed by rewriting `authorized_keys` from a filtered copy rather than a `sed` expression, because that file decides who gets into the machine.
+
+---
+
 ## [0.2.10] — 2026-08-30
 
 ### Added

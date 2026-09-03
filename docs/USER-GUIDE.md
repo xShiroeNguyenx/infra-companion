@@ -613,6 +613,32 @@ Needs AI configured (see §14). If not, the settings form opens.
 
 Pick your `~/.ssh/config` → it creates hosts, **preserves multi-hop ProxyJump**, imports IdentityFile (dedupes keys), and warns if needed. The group is named `ssh_config (date)`.
 
+### 15F. Watch a log — `⋯` → Watch a log
+
+Pick a host and a path, press Start, and the lines arrive here instead of in a terminal tab. Filter by plain text or `/regex/`; **Invert** keeps the lines that *don't* match, which is how you push routine noise out of the way; matches are highlighted in place.
+
+It runs **`tail -F`**, not `-f`. That difference matters at midnight: logrotate renames the file and creates a new one, `-f` keeps following the old inode, and the panel then looks perfectly alive while never showing another line again.
+
+It keeps the last **5000 lines** — this is a window for watching, not an archive (session logging is the archive). Follow-the-bottom switches itself off the instant you scroll up, so reading something older doesn't yank you back down; scroll to the bottom to re-arm it. Closing the panel stops the command on the server.
+
+### 15G. Scheduled jobs — `⋯` → Scheduled jobs
+
+Shows the machine's crontab: each job's schedule in words (*every 5 minutes*, *daily at 03:00*) next to its command. Anything too complex to describe honestly — `0 2,14 * * 1-5` — is shown as the raw expression instead, because guessing wrong about when a job runs is worse than not guessing.
+
+You edit the crontab **as text**, not through a per-row form. Real crontabs carry comments and environment variables (`MAILTO`, `PATH`) that do real work, and rebuilding the file from only the parts a form understands is exactly how a colleague's line disappears.
+
+> Saving **replaces the entire crontab** of the logged-in user, so it always confirms first — and says so more loudly when the host belongs to a group you marked PRODUCTION (§1). Success is verified by a marker the command prints, not by an exit code, which the cleanup step would otherwise hide.
+
+### 15H. Rotate SSH keys — `⋯` → Rotate SSH keys
+
+Pick the new key, optionally the old key to retire, tick the machines. For each one, in order: push the new key → **log in using it** → and only then remove the old one.
+
+> The property that makes this safe to run on machines you care about: **if the new key cannot log in, the old key is kept.** On every failure path. The row then reads *not verified — old key kept*, and you still have your way in.
+
+It runs one machine at a time so you can stop as soon as something looks wrong. The old key is removed by reading `authorized_keys`, filtering the line out, and writing the file back — not with a `sed` expression on the server, because that file decides who gets into the machine and a slightly wrong pattern there cuts someone else's access. Permissions are set back to `600` afterwards; leave them wrong and sshd ignores the whole file, which would mean removing the old key *and* breaking the new one.
+
+Still: try it on an unimportant machine first, and keep a session open to it while you do.
+
 ### 15D. What is filling the disk — `⋯` → What is filling the disk
 
 Pick a host. The top strip lists every filesystem with how full it is (red past 90%) and how much is left — that is the question you actually have first: *which partition is running out*. Below it, the directory you're in, one row per child, with a bar sized to its share of that level. Click a row to go down, **↑** to go back up, **↻** to rescan.

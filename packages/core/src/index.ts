@@ -15,6 +15,8 @@ export { listSerialPorts } from './connection/SerialSession'
 export { BulkService } from './bulk/BulkService'
 export type { BulkTarget, BulkResult } from './bulk/BulkService'
 export { execOnce } from './connection/execOnce'
+export { LineBuffer, execStream } from './connection/execStream'
+export type { ExecStreamOptions, StreamHandle } from './connection/execStream'
 export type { ExecOnceOptions, ExecOnceResult } from './connection/execOnce'
 export { ping, dnsLookup, checkPort, scanCommonPorts, fetchImageAsDataUrl, normalizeImageUrl } from './nettools/netTools'
 export type { PingResult, DnsResult, PortScanEntry } from './nettools/netTools'
@@ -353,11 +355,15 @@ export { WindowsAdapter, parseExcludedPortRanges, parseStrayJson } from './local
 export { PosixAdapter, createPlatformAdapter } from './localdev/platform/PosixAdapter'
 // F43 — đẩy public key lên authorized_keys (phần quyết định; phần chạy lệnh ở main).
 export {
+  AUTHKEYS_OK_MARKER,
   appendAuthorizedKeyCommand,
+  authKeysWriteSucceeded,
   authorizedKeysHas,
   planCopyId,
   publicKeyIdentity,
-  readAuthorizedKeysCommand
+  readAuthorizedKeysCommand,
+  removeKeyFromAuthorized,
+  writeAuthorizedKeysCommand
 } from './keys/authorizedKeys'
 export type { CopyIdOutcome } from './keys/authorizedKeys'
 // F36 / F37 — chẩn đoán đọc-thuần trên host: đĩa đầy ở đâu, máy nào cần vá gì.
@@ -371,3 +377,14 @@ export {
   updatesCommand
 } from './diag/packageUpdates'
 export type { HostUpdates, PackageManager, PackageUpdate } from './diag/packageUpdates'
+// F35 — đọc/sửa crontab. Phần GHI là ghi vào production: nơi gọi phải xác nhận trước.
+export {
+  CRON_OK_MARKER,
+  buildCrontab,
+  describeSchedule,
+  parseCrontab,
+  readCrontabCommand,
+  writeCrontabCommand,
+  writeSucceeded
+} from './diag/crontab'
+export type { CronLine, CronLineKind, ScheduleDescription } from './diag/crontab'

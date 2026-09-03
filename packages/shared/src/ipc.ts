@@ -175,9 +175,18 @@ export const IPC = {
    */
   /** F43 — đẩy public key lên host rồi đăng nhập thử bằng chính key đó. */
   KEY_COPY_ID: 'key:copy-id',
+  /** F42 — xoay vòng key trên MỘT host (đẩy mới → xác minh → mới gỡ cũ). */
+  KEY_ROTATE: 'key:rotate',
+  /** F30 — theo dõi file log qua kênh exec chạy dài (không chiếm tab terminal). */
+  LOG_TAIL_START: 'log-tail:start',
+  LOG_TAIL_STOP: 'log-tail:stop',
+  LOG_TAIL_EVENT: 'log-tail:event',
   /** F36/F37 — chẩn đoán chỉ-đọc trên host: đĩa đầy ở đâu, máy nào cần vá gì. */
   DIAG_DISK: 'diag:disk',
   DIAG_UPDATES: 'diag:updates',
+  /** F35 — đọc/ghi crontab. GHI là ghi vào production: renderer phải xác nhận trước. */
+  CRON_READ: 'cron:read',
+  CRON_WRITE: 'cron:write',
   /** F44 — xem / quên fingerprint đã TOFU. */
   KNOWN_HOSTS_LIST: 'known-hosts:list',
   KNOWN_HOSTS_DELETE: 'known-hosts:delete',

@@ -981,6 +981,25 @@ export interface HostUpdatesDto {
   error?: string
 }
 
+/** F35 — đọc/ghi crontab của một host. */
+export interface CronReadResult {
+  ok: boolean
+  content: string
+  error?: string
+}
+
+export interface CronWriteResult {
+  ok: boolean
+  error?: string
+}
+
+/** F30 — sự kiện của một phiên theo dõi log. */
+export type LogTailEvent =
+  | { id: string; kind: 'lines'; lines: Array<{ text: string; source: 'stdout' | 'stderr' }> }
+  | { id: string; kind: 'closed'; code: number | null; error?: string }
+
+export type LogTailStartResult = { ok: true; id: string } | { ok: false; error: string }
+
 /** F44 — một fingerprint đã TOFU. `hostPattern` dạng `host` hoặc `[host]:port`. */
 export interface KnownHostDto {
   id: string
@@ -1001,6 +1020,26 @@ export interface CopyIdResult {
   ok: boolean
   /** 'added' | 'already-present' khi ok; 'not-verified' = ghi được nhưng login bằng key vẫn hỏng. */
   outcome: 'added' | 'already-present' | 'not-verified' | 'error'
+  message: string
+}
+
+/** F42 — xoay vòng SSH key trên MỘT host. Renderer lặp qua từng host để có tiến độ. */
+export interface RotateRequest {
+  hostId: string
+  newKeyId: string
+  /** null = chỉ đẩy key mới, không gỡ gì. */
+  oldKeyId: string | null
+}
+
+export interface RotateResult {
+  hostId: string
+  host: string
+  /**
+   * `rotated` = đã đẩy + xác minh + gỡ key cũ · `installed` = đã đẩy + xác minh, key cũ CÒN
+   * · `not-verified` = key mới ghi được nhưng không đăng nhập được, **key cũ giữ nguyên**
+   * · `error` = hỏng trước đó.
+   */
+  stage: 'rotated' | 'installed' | 'not-verified' | 'error'
   message: string
 }
 
@@ -1718,12 +1757,24 @@ export interface InfraApi {
   keys: {
     /** Đẩy public key lên `~/.ssh/authorized_keys` của host rồi đăng nhập thử bằng key đó. */
     copyId(request: CopyIdRequest): Promise<CopyIdResult>
+    /** Xoay vòng key trên một host. KHÔNG BAO GIỜ gỡ key cũ khi key mới chưa đăng nhập được. */
+    rotate(request: RotateRequest): Promise<RotateResult>
+  }
+  logTail: {
+    /** Mở phiên `tail -F` trên host. Dòng về qua `onEvent`. */
+    start(hostId: string, path: string): Promise<LogTailStartResult>
+    stop(id: string): Promise<void>
+    onEvent(cb: (event: LogTailEvent) => void): () => void
   }
   diag: {
     /** Liệt kê MỘT cấp dưới `path` (drill-down từng bước) + dung lượng còn trống các phân vùng. */
     disk(hostId: string, path: string): Promise<DiskUsageResultDto>
     /** Liệt kê bản cập nhật đang chờ. CHỈ ĐỌC — không chạy `apt update`, không cài gì. */
     updates(hostId: string): Promise<HostUpdatesDto>
+    /** Đọc crontab của user đang đăng nhập. Rỗng = chưa có crontab, không phải lỗi. */
+    cronRead(hostId: string): Promise<CronReadResult>
+    /** ⚠️ GHI ĐÈ crontab. Nơi gọi phải xác nhận trước — đây là thay đổi trên production. */
+    cronWrite(hostId: string, content: string): Promise<CronWriteResult>
   }
   knownHosts: {
     list(): Promise<KnownHostDto[]>

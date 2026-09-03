@@ -8,9 +8,12 @@ import {
   parseDu,
   parseManager,
   parseUpdates,
-  updatesCommand
+  readCrontabCommand,
+  updatesCommand,
+  writeCrontabCommand,
+  writeSucceeded
 } from '@infra/core'
-import { IPC, type DiskUsageResultDto, type HostUpdatesDto } from '@infra/shared'
+import { IPC, type CronReadResult, type CronWriteResult, type DiskUsageResultDto, type HostUpdatesDto } from '@infra/shared'
 import { makeHostKeyVerifier, prepareConnection } from './connection'
 import { touchActivity } from './vault'
 
@@ -62,6 +65,34 @@ export function registerDiagIpc(): void {
       }
     } catch (error) {
       return { ok: false, usage: null, filesystems: [], error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle(IPC.CRON_READ, async (event, hostId: string): Promise<CronReadResult> => {
+    touchActivity()
+    try {
+      const res = await run(event, hostId, readCrontabCommand(), PKG_TIMEOUT_MS)
+      // stdout rỗng là HỢP LỆ ở đây: máy chưa có crontab nào. `; true` đã nuốt mã lỗi của
+      // `crontab -l`, nên chỉ coi là hỏng khi execOnce báo lỗi tầng dưới.
+      return { ok: true, content: res.stdout }
+    } catch (error) {
+      return { ok: false, content: '', error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  /**
+   * ⚠️ Đây là đường GHI VÀO PRODUCTION duy nhất trong file này. Renderer phải xác nhận trước
+   * khi gọi; ở đây chỉ lo chạy đúng và **kiểm chứng bằng marker** chứ không tin exit code —
+   * `rm -f` ở cuối chuỗi lệnh che mất mã lỗi của `crontab`.
+   */
+  ipcMain.handle(IPC.CRON_WRITE, async (event, hostId: string, content: string): Promise<CronWriteResult> => {
+    touchActivity()
+    try {
+      const res = await run(event, hostId, writeCrontabCommand(content), PKG_TIMEOUT_MS)
+      if (writeSucceeded(res.stdout)) return { ok: true }
+      return { ok: false, error: res.error ?? 'crontab từ chối nội dung (kiểm lại cú pháp dòng lịch)' }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
 

@@ -1,10 +1,14 @@
 import { describe, expect, test } from 'vitest'
 import {
+  AUTHKEYS_OK_MARKER,
   appendAuthorizedKeyCommand,
+  authKeysWriteSucceeded,
   authorizedKeysHas,
   planCopyId,
   publicKeyIdentity,
-  readAuthorizedKeysCommand
+  readAuthorizedKeysCommand,
+  removeKeyFromAuthorized,
+  writeAuthorizedKeysCommand
 } from './authorizedKeys'
 
 // Blob bịa, KHÔNG phải key thật — chỉ cần đúng hình dạng `<type> <base64> <comment>`
@@ -65,6 +69,62 @@ describe('planCopyId', () => {
   test('chưa có → added, đã có → already-present', () => {
     expect(planCopyId('', LINE)).toBe('added')
     expect(planCopyId(LINE, LINE)).toBe('already-present')
+  })
+})
+
+describe('removeKeyFromAuthorized — F42', () => {
+  const OTHER = 'ssh-rsa AAAAsomeoneelse colleague@laptop'
+
+  test('gỡ đúng key, giữ nguyên key của người khác', () => {
+    const out = removeKeyFromAuthorized(`${OTHER}\n${LINE}\n`, LINE)
+    expect(out).toBe(`${OTHER}\n`)
+  })
+
+  test('khớp theo key chứ không theo comment', () => {
+    const out = removeKeyFromAuthorized(`ssh-ed25519 ${BLOB} may-khac\n${OTHER}\n`, LINE)
+    expect(out).toBe(`${OTHER}\n`)
+  })
+
+  test('key không có trong file → null (khỏi ghi lại, khỏi báo nhầm là đã gỡ)', () => {
+    expect(removeKeyFromAuthorized(OTHER, LINE)).toBeNull()
+    expect(removeKeyFromAuthorized('', LINE)).toBeNull()
+  })
+
+  test('comment và dòng trống được giữ — có thể là ghi chú của đồng nghiệp', () => {
+    const out = removeKeyFromAuthorized(`# key cua ca doi\n\n${LINE}\n${OTHER}\n`, LINE)
+    expect(out).toBe(`# key cua ca doi\n\n${OTHER}\n`)
+  })
+
+  test('gỡ key cuối cùng → file rỗng, không phải chuỗi "\\n" lạc lõng', () => {
+    expect(removeKeyFromAuthorized(`${LINE}\n`, LINE)).toBe('')
+  })
+
+  test('key trùng nhiều dòng thì gỡ hết', () => {
+    expect(removeKeyFromAuthorized(`${LINE}\n${LINE}\n${OTHER}\n`, LINE)).toBe(`${OTHER}\n`)
+  })
+})
+
+describe('writeAuthorizedKeysCommand — F42', () => {
+  test('chmod 600 sau khi ghi — thiếu là sshd im lặng bỏ qua CẢ FILE', () => {
+    // Vừa gỡ key cũ vừa làm hỏng key mới = tự khoá mình ra ngoài
+    expect(writeAuthorizedKeysCommand('x\n')).toContain('chmod 600 ~/.ssh/authorized_keys')
+  })
+
+  test('KHÔNG dùng $?, heredoc, $() hay backtick', () => {
+    const cmd = writeAuthorizedKeysCommand('x\n')
+    expect(cmd).not.toContain('$?')
+    expect(cmd).not.toContain('<<')
+    expect(cmd).not.toContain('$(')
+    expect(cmd).not.toContain('`')
+  })
+
+  test('luôn dọn file tạm, kể cả khi ghi thất bại', () => {
+    expect(writeAuthorizedKeysCommand('x')).toMatch(/;\s*rm -f /)
+  })
+
+  test('thành công nhận biết bằng marker chứ không bằng exit code', () => {
+    expect(authKeysWriteSucceeded(`${AUTHKEYS_OK_MARKER}\n`)).toBe(true)
+    expect(authKeysWriteSucceeded('bash: chmod: khong the')).toBe(false)
   })
 })
 

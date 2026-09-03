@@ -21,6 +21,9 @@ import { SyncModal } from './components/SyncModal'
 import { ExportHostsModal } from './components/ExportHostsModal'
 import { KnownHostsModal } from './components/KnownHostsModal'
 import { DiskUsageModal } from './components/DiskUsageModal'
+import { LogTailModal } from './components/LogTailModal'
+import { CronModal } from './components/CronModal'
+import { KeyRotateModal } from './components/KeyRotateModal'
 import { PackageUpdatesModal } from './components/PackageUpdatesModal'
 import { AiModal } from './components/AiModal'
 import { AiDiagnoseModal } from './components/AiDiagnoseModal'
@@ -357,6 +360,9 @@ export default function App() {
     { id: 'export-hosts', label: t('menu.export'), run: () => setModal('export-hosts') },
     { id: 'known-hosts', label: t('menu.knownHosts'), run: () => setModal('known-hosts') },
     { id: 'disk-usage', label: t('menu.diskUsage'), run: () => setModal('disk-usage') },
+    { id: 'log-tail', label: t('menu.logTail'), run: () => setModal('log-tail') },
+    { id: 'cron', label: t('menu.cron'), run: () => setModal('cron') },
+    { id: 'key-rotate', label: t('menu.keyRotate'), run: () => setModal('key-rotate') },
     { id: 'pkg-updates', label: t('menu.pkgUpdates'), run: () => setModal('pkg-updates') },
     { id: 'open-snippets', label: t('menu.snippets'), run: () => setModal('snippets') },
     { id: 'open-tunnels', label: t('menu.tunnels'), run: () => setModal('tunnels') },
@@ -479,6 +485,9 @@ export default function App() {
       {modal === 'export-hosts' && <ExportHostsModal onClose={() => setModal(null)} />}
       {modal === 'known-hosts' && <KnownHostsModal onClose={() => setModal(null)} />}
       {modal === 'disk-usage' && <DiskUsageModal host={null} onClose={() => setModal(null)} />}
+      {modal === 'log-tail' && <LogTailModal onClose={() => setModal(null)} />}
+      {modal === 'cron' && <CronModal onClose={() => setModal(null)} />}
+      {modal === 'key-rotate' && <KeyRotateModal onClose={() => setModal(null)} />}
       {modal === 'pkg-updates' && <PackageUpdatesModal onClose={() => setModal(null)} />}
       {modal === 'ai' && <AiModal onClose={() => setModal(null)} />}
       {modal === 'ai-diagnose' && (

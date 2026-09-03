@@ -11,6 +11,7 @@ import { flushSecretClipboard, registerRevealIpc } from './ipc/reveal'
 import { registerCopyIdIpc } from './ipc/copyId'
 import { registerKnownHostsIpc } from './ipc/knownHosts'
 import { registerDiagIpc } from './ipc/diag'
+import { disposeLogTails, registerLogTailIpc } from './ipc/logTail'
 import { registerMonitorIpc } from './ipc/monitor'
 import { registerWatcherIpc } from './ipc/watcher'
 import { registerHostToolsIpc } from './ipc/hostTools'
@@ -259,6 +260,7 @@ registerRevealIpc()
 registerCopyIdIpc()
 registerKnownHostsIpc()
 registerDiagIpc()
+registerLogTailIpc()
 registerBulkIpc()
 registerAiIpc()
 registerNetToolsIpc()
@@ -329,6 +331,7 @@ app.on('before-quit', (event) => {
   disposeWatcher()
   disposeFonts()
   flushSecretClipboard()
+  disposeLogTails()
 
   // Đẩy blob sync lần cuối TRƯỚC khi lock vault (`exportSnapshot` cần DEK), và nằm trong
   // cùng cửa sổ chờ QUIT_GRACE_MS: một thư mục mạng treo không được giữ app lại mãi.

@@ -303,6 +303,9 @@ export function Sidebar() {
               <MenuItem label={t('menu.export')} onClick={() => { setMenuOpen(false); openAppModal('export-hosts') }} />
               <MenuItem label={t('menu.knownHosts')} onClick={() => { setMenuOpen(false); openAppModal('known-hosts') }} />
               <MenuItem label={t('menu.diskUsage')} onClick={() => { setMenuOpen(false); openAppModal('disk-usage') }} />
+              <MenuItem label={t('menu.logTail')} onClick={() => { setMenuOpen(false); openAppModal('log-tail') }} />
+              <MenuItem label={t('menu.cron')} onClick={() => { setMenuOpen(false); openAppModal('cron') }} />
+              <MenuItem label={t('menu.keyRotate')} onClick={() => { setMenuOpen(false); openAppModal('key-rotate') }} />
               <MenuItem label={t('menu.pkgUpdates')} onClick={() => { setMenuOpen(false); openAppModal('pkg-updates') }} />
               {/* Local dev là "khu vực sản phẩm khác" (môi trường dev local, không phải SSH) nên
                   tách bằng separator; và CHỈ hiện khi user đã bật ở Cài đặt → Local dev. */}

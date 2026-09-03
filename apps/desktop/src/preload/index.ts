@@ -8,6 +8,7 @@ import {
   type HostKeyQuestion,
   type InfraApi,
   type KeyImportInput,
+  type LogTailEvent,
   type ContributedCommandDto,
   type LdRuntimeProgressDto,
   type LdServiceDto,
@@ -139,11 +140,19 @@ const api: InfraApi = {
     hosts: (format) => ipcRenderer.invoke(IPC.EXPORT_HOSTS, format)
   },
   keys: {
-    copyId: (request) => ipcRenderer.invoke(IPC.KEY_COPY_ID, request)
+    copyId: (request) => ipcRenderer.invoke(IPC.KEY_COPY_ID, request),
+    rotate: (request) => ipcRenderer.invoke(IPC.KEY_ROTATE, request)
+  },
+  logTail: {
+    start: (hostId, path) => ipcRenderer.invoke(IPC.LOG_TAIL_START, hostId, path),
+    stop: (id) => ipcRenderer.invoke(IPC.LOG_TAIL_STOP, id),
+    onEvent: (cb) => subscribe<LogTailEvent>(IPC.LOG_TAIL_EVENT, cb)
   },
   diag: {
     disk: (hostId, path) => ipcRenderer.invoke(IPC.DIAG_DISK, hostId, path),
-    updates: (hostId) => ipcRenderer.invoke(IPC.DIAG_UPDATES, hostId)
+    updates: (hostId) => ipcRenderer.invoke(IPC.DIAG_UPDATES, hostId),
+    cronRead: (hostId) => ipcRenderer.invoke(IPC.CRON_READ, hostId),
+    cronWrite: (hostId, content) => ipcRenderer.invoke(IPC.CRON_WRITE, hostId, content)
   },
   knownHosts: {
     list: () => ipcRenderer.invoke(IPC.KNOWN_HOSTS_LIST),

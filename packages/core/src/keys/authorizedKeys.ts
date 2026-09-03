@@ -58,3 +58,47 @@ export type CopyIdOutcome = 'added' | 'already-present'
 export function planCopyId(existingContent: string, publicKeyLine: string): CopyIdOutcome {
   return authorizedKeysHas(existingContent, publicKeyLine) ? 'already-present' : 'added'
 }
+
+/**
+ * F42 — bỏ một key khỏi nội dung `authorized_keys`. Trả về `null` nếu key không có trong đó
+ * (nơi gọi khỏi phải ghi lại file, và khỏi báo nhầm là "đã gỡ").
+ *
+ * Lọc trong JS rồi ghi lại CẢ FILE, thay vì `sed -i` trên remote: một biểu thức sed sai chỗ
+ * sẽ cắt nhầm dòng của người khác, và đó là file quyết định ai vào được máy. Comment và dòng
+ * trống giữ nguyên — chúng có thể là ghi chú của đồng nghiệp.
+ */
+export function removeKeyFromAuthorized(content: string, publicKeyLine: string): string | null {
+  const wanted = publicKeyIdentity(publicKeyLine)
+  if (wanted === null) return null
+  const lines = content.replace(/\r\n?/g, '\n').split('\n')
+  const kept = lines.filter((line) => {
+    if (line.trim() === '' || line.trimStart().startsWith('#')) return true
+    return publicKeyIdentity(line) !== wanted
+  })
+  if (kept.length === lines.length) return null // không có gì để gỡ
+  const text = kept.join('\n').replace(/\n+$/, '')
+  return text === '' ? '' : `${text}\n`
+}
+
+/**
+ * Lệnh ghi ĐÈ `authorized_keys`.
+ *
+ * Không heredoc, không `$(...)`, không `$?` (§4). `chmod 600` sau khi ghi là bắt buộc: file
+ * quá rộng quyền thì sshd im lặng bỏ qua — vừa gỡ key cũ vừa làm hỏng key mới là cách chắc
+ * chắn nhất để tự khoá mình ra ngoài. Thành công nhận biết bằng marker vì `rm` che exit code.
+ */
+export const AUTHKEYS_OK_MARKER = 'IC_AUTHKEYS_OK'
+
+export function writeAuthorizedKeysCommand(content: string): string {
+  const tmp = '~/.infra-companion-authkeys.tmp'
+  return (
+    `umask 077; printf '%s' ${shq(content)} > ${tmp} && ` +
+    `cat ${tmp} > ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && ` +
+    `echo ${AUTHKEYS_OK_MARKER}; rm -f ${tmp}`
+  )
+}
+
+/** Ghi authorized_keys có thành công không. */
+export function authKeysWriteSucceeded(stdout: string): boolean {
+  return stdout.includes(AUTHKEYS_OK_MARKER)
+}
