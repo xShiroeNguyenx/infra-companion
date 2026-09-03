@@ -5,6 +5,19 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.10] — 2026-08-30
+
+### Added
+
+- **Find what's filling a disk, without opening a terminal** (`⋯` → *What is filling the disk*). Picks a host, shows every filesystem with how full it is and how much is left, then lets you walk down the tree one level at a time — each directory as a row with a bar sized to its share of the level. "Disk full" is the most common server emergency and answering it has always meant SSHing in and reading `du` output by eye. It goes **one level per step** (`du -d 1`) rather than scanning the whole tree, because on a production box scanning `/` takes minutes and most of the result is never read, and it **never crosses into another filesystem** — without that, `du /` wanders into `/proc`, `/sys` and network mounts and returns a number that answers no question you asked. Directories you can't read are skipped rather than failing the scan, and the screen says so, since the parent total will then exceed the rows beneath it.
+- **See which machines need patching, across the fleet** (`⋯` → *What needs patching*). Tick the hosts, scan once, and get a row per machine: how many packages are waiting, how many of those are security updates, and the package names. Machines with security updates sort to the top. Asking this today means SSHing into each box in turn, which for a couple of dozen hosts means nobody asks. It reads `apt` / `dnf` / `yum` / `apk` — detected per host — and is **read-only on purpose**: it does not run `apt update` first, because that needs root and writes to the machine, turning a diagnostic into a change (results are therefore as fresh as each machine's own last cache refresh, and the screen says so). There is deliberately **no button to install anything**: patching is something you want to be present for, and a "patch the whole fleet" button only has to be misclicked once.
+
+### Changed
+
+- **Vault schema v18 drops the last remnants of the removed VPN feature** — a dead `vpn_profiles` table and the `hosts.vpn_profile_id` column that referenced it. Nothing has used them for many versions. The v7 migration that created them is left untouched, as it must be; the cleanup is a new migration at the end of the list.
+
+---
+
 ## [0.2.9] — 2026-08-29
 
 ### Added

@@ -360,3 +360,14 @@ export {
   readAuthorizedKeysCommand
 } from './keys/authorizedKeys'
 export type { CopyIdOutcome } from './keys/authorizedKeys'
+// F36 / F37 — chẩn đoán đọc-thuần trên host: đĩa đầy ở đâu, máy nào cần vá gì.
+export { dfCommand, duCommand, formatKb, parentPath, parseDf, parseDu } from './diag/diskUsage'
+export type { DiskEntry, DiskUsage, Filesystem } from './diag/diskUsage'
+export {
+  detectManagerCommand,
+  parseManager,
+  parseUpdates,
+  securityCount,
+  updatesCommand
+} from './diag/packageUpdates'
+export type { HostUpdates, PackageManager, PackageUpdate } from './diag/packageUpdates'

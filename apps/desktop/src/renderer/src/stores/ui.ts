@@ -3,6 +3,8 @@ import { create } from 'zustand'
 export type AppModal =
   | 'export-hosts'
   | 'known-hosts'
+  | 'disk-usage'
+  | 'pkg-updates'
   | 'snippets'
   | 'tunnels'
   | 'keys'

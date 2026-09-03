@@ -141,6 +141,10 @@ const api: InfraApi = {
   keys: {
     copyId: (request) => ipcRenderer.invoke(IPC.KEY_COPY_ID, request)
   },
+  diag: {
+    disk: (hostId, path) => ipcRenderer.invoke(IPC.DIAG_DISK, hostId, path),
+    updates: (hostId) => ipcRenderer.invoke(IPC.DIAG_UPDATES, hostId)
+  },
   knownHosts: {
     list: () => ipcRenderer.invoke(IPC.KNOWN_HOSTS_LIST),
     forget: (id) => ipcRenderer.invoke(IPC.KNOWN_HOSTS_DELETE, id)

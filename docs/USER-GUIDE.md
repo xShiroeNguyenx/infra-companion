@@ -613,6 +613,20 @@ Needs AI configured (see §14). If not, the settings form opens.
 
 Pick your `~/.ssh/config` → it creates hosts, **preserves multi-hop ProxyJump**, imports IdentityFile (dedupes keys), and warns if needed. The group is named `ssh_config (date)`.
 
+### 15D. What is filling the disk — `⋯` → What is filling the disk
+
+Pick a host. The top strip lists every filesystem with how full it is (red past 90%) and how much is left — that is the question you actually have first: *which partition is running out*. Below it, the directory you're in, one row per child, with a bar sized to its share of that level. Click a row to go down, **↑** to go back up, **↻** to rescan.
+
+It walks **one level per step** (`du -d 1`) rather than scanning the whole tree, because scanning `/` on a production box takes minutes and most of the output is never read. It uses `-x`, so it never wanders into another filesystem — without that, `du /` disappears into `/proc`, `/sys` and network mounts and comes back with a number that answers nothing.
+
+> Directories you don't have permission to read are skipped instead of failing the whole scan. When that happens the parent's total is larger than the rows listed beneath it — that gap *is* the unreadable part.
+
+### 15E. What needs patching — `⋯` → What needs patching
+
+Tick the hosts and scan once. Each machine comes back as a row: how many packages are waiting, how many of those are security updates, and the package names. Machines with security updates sort to the top; ones already current say so. It detects `apt` / `dnf` / `yum` / `apk` per host, and scans in small batches rather than opening every connection at once, which through a single gate is a reliable way to get throttled.
+
+> **Read-only, deliberately.** It does not run `apt update` first — that needs root and writes to the machine, which turns a diagnostic into a change. So the results are exactly as fresh as each machine's own last cache refresh. And there is **no button to install anything**: patching is something you want to be watching, and a "patch the whole fleet" button only has to be misclicked once.
+
 ### 15C. Trusted fingerprints — `⋯` → Trusted fingerprints
 
 Every host key you've accepted, newest-seen first, with the full SHA-256 fingerprint (not truncated — comparing it against `ssh-keygen -lf` on the server is the only thing you'd want it for), the key type, when you first trusted it and when it was last seen. Filter by host or fingerprint.

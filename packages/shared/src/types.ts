@@ -934,6 +934,53 @@ export interface SshConfigImportResult {
   warnings: string[]
 }
 
+/** F36 — một mục con trong thư mục đang xem. */
+export interface DiskEntryDto {
+  path: string
+  name: string
+  sizeKb: number
+  percent: number
+}
+
+export interface DiskUsageDto {
+  path: string
+  totalKb: number
+  entries: DiskEntryDto[]
+}
+
+export interface FilesystemDto {
+  filesystem: string
+  sizeKb: number
+  usedKb: number
+  availKb: number
+  usePercent: number
+  mountedOn: string
+}
+
+export interface DiskUsageResultDto {
+  ok: boolean
+  usage: DiskUsageDto | null
+  filesystems: FilesystemDto[]
+  error?: string
+}
+
+/** F37 — bản cập nhật của một host. `manager` = 'unknown' khi không dò ra công cụ nào. */
+export type PackageManagerDto = 'apt' | 'dnf' | 'yum' | 'apk' | 'unknown'
+
+export interface PackageUpdateDto {
+  name: string
+  current: string | null
+  candidate: string
+  security: boolean
+}
+
+export interface HostUpdatesDto {
+  hostId: string
+  manager: PackageManagerDto
+  updates: PackageUpdateDto[]
+  error?: string
+}
+
 /** F44 — một fingerprint đã TOFU. `hostPattern` dạng `host` hoặc `[host]:port`. */
 export interface KnownHostDto {
   id: string
@@ -1671,6 +1718,12 @@ export interface InfraApi {
   keys: {
     /** Đẩy public key lên `~/.ssh/authorized_keys` của host rồi đăng nhập thử bằng key đó. */
     copyId(request: CopyIdRequest): Promise<CopyIdResult>
+  }
+  diag: {
+    /** Liệt kê MỘT cấp dưới `path` (drill-down từng bước) + dung lượng còn trống các phân vùng. */
+    disk(hostId: string, path: string): Promise<DiskUsageResultDto>
+    /** Liệt kê bản cập nhật đang chờ. CHỈ ĐỌC — không chạy `apt update`, không cài gì. */
+    updates(hostId: string): Promise<HostUpdatesDto>
   }
   knownHosts: {
     list(): Promise<KnownHostDto[]>

@@ -10,6 +10,7 @@ import { registerExportIpc } from './ipc/export'
 import { flushSecretClipboard, registerRevealIpc } from './ipc/reveal'
 import { registerCopyIdIpc } from './ipc/copyId'
 import { registerKnownHostsIpc } from './ipc/knownHosts'
+import { registerDiagIpc } from './ipc/diag'
 import { registerMonitorIpc } from './ipc/monitor'
 import { registerWatcherIpc } from './ipc/watcher'
 import { registerHostToolsIpc } from './ipc/hostTools'
@@ -257,6 +258,7 @@ registerExportIpc()
 registerRevealIpc()
 registerCopyIdIpc()
 registerKnownHostsIpc()
+registerDiagIpc()
 registerBulkIpc()
 registerAiIpc()
 registerNetToolsIpc()

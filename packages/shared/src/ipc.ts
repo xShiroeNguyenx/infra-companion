@@ -175,6 +175,9 @@ export const IPC = {
    */
   /** F43 — đẩy public key lên host rồi đăng nhập thử bằng chính key đó. */
   KEY_COPY_ID: 'key:copy-id',
+  /** F36/F37 — chẩn đoán chỉ-đọc trên host: đĩa đầy ở đâu, máy nào cần vá gì. */
+  DIAG_DISK: 'diag:disk',
+  DIAG_UPDATES: 'diag:updates',
   /** F44 — xem / quên fingerprint đã TOFU. */
   KNOWN_HOSTS_LIST: 'known-hosts:list',
   KNOWN_HOSTS_DELETE: 'known-hosts:delete',

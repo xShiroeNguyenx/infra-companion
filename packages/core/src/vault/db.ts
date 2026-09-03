@@ -290,6 +290,20 @@ const MIGRATIONS: string[] = [
   // ngay lúc bấm Enter.
   `
   ALTER TABLE groups ADD COLUMN production INTEGER NOT NULL DEFAULT 0;
+  `,
+
+  // v18 — dọn tàn dư của tính năng VPN đã bỏ (bảng `vpn_profiles` + cột `hosts.vpn_profile_id`).
+  //
+  // Ghi chú ở v7 nói "giữ lại để bảo toàn tính tuần tự của migration" — điều đó vẫn đúng và
+  // KHÔNG bị vi phạm ở đây: v7 giữ nguyên không sửa, việc dọn nằm ở một migration MỚI cuối
+  // danh sách. Cái không được phép là đi sửa v7, chứ không phải là không bao giờ được xoá.
+  //
+  // Thứ tự bắt buộc: bỏ CỘT trước rồi mới bỏ BẢNG — cột đang là đầu con của khoá ngoại, xoá
+  // bảng trước sẽ để lại một tham chiếu treo. Cột này không nằm trong danh sách cột của
+  // `importSnapshot` nên sync không bị ảnh hưởng.
+  `
+  ALTER TABLE hosts DROP COLUMN vpn_profile_id;
+  DROP TABLE vpn_profiles;
   `
 ]
 
