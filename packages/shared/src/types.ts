@@ -934,6 +934,56 @@ export interface SshConfigImportResult {
   warnings: string[]
 }
 
+/** F05 — một droplet DigitalOcean sau khi parse trang API (ứng viên, chưa phải host). */
+export interface DoDropletDto {
+  id: number
+  name: string
+  /** IPv4 public đầu tiên — null nếu droplet không có (chỉ nằm trong VPC). */
+  publicIp: string | null
+  /** IPv4 private (VPC) đầu tiên. Import dùng public trước, không có mới rơi về private. */
+  privateIp: string | null
+  region: string
+  /** 'active' | 'off' | 'new' | … — hiển thị thôi, máy off vẫn import được. */
+  status: string
+  tags: string[]
+  image: string
+  sizeSlug: string
+  /** Vault đã có host trùng địa chỉ (main điền sau khi liệt kê) — UI khoá chọn để khỏi nhân đôi. */
+  exists: boolean
+}
+
+export interface DoConfigDto {
+  hasToken: boolean
+}
+
+/** Lỗi liệt kê droplet trả về dạng MÃ — renderer dịch lúc render (đổi ngôn ngữ là đổi theo). */
+export type DoListErrorKind = 'noToken' | 'unauthorized' | 'http' | 'timeout' | 'network' | 'badResponse'
+
+export type DoListResult =
+  | { ok: true; droplets: DoDropletDto[]; warnings: string[] }
+  | { ok: false; error: DoListErrorKind; detail?: string }
+
+export interface DoImportOptions {
+  /** Import vào group có sẵn. Không có (null/undefined) → dùng newGroupName. */
+  groupId?: string | null
+  /** Tên group khi không chọn group có sẵn — group CÙNG TÊN đã có thì tái dùng, không tạo bản thứ hai. */
+  newGroupName?: string
+  /** null/để trống = kế thừa từ group. */
+  username?: string | null
+  /** Gắn key có sẵn trong vault cho các host tạo mới → authType 'key'. */
+  keyId?: string | null
+}
+
+export interface DoImportResult {
+  imported: number
+  /** Bỏ qua vì vault đã có host trùng địa chỉ. */
+  skipped: number
+  /** Bỏ qua vì droplet không có địa chỉ IPv4 nào. */
+  noIp: number
+  groupName: string
+  warnings: string[]
+}
+
 /** F36 — một mục con trong thư mục đang xem. */
 export interface DiskEntryDto {
   path: string
@@ -1752,6 +1802,14 @@ export interface InfraApi {
   importer: {
     /** Mở dialog chọn file ssh_config rồi import. null = user huỷ. */
     sshConfig(): Promise<SshConfigImportResult | null>
+    /** F05 — đã lưu token DigitalOcean trong vault chưa (token thật không bao giờ qua IPC). */
+    doConfig(): Promise<DoConfigDto>
+    /** Lưu token DigitalOcean (mã hoá DEK trong vault). '' = xoá token đã lưu. */
+    doSetToken(token: string): Promise<void>
+    /** Liệt kê droplet qua API. tokenOverride: dùng token vừa nhập thay cho token đã lưu. */
+    doListDroplets(tokenOverride?: string): Promise<DoListResult>
+    /** Tạo host từ các droplet đã chọn — dedupe theo địa chỉ, không tạo bản trùng. */
+    doImport(droplets: DoDropletDto[], options: DoImportOptions): Promise<DoImportResult>
   }
   exporter: {
     /**

@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, **a self-managed local PHP/WordPress dev stack**, and more.
 
-**Current release: v0.2.12 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.2.13 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -170,6 +170,7 @@
 ### Import / Export
 - **Read a saved secret back** — show a stored host password or key passphrase, or copy it to the clipboard without it ever appearing on screen. Requires the master password **again**, every time, even while the vault is unlocked; masked, auto-hides, clipboard self-clears
 - **Import** `~/.ssh/config` — hosts, multi-hop `ProxyJump`, and IdentityFile keys (deduped)
+- **Import from DigitalOcean** — paste a **read-scope** API token, tick the droplets, get hosts (public IP first, private as fallback, origin recorded in the notes). Droplets whose address already has a host are locked out, so re-importing never duplicates the list. The token is stored **encrypted in the vault** and never crosses into the UI process; the app only ever **reads** from the API
 - **Export** hosts as **ssh_config / CSV / JSON** — group inheritance resolved, `ProxyJump` rebuilt, aliases sanitised. **Carries no secrets** (no passwords, keys, notes or env) — a readable inventory, not a backup
 
 ### AI Assistant
@@ -237,7 +238,7 @@ pnpm test         # unit tests (crypto, sync-merge, ssh_config parser)
 
 ```bash
 pnpm test
-# 1344 tests; on Node 20 the node:sqlite suites (vault-merge, replication clusters, local-dev
+# 1356 tests; on Node 20 the node:sqlite suites (vault-merge, replication clusters, local-dev
 # store) are skipped — they need Node ≥ 22.5.
 # To run those too, use Electron's bundled Node 24 runtime — from packages/core, not the
 # repo root: run it at the root and vitest never sees packages/core/vitest.config.ts, so the
@@ -327,7 +328,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.2.12)
+## Known Limitations (v0.2.13)
 
 - **Local dev stack is Windows-only** for now (OS-specific work is isolated behind a single adapter, so other platforms are a matter of writing one). `.test` domains and local HTTPS are **not wired up yet** — mkcert installs and lands on `PATH`, but issuing/trusting a certificate is still a manual `mkcert -install`. There is no WordPress downloader (point it at a folder you already have), and no local↔server deploy or public-share link yet. phpMyAdmin 5.2 does not support PHP 8.4, so the app serves it with PHP 8.3 when both are installed
 - **Domain → server mapping needs a Chromium browser** (Chrome/Edge/Brave/Vivaldi); Firefox has no equivalent flag, and the override has no effect when the machine routes through a system proxy (the proxy resolves DNS itself). Non-browser clients (Postman, MySQL clients) aren't covered — use a tunnel or the `curl --resolve` command instead
@@ -337,7 +338,7 @@ infra-companion/
 - Sync backend: **folder only** for now (WebDAV, S3, Git planned — see [ROADMAP.md](ROADMAP.md)); moving the blob by hand is covered by export/import to a file. There is no conflict-resolution UI — the merge is Last-Write-Wins and it does not ask. The sync passphrase minimum is 8 characters, which is **not enough** for a blob you put on a cloud drive: it holds your private keys and host passwords behind that one passphrase
 - Secrets Manager: 1Password, Bitwarden, HashiCorp Vault via CLI (KeePassXC planned)
 - **Remote desktop tunneling** reaches targets via **jump-host chains** (SSH `-J` style); a target reachable only through an interactive **login-script gate** is not yet supported. **RDP** opens the OS client through a tunnel (not embedded); embedded FreeRDP is not planned. VNC needs a real VNC server on the target and network reachability (LAN or SSH tunnel)
-- No team server, cloud import (AWS/GCP…), Docker/K8s browser — see [ROADMAP.md](ROADMAP.md); plugin system is at **v1** (🛒 Marketplace tab installs from a static registry, entries are ed25519-signed; no permission enforcement / output transform yet)
+- No team server or Docker/K8s browser; **cloud import covers DigitalOcean only** for now (AWS EC2 / GCP / Azure / Hetzner planned), it is a one-shot pull with no periodic refresh — see [ROADMAP.md](ROADMAP.md); plugin system is at **v1** (🛒 Marketplace tab installs from a static registry, entries are ed25519-signed; no permission enforcement / output transform yet)
 - The **sensitive command guard** matches by text pattern, not by parsing the shell — it errs toward asking (e.g. `grep reboot` triggers the `reboot` rule) rather than staying silent, since a false prompt is safer than a missed `rm -rf`; tune the list in Settings to taste
 - **Split layout** and **pane frame style** are global settings (applied to every split tab), not yet per-tab or per-pane
 - **Custom mouse cursors** are limited by what a browser engine can do: **animated cursors (`.ani`) are impossible** and an animated GIF keeps only its first frame; images are capped at **128×128** (Chromium silently ignores anything larger, so the app scales down on import). The hover state of a cursor you add is a second image you supply, and it shares the normal image's hotspot. Cursors are stored per machine and not synced, and no third-party cursor theme is bundled — the popular ones (Bibata, Breeze, Capitaine) are GPL/LGPL, so download one and add it yourself
@@ -351,7 +352,7 @@ See [ROADMAP.md](ROADMAP.md) for the full list of planned features, including:
 
 - Plugin system (F16)
 - Sync backends: WebDAV, S3, Git
-- Cloud host import (AWS EC2 / GCP / Azure / DigitalOcean)
+- Cloud host import — remaining providers (AWS EC2 / GCP / Azure / Hetzner); DigitalOcean shipped in v0.2.13
 - Docker & Kubernetes browser
 - Remote desktop v2: tunneling through login-script gates; embedded RDP
 - Team self-host server with shared vaults and RBAC

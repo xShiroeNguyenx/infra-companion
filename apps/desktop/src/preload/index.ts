@@ -134,7 +134,11 @@ const api: InfraApi = {
     delete: (path) => ipcRenderer.invoke(IPC.FS_DELETE, path)
   },
   importer: {
-    sshConfig: () => ipcRenderer.invoke(IPC.IMPORT_SSH_CONFIG)
+    sshConfig: () => ipcRenderer.invoke(IPC.IMPORT_SSH_CONFIG),
+    doConfig: () => ipcRenderer.invoke(IPC.IMPORT_DO_CONFIG),
+    doSetToken: (token) => ipcRenderer.invoke(IPC.IMPORT_DO_SET_TOKEN, token),
+    doListDroplets: (tokenOverride) => ipcRenderer.invoke(IPC.IMPORT_DO_LIST, tokenOverride),
+    doImport: (droplets, options) => ipcRenderer.invoke(IPC.IMPORT_DO_RUN, droplets, options)
   },
   exporter: {
     hosts: (format) => ipcRenderer.invoke(IPC.EXPORT_HOSTS, format)

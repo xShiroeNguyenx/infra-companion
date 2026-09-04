@@ -615,6 +615,16 @@ Needs AI configured (see §14). If not, the settings form opens.
 
 Pick your `~/.ssh/config` → it creates hosts, **preserves multi-hop ProxyJump**, imports IdentityFile (dedupes keys), and warns if needed. The group is named `ssh_config (date)`.
 
+### 15I. Import from DigitalOcean — *All features* → Import from DigitalOcean
+
+Paste an API token (control panel → API → Tokens — **read scope is enough**, and the app only ever calls one read endpoint; there is no code path that creates, changes or deletes anything on DigitalOcean), press **Fetch droplet list**, tick what you want, **Create N hosts**.
+
+Each droplet becomes a host at its **public IP**, falling back to the private IP for machines that only live inside a VPC (those are marked — you'll need a VPN or jump host to actually reach them). Where the host came from — droplet id, region, image, tags — is written into its **notes**, so six months later the host still says what it is.
+
+- **Re-importing is safe.** A droplet whose address already has a host in the vault is shown as *already here* and locked out of selection; the same guard applies within a single run. Add three droplets next month, run the import again, get three new hosts — not a second copy of the fleet.
+- **The group is reused.** Imported hosts go into a group you pick, or into *DigitalOcean* by default — and that default is found again on the next run, not created twice. Leave the SSH user (droplets default to `root`) or the key empty to inherit them from the group, which is the practical way to set auth once for the whole batch.
+- **The token is stored encrypted in the vault** (same treatment as the AI API key), never enters the UI process, and is only saved after a fetch has actually succeeded — a mistyped token can't overwrite a working one. *Delete token* forgets it.
+
 ### 15F. Watch a log — `⋯` → Watch a log
 
 Pick a host and a path, press Start, and the lines arrive here instead of in a terminal tab. Filter by plain text or `/regex/`; **Invert** keeps the lines that *don't* match, which is how you push routine noise out of the way; matches are highlighted in place.

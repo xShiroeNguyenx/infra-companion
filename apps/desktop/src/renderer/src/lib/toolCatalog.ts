@@ -68,6 +68,7 @@ export const TOOLS: readonly ToolEntry[] = [
   // --- Dữ liệu vào/ra ---
   { id: 'sync', menuKey: 'menu.sync', descKey: 'features.dSync', category: 'data', modal: 'sync', common: true },
   { id: 'export-hosts', menuKey: 'menu.export', descKey: 'features.dExport', category: 'data', modal: 'export-hosts', common: false },
+  { id: 'do-import', menuKey: 'menu.doImport', descKey: 'features.dDoImport', category: 'data', modal: 'do-import', common: false },
 
   // --- Ứng dụng ---
   { id: 'ai', menuKey: 'menu.ai', descKey: 'features.dAi', category: 'app', modal: 'ai', common: false },

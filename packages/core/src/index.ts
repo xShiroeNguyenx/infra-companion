@@ -178,6 +178,9 @@ export { resolveSecret, detectSecretProvider } from './secrets/SecretsService'
 export type { SecretProvider } from './secrets/SecretsService'
 export { generateTotp, isValidTotpSecret, normalizeTotpSecret, applyTotpToken, TOTP_TOKEN } from './secrets/totp'
 export { importSshConfig, parseSshConfig } from './importers/sshConfig'
+// F05 — Cloud import (DigitalOcean): parse + ghi vault là hàm thuần, phần fetch nằm ở main.
+export { DO_DEFAULT_GROUP_NAME, importDroplets, parseDropletsPage } from './importers/digitalOcean'
+export type { DropletImportVault } from './importers/digitalOcean'
 // P30 — xuất hosts ra định dạng đọc được. Bản xuất KHÔNG chứa bí mật (xem đầu file).
 export { renderExport, resolveForExport, sshAlias, toCsv, toJson, toSshConfig } from './exporters/hostExport'
 export type { ExportFormat, ExportHost } from './exporters/hostExport'

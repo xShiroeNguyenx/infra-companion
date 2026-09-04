@@ -33,7 +33,8 @@ const SHORT_LABEL: Partial<Record<I18nKey, I18nKey>> = {
   'menu.hostmap': 'dashboard.toolHostmap',
   'menu.aiDiagnose': 'dashboard.toolAiDiagnose',
   'menu.recordings': 'dashboard.toolRecordings',
-  'menu.net': 'dashboard.toolNet'
+  'menu.net': 'dashboard.toolNet',
+  'menu.doImport': 'dashboard.toolDoImport'
 }
 
 function Tile({

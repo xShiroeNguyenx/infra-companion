@@ -1259,6 +1259,30 @@ export class VaultService {
   }
 
   // -------------------------------------------------------------------------
+  // DigitalOcean import (F05) — token MÃ HOÁ bằng DEK trong meta, như ai_api_key
+  // -------------------------------------------------------------------------
+
+  hasDoToken(): boolean {
+    return this.readMeta('do_token') !== null
+  }
+
+  /** Token thật để gọi API — chỉ dùng trong main process, không bao giờ qua IPC. */
+  getDoToken(): string | undefined {
+    const enc = this.readMeta('do_token')
+    if (!enc) return undefined
+    return decryptField(this.requireDek(), enc) ?? undefined
+  }
+
+  /** token: '' = xoá, chuỗi khác rỗng = đặt mới. */
+  setDoToken(token: string): void {
+    if (token === '') {
+      this.ensureDb().prepare('DELETE FROM meta WHERE key = ?').run('do_token')
+    } else {
+      this.writeMeta('do_token', encryptField(this.requireDek(), token))
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Snapshot cho sync E2EE (chứa secret ĐÃ GIẢI MÃ — chỉ dùng trong main process)
   // -------------------------------------------------------------------------
 

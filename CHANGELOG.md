@@ -5,6 +5,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.13] — 2026-09-04
+
+### Added
+
+- **Import hosts from DigitalOcean** (*All features → Import from DigitalOcean*) — the first slice of cloud import. Paste an API token (**read scope is enough**, and the app only ever calls one read endpoint — there is no code path that creates, changes or deletes anything on DigitalOcean), fetch the droplet list, tick what you want, and each droplet becomes a host: public IP first, private IP as the fallback for VPC-only machines, and where it came from — droplet id, region, image, tags — recorded in the host's notes so six months later the host still says what it is. Droplets whose address already has a host in the vault are **locked out of selection**, so running the import again after adding three new droplets creates three hosts, not a second copy of the fleet; the same guard applies within a single run. Imported hosts land in a group of your choice (the default *DigitalOcean* group is reused across runs, not duplicated), with the SSH user and key left inheritable from the group if you don't set them. The token is stored **encrypted in the vault** like the AI API key — it never crosses into the UI process, which only ever learns *whether* a token is saved — and it is only saved after a fetch has actually succeeded, so a mistyped token can't overwrite a working one. Errors come back as what happened (*token rejected*, *timed out*, *not the DigitalOcean API — a proxy in between?*) rather than a generic failure.
+
+### Changed
+
+- **Rotate SSH keys got its own icon (♻️).** It shared 🔄 with Sync, and on the Dashboard grid the icon is how you find a tool.
+
+---
+
 ## [0.2.12] — 2026-08-31
 
 ### Fixed

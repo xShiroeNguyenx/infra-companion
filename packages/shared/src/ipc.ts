@@ -88,6 +88,10 @@ export const IPC = {
   FS_DELETE: 'fs:delete',
 
   IMPORT_SSH_CONFIG: 'import:ssh-config',
+  IMPORT_DO_CONFIG: 'import:do-config',
+  IMPORT_DO_SET_TOKEN: 'import:do-set-token',
+  IMPORT_DO_LIST: 'import:do-list',
+  IMPORT_DO_RUN: 'import:do-run',
 
   BULK_RUN: 'bulk:run',
   BULK_CANCEL: 'bulk:cancel',

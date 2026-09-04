@@ -2,6 +2,7 @@ import { create } from 'zustand'
 
 export type AppModal =
   | 'export-hosts'
+  | 'do-import'
   | 'known-hosts'
   | 'log-tail'
   | 'cron'
