@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, **a self-managed local PHP/WordPress dev stack**, and more.
 
-**Current release: v0.2.16 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.2.17 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -36,12 +36,13 @@
 - **TOFU known-hosts** — fingerprint shown on first connect, red alert on host-key change; `⋯` → **Trusted fingerprints** lists everything you've trusted and lets you forget an entry (after a server rebuild) so you stop clicking past a red warning forever
 - **Push a public key to a host** — one button on a password host appends your key to `~/.ssh/authorized_keys` and then **logs in with it to prove it worked** (wrong `~/.ssh` permissions make sshd ignore the key silently), before offering to switch the host to key auth
 - **Quick Connect** — type `user@host:port` in the sidebar; 50-entry history
-- **Favorite hosts** — pin hosts with ⭐ to a Favorites section at the top of the sidebar (respects search)
+- **Favorite hosts** — pin hosts with ⭐ to the sidebar's Favorites block (respects search)
+- **A sidebar you arrange** — the left column is a set of blocks (Favorites · host groups · Tunnels · Snippets · Workspaces · Recent) you switch off and drag into any order; groups fold and remember it, folded ones show their host count, and searching opens everything so a match is never hidden
 - **Telnet** and **Serial / COM port** (auto-lists connected ports, configurable baud)
 - **Local terminal** — PowerShell, cmd, Git Bash, WSL shells via node-pty
 
 ### Terminal UX
-- **Dashboard home screen** — the app boots into a home page behind your tabs (🏠 button): a **"Needs attention" strip** that appears only when something is actually wrong (host not responding, tunnel failed, replica with a critical diagnosis), **every tool as two rows of icons at the top**, quick-connect in the header next to *+ New terminal*, counters, favorite hosts, **host-group cards** (colour band; click the group name for its full host list, a host chip to open just that host, or the footer to open the whole group as splits), recent connections, saved workspaces, tunnels with live status + start/stop, and a keyboard-shortcut cheat sheet — the lists split into two columns on a wide window. Prefer boot-to-shell? Settings → Startup page → Terminal
+- **Dashboard home screen** — the app boots into a home page behind your tabs (🏠 button): a **"Needs attention" strip** that appears only when something is actually wrong (host not responding, tunnel failed, replica with a critical diagnosis), **a single row of tool icons that orders itself by how much you use each tool** (pin the ones that should always keep a tile), quick-connect in the header next to *+ New terminal*, counters, favorite hosts, **host-group cards** (colour band; click the group name for its full host list, a host chip to open just that host, or the footer to open the whole group as splits), recent connections, saved workspaces, tunnels with live status + start/stop, and a keyboard-shortcut cheat sheet — the lists split into two columns on a wide window. Prefer boot-to-shell? Settings → Startup page → Terminal
 - **xterm.js** with WebGL renderer — smooth even at high throughput (`yes`, large `cat`)
 - **Multi-tab** with Ctrl+Shift+T / middle-click close
 - **Split panes** — side-by-side sessions, Ctrl+Shift+D
@@ -51,7 +52,7 @@
 - **Pane frame styles** — Compact bar (default) or Mac style (rounded corners + round red close button), in Settings → Terminal
 - **Command palette button** — a toolbar button opens the palette for people who don't know the `Ctrl+Shift+P` shortcut
 - **Tools in tabs, not blocking popups** — Monitoring, Compare, Local dev, **Tunnels**, **Processes**, **Services**, the **AI troubleshooter**, plus **Watch a log**, **Scheduled jobs**, **Rotate SSH keys**, **Disk usage**, **What needs patching** and **Trusted fingerprints** all open in a tab (⊞ in the popup header, or the palette), so a fleet-wide scan or a log you're following never freezes the rest of the app; Monitoring and Tunnels can also **detach into an always-on-top window**
-- **All features tab** — the `⋯` menu keeps only the daily tools and ends with **⊞ All features…**: every tool grouped by area with a one-line description and a search box, so the menu stops growing without bound
+- **All features tab** — the `⋯` menu is itself grouped by area with a **search box** that reaches the whole catalogue, and ends with **⊞ All features…**: every tool with a one-line description and its own search, so the menu stops growing without bound
 - **Open a group as split panes** — one click on a group header opens every host in it side by side, ready to broadcast
 - **Workspaces** — save a layout (tabs + split panes + broadcast) and restore it in one click (⋯ → Workspaces)
 - **Broadcast input** — type once, send to all open panes simultaneously (Ctrl+Shift+B)
@@ -79,7 +80,7 @@
 - **Encrypted vault** — master password → argon2id → AES-256-GCM field-level encryption; all secrets (passwords, private keys, env vars) are encrypted at rest
 - **Auto-lock** after 15 minutes idle; lock overlay preserves scrollback
 - **Remember on this machine** — unlocks via Windows DPAPI / macOS Keychain (no master password prompt on relaunch)
-- **Groups with inheritance** — set default username / auth / key / env / startup snippet at group level; individual hosts can override; rename or delete any group from its sidebar header (empty groups included — deleting a group moves its hosts to *Ungrouped*, never deletes them)
+- **Groups with inheritance** — set default username / auth / key / env / startup snippet at group level; individual hosts can override; open, rename or delete any group from the `⋯` button on its sidebar header (empty groups included — deleting a group moves its hosts to *Ungrouped*, never deletes them)
 - **SSH Keys** — generate ed25519, import OpenSSH/PEM/PuTTY; private keys never leave main process in plaintext
 - **Snippets** — parameterized commands (`{{variable}}`), run across multiple sessions at once
 - **Notes per host** — encrypted Markdown note per host (purpose, handoff info, app passwords); quick-view from the sidebar, synced with the host
@@ -330,7 +331,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.2.16)
+## Known Limitations (v0.2.17)
 
 - **Local dev stack is Windows-only** for now (OS-specific work is isolated behind a single adapter, so other platforms are a matter of writing one). `.test` domains and local HTTPS are **not wired up yet** — mkcert installs and lands on `PATH`, but issuing/trusting a certificate is still a manual `mkcert -install`. There is no WordPress downloader (point it at a folder you already have), and no local↔server deploy or public-share link yet. phpMyAdmin 5.2 does not support PHP 8.4, so the app serves it with PHP 8.3 when both are installed
 - **Domain → server mapping needs a Chromium browser** (Chrome/Edge/Brave/Vivaldi); Firefox has no equivalent flag, and the override has no effect when the machine routes through a system proxy (the proxy resolves DNS itself). Non-browser clients (Postman, MySQL clients) aren't covered — use a tunnel or the `curl --resolve` command instead

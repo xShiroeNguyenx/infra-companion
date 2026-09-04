@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useToolUsageStore } from './toolUsage'
 
 export type AppModal =
   | 'export-hosts'
@@ -63,7 +64,14 @@ const SIDEBAR_KEY = 'infra.sidebar.collapsed'
 export const useUiStore = create<UiState>((set) => ({
   modal: null,
   // Mở cửa sổ chẩn đoán (từ menu/palette/pill) luôn xoá cờ thu nhỏ để hiện đầy đủ.
-  setModal: (modal) => set(modal === 'ai-diagnose' ? { modal, aiDiagnoseMin: false } : { modal }),
+  setModal: (modal) => {
+    // Đếm lượt dùng cho lưới công cụ Dashboard. Đặt ở ĐÂY vì mọi đường mở công cụ (menu `⋯`,
+    // Command Palette, lưới, tab "Tất cả tính năng") đều đi qua `setModal` — đếm ở riêng lưới
+    // thì công cụ chưa có ô sẽ không bao giờ kiếm được điểm để giành ô.
+    // `null` là ĐÓNG modal, không phải mở gì.
+    if (modal !== null) useToolUsageStore.getState().record(modal)
+    set(modal === 'ai-diagnose' ? { modal, aiDiagnoseMin: false } : { modal })
+  },
   aiDiagnoseMin: false,
   minimizeAiDiagnose: () => set({ modal: null, aiDiagnoseMin: true }),
   setAiDiagnoseMin: (aiDiagnoseMin) => set({ aiDiagnoseMin }),

@@ -3,6 +3,7 @@ import type { SessionKind, SessionStatus, TerminalCreateRequest } from '@infra/s
 import { clearTermSession } from '../lib/termBus'
 import { errorMessage, useToastsStore } from './toasts'
 import { useDataStore } from './data'
+import { useToolUsageStore } from './toolUsage'
 
 /**
  * Cách mở lại 1 pane — lưu vào workspace để dựng lại layout. Chỉ tham chiếu hostId
@@ -347,13 +348,18 @@ export const useTabsStore = create<TabsState>((set, get) => ({
    * Mở (hoặc focus) tab công cụ. Mỗi loại NHIỀU NHẤT 1 tab: các công cụ này đọc chung 1 store,
    * mở 2 tab cùng loại chỉ tạo 2 bản UI dẫm chân nhau chứ không thêm giá trị gì.
    */
-  openToolTab: (kind) =>
+  openToolTab: (kind) => {
+    // Cùng bảng đếm với `ui.setModal` (khoá = tên công cụ): một công cụ mở được cả ở popup
+    // lẫn ở tab, nên hai đường phải cộng vào cùng một chỗ, nếu không lưới sẽ hiểu sai mức dùng.
+    // 'features' là chính ô "Tất cả" — nó luôn có ô cố định nên không cần điểm.
+    if (kind !== 'features') useToolUsageStore.getState().record(kind)
     set((state) => {
       const existing = state.tabs.find((t) => t.kind === kind)
       if (existing) return { activeId: existing.id }
       const tab: AppTab = { id: newTabId(), kind, panes: [], activePaneId: null, broadcast: false }
       return { tabs: [...state.tabs, tab], activeId: tab.id }
-    }),
+    })
+  },
 
   openMonitorTab: () => get().openToolTab('monitor'),
   openCompareTab: () => get().openToolTab('compare'),

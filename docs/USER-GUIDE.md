@@ -60,12 +60,12 @@ You can look at a password you stored. Edit the host → **👁 Show saved passw
 **What it is**: after unlocking, the app lands on a **Dashboard** — the home screen that lives *behind* your tabs. The **🏠 button** at the left of the tab bar returns to it anytime (it lights up while you're home); clicking any tab goes back to that tab, and closing the last tab drops you home instead of an empty screen.
 
 **What's on it**:
-- **Tools** — **exactly two rows of icons across the top**, spread over the full width, one click each; the last tile is always **⊞ All**, which opens the *All features* tab (full list, descriptions, search). The grid cuts off rather than growing a third row — with the tool list only getting longer, either every tile shrinks or the grid slowly eats the Dashboard, and the full catalogue already lives one click away. Hover an icon to see its name; the **📡 uptime watcher** tile stays highlighted while it's running, because that one is a toggle rather than a panel. The `⋯` menu still has the same entries — it's the way in while you're on a terminal tab and the Dashboard isn't showing.
+- **Tools** — **one row of ten icons** across the top, plus **⊞ All** at the end, which opens the *All features* tab (full list, descriptions, search). The row **orders itself by how much you use each tool**: every time a tool opens — from the grid, the `⋯` menu, the palette or a tab — it scores a point, and points fade with a 30-day half-life, so a fortnight of heavy use months ago no longer holds a tile that this week's habit can never win back. Before you've used anything the order is simply the catalogue order. **✎ Arrange** (top right of the section) opens a panel to **pin** the tools that should always keep a tile — pinned ones come first, drag them into the order you want — with every tool listed underneath, its usage count beside it, and the ones that no longer fit the row dimmed so you can see what got cut. Nothing disappears: whatever misses the row is one click away under ⊞ All. Hover an icon for its name; the **📡 uptime watcher** tile stays highlighted while it's running, because that one is a toggle rather than a panel. Pins and counts are per-machine.
 - **Host groups sit directly under the tools** — the click-to-work area comes before the read-only stat tiles.
 - **Quick connect** — in the **header row next to *+ New terminal***: type `user@host[:port]` and press Enter. A confirmation drops down under the box once what you typed looks like a target.
 - **Stats** — hosts, groups, connections today / last 7 days (derived from Quick-Connect history)
 - **★ Favorites** — one click opens an SSH tab
-- **Finding a tool**: the sidebar `⋯` menu keeps only what you reach for daily and ends with **⊞ All features…**, which opens a tab listing every tool grouped by area, each with a one-line description, and a search box. The Dashboard's icon grid still shows everything at a glance. Every dialog has a **×** in its header (and `Esc` still works).
+- **Finding a tool**: the sidebar **`⋯` menu** has a **search box** at the top — type two or three letters and it searches the **whole** catalogue, not just the daily shortlist it shows when idle. Entries are **grouped by area** (same groupings as the *All features* tab), *Create group* and *Import ssh_config* sit in their own **Manage hosts** section because they change your data rather than open a tool, and **⊞ All features… / Settings / Help** are pinned at the bottom so they never scroll away. It's the way in while you're on a terminal tab and the Dashboard isn't showing. Every dialog has a **×** in its header (and `Esc` still works).
 - **Anything long-running belongs in a tab.** A dialog blocks the whole app while it's open, so the tools that take time — *Watch a log*, *Scheduled jobs*, *Rotate SSH keys*, *What is filling the disk*, *What needs patching*, *Trusted fingerprints*, alongside Monitoring, Tunnels, Processes and Services — carry a **⊞** button in their header that moves them into a tab. Moving restarts the tool, so a log you intend to watch for a while is best opened as a tab from the start.
 - **A "Needs attention" strip** at the very top — hosts that aren't responding, tunnels that failed, and replicas with a critical diagnosis. It shows up **only when there is something wrong**; a panel that is always there is a panel you stop reading. A host with no check result yet is not counted as down, and while the watcher is off the strip stays quiet entirely, because silence there means "no data", not "all clear".
 - **Host group cards** — three separate things to click, so the group isn't all-or-nothing:
@@ -88,13 +88,49 @@ On a wide window those last four lists each **split into two columns inside thei
 
 ---
 
+## 1C. The sidebar — arrange it your way
+
+**What it is**: the left column is a stack of **blocks**, and you decide which ones are there and in what order. The **⚙ button** beside the search box opens the layout panel.
+
+**The blocks**:
+
+| Block | On by default | Clicking a row |
+|---|---|---|
+| **★ Favorites** | yes | connects to the host |
+| **🗂 Host groups** | yes | your groups and their hosts (see below) |
+| **🔀 Tunnels** | no | **Start/Stop** right on the row, live status dot |
+| **📝 Snippets** | no | opens the run dialog (variables + which panes to send to) |
+| **🗂 Workspaces** | no | reopens that whole tab/split layout |
+| **🕒 Recent** | yes | reconnects |
+
+In the ⚙ panel: **tick** to show or hide a block, **drag the ⠿ handle** to reorder. Every block is in one list whether it's on or off — turn one off and back on and it returns to the same place, rather than jumping to the end. **Reset to default layout** puts it back. It's all stored **on this machine** (not synced), and the defaults are exactly the old layout, so if you never open the panel nothing changes.
+
+Why the three new blocks exist: they do their most common job **without leaving the column** — flipping a tunnel on, running a snippet, restoring a workspace — instead of opening a dialog for a one-second action. The full editors still live in their own tools; a 240px column is no place for a form. A block that's on but has nothing in it says so rather than leaving a blank gap.
+
+### Groups fold
+
+Every group used to be open at once, so four groups of five or six hosts already ran past the bottom of the screen. Now:
+
+- **Click a group's name** to fold or unfold it; it's remembered across restarts. A folded group shows its **host count**, which is the only thing left saying what's inside.
+- **Searching opens everything** regardless of what's folded — a search that hides its own result would be useless exactly when you need it.
+- With **three or more groups**, a **collapse/expand-all** button appears next to the search box.
+- **★ Favorites folds too.** A pinned host deliberately appears twice — there and in its own group — so if you prefer finding it in the group, fold the Favorites block and you lose nothing.
+
+### The group `⋯` menu
+
+Each group header carries a single **`⋯`** button holding three things: **open the whole group** (every host as split panes in one tab), **edit group**, and **delete group**. Delete sits below a divider and turns red on hover — it's the only one there that loses data, and it still asks for confirmation. (These were three separate hover icons before, crowded against the host count.)
+
+**Test**: open ⚙ → tick **Tunnels** on and drag it above **Host groups** → the tunnels block appears at the top with working Start/Stop; restart the app → the layout is still yours; type in the search box → every group opens; clear it → your folded groups come back folded.
+
+---
+
 ## 2. Managing Hosts / Groups / Keys
 
 ### Host
 - Left sidebar → **+ Host**. Fill in name, hostname/IP, port, username, auth method.
 - Click a host to connect; hover to reveal **⭐ pin**, **split** (⊟), **SFTP** (📁), **edit** (✏).
 - **Notes**: the host editor has a **Notes** field (Markdown, **encrypted** in the vault) — record the server's purpose, handoff info, app passwords… Hosts with a note show a **📝** button in the sidebar for a quick read-only view; synced with the host.
-- **Favorite hosts**: hover a host → click **⭐** to pin it. Pinned hosts appear in a **★ Favorites** section at the very top of the sidebar for quick access (still filtered by the search box). Click ⭐ again to unpin. Stored **on this machine** (not synced). *Test: pin a host → it shows under ★ Favorites at the top; it persists across app restarts.*
+- **Favorite hosts**: hover a host → click **⭐** to pin it. Pinned hosts appear in the **★ Favorites** block of the sidebar (top by default — you can move or hide that block, see §1C) for quick access, still filtered by the search box. Click ⭐ again to unpin. Stored **on this machine** (not synced). *Test: pin a host → it shows under ★ Favorites; it persists across app restarts.*
 
 ### Authentication — 7 methods
 | Method | When to use |
@@ -112,7 +148,7 @@ On a wide window those last four lists each **split into two columns inside thei
 - **Import a key**: paste a private key (OpenSSH/PEM/PuTTY), enter a passphrase if any.
 
 ### Groups + inheritance
-- Menu `⋯` → **Create group**. Set defaults: username / auth method / key / env / startup snippet.
+- Menu `⋯` → **Manage hosts** → **Create group**. Set defaults: username / auth method / key / env / startup snippet. (To edit or delete one later: the group's **`⋯`** button in the sidebar — see §1C.)
 - Hosts in the group that leave those fields empty **inherit** from the group.
 - **Test inheritance**: create a group "Production" with default username `deploy` → create a host with username left blank → connect and it uses `deploy`.
 

@@ -5,6 +5,22 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.17] — 2026-09-05
+
+### Added
+
+- **The sidebar is a set of blocks you arrange yourself.** The left column was a fixed order — Favorites, then host groups, then Recent — which suits you only if that happens to be how you work. Now it is a list of **blocks** you can switch off and drag into any order, through the **⚙ button** next to the search box: **★ Favorites · 🗂 Host groups · 🔀 Tunnels · 📝 Snippets · 🗂 Workspaces · 🕒 Recent**. Three of those are new here, and each does its most common job **without leaving the column**: a tunnel starts and stops on its row, a snippet opens the run dialog (which still asks which panes to target — running a snippet on the wrong pane is a real accident, so that step stays), and a workspace reopens its whole tab set. Blocks that are on but empty say so rather than rendering as blank space. **The defaults are exactly the old layout** and the three new blocks start switched off, so nothing changes for anyone who never opens the panel. Settings are per-machine.
+- **Groups collapse, so the list stops growing without limit.** Every group used to be expanded at once: four groups of five or six hosts already ran off the bottom of the screen, and more hosts only made it longer. Groups now fold, remember it across restarts, and a folded group shows its **host count** — the one thing that still says what is inside. **Searching expands everything** regardless, because finding a host and then hiding it inside a folded group would defeat the search exactly when it matters. A **collapse/expand-all** button sits next to the search box once you have three or more groups.
+- **Each group header now has a single `⋯` menu** holding *open the whole group*, *edit* and *delete*, instead of three hover icons crowding the host count. Delete is set apart by a divider and turns red on hover — it is the only entry there that loses data (the confirmation dialog is unchanged).
+- **The `⋯` tools menu is grouped and searchable.** It was a flat list a dozen entries long that covered half the host list when opened, mixing tools with contact-book actions. It now has a **search box** (typing searches the **whole** catalogue, not just the daily shortlist), entries **grouped by area** using the same categories as the *All features* tab, *Create group* and *Import ssh_config* moved into a **Manage hosts** section of their own, and *All features / Settings / Help* pinned to the bottom where they don't scroll away.
+- **The Dashboard tool grid is one row that arranges itself.** It was two fixed rows in catalogue order, so everyone saw the same tiles whether or not they had ever opened them. Tiles are now ordered by **how much you actually use each tool**, scored with a 30-day half-life so a burst of use months ago no longer holds a tile forever while this week's habit never catches up. Usage is counted wherever a tool opens — the menu, the palette, a tab — not only on the grid, so a tool with no tile can still earn one. An **Arrange** button opens a panel to **pin** tools that should always keep a tile, drag them into order, and see each tool's usage count next to it, with tools that no longer fit the row dimmed rather than silently missing. Pins and counts stay on this machine.
+
+### Changed
+
+- **Recent connections lists only what isn't already above it.** Opening a saved host also wrote a line there, so the bottom of the sidebar was repeating the host list and pushing the real one off screen. It now shows only **quick-connect targets that were never saved as a host** — the one thing with no other way in — and four rows instead of eight.
+
+---
+
 ## [0.2.16] — 2026-09-04
 
 ### Added
