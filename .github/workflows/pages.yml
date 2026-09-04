@@ -44,7 +44,7 @@ jobs:
       - name: Upload landing page artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Gốc site = thư mục landing (index.html + favicon.svg nằm cùng cấp)
+          # Gốc site = thư mục landing (index.html + icon-128.png nằm cùng cấp)
           path: docs/landing
 
       - name: Deploy to GitHub Pages

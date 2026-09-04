@@ -988,6 +988,8 @@ export const vi = {
   'help.updAvailable': 'Đã có bản {version}.',
   'help.updLatest': 'Đang dùng bản mới nhất ({version}).',
   'help.updError': 'Không kiểm tra được: {message}',
+  'help.updAssetsPending':
+    'Bản phát hành mới nhất vừa được tạo nhưng file cập nhật chưa tải lên xong (CI đang build) — thử lại sau vài phút.',
   'help.copyInfo': 'Sao chép thông tin hệ thống',
   'help.copied': 'Đã sao chép ✓',
   'help.copyInfoHint':
@@ -2522,6 +2524,8 @@ export const en: Partial<Record<I18nKey, string>> = {
   'help.updAvailable': 'Version {version} is available.',
   'help.updLatest': "You're on the latest version ({version}).",
   'help.updError': "Couldn't check: {message}",
+  'help.updAssetsPending':
+    "The newest release was just created but its update files haven't finished uploading (CI is still building) — try again in a few minutes.",
   'help.copyInfo': 'Copy system information',
   'help.copied': 'Copied ✓',
   'help.copyInfoHint':
@@ -4035,6 +4039,8 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'help.updAvailable': 'バージョン {version} が利用できます。',
   'help.updLatest': '最新バージョンです ({version})。',
   'help.updError': '確認できませんでした: {message}',
+  'help.updAssetsPending':
+    '最新リリースは作成されたばかりで、更新ファイルのアップロードがまだ完了していません（CI がビルド中）— 数分後にもう一度お試しください。',
   'help.copyInfo': 'システム情報をコピー',
   'help.copied': 'コピーしました ✓',
   'help.copyInfoHint': 'アプリのバージョンと OS の情報だけです — ホストやアドレス、アカウントは含みません。',

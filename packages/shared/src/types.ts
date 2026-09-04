@@ -1714,7 +1714,12 @@ export type UpdateCheckResultDto =
   | { status: 'dev' }
   | { status: 'available'; version: string }
   | { status: 'latest'; version: string }
-  | { status: 'error'; message: string }
+  /**
+   * `code: 'assetsPending'` — release mới nhất vừa được tạo nhưng chưa có file update
+   * (`latest*.yml` trả 404): tag vừa push, CI còn đang build/tải asset lên. Không phải hỏng,
+   * chỉ cần thử lại sau vài phút — renderer dịch thành câu nói đúng điều đó thay vì dump lỗi thô.
+   */
+  | { status: 'error'; message: string; code?: 'assetsPending' }
 
 export interface InfraApi {
   vault: {

@@ -49,7 +49,11 @@ export function registerUpdaterIpc(win: BrowserWindow): void {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       console.error('[updater] check failed:', message)
-      return { status: 'error', message }
+      // Ngay sau khi push tag, GitHub đã trỏ "latest release" vào bản mới trong khi CI còn
+      // đang tải asset lên — vài phút đầu `latest*.yml` chưa tồn tại và electron-updater ném
+      // 404. Đã có user bấm kiểm tra đúng khoảng đó và nhận nguyên một trang stack trace.
+      const assetsPending = /\.yml/.test(message) && /404/.test(message)
+      return assetsPending ? { status: 'error', message, code: 'assetsPending' } : { status: 'error', message }
     }
   })
   ipcMain.handle(IPC.UPDATE_DOWNLOAD, () => autoUpdater.downloadUpdate())

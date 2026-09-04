@@ -168,6 +168,9 @@ export function HelpModal({
     if (r.status === 'dev') return t('help.updDev')
     if (r.status === 'available') return t('help.updAvailable', { version: r.version })
     if (r.status === 'latest') return t('help.updLatest', { version: r.version })
+    // Release vừa tạo, asset chưa lên xong: nói đúng chuyện "thử lại sau vài phút" —
+    // nguyên văn lỗi là cả trang stack trace 404, không giúp gì người đang đứng trước nút.
+    if (r.code === 'assetsPending') return t('help.updAssetsPending')
     return t('help.updError', { message: r.message })
   }
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="theme-color" content="#0b0e14" />
-<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="icon" type="image/png" href="icon-128.png" />
 <title>Plugin Marketplace — Infra Companion</title>
 <meta name="description" content="Browse Infra Companion plugins — the same signed catalog the app installs from. One-click install inside the app; every entry is ed25519-signed." />
 <style>
@@ -41,11 +41,8 @@
   }
   nav .wrap { display: flex; align-items: center; gap: 16px; height: 60px; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -.01em; }
-  .brand .logo {
-    width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
-    background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; font-size: 16px;
-    box-shadow: 0 4px 14px rgba(59,130,246,.45);
-  }
+  /* Icon thật của app (cùng file với trang chính) — xem ghi chú ở index.html */
+  .brand .logo { width: 28px; height: 28px; display: block; }
   nav .links { margin-left: auto; display: flex; align-items: center; gap: 22px; }
   nav .links a { color: var(--muted); font-size: 14px; }
   nav .links a:hover { color: var(--text); }
@@ -122,7 +119,7 @@
 
 <nav>
   <div class="wrap">
-    <a class="brand" href="index.html"><span class="logo">⌘</span> Infra Companion</a>
+    <a class="brand" href="index.html"><img class="logo" src="icon-128.png" alt="" /> Infra Companion</a>
     <div class="links">
       <a class="hide-sm" href="index.html">Home</a>
       <a class="hide-sm" href="index.html#features">Features</a>
@@ -161,7 +158,7 @@
 
 <footer>
   <div class="wrap">
-    <div class="brand"><span class="logo">⌘</span> Infra Companion</div>
+    <div class="brand"><img class="logo" src="icon-128.png" alt="" /> Infra Companion</div>
     <div class="fl">
       <a href="index.html">Home</a>
       <a href="https://github.com/xShiroeNguyenx/infra-companion/releases/latest" target="_blank" rel="noreferrer">Download</a>
