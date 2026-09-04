@@ -13,3 +13,6 @@ release/
 
 # Quy tắc làm việc cho Claude Code — giữ ở máy, không publish
 CLAUDE.md
+
+# Cấu hình editor cá nhân (vd tắt warning vars của extension GitHub Actions) — không ép người clone
+.vscode/
