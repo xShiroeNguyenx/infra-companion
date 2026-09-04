@@ -184,7 +184,7 @@ export type { DropletImportVault } from './importers/digitalOcean'
 // P30 — xuất hosts ra định dạng đọc được. Bản xuất KHÔNG chứa bí mật (xem đầu file).
 export { renderExport, resolveForExport, sshAlias, toCsv, toJson, toSshConfig } from './exporters/hostExport'
 export type { ExportFormat, ExportHost } from './exporters/hostExport'
-export { VaultService } from './vault/VaultService'
+export { LEGACY_SYNC_CHANNEL_ID, VaultService } from './vault/VaultService'
 export type {
   KnownHostEntry,
   KnownHostRecord,
@@ -193,12 +193,36 @@ export type {
   ReplRunSaveInput,
   ResolvedConnection,
   ResolvedEndpoint,
+  SyncChannel,
   SyncConfig,
   SyncSnapshot
 } from './vault/VaultService'
 export { deriveSyncKey, newSyncSalt } from './vault/crypto'
 export { SyncService, createBackend, BLOB_NAME, findNearMissBlobs, isEmptySnapshot } from './sync/SyncService'
 export type { SyncBackend, SyncResult, BlobError } from './sync/SyncService'
+// Google Drive sync — phần thuần của OAuth desktop (loopback+PKCE) và Drive API v3
+export {
+  GOOGLE_TOKEN_URL,
+  GOOGLE_REVOKE_URL,
+  GOOGLE_DRIVE_SCOPES,
+  buildGoogleAuthUrl,
+  emailFromIdToken,
+  newOAuthState,
+  newPkce,
+  parseLoopbackCallback,
+  parseTokenResponse
+} from './sync/googleOAuth'
+export type { GoogleTokens, LoopbackCallback, TokenParse } from './sync/googleOAuth'
+export {
+  DRIVE_FILES_URL,
+  DRIVE_UPLOAD_URL,
+  buildDriveListByNameUrl,
+  buildDriveListContainsUrl,
+  buildMultipartUpload,
+  driveEscapeQuery,
+  parseDriveFileList
+} from './sync/driveApi'
+export type { DriveFileRef, DriveListParse } from './sync/driveApi'
 export { validateManifest, parseManifest } from './plugins/manifest'
 export type { PluginManifest, PluginCommandManifest, ManifestResult } from './plugins/manifest'
 export { discoverPlugins } from './plugins/discover'

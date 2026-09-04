@@ -533,9 +533,20 @@ Purely local, no SSH. Enter a host/IP then:
 
 **What it is**: encrypt the whole vault into a single blob and push it to a **shared folder you already use** (Google Drive / Dropbox / OneDrive / Syncthing / network share). The backend **only ever sees an encrypted blob** (zero-knowledge). Termius forces you onto their cloud — this is self-hosted.
 
-**Use**:
+Sync runs over **channels**, and you can enable one or both — each has its own passphrase, salt and status card, and turning one off never touches the other. Typical split: a shared folder for the LAN, Google Drive as the off-site copy. Every sync round pulls, merges and pushes each enabled channel in turn, so machines converge no matter which channel each one uses.
+
+**Channel *Folder*:**
 1. Pick a sync folder → set a **sync passphrase** (≥8 chars, **the same on every machine**, can differ from the master password) → enable sync.
 2. On another machine: same folder + same passphrase → data converges (Last-Write-Wins merge + tombstones for deletes).
+
+**Channel *Google Drive*** — no desktop sync client needed; the app talks to the Drive API directly:
+1. Pick **Google Drive** → **Sign in with Google…** — the system browser opens, you approve, come back. The app asks for the `drive.file` permission, which only reaches **files this app created**: it cannot see or list anything else in your Drive.
+2. Set the sync passphrase (**≥12 chars** for this backend — the blob lives on a cloud drive) → enable.
+3. On a new machine: install the app, set a master password, **sign in to the same Google account + enter the same passphrase** — that's the whole setup.
+
+> **Signing in to Google never replaces the passphrase.** The blob is encrypted end-to-end *before* upload; Google cannot read it, and someone who takes over your Google account gets one unreadable file — not your servers. That is why the passphrase prompt stays.
+
+The blob is a normal file in My Drive (`infra-companion-vault.blob`), so the borrowed-machine trick below still works: download it from drive.google.com and *Import from file*. **Disconnect** revokes the app's access token; you can also revoke it any time from your Google account's *Security → Third-party access* page. If the connection dies (token revoked or expired), the Sync screen says so and offers the sign-in button right there.
 
 **Auto-sync**: once sync is on, a dropdown sets how often it runs on its own — **off / 5 / 15 / 30 / 60 minutes**, default 15 — plus one last push when you quit the app, so a change made just before closing doesn't sit on one machine until another overwrites it. It only runs while the vault is unlocked, and it never resets the auto-lock timer, so leaving it on doesn't keep the vault open. Setting it to *off* also turns off the quit push — off means you're driving. When a round pulls something in, a toast says so and the lists reload — otherwise the window would sit on stale data.
 

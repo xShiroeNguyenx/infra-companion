@@ -172,6 +172,11 @@ export const IPC = {
   SYNC_CONFIGURE: 'sync:configure',
   SYNC_NOW: 'sync:now',
   SYNC_DISABLE: 'sync:disable',
+  // Google Drive backend — đăng nhập OAuth (loopback+PKCE) + bật sync qua Drive
+  SYNC_GDRIVE_STATUS: 'sync:gdrive-status',
+  SYNC_GDRIVE_LOGIN: 'sync:gdrive-login',
+  SYNC_GDRIVE_LOGOUT: 'sync:gdrive-logout',
+  SYNC_CONFIGURE_GDRIVE: 'sync:configure-gdrive',
   /** P30 — xuất hosts ra ssh_config/CSV/JSON (bản xuất KHÔNG chứa bí mật). */
   EXPORT_HOSTS: 'export:hosts',
   /**

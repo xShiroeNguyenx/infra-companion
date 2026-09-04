@@ -78,7 +78,26 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # OAuth client Google nhúng LÚC BUILD từ env (electron.vite.config.ts, khối main).
+      # Thiếu biến thì bản cài vẫn build được nhưng tính năng Google Drive sync CHẾT IM LẶNG
+      # ("chưa cấu hình client") — chặn ở đây cho lộ sớm, cùng lý do với guard version ở trên.
+      # Đặt MỘT LẦN tại: Settings → Secrets and variables → Actions → tab Variables
+      # (client của Desktop app không phải bí mật — Variables là đủ, Secrets cũng nhận).
+      - name: Google OAuth client phải được cấu hình
+        shell: bash
+        env:
+          CID: ${{ vars.INFRA_GOOGLE_CLIENT_ID || secrets.INFRA_GOOGLE_CLIENT_ID }}
+          CSECRET: ${{ vars.INFRA_GOOGLE_CLIENT_SECRET || secrets.INFRA_GOOGLE_CLIENT_SECRET }}
+        run: |
+          if [ -z "$CID" ] || [ -z "$CSECRET" ]; then
+            echo "::error::Thiếu INFRA_GOOGLE_CLIENT_ID / INFRA_GOOGLE_CLIENT_SECRET (GitHub Variables hoặc Secrets). Bản build ra sẽ không đăng nhập Google được — đặt biến ở Settings → Secrets and variables → Actions rồi chạy lại."
+            exit 1
+          fi
+          echo "OAuth client: OK"
+
       - name: Build & publish
         run: pnpm dist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INFRA_GOOGLE_CLIENT_ID: ${{ vars.INFRA_GOOGLE_CLIENT_ID || secrets.INFRA_GOOGLE_CLIENT_ID }}
+          INFRA_GOOGLE_CLIENT_SECRET: ${{ vars.INFRA_GOOGLE_CLIENT_SECRET || secrets.INFRA_GOOGLE_CLIENT_SECRET }}

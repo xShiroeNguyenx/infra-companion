@@ -35,6 +35,15 @@ export default defineConfig({
   main: {
     // Workspace packages là TS source → bundle thẳng vào main; node-pty giữ external (native module)
     plugins: [externalizeDepsPlugin({ exclude: ['@infra/core', '@infra/shared'] })],
+    define: {
+      // OAuth client Google (Desktop app) — nhúng LÚC BUILD từ env; CI đặt env từ GitHub
+      // Variables nên client_id/secret KHÔNG nằm trong source. Với installed app cặp này
+      // không phải bí mật (trích được từ binary), giữ ngoài repo chỉ để khỏi hardcode.
+      // Build local không đặt env → chuỗi rỗng → tính năng Google Drive báo "chưa cấu hình",
+      // các phần còn lại của app không ảnh hưởng. Dev dùng .google-oauth.json ở gốc repo.
+      __GOOGLE_CLIENT_ID__: JSON.stringify(process.env.INFRA_GOOGLE_CLIENT_ID ?? ''),
+      __GOOGLE_CLIENT_SECRET__: JSON.stringify(process.env.INFRA_GOOGLE_CLIENT_SECRET ?? '')
+    },
     build: {
       rollupOptions: {
         // Entry thứ 2: bootstrap chạy trong worker_thread cho Plugin system → emit out/main/plugin-worker.js

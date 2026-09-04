@@ -7,5 +7,9 @@ release/
 .DS_Store
 .env
 
+# OAuth client cho DEV — file JSON tải từ Google Console, thả vào gốc repo để `pnpm dev`
+# tự nhận (xem apps/desktop/src/main/lib/googleDrive.ts). Bản release dùng hằng nhúng cứng.
+.google-oauth.json
+
 # Quy tắc làm việc cho Claude Code — giữ ở máy, không publish
 CLAUDE.md

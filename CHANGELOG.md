@@ -5,6 +5,19 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.15] — 2026-09-04
+
+### Added
+
+- **Sign in with Google and sync through Drive** (*Sync → Google Drive*). Until now the folder backend needed a desktop sync client (Drive for Desktop, Syncthing…) already running on every machine; now the app talks to the Drive API directly. Sign in once per machine — the system browser opens, you approve, done; the app holds a refresh token encrypted in the vault and never shows the token to the UI layer. A new machine needs exactly two things: the Google sign-in and the sync passphrase. **Signing in never replaces the passphrase** — the blob is encrypted end-to-end on your machine before upload, so neither Google nor a stolen Google account can read it; losing the account loses one unreadable file, not the fleet. The permission asked for is `drive.file`, which by Google's own rules only reaches **files this app created** — it cannot see, list or touch anything else in the Drive; the one file it makes (`infra-companion-vault.blob`) is visible in My Drive, so the borrowed-machine trick still works: download it from drive.google.com and use *Import from file*. All the anti-overwrite guards from the folder backend apply unchanged — a renamed duplicate or a half-synced Drive stops the write instead of clobbering every other machine. Because this blob lives on a cloud drive, its passphrase minimum is **12 characters** (the folder backend keeps 8). If the connection dies — token revoked, or expired while the OAuth app is still in testing — the Sync screen says so and offers the sign-in button right there, instead of failing quietly in a background cycle. What we deliberately did not build: any server of ours (the app talks straight to Google), any scope broader than `drive.file`, and any way to skip the passphrase.
+- **Sync channels run side by side.** Folder sync and Google Drive sync are no longer either-or — trying Drive used to mean turning your folder sync off first. Each is now a **channel** with its own passphrase, salt and status card: enable one, the other, or both (a NAS folder for the LAN, Drive as the off-site copy), sync or turn off each without touching the other. A sync round pulls, merges and pushes every enabled channel in turn, so machines converge no matter which channel each one uses — and a channel that fails says so on its own card instead of silencing the rest. An existing single-channel setup migrates silently, sync key and all. While a Google account is connected, the **status bar shows ☁️ with its email** — one glance answers "which account is this machine syncing through", and clicking it opens Sync.
+
+### Fixed
+
+- **Checking for updates minutes after a release goes out no longer dumps a stack trace.** GitHub points "latest release" at the new version the moment CI creates it, while the update files are still uploading; a check in that window got a 404 wrapped in a full page of HTTP headers. It now says what is actually happening — *the release's update files haven't finished uploading, try again in a few minutes*.
+
+---
+
 ## [0.2.14] — 2026-09-04
 
 ### Changed

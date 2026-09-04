@@ -72,18 +72,34 @@ export interface SyncSnapshot {
 }
 
 /** Cấu hình sync — lưu JSON trong `meta`, không bí mật nên không cần migration khi thêm trường. */
-export interface SyncConfig {
+/**
+ * MỘT kênh đồng bộ — thư mục hoặc Google Drive. Từ v0.2.15 nhiều kênh chạy SONG SONG
+ * (vd thư mục NAS trong mạng nội bộ + Drive làm bản ngoài): mỗi kênh salt/key/trạng thái
+ * riêng, kéo-merge-đẩy lần lượt từng kênh — LWW + tombstone bảo đảm hội tụ.
+ */
+export interface SyncChannel {
+  /** Khoá định danh — đặt tên file sync key và địa chỉ hoá thao tác per-kênh từ UI. */
+  id: string
   backend: string
   folderPath: string
   saltB64: string
-  /** Tự đồng bộ mỗi N phút. 0 hoặc thiếu = tắt. */
-  autoMinutes?: number
+  /** backend 'gdrive': fileId của blob trên Drive — nhớ lại để update đúng file, không tạo bản trùng. */
+  gdriveFileId?: string
   /**
    * Lần cuối THẬT SỰ đọc được blob từ backend. Có giá trị này mà lần sau blob biến mất
    * nghĩa là thư mục hỏng/chưa tải xong, không phải "lần đầu" → không được ghi đè.
    */
   seenRemoteAt?: number
 }
+
+export interface SyncConfig {
+  channels: SyncChannel[]
+  /** Tự đồng bộ mỗi N phút — MỘT lịch chung cho mọi kênh. 0 hoặc thiếu = tắt. */
+  autoMinutes?: number
+}
+
+/** Id của kênh chuyển từ cấu hình một-kênh cũ — cố định để main còn tìm được file sync key cũ. */
+export const LEGACY_SYNC_CHANNEL_ID = 'legacy'
 
 const SYNC_TABLES = ['groups', 'keys', 'hosts', 'snippets', 'tunnels', 'known_hosts']
 
@@ -1219,7 +1235,34 @@ export class VaultService {
 
   getSyncConfig(): SyncConfig | null {
     const raw = this.readMeta('sync_config')
-    return raw ? (JSON.parse(raw) as SyncConfig) : null
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as SyncConfig & {
+      // hình dạng cũ (≤ v0.2.14): một kênh duy nhất, field nằm phẳng ở gốc
+      backend?: string
+      folderPath?: string
+      saltB64?: string
+      gdriveFileId?: string
+      seenRemoteAt?: number
+    }
+    if (Array.isArray(parsed.channels)) return { channels: parsed.channels, autoMinutes: parsed.autoMinutes }
+    if (typeof parsed.backend !== 'string' || typeof parsed.saltB64 !== 'string') return null
+    // Migration lười một-kênh → danh sách. Id CỐ ĐỊNH 'legacy' để main còn tìm được file
+    // sync key cũ (vault-sync-key.bin) của kênh này. Ghi lại luôn để chỉ chuyển một lần.
+    const migrated: SyncConfig = {
+      channels: [
+        {
+          id: LEGACY_SYNC_CHANNEL_ID,
+          backend: parsed.backend,
+          folderPath: parsed.folderPath ?? '',
+          saltB64: parsed.saltB64,
+          gdriveFileId: parsed.gdriveFileId,
+          seenRemoteAt: parsed.seenRemoteAt
+        }
+      ],
+      autoMinutes: parsed.autoMinutes
+    }
+    this.setSyncConfig(migrated)
+    return migrated
   }
 
   setSyncConfig(config: SyncConfig): void {
@@ -1298,6 +1341,44 @@ export class VaultService {
     const enc = this.readMeta(`do_token:${accountId}`)
     if (!enc) return undefined
     return decryptField(this.requireDek(), enc) ?? undefined
+  }
+
+  // -------------------------------------------------------------------------
+  // Google Drive sync — refresh token MÃ HOÁ bằng DEK trong meta (khuôn ai_api_key),
+  // email tài khoản là JSON thường (không bí mật, chỉ để hiển thị "đang kết nối ai")
+  // -------------------------------------------------------------------------
+
+  getGdriveEmail(): string | null {
+    const raw = this.readMeta('gdrive_account')
+    if (!raw) return null
+    try {
+      const data = JSON.parse(raw) as { email?: unknown }
+      return typeof data.email === 'string' ? data.email : null
+    } catch {
+      return null
+    }
+  }
+
+  hasGdriveToken(): boolean {
+    return this.readMeta('gdrive_refresh_token') !== null
+  }
+
+  /** Refresh token thật — chỉ dùng trong main process, không bao giờ qua IPC. */
+  getGdriveRefreshToken(): string | undefined {
+    const enc = this.readMeta('gdrive_refresh_token')
+    if (!enc) return undefined
+    return decryptField(this.requireDek(), enc) ?? undefined
+  }
+
+  setGdriveAuth(refreshToken: string, email: string | null): void {
+    this.writeMeta('gdrive_refresh_token', encryptField(this.requireDek(), refreshToken))
+    this.writeMeta('gdrive_account', JSON.stringify({ email }))
+  }
+
+  clearGdriveAuth(): void {
+    const db = this.ensureDb()
+    db.prepare('DELETE FROM meta WHERE key = ?').run('gdrive_refresh_token')
+    db.prepare('DELETE FROM meta WHERE key = ?').run('gdrive_account')
   }
 
   /**

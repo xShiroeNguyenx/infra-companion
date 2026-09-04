@@ -786,15 +786,40 @@ export interface RdpSessionDto {
 // Sync E2EE
 // ---------------------------------------------------------------------------
 
-export interface SyncStatusDto {
-  configured: boolean
-  backend?: string
+/** Trạng thái MỘT kênh đồng bộ (từ v0.2.15 nhiều kênh chạy song song). */
+export interface SyncChannelStatusDto {
+  id: string
+  backend: string
+  /** backend 'folder': đường dẫn thư mục. */
   folder?: string
+  /** backend 'gdrive': email tài khoản đang kết nối (chỉ để hiển thị). */
+  gdriveEmail?: string | null
   lastSyncAt?: number
   lastMessage?: string
-  /** Tự đồng bộ mỗi N phút; 0 = tắt. */
+}
+
+export interface SyncStatusDto {
+  /** Có ít nhất một kênh đang bật. */
+  configured: boolean
+  channels: SyncChannelStatusDto[]
+  /** Tự đồng bộ mỗi N phút — lịch chung cho mọi kênh; 0 = tắt. */
   autoMinutes?: number
 }
+
+/** Trạng thái kết nối Google (token thật không bao giờ qua IPC — chỉ có cờ + email). */
+export interface GdriveStatusDto {
+  connected: boolean
+  email: string | null
+}
+
+/** Kết quả đăng nhập Google — lỗi dạng MÃ để renderer dịch lúc render. */
+export type GdriveLoginResult =
+  | { ok: true; email: string | null }
+  | {
+      ok: false
+      error: 'clientNotConfigured' | 'vaultLocked' | 'timeout' | 'denied' | 'stateMismatch' | 'network' | 'badResponse'
+      detail?: string
+    }
 
 export interface SyncRunResult {
   ok: boolean
@@ -2125,9 +2150,20 @@ export interface InfraApi {
     /** Mở dialog chọn thư mục đồng bộ. null = huỷ. */
     pickFolder(): Promise<string | null>
     /** Bật sync: dẫn xuất sync key từ passphrase, verify với blob hiện có, ghi nhớ key. */
+    /** Bật/cấu hình lại kênh THƯ MỤC (mỗi loại backend tối đa một kênh). */
     configure(folderPath: string, passphrase: string, force?: boolean): Promise<SyncRunResult>
-    now(force?: boolean): Promise<SyncRunResult>
-    disable(): Promise<SyncStatusDto>
+    /** Chạy đồng bộ: mọi kênh (mặc định) hoặc đúng một kênh. */
+    now(force?: boolean, channelId?: string): Promise<SyncRunResult>
+    /** Tắt một kênh (channelId) hoặc tắt hết (không truyền). */
+    disable(channelId?: string): Promise<SyncStatusDto>
+    /** Trạng thái kết nối Google Drive (đã đăng nhập chưa, tài khoản nào). */
+    gdriveStatus(): Promise<GdriveStatusDto>
+    /** Mở trình duyệt hệ thống đăng nhập Google (OAuth loopback + PKCE). */
+    gdriveLogin(): Promise<GdriveLoginResult>
+    /** Thu hồi token + quên tài khoản Google. */
+    gdriveLogout(): Promise<GdriveStatusDto>
+    /** Bật sync qua Google Drive (đã đăng nhập trước đó). Passphrase tối thiểu 12 ký tự. */
+    configureGdrive(passphrase: string, force?: boolean): Promise<SyncRunResult>
     /** Bật/tắt tự đồng bộ. 0 = tắt. */
     setAuto(minutes: number): Promise<SyncStatusDto>
     /** Ghi blob mã hoá ra file do user chọn (không cần đã bật sync). */

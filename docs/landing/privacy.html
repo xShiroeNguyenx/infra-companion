@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0b0e14" />
+<link rel="icon" type="image/png" href="icon-128.png" />
+<title>Privacy Policy — Infra Companion</title>
+<meta name="description" content="Privacy policy for Infra Companion, a local-first desktop SSH client. No developer servers, no analytics; optional Google Drive sync stores one end-to-end-encrypted file." />
+<style>
+  :root {
+    --app: #0b0e14; --panel: #0e121b; --edge: #232a39; --edge-strong: #323b4f;
+    --text: #e6e8ee; --muted: #a1a7b6; --subtle: #6b7385;
+    --accent: #3b82f6; --accent-2: #6366f1;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, system-ui, sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--app); color: var(--text); font-family: var(--sans); line-height: 1.7; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 0 24px; }
+  nav { position: sticky; top: 0; backdrop-filter: blur(10px); background: rgba(11,14,20,.7); border-bottom: 1px solid var(--edge); }
+  nav .wrap { display: flex; align-items: center; gap: 10px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); }
+  .logo { width: 28px; height: 28px; display: block; }
+  main { padding: 48px 0 80px; }
+  h1 { font-size: 32px; margin: 0 0 4px; }
+  .updated { color: var(--subtle); font-size: 13px; margin-bottom: 32px; }
+  h2 { font-size: 20px; margin: 36px 0 8px; }
+  p, li { color: var(--muted); font-size: 15px; }
+  strong { color: var(--text); }
+  code { font-family: var(--mono); font-size: 13px; background: var(--panel); border: 1px solid var(--edge); border-radius: 5px; padding: 1px 6px; }
+  .card { background: var(--panel); border: 1px solid var(--edge-strong); border-radius: 10px; padding: 14px 18px; margin: 18px 0; }
+  footer { border-top: 1px solid var(--edge); padding: 24px 0; color: var(--subtle); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="index.html"><img class="logo" src="icon-128.png" alt="" /> Infra Companion</a>
+  </div>
+</nav>
+
+<main>
+<div class="wrap">
+  <h1>Privacy Policy</h1>
+  <div class="updated">Effective date: September 4, 2026</div>
+
+  <p><strong>Infra Companion</strong> is a free, open-source desktop SSH client. It is
+  <strong>local-first</strong>: your hosts, credentials, SSH keys and settings live on your own
+  computer, inside a vault encrypted with a master password only you know.</p>
+
+  <div class="card">
+    <p style="margin:0"><strong>The short version:</strong> the developer operates <strong>no
+    servers</strong> and <strong>receives no data</strong>. The app has no analytics, no
+    telemetry, no ads, and never sells or shares anything — there is nothing to sell or share,
+    because your data never reaches us. The full source code is
+    <a href="https://github.com/xShiroeNguyenx/infra-companion" target="_blank" rel="noreferrer">public on GitHub</a>
+    and can be audited by anyone.</p>
+  </div>
+
+  <h2>Data the app stores</h2>
+  <ul>
+    <li>Everything you enter (hosts, groups, SSH keys, passwords, snippets, notes) is stored
+    <strong>only on your computer</strong>, encrypted at rest in a local vault.</li>
+    <li>Optional integrations you configure (for example an AI provider API key or a cloud
+    provider token) are stored encrypted inside the same local vault and are used only to call
+    the service you configured them for.</li>
+  </ul>
+
+  <h2>Google user data (optional Google Drive sync)</h2>
+  <p>If — and only if — you enable <em>Sync via Google Drive</em>, the app asks for these
+  Google permissions:</p>
+  <ul>
+    <li><code>drive.file</code> — lets the app create and update <strong>only the files it
+    created itself</strong>. Infra Companion uses it for exactly one file,
+    <code>infra-companion-vault.blob</code>, stored in your own Google Drive. The app cannot
+    see, read or list any other file in your Drive.</li>
+    <li><code>openid</code> and <code>email</code> — used solely to display which Google
+    account is connected inside the app. Your email address is stored locally on your machine
+    and is never transmitted anywhere else.</li>
+  </ul>
+  <p>The synced file is <strong>encrypted end-to-end</strong> on your machine with a sync
+  passphrase that only you know, <em>before</em> it is uploaded. Neither Google nor the
+  developer can decrypt it. The developer never receives the file, the passphrase, or your
+  OAuth tokens: the app talks <strong>directly</strong> to Google's API from your computer,
+  and the OAuth refresh token is stored encrypted inside your local vault.</p>
+
+  <h2>Data sharing</h2>
+  <p>None. No data is shared with, sold to, or transferred to any third party. The only
+  network calls the app makes are the ones you configure it to make (your own SSH servers,
+  your chosen sync location, update checks against GitHub Releases, and optional integrations
+  you enable).</p>
+
+  <h2>Data retention &amp; deletion</h2>
+  <ul>
+    <li>Local data: delete the vault from within the app, or uninstall the app and remove its
+    data folder. It was never anywhere else.</li>
+    <li>Google Drive sync: click <em>Disconnect</em> in the app (this also revokes the OAuth
+    token), delete <code>infra-companion-vault.blob</code> from your Google Drive, and — at any
+    time — revoke the app's access at
+    <a href="https://myaccount.google.com/connections" target="_blank" rel="noreferrer">myaccount.google.com → Security → Third-party access</a>.</li>
+  </ul>
+
+  <h2>Limited Use disclosure</h2>
+  <p>Infra Companion's use and transfer to any other app of information received from Google
+  APIs will adhere to the
+  <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer">Google API Services User Data Policy</a>,
+  including the Limited Use requirements.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>Any change to this policy is published on this page, with the effective date above, and
+  is visible in the site's public git history.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this policy or the app's data handling:
+  <a href="https://github.com/xShiroeNguyenx/infra-companion/issues" target="_blank" rel="noreferrer">open an issue on GitHub</a>.</p>
+</div>
+</main>
+
+<footer>
+  <div class="wrap">© 2026 NguyenKhanh · <a href="index.html">Infra Companion</a> · MIT License</div>
+</footer>
+
+</body>
+</html>
