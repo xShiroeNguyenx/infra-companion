@@ -5,6 +5,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.16] — 2026-09-04
+
+### Added
+
+- **Two more sync channels: WebDAV and S3.** The channel system from v0.2.15 gets its next two backends, and they slot in beside the folder and Google Drive channels — enable any mix, each with its own passphrase and status card. **WebDAV** talks to Nextcloud, Seafile, Synology, or a plain Nginx `dav_module` — point it at a folder URL, give it a username and password, done. **S3** speaks Signature V4 with no SDK attached, so it works with anything S3-shaped: AWS itself, MinIO on your LAN, Cloudflare R2, Backblaze B2 — and the key only needs `GetObject` + `PutObject` + `ListBucket` on one bucket. Server credentials are stored encrypted in the vault and only after a connection has actually succeeded; the blob stays end-to-end encrypted with a passphrase of at least 12 characters, so the server operator — including AWS — sees only noise. All the anti-overwrite guards apply to both: a renamed blob or a half-synced store stops the write instead of clobbering every other machine. A 403 from S3 is explained rather than dumped, because S3's 403 famously means three different things (wrong key, missing permission, or *file not found* when the key can't list the bucket).
+- **Cloud import now covers AWS EC2, Google Cloud and Azure** (*Cloud import*, the tool formerly labeled DigitalOcean). One dialog, four providers, one flow: pick the provider, add a read-only account, fetch, tick, import — every machine lands as a host with its public IP first, private IP as fallback, and its origin (instance id, region/zone, size, tags) recorded in the host's notes. Accounts are only kept **after a fetch with them has succeeded**, so mistyped credentials never become saved accounts; everything sensitive lives encrypted in the vault and never reaches the UI process. Each provider asks for the least it can: **AWS** wants an IAM key with exactly `ec2:DescribeInstances`; **GCP** takes a service-account JSON key with the *Compute Viewer* role (paste the file, the app builds the signed JWT itself); **Azure** takes an app registration with the *Reader* role — and since Azure keeps IP addresses as separate resources, the app joins VMs, network interfaces and public IPs across three read-only calls so you don't have to. Machines whose address already has a host stay locked out of selection, same as always: re-importing never duplicates the fleet.
+
+---
+
 ## [0.2.15] — 2026-09-04
 
 ### Added

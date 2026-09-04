@@ -85,6 +85,15 @@ export interface SyncChannel {
   saltB64: string
   /** backend 'gdrive': fileId của blob trên Drive — nhớ lại để update đúng file, không tạo bản trùng. */
   gdriveFileId?: string
+  /** backend 'webdav': URL thư mục + username (mật khẩu mã hoá riêng: sync_secret:<id>). */
+  webdavUrl?: string
+  webdavUsername?: string
+  /** backend 's3': endpoint/region/bucket/prefix + access key (secret key mã hoá riêng: sync_secret:<id>). */
+  s3Endpoint?: string
+  s3Region?: string
+  s3Bucket?: string
+  s3Prefix?: string
+  s3AccessKeyId?: string
   /**
    * Lần cuối THẬT SỰ đọc được blob từ backend. Có giá trị này mà lần sau blob biến mất
    * nghĩa là thư mục hỏng/chưa tải xong, không phải "lần đầu" → không được ghi đè.
@@ -1299,6 +1308,73 @@ export class VaultService {
     } else if (typeof input.apiKey === 'string') {
       this.writeMeta('ai_api_key', encryptField(this.requireDek(), input.apiKey))
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Bí mật theo KÊNH sync (mật khẩu WebDAV, secret key S3…) — mã hoá DEK trong meta
+  // 'sync_secret:<channelId>'. Generic theo channelId để thêm backend mới không phải
+  // thêm method; xoá kênh thì PHẢI gọi delete để không để lại bí mật mồ côi.
+  // -------------------------------------------------------------------------
+
+  getSyncChannelSecret(channelId: string): string | undefined {
+    const enc = this.readMeta(`sync_secret:${channelId}`)
+    if (!enc) return undefined
+    return decryptField(this.requireDek(), enc) ?? undefined
+  }
+
+  setSyncChannelSecret(channelId: string, secret: string): void {
+    this.writeMeta(`sync_secret:${channelId}`, encryptField(this.requireDek(), secret))
+  }
+
+  deleteSyncChannelSecret(channelId: string): void {
+    this.ensureDb().prepare('DELETE FROM meta WHERE key = ?').run(`sync_secret:${channelId}`)
+  }
+
+  // -------------------------------------------------------------------------
+  // Cloud import (F05 — AWS/GCP/Azure): danh bạ 'cloud_accounts' là JSON thường
+  // (label/provider/config KHÔNG bí mật: region, project id…), credentials mã hoá DEK
+  // ở 'cloud_secret:<id>' — cùng khuôn do_accounts/do_token của DigitalOcean.
+  // -------------------------------------------------------------------------
+
+  listCloudAccounts(): Array<{ id: string; label: string; provider: string; config: Record<string, string> }> {
+    const raw = this.readMeta('cloud_accounts')
+    return raw
+      ? (JSON.parse(raw) as Array<{ id: string; label: string; provider: string; config: Record<string, string> }>)
+      : []
+  }
+
+  /** secretJson: undefined = giữ nguyên, chuỗi = đặt mới (JSON credentials theo provider). */
+  saveCloudAccount(input: {
+    id?: string
+    label: string
+    provider: string
+    config: Record<string, string>
+    secretJson?: string
+  }): { id: string; label: string; provider: string; config: Record<string, string> } {
+    const accounts = this.listCloudAccounts()
+    const id = input.id ?? randomUUID()
+    const record = { id, label: input.label.trim() || input.provider, provider: input.provider, config: input.config }
+    const idx = accounts.findIndex((a) => a.id === id)
+    if (idx >= 0) accounts[idx] = record
+    else accounts.push(record)
+    this.writeMeta('cloud_accounts', JSON.stringify(accounts))
+    if (typeof input.secretJson === 'string' && input.secretJson !== '') {
+      this.writeMeta(`cloud_secret:${id}`, encryptField(this.requireDek(), input.secretJson))
+    }
+    return record
+  }
+
+  deleteCloudAccount(id: string): void {
+    const accounts = this.listCloudAccounts().filter((a) => a.id !== id)
+    this.writeMeta('cloud_accounts', JSON.stringify(accounts))
+    this.ensureDb().prepare('DELETE FROM meta WHERE key = ?').run(`cloud_secret:${id}`)
+  }
+
+  /** Credentials thật (JSON) — chỉ dùng trong main process, không bao giờ qua IPC. */
+  getCloudSecret(id: string): string | undefined {
+    const enc = this.readMeta(`cloud_secret:${id}`)
+    if (!enc) return undefined
+    return decryptField(this.requireDek(), enc) ?? undefined
   }
 
   // -------------------------------------------------------------------------

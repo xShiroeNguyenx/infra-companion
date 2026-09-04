@@ -7,7 +7,14 @@ import { useT } from '../i18n'
 
 const AUTO_CHOICES = [0, 5, 15, 30, 60]
 
-type BackendChoice = 'folder' | 'gdrive'
+type BackendChoice = 'folder' | 'gdrive' | 'webdav' | 's3'
+
+const BACKEND_LABEL_KEY = {
+  folder: 'sync.backendFolder',
+  gdrive: 'sync.backendGdrive',
+  webdav: 'sync.backendWebdav',
+  s3: 'sync.backendS3'
+} as const
 
 /**
  * Sync E2EE (Phase 4): đồng bộ vault mã hoá qua NHIỀU KÊNH chạy song song — thư mục
@@ -29,6 +36,16 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
   /** Đang chờ user thao tác trong trình duyệt — tách khỏi `busy` vì có thể kéo dài vài phút. */
   const [loggingIn, setLoggingIn] = useState(false)
   const [folder, setFolder] = useState('')
+  // WebDAV / S3 — trường của form bật kênh; bí mật chỉ nằm trong state lúc gõ, gửi xong xoá
+  const [davUrl, setDavUrl] = useState('')
+  const [davUser, setDavUser] = useState('')
+  const [davPass, setDavPass] = useState('')
+  const [s3Endpoint, setS3Endpoint] = useState('')
+  const [s3Region, setS3Region] = useState('')
+  const [s3Bucket, setS3Bucket] = useState('')
+  const [s3Prefix, setS3Prefix] = useState('')
+  const [s3AccessKey, setS3AccessKey] = useState('')
+  const [s3SecretKey, setS3SecretKey] = useState('')
   const [passphrase, setPassphrase] = useState('')
   const [filePass, setFilePass] = useState('')
   const [showFile, setShowFile] = useState(false)
@@ -120,22 +137,59 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
   }
 
   const configure = (): void => {
+    const done = (): void => {
+      setPassphrase('')
+      setDavPass('')
+      setS3SecretKey('')
+      setFormOpen(false)
+    }
+    // Blob nằm ngoài máy (gdrive/webdav/s3) → passphrase là lớp bảo vệ duy nhất, siết hơn
+    // mức 8 của thư mục local
+    if (formBackend !== 'folder' && passphrase.length < 12) return setError(t('sync.remoteErrPass'))
     if (formBackend === 'gdrive') {
       if (!gdrive?.connected) return setError(t('sync.gd.err.notConnected'))
-      // Blob nằm trên cloud → passphrase là lớp bảo vệ duy nhất, siết hơn mức 8 của thư mục
-      if (passphrase.length < 12) return setError(t('sync.gd.errPass'))
-      void run((force) => window.infra.sync.configureGdrive(passphrase, force), false, () => {
-        setPassphrase('')
-        setFormOpen(false)
-      })
+      void run((force) => window.infra.sync.configureGdrive(passphrase, force), false, done)
+      return
+    }
+    if (formBackend === 'webdav') {
+      if (!davUrl.trim() || !davUser.trim() || !davPass) return setError(t('sync.dav.errFields'))
+      void run(
+        (force) =>
+          window.infra.sync.configureWebdav(
+            { url: davUrl.trim(), username: davUser.trim(), password: davPass, passphrase },
+            force
+          ),
+        false,
+        done
+      )
+      return
+    }
+    if (formBackend === 's3') {
+      if (!s3Endpoint.trim() || !s3Region.trim() || !s3Bucket.trim() || !s3AccessKey.trim() || !s3SecretKey) {
+        return setError(t('sync.s3.errFields'))
+      }
+      void run(
+        (force) =>
+          window.infra.sync.configureS3(
+            {
+              endpoint: s3Endpoint.trim(),
+              region: s3Region.trim(),
+              bucket: s3Bucket.trim(),
+              prefix: s3Prefix.trim(),
+              accessKeyId: s3AccessKey.trim(),
+              secretAccessKey: s3SecretKey,
+              passphrase
+            },
+            force
+          ),
+        false,
+        done
+      )
       return
     }
     if (!folder.trim()) return setError(t('sync.errFolder'))
     if (passphrase.length < 8) return setError(t('sync.errPass'))
-    void run((force) => window.infra.sync.configure(folder.trim(), passphrase, force), false, () => {
-      setPassphrase('')
-      setFormOpen(false)
-    })
+    void run((force) => window.infra.sync.configure(folder.trim(), passphrase, force), false, done)
   }
 
   const syncNow = (channelId?: string): void => void run((force) => window.infra.sync.now(force, channelId))
@@ -180,7 +234,11 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
         <div className="text-content min-w-0 flex-1 truncate text-xs font-medium">
           {channel.backend === 'gdrive'
             ? `☁️ Google Drive${channel.gdriveEmail ? ` (${channel.gdriveEmail})` : ''}`
-            : `📁 ${channel.folder}`}
+            : channel.backend === 'webdav'
+              ? `🌐 ${channel.detail ?? 'WebDAV'}`
+              : channel.backend === 's3'
+                ? `🪣 ${channel.detail ?? 'S3'}`
+                : `📁 ${channel.folder}`}
         </div>
         <Button type="button" className="!px-2 !py-0.5 !text-[11px]" disabled={busy} onClick={() => syncNow(channel.id)}>
           {t('sync.chanSync')}
@@ -215,8 +273,8 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
     <>
       {channels.length === 0 ? (
         <Field label={t('sync.backendLabel')}>
-          <div className="flex gap-1.5">
-            {(['folder', 'gdrive'] as const).map((choice) => (
+          <div className="grid grid-cols-2 gap-1.5">
+            {(['folder', 'gdrive', 'webdav', 's3'] as const).map((choice) => (
               <button
                 key={choice}
                 type="button"
@@ -226,38 +284,78 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
                   setMessage(null)
                   setForceAction(null)
                 }}
-                className={`flex-1 cursor-pointer rounded border px-2 py-1.5 text-xs ${
+                className={`cursor-pointer rounded border px-2 py-1.5 text-xs ${
                   formBackend === choice
                     ? 'border-accent bg-accent-soft/40 text-content'
                     : 'border-edge-strong text-muted hover:bg-hover'
                 }`}
               >
-                {t(choice === 'folder' ? 'sync.backendFolder' : 'sync.backendGdrive')}
+                {t(BACKEND_LABEL_KEY[choice])}
               </button>
             ))}
           </div>
         </Field>
       ) : (
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-muted text-xs font-medium">
-            {t(formBackend === 'folder' ? 'sync.backendFolder' : 'sync.backendGdrive')}
-          </span>
+          <span className="text-muted text-xs font-medium">{t(BACKEND_LABEL_KEY[formBackend])}</span>
           <button type="button" className="text-subtle text-[11px] underline" onClick={() => setFormOpen(false)}>
             {t('common.cancel')}
           </button>
         </div>
       )}
-      {formBackend === 'folder' ? (
+      {formBackend === 'folder' && (
         <Field label={t('sync.folder')}>
           <div className="flex gap-2">
             <TextInput value={folder} onChange={(e) => setFolder(e.target.value)} placeholder={t('sync.folderPh')} className="flex-1" />
             <Button type="button" onClick={() => void pickFolder()}>{t('sync.choose')}</Button>
           </div>
         </Field>
-      ) : (
+      )}
+      {formBackend === 'gdrive' && (
         <>
           <p className="mb-2 text-[11px] leading-relaxed text-muted">{t('sync.gd.desc')}</p>
           {googleAccount}
+        </>
+      )}
+      {formBackend === 'webdav' && (
+        <>
+          <p className="mb-2 text-[11px] leading-relaxed text-muted">{t('sync.dav.desc')}</p>
+          <Field label={t('sync.dav.url')}>
+            <TextInput value={davUrl} onChange={(e) => setDavUrl(e.target.value)} placeholder="https://cloud.example.net/remote.php/dav/files/deploy/infra-sync" />
+          </Field>
+          <div className="grid grid-cols-2 gap-x-3">
+            <Field label={t('sync.dav.user')}>
+              <TextInput value={davUser} onChange={(e) => setDavUser(e.target.value)} placeholder="deploy" />
+            </Field>
+            <Field label={t('sync.dav.pass')}>
+              <TextInput type="password" value={davPass} onChange={(e) => setDavPass(e.target.value)} placeholder="••••••••" />
+            </Field>
+          </div>
+        </>
+      )}
+      {formBackend === 's3' && (
+        <>
+          <p className="mb-2 text-[11px] leading-relaxed text-muted">{t('sync.s3.desc')}</p>
+          <div className="grid grid-cols-2 gap-x-3">
+            <Field label={t('sync.s3.endpoint')}>
+              <TextInput value={s3Endpoint} onChange={(e) => setS3Endpoint(e.target.value)} placeholder="https://s3.ap-southeast-1.amazonaws.com" />
+            </Field>
+            <Field label={t('sync.s3.region')}>
+              <TextInput value={s3Region} onChange={(e) => setS3Region(e.target.value)} placeholder="ap-southeast-1" />
+            </Field>
+            <Field label={t('sync.s3.bucket')}>
+              <TextInput value={s3Bucket} onChange={(e) => setS3Bucket(e.target.value)} placeholder="my-bucket" />
+            </Field>
+            <Field label={t('sync.s3.prefix')}>
+              <TextInput value={s3Prefix} onChange={(e) => setS3Prefix(e.target.value)} placeholder="backup/infra" />
+            </Field>
+            <Field label={t('sync.s3.accessKey')}>
+              <TextInput value={s3AccessKey} onChange={(e) => setS3AccessKey(e.target.value)} />
+            </Field>
+            <Field label={t('sync.s3.secretKey')}>
+              <TextInput type="password" value={s3SecretKey} onChange={(e) => setS3SecretKey(e.target.value)} />
+            </Field>
+          </div>
         </>
       )}
       <Field label={t('sync.passphrase')}>
@@ -265,10 +363,13 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
           type="password"
           value={passphrase}
           onChange={(e) => setPassphrase(e.target.value)}
-          placeholder={formBackend === 'gdrive' ? '•••••••••••• (≥12)' : '••••••••'}
+          placeholder={formBackend !== 'folder' ? '•••••••••••• (≥12)' : '••••••••'}
         />
       </Field>
       {formBackend === 'gdrive' && <p className="mb-2 text-[11px] text-muted">{t('sync.gd.note')}</p>}
+      {(formBackend === 'webdav' || formBackend === 's3') && (
+        <p className="mb-2 text-[11px] text-muted">{t('sync.remoteNote')}</p>
+      )}
       <p className="mb-3 text-[11px] text-warning/90">{t('sync.warn')}</p>
     </>
   )
@@ -315,7 +416,7 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
   )
 
   const showForm = channels.length === 0 || formOpen
-  const missingBackends = (['folder', 'gdrive'] as const).filter((b) => !hasBackend(b))
+  const missingBackends = (['folder', 'gdrive', 'webdav', 's3'] as const).filter((b) => !hasBackend(b))
 
   return (
     <Modal title={t('sync.title')} onClose={onClose}>
@@ -343,7 +444,7 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
                       setMessage(null)
                     }}
                   >
-                    ＋ {t(b === 'folder' ? 'sync.backendFolder' : 'sync.backendGdrive')}
+                    ＋ {t(BACKEND_LABEL_KEY[b])}
                   </button>
                 ))}
               </div>

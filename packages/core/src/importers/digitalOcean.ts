@@ -40,7 +40,8 @@ export function parseDropletsPage(json: unknown): ParsedDropletsPage {
     const region = d.region as Record<string, unknown> | undefined
     const image = d.image as Record<string, unknown> | undefined
     droplets.push({
-      id: d.id,
+      // DTO chung cho mọi cloud dùng id CHUỖI (AWS `i-…`, Azure vmId…) — DO là số thì String hoá
+      id: String(d.id),
       name: d.name,
       publicIp: ipOf('public'),
       privateIp: ipOf('private'),
@@ -137,7 +138,7 @@ export function importDroplets(
       username,
       authType: keyId ? 'key' : null,
       keyId,
-      notes: dropletNote(droplet)
+      notes: dropletNote(droplet, options.source)
     })
     taken.add(key)
     imported += 1
@@ -147,11 +148,12 @@ export function importDroplets(
 }
 
 /** Ghi gốc gác vào notes (mã hoá trong vault) — sau này nhìn host còn biết nó từ đâu ra. */
-function dropletNote(droplet: DoDropletDto): string {
+function dropletNote(droplet: DoDropletDto, source?: string): string {
   return [
-    `DigitalOcean droplet #${droplet.id}`,
+    source ? `${source} ${droplet.id}` : `DigitalOcean droplet #${droplet.id}`,
     droplet.region && `region ${droplet.region}`,
     droplet.image,
+    droplet.sizeSlug,
     droplet.tags.length > 0 ? `tags: ${droplet.tags.join(', ')}` : ''
   ]
     .filter(Boolean)

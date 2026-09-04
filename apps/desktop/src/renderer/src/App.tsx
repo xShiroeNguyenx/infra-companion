@@ -19,7 +19,7 @@ import { LocaldevSettingsModal } from './features/localdev/LocaldevSettingsModal
 import { MetricsHistoryModal } from './components/MetricsHistoryModal'
 import { SyncModal } from './components/SyncModal'
 import { ExportHostsModal } from './components/ExportHostsModal'
-import { DoImportModal } from './components/DoImportModal'
+import { CloudImportModal } from './components/CloudImportModal'
 import { KnownHostsModal } from './components/KnownHostsModal'
 import { DiskUsageModal } from './components/DiskUsageModal'
 import { LogTailModal } from './components/LogTailModal'
@@ -487,7 +487,7 @@ export default function App() {
       {modal === 'monitor' && <MonitorModal onClose={() => setModal(null)} />}
       {modal === 'sync' && <SyncModal onClose={() => setModal(null)} />}
       {modal === 'export-hosts' && <ExportHostsModal onClose={() => setModal(null)} />}
-      {modal === 'do-import' && <DoImportModal onClose={() => setModal(null)} />}
+      {modal === 'do-import' && <CloudImportModal onClose={() => setModal(null)} />}
       {modal === 'known-hosts' && <KnownHostsModal onClose={() => setModal(null)} />}
       {modal === 'disk-usage' && <DiskUsageModal host={null} onClose={() => setModal(null)} />}
       {modal === 'log-tail' && <LogTailModal onClose={() => setModal(null)} />}

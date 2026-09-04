@@ -223,6 +223,37 @@ export {
   parseDriveFileList
 } from './sync/driveApi'
 export type { DriveFileRef, DriveListParse } from './sync/driveApi'
+// WebDAV + S3 sync backends — SigV4 thuần (dùng chung với EC2) + parse phản hồi
+export { awsUriEncode, sha256Hex, signAwsRequest } from './sync/awsSig'
+export type { AwsSignInput, AwsSignedRequest } from './sync/awsSig'
+export {
+  normalizeS3Prefix,
+  parseS3ListKeys,
+  s3KeyBasename,
+  s3ListUrl,
+  s3ObjectUrl
+} from './sync/s3Api'
+export type { S3Target } from './sync/s3Api'
+export { PROPFIND_BODY, parsePropfindNames, webdavJoin } from './sync/webdavApi'
+// F05 — cloud import AWS/GCP/Azure: parser thuần, phần mạng ở main
+export { buildDescribeInstancesBody, ec2Host, parseDescribeInstances } from './importers/awsEc2'
+export {
+  GCP_TOKEN_URL,
+  buildGcpJwt,
+  buildGcpTokenBody,
+  gcpAggregatedInstancesUrl,
+  parseGcpAggregated,
+  parseGcpServiceAccount
+} from './importers/gcpCompute'
+export type { GcpServiceAccount } from './importers/gcpCompute'
+export {
+  azureNicListUrl,
+  azurePublicIpListUrl,
+  azureTokenUrl,
+  azureVmListUrl,
+  buildAzureTokenBody,
+  joinAzureInstances
+} from './importers/azureVms'
 export { validateManifest, parseManifest } from './plugins/manifest'
 export type { PluginManifest, PluginCommandManifest, ManifestResult } from './plugins/manifest'
 export { discoverPlugins } from './plugins/discover'

@@ -533,7 +533,7 @@ Purely local, no SSH. Enter a host/IP then:
 
 **What it is**: encrypt the whole vault into a single blob and push it to a **shared folder you already use** (Google Drive / Dropbox / OneDrive / Syncthing / network share). The backend **only ever sees an encrypted blob** (zero-knowledge). Termius forces you onto their cloud — this is self-hosted.
 
-Sync runs over **channels**, and you can enable one or both — each has its own passphrase, salt and status card, and turning one off never touches the other. Typical split: a shared folder for the LAN, Google Drive as the off-site copy. Every sync round pulls, merges and pushes each enabled channel in turn, so machines converge no matter which channel each one uses.
+Sync runs over **channels** — folder, Google Drive, **WebDAV** and **S3** — and you can enable any mix: each has its own passphrase, salt and status card, and turning one off never touches the other. Typical split: a shared folder for the LAN, a cloud channel as the off-site copy. Every sync round pulls, merges and pushes each enabled channel in turn, so machines converge no matter which channel each one uses.
 
 **Channel *Folder*:**
 1. Pick a sync folder → set a **sync passphrase** (≥8 chars, **the same on every machine**, can differ from the master password) → enable sync.
@@ -547,6 +547,12 @@ Sync runs over **channels**, and you can enable one or both — each has its own
 > **Signing in to Google never replaces the passphrase.** The blob is encrypted end-to-end *before* upload; Google cannot read it, and someone who takes over your Google account gets one unreadable file — not your servers. That is why the passphrase prompt stays.
 
 The blob is a normal file in My Drive (`infra-companion-vault.blob`), so the borrowed-machine trick below still works: download it from drive.google.com and *Import from file*. **Disconnect** revokes the app's access token; you can also revoke it any time from your Google account's *Security → Third-party access* page. If the connection dies (token revoked or expired), the Sync screen says so and offers the sign-in button right there.
+
+**Channel *WebDAV*** — Nextcloud, Seafile, Synology, plain Nginx `dav_module`: give it the **folder URL** (for Nextcloud that's `…/remote.php/dav/files/<user>/<folder>`), a username and a password (an *app password* is the right thing to paste for Nextcloud). The password is stored encrypted in the vault, only after the connection has actually worked.
+
+**Channel *S3*** — anything that speaks S3: AWS itself, MinIO on your LAN, Cloudflare R2, Backblaze B2. Endpoint + region + bucket (+ optional key prefix) + an access key that has **`GetObject` + `PutObject` + `ListBucket` on that one bucket** — `ListBucket` is not optional: without it S3 answers "403" even for *file doesn't exist*, and the app can no longer tell an empty bucket from a broken one. No AWS SDK is involved; the app signs requests itself (SigV4), which is also why any S3-compatible endpoint works.
+
+> Remote channels (Google Drive / WebDAV / S3) require a passphrase of **at least 12 characters** — that blob lives off-machine, and the passphrase is the only thing protecting it.
 
 **Auto-sync**: once sync is on, a dropdown sets how often it runs on its own — **off / 5 / 15 / 30 / 60 minutes**, default 15 — plus one last push when you quit the app, so a change made just before closing doesn't sit on one machine until another overwrites it. It only runs while the vault is unlocked, and it never resets the auto-lock timer, so leaving it on doesn't keep the vault open. Setting it to *off* also turns off the quit push — off means you're driving. When a round pulls something in, a toast says so and the lists reload — otherwise the window would sit on stale data.
 
@@ -627,15 +633,24 @@ Needs AI configured (see §14). If not, the settings form opens.
 
 Pick your `~/.ssh/config` → it creates hosts, **preserves multi-hop ProxyJump**, imports IdentityFile (dedupes keys), and warns if needed. The group is named `ssh_config (date)`.
 
-### 15I. Import from DigitalOcean — *All features* → Import from DigitalOcean
+### 15I. Cloud import — *All features* → Cloud import
 
-Pick an account (or paste a new API token — control panel → API → Tokens, **read scope is enough**, and the app only ever calls one read endpoint; there is no code path that creates, changes or deletes anything on DigitalOcean), press **Fetch droplet list**, tick what you want, **Create N hosts**.
+One dialog imports machines from **DigitalOcean, AWS EC2, Google Cloud and Azure**: pick the provider, add a **read-only** account, **Fetch machine list**, tick what you want, **Create N hosts**. The app only ever calls read endpoints — there is no code path that creates, changes or deletes anything on the cloud side.
 
-Each droplet becomes a host at its **public IP**, falling back to the private IP for machines that only live inside a VPC (those are marked — you'll need a VPN or jump host to actually reach them). Where the host came from — droplet id, region, image, tags — is written into its **notes**, so six months later the host still says what it is.
+What each provider needs (least privilege on purpose):
 
-- **Re-importing is safe.** A droplet whose address already has a host in the vault is shown as *already here* and locked out of selection; the same guard applies within a single run. Add three droplets next month, run the import again, get three new hosts — not a second copy of the fleet.
-- **The group is reused.** Imported hosts go into a group you pick, or into *DigitalOcean* by default — and that default is found again on the next run, not created twice. Leave the SSH user (droplets default to `root`) or the key empty to inherit them from the group, which is the practical way to set auth once for the whole batch.
-- **Multiple accounts.** Each token is saved under a name you choose (*Company A*, *personal*); pick the account, fetch, import — then switch to the next account for its fleet. Tokens are stored **encrypted in the vault** (same treatment as the AI API key), never enter the UI process, and a new one is only saved after a fetch with it has actually succeeded — a mistyped token can't become a saved account. *Delete this account* forgets its token with it.
+| Provider | Credentials | Minimum access |
+|---|---|---|
+| DigitalOcean | API token (control panel → API → Tokens) | Read scope |
+| AWS EC2 | IAM access key + secret, region | just `ec2:DescribeInstances` |
+| Google Cloud | service-account **JSON key, pasted whole** | *Compute Viewer* role |
+| Azure | app registration: tenant + client id + secret + subscription | *Reader* role on the subscription |
+
+Each machine becomes a host at its **public IP**, falling back to the private IP for machines that only live inside a VPC/VNet (those are marked — you'll need a VPN or jump host to actually reach them). Where the host came from — instance id, region/zone, size, tags — is written into its **notes**, so six months later the host still says what it is. Azure keeps IP addresses as separate resources; the app joins VMs, network interfaces and public IPs for you.
+
+- **Re-importing is safe.** A machine whose address already has a host in the vault is shown as *already here* and locked out of selection; the same guard applies within a single run. Add three machines next month, run the import again, get three new hosts — not a second copy of the fleet.
+- **The group is reused.** Imported hosts go into a group you pick, or into a per-provider default (*DigitalOcean*, *AWS*, *GCP*, *Azure*) — found again on the next run, not created twice. Leave the SSH user or key empty to inherit them from the group, which is the practical way to set auth once for the whole batch (default users differ: DO/GCP images tend to use `root`, AWS `ec2-user`/`ubuntu`, Azure `azureuser`).
+- **Accounts are kept only after they work.** Every account is saved under a name you choose, its credentials **encrypted in the vault** (same treatment as the AI API key), never entering the UI process — and only after a fetch with it has actually succeeded, so mistyped credentials can't become a saved account. *Delete this account* forgets its credentials with it.
 
 ### 15F. Watch a log — `⋯` → Watch a log
 

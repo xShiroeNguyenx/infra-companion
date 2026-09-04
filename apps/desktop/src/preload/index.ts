@@ -139,7 +139,11 @@ const api: InfraApi = {
     doSaveAccount: (input) => ipcRenderer.invoke(IPC.IMPORT_DO_SAVE_ACCOUNT, input),
     doDeleteAccount: (id) => ipcRenderer.invoke(IPC.IMPORT_DO_DELETE_ACCOUNT, id),
     doListDroplets: (request) => ipcRenderer.invoke(IPC.IMPORT_DO_LIST, request),
-    doImport: (droplets, options) => ipcRenderer.invoke(IPC.IMPORT_DO_RUN, droplets, options)
+    doImport: (droplets, options) => ipcRenderer.invoke(IPC.IMPORT_DO_RUN, droplets, options),
+    cloudAccounts: () => ipcRenderer.invoke(IPC.CLOUD_ACCOUNTS),
+    cloudSaveAccount: (input) => ipcRenderer.invoke(IPC.CLOUD_SAVE_ACCOUNT, input),
+    cloudDeleteAccount: (id) => ipcRenderer.invoke(IPC.CLOUD_DELETE_ACCOUNT, id),
+    cloudListInstances: (accountId) => ipcRenderer.invoke(IPC.CLOUD_LIST_INSTANCES, accountId)
   },
   exporter: {
     hosts: (format) => ipcRenderer.invoke(IPC.EXPORT_HOSTS, format)
@@ -308,6 +312,8 @@ const api: InfraApi = {
     gdriveLogin: () => ipcRenderer.invoke(IPC.SYNC_GDRIVE_LOGIN),
     gdriveLogout: () => ipcRenderer.invoke(IPC.SYNC_GDRIVE_LOGOUT),
     configureGdrive: (passphrase, force) => ipcRenderer.invoke(IPC.SYNC_CONFIGURE_GDRIVE, passphrase, force === true),
+    configureWebdav: (input, force) => ipcRenderer.invoke(IPC.SYNC_CONFIGURE_WEBDAV, input, force === true),
+    configureS3: (input, force) => ipcRenderer.invoke(IPC.SYNC_CONFIGURE_S3, input, force === true),
     setAuto: (minutes) => ipcRenderer.invoke(IPC.SYNC_SET_AUTO, minutes),
     exportFile: (passphrase) => ipcRenderer.invoke(IPC.SYNC_EXPORT_FILE, passphrase),
     importFile: (passphrase) => ipcRenderer.invoke(IPC.SYNC_IMPORT_FILE, passphrase),

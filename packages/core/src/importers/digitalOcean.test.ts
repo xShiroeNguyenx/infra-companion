@@ -49,7 +49,7 @@ describe('parseDropletsPage', () => {
 
     const web = page.droplets[0]!
     expect(web).toMatchObject({
-      id: 101,
+      id: '101',
       name: 'web-01',
       publicIp: '203.0.113.11',
       privateIp: '10.20.30.11',
@@ -130,7 +130,7 @@ function fakeVault(seed?: { hostnames?: string[]; groups?: Array<{ id: string; n
 
 function droplet(over: Partial<DoDropletDto>): DoDropletDto {
   return {
-    id: 100,
+    id: '100',
     name: 'web-01',
     publicIp: '203.0.113.10',
     privateIp: null,
@@ -184,7 +184,7 @@ describe('importDroplets', () => {
 
   test('vault đã có host trùng địa chỉ → bỏ qua và đếm vào skipped', () => {
     const { vault, saved } = fakeVault({ hostnames: ['203.0.113.10'] })
-    const result = importDroplets(vault, [droplet({}), droplet({ id: 101, name: 'web-02', publicIp: '203.0.113.11' })], {})
+    const result = importDroplets(vault, [droplet({}), droplet({ id: '101', name: 'web-02', publicIp: '203.0.113.11' })], {})
     expect(result).toMatchObject({ imported: 1, skipped: 1 })
     expect(saved.map((h) => h.hostname)).toEqual(['203.0.113.11'])
   })
@@ -193,7 +193,7 @@ describe('importDroplets', () => {
     const { vault } = fakeVault()
     const result = importDroplets(
       vault,
-      [droplet({}), droplet({ id: 101, name: 'web-01-clone', publicIp: '203.0.113.10' })],
+      [droplet({}), droplet({ id: '101', name: 'web-01-clone', publicIp: '203.0.113.10' })],
       {}
     )
     expect(result).toMatchObject({ imported: 1, skipped: 1 })
@@ -205,7 +205,7 @@ describe('importDroplets', () => {
       vault,
       [
         droplet({ publicIp: null, privateIp: '10.20.30.11' }),
-        droplet({ id: 101, name: 'ghost-01', publicIp: null, privateIp: null })
+        droplet({ id: '101', name: 'ghost-01', publicIp: null, privateIp: null })
       ],
       {}
     )

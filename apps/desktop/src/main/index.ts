@@ -7,6 +7,7 @@ import { registerBulkIpc } from './ipc/bulk'
 import { registerDataIpc } from './ipc/data'
 import { registerImportIpc } from './ipc/import'
 import { registerDigitalOceanIpc } from './ipc/digitalocean'
+import { registerCloudImportIpc } from './ipc/cloudImport'
 import { registerExportIpc } from './ipc/export'
 import { flushSecretClipboard, registerRevealIpc } from './ipc/reveal'
 import { registerCopyIdIpc } from './ipc/copyId'
@@ -257,6 +258,7 @@ registerVaultIpc()
 registerDataIpc()
 registerImportIpc()
 registerDigitalOceanIpc()
+registerCloudImportIpc()
 registerExportIpc()
 registerRevealIpc()
 registerCopyIdIpc()

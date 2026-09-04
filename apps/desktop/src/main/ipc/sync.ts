@@ -14,8 +14,16 @@ import {
   type SyncChannel,
   type SyncConfig
 } from '@infra/core'
-import { IPC, type SyncChannelStatusDto, type SyncRunResult, type SyncStatusDto } from '@infra/shared'
+import {
+  IPC,
+  type S3ConfigInput,
+  type SyncChannelStatusDto,
+  type SyncRunResult,
+  type SyncStatusDto,
+  type WebdavConfigInput
+} from '@infra/shared'
 import { DriveBackend, gdriveLogin, gdriveLogout, gdriveStatus } from '../lib/googleDrive'
+import { S3Backend, WebdavBackend } from '../lib/syncBackends'
 import { getVault, touchActivity } from './vault'
 
 /** Các mốc auto-sync cho phép (phút). 0 = tắt. Chặn giá trị lạ từ renderer. */
@@ -66,8 +74,22 @@ function channelStatus(channel: SyncChannel): SyncChannelStatusDto {
     backend: channel.backend,
     folder: channel.backend === 'folder' ? channel.folderPath : undefined,
     gdriveEmail: channel.backend === 'gdrive' ? getVault().getGdriveEmail() : undefined,
+    detail:
+      channel.backend === 'webdav'
+        ? channel.webdavUrl
+        : channel.backend === 's3'
+          ? `${channel.s3Bucket}${channel.s3Prefix ? `/${channel.s3Prefix}` : ''} @ ${safeHost(channel.s3Endpoint)}`
+          : undefined,
     lastSyncAt: state?.at,
     lastMessage: state?.message
+  }
+}
+
+function safeHost(endpoint: string | undefined): string {
+  try {
+    return new URL(endpoint ?? '').host
+  } catch {
+    return endpoint ?? ''
   }
 }
 
@@ -89,7 +111,10 @@ function broadcastPulled(pulled: number): void {
 
 /** Nhãn ngắn của kênh cho thông điệp gộp khi chạy nhiều kênh một lượt. */
 function channelLabel(channel: SyncChannel): string {
-  return channel.backend === 'gdrive' ? 'Google Drive' : channel.folderPath || 'Thư mục'
+  if (channel.backend === 'gdrive') return 'Google Drive'
+  if (channel.backend === 'webdav') return `WebDAV ${channel.webdavUrl ?? ''}`.trim()
+  if (channel.backend === 's3') return `S3 ${channel.s3Bucket ?? ''}`.trim()
+  return channel.folderPath || 'Thư mục'
 }
 
 /**
@@ -104,6 +129,23 @@ function makeBackend(channel: SyncChannel): SyncBackend {
       initialFileId: channel.gdriveFileId,
       email: getVault().getGdriveEmail(),
       onFileId: (id) => updateChannel(channel.id, (c) => (c.gdriveFileId === id ? c : { ...c, gdriveFileId: id }))
+    })
+  }
+  if (channel.backend === 'webdav') {
+    return new WebdavBackend({
+      url: channel.webdavUrl ?? '',
+      username: channel.webdavUsername ?? '',
+      getPassword: () => getVault().getSyncChannelSecret(channel.id)
+    })
+  }
+  if (channel.backend === 's3') {
+    return new S3Backend({
+      endpoint: channel.s3Endpoint ?? '',
+      region: channel.s3Region ?? '',
+      bucket: channel.s3Bucket ?? '',
+      prefix: channel.s3Prefix ?? '',
+      accessKeyId: channel.s3AccessKeyId ?? '',
+      getSecret: () => getVault().getSyncChannelSecret(channel.id)
     })
   }
   return createBackend(channel.backend, channel.folderPath)
@@ -335,6 +377,8 @@ export function registerSyncIpc(): void {
       for (const channel of doomed) {
         dropSyncKey(channel.id)
         channelState.delete(channel.id)
+        // Kênh WebDAV/S3 còn bí mật mã hoá trong vault — xoá kèm, đừng để bí mật mồ côi
+        getVault().deleteSyncChannelSecret(channel.id)
       }
       const channels = channelId ? config.channels.filter((c) => c.id !== channelId) : []
       if (channels.length > 0) vault.setSyncConfig({ ...config, channels })
@@ -419,6 +463,115 @@ export function registerSyncIpc(): void {
       return result
     }
   )
+
+  // -------------------------------------------------------------------------
+  // WebDAV + S3 — hai kênh remote thêm từ v0.2.16. Cùng khuôn với gdrive: passphrase ≥12
+  // (blob nằm ngoài máy), verify credentials + passphrase TRƯỚC khi lưu kênh, bí mật
+  // (mật khẩu/secret key) mã hoá DEK theo kênh, chỉ lưu sau khi kiểm chứng thành công.
+  // -------------------------------------------------------------------------
+
+  ipcMain.handle(
+    IPC.SYNC_CONFIGURE_WEBDAV,
+    async (_e, input: WebdavConfigInput, force = false): Promise<SyncRunResult> => {
+      touchActivity()
+      if (input.passphrase.length < 12) {
+        return { ok: false, pulled: 0, message: 'Blob sẽ nằm trên server WebDAV — passphrase cần ít nhất 12 ký tự' }
+      }
+      if (getVault().state() !== 'unlocked') {
+        return { ok: false, pulled: 0, message: 'Vault đang khoá — mở khoá trước đã' }
+      }
+      const url = input.url.trim().replace(/\/+$/, '')
+      if (!/^https?:\/\//.test(url)) {
+        return { ok: false, pulled: 0, message: 'URL WebDAV phải bắt đầu bằng http:// hoặc https://' }
+      }
+
+      const backend = new WebdavBackend({ url, username: input.username, getPassword: () => input.password })
+      let existingSalt: string | null
+      try {
+        existingSalt = await SyncService.readRemoteSalt(backend)
+      } catch (error) {
+        // Sai URL/user/mật khẩu lộ ngay ở đây — chưa lưu gì cả, cứ báo thẳng
+        return { ok: false, pulled: 0, message: error instanceof Error ? error.message : String(error) }
+      }
+      const saltB64 = existingSalt ?? newSyncSalt()
+      const syncKey = deriveSyncKey(input.passphrase, saltB64)
+      const verdict = await service.verify(backend, syncKey)
+      if (verdict === 'wrong-pass') {
+        return { ok: false, pulled: 0, message: 'Sai sync passphrase — không khớp blob đã có trên server này' }
+      }
+
+      const channel = upsertChannel({
+        backend: 'webdav',
+        folderPath: '',
+        saltB64,
+        webdavUrl: url,
+        webdavUsername: input.username,
+        seenRemoteAt: verdict === 'ok' ? Date.now() : undefined
+      })
+      getVault().setSyncChannelSecret(channel.id, input.password)
+      rememberSyncKey(channel.id, syncKey)
+
+      const result = await runSync(service, { channelId: channel.id, force })
+      applyAutoTimer(service)
+      return result
+    }
+  )
+
+  ipcMain.handle(IPC.SYNC_CONFIGURE_S3, async (_e, input: S3ConfigInput, force = false): Promise<SyncRunResult> => {
+    touchActivity()
+    if (input.passphrase.length < 12) {
+      return { ok: false, pulled: 0, message: 'Blob sẽ nằm trên S3 — passphrase cần ít nhất 12 ký tự' }
+    }
+    if (getVault().state() !== 'unlocked') {
+      return { ok: false, pulled: 0, message: 'Vault đang khoá — mở khoá trước đã' }
+    }
+    const endpoint = input.endpoint.trim().replace(/\/+$/, '')
+    if (!/^https?:\/\//.test(endpoint)) {
+      return { ok: false, pulled: 0, message: 'Endpoint S3 phải bắt đầu bằng http:// hoặc https://' }
+    }
+    if (!input.bucket.trim() || !input.region.trim() || !input.accessKeyId.trim() || !input.secretAccessKey) {
+      return { ok: false, pulled: 0, message: 'Điền đủ region, bucket, access key và secret key' }
+    }
+
+    const backend = new S3Backend({
+      endpoint,
+      region: input.region.trim(),
+      bucket: input.bucket.trim(),
+      prefix: input.prefix.trim(),
+      accessKeyId: input.accessKeyId.trim(),
+      getSecret: () => input.secretAccessKey
+    })
+    let existingSalt: string | null
+    try {
+      existingSalt = await SyncService.readRemoteSalt(backend)
+    } catch (error) {
+      return { ok: false, pulled: 0, message: error instanceof Error ? error.message : String(error) }
+    }
+    const saltB64 = existingSalt ?? newSyncSalt()
+    const syncKey = deriveSyncKey(input.passphrase, saltB64)
+    const verdict = await service.verify(backend, syncKey)
+    if (verdict === 'wrong-pass') {
+      return { ok: false, pulled: 0, message: 'Sai sync passphrase — không khớp blob đã có trên bucket này' }
+    }
+
+    const channel = upsertChannel({
+      backend: 's3',
+      folderPath: '',
+      saltB64,
+      s3Endpoint: endpoint,
+      s3Region: input.region.trim(),
+      s3Bucket: input.bucket.trim(),
+      s3Prefix: input.prefix.trim(),
+      s3AccessKeyId: input.accessKeyId.trim(),
+      seenRemoteAt: verdict === 'ok' ? Date.now() : undefined
+    })
+    getVault().setSyncChannelSecret(channel.id, input.secretAccessKey)
+    rememberSyncKey(channel.id, syncKey)
+
+    const result = await runSync(service, { channelId: channel.id, force })
+    applyAutoTimer(service)
+    return result
+  })
 
   // -------------------------------------------------------------------------
   // Xuất / nhập blob dạng FILE — không cần bật sync, không cần Drive for Desktop.

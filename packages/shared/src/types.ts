@@ -794,6 +794,8 @@ export interface SyncChannelStatusDto {
   folder?: string
   /** backend 'gdrive': email tài khoản đang kết nối (chỉ để hiển thị). */
   gdriveEmail?: string | null
+  /** backend 'webdav'/'s3': mô tả đích (URL / bucket@host) — chỉ để hiển thị. */
+  detail?: string
   lastSyncAt?: number
   lastMessage?: string
 }
@@ -959,22 +961,73 @@ export interface SshConfigImportResult {
   warnings: string[]
 }
 
-/** F05 — một droplet DigitalOcean sau khi parse trang API (ứng viên, chưa phải host). */
-export interface DoDropletDto {
-  id: number
+/**
+ * F05 — một máy ảo trên cloud (droplet/EC2 instance/GCE instance/Azure VM) sau khi parse,
+ * đã quy về MỘT hình dạng chung: mọi provider đi qua cùng danh sách xem trước + cùng đường
+ * import (`importDroplets`), thêm provider mới chỉ là thêm một parser.
+ */
+export interface CloudInstanceDto {
+  /** Id bên provider — chuỗi (DO là số → String hoá; AWS `i-…`, GCP id số dạng chuỗi, Azure vmId). */
+  id: string
   name: string
-  /** IPv4 public đầu tiên — null nếu droplet không có (chỉ nằm trong VPC). */
+  /** IPv4 public đầu tiên — null nếu máy không có (chỉ nằm trong VPC/VNet). */
   publicIp: string | null
-  /** IPv4 private (VPC) đầu tiên. Import dùng public trước, không có mới rơi về private. */
+  /** IPv4 private đầu tiên. Import dùng public trước, không có mới rơi về private. */
   privateIp: string | null
   region: string
-  /** 'active' | 'off' | 'new' | … — hiển thị thôi, máy off vẫn import được. */
+  /** 'active'/'running' | 'off'/'stopped' | '' (không biết) — hiển thị thôi, máy off vẫn import được. */
   status: string
   tags: string[]
   image: string
   sizeSlug: string
   /** Vault đã có host trùng địa chỉ (main điền sau khi liệt kê) — UI khoá chọn để khỏi nhân đôi. */
   exists: boolean
+}
+
+/** Tên cũ thời chỉ có DigitalOcean — giữ làm alias cho code sẵn có. */
+export type DoDropletDto = CloudInstanceDto
+
+/** F05 — provider của cloud import (DigitalOcean đi bộ IPC riêng có sẵn). */
+export type CloudProvider = 'aws' | 'gcp' | 'azure'
+
+/** Tài khoản cloud đã lưu — config là phần KHÔNG bí mật (region, subscription id…). */
+export interface CloudAccountDto {
+  id: string
+  label: string
+  provider: string
+  config: Record<string, string>
+}
+
+/** secretJson: undefined = giữ credentials cũ (đổi tên/label), chuỗi JSON = đặt mới. */
+export interface CloudAccountInput {
+  id?: string
+  label: string
+  provider: CloudProvider
+  config: Record<string, string>
+  secretJson?: string
+}
+
+export type CloudListResult =
+  | { ok: true; instances: CloudInstanceDto[]; warnings: string[] }
+  | { ok: false; error: 'noAccount' | 'badCreds' | 'auth' | 'http' | 'timeout' | 'network' | 'badResponse'; detail?: string }
+
+/** Bật kênh sync WebDAV — mật khẩu mã hoá DEK theo kênh, không vào SyncChannel JSON. */
+export interface WebdavConfigInput {
+  url: string
+  username: string
+  password: string
+  passphrase: string
+}
+
+/** Bật kênh sync S3 (AWS/MinIO/R2/B2… — mọi endpoint nhận SigV4). */
+export interface S3ConfigInput {
+  endpoint: string
+  region: string
+  bucket: string
+  prefix: string
+  accessKeyId: string
+  secretAccessKey: string
+  passphrase: string
 }
 
 /** Một tài khoản DigitalOcean đã lưu — chỉ có nhãn, token thật không bao giờ vào DTO. */
@@ -1017,6 +1070,8 @@ export interface DoImportOptions {
   username?: string | null
   /** Gắn key có sẵn trong vault cho các host tạo mới → authType 'key'. */
   keyId?: string | null
+  /** Nhãn nguồn ghi vào notes của host (vd 'AWS EC2', 'GCP', 'Azure') — mặc định DigitalOcean. */
+  source?: string
 }
 
 export interface DoImportResult {
@@ -1860,8 +1915,14 @@ export interface InfraApi {
     doDeleteAccount(id: string): Promise<void>
     /** Liệt kê droplet qua API — theo tài khoản đã lưu hoặc token vừa nhập. */
     doListDroplets(request: DoListRequest): Promise<DoListResult>
-    /** Tạo host từ các droplet đã chọn — dedupe theo địa chỉ, không tạo bản trùng. */
+    /** Tạo host từ các máy đã chọn (mọi provider dùng chung) — dedupe theo địa chỉ. */
     doImport(droplets: DoDropletDto[], options: DoImportOptions): Promise<DoImportResult>
+    /** F05 AWS/GCP/Azure — danh bạ tài khoản (credentials không bao giờ qua IPC). */
+    cloudAccounts(): Promise<CloudAccountDto[]>
+    cloudSaveAccount(input: CloudAccountInput): Promise<CloudAccountDto>
+    cloudDeleteAccount(id: string): Promise<void>
+    /** Liệt kê máy ảo của một tài khoản đã lưu — chỉ gọi API đọc. */
+    cloudListInstances(accountId: string): Promise<CloudListResult>
   }
   exporter: {
     /**
@@ -2164,6 +2225,10 @@ export interface InfraApi {
     gdriveLogout(): Promise<GdriveStatusDto>
     /** Bật sync qua Google Drive (đã đăng nhập trước đó). Passphrase tối thiểu 12 ký tự. */
     configureGdrive(passphrase: string, force?: boolean): Promise<SyncRunResult>
+    /** Bật kênh WebDAV (Nextcloud/Seafile/Nginx dav…). Passphrase tối thiểu 12 ký tự. */
+    configureWebdav(input: WebdavConfigInput, force?: boolean): Promise<SyncRunResult>
+    /** Bật kênh S3 (AWS/MinIO/R2/B2…). Passphrase tối thiểu 12 ký tự. */
+    configureS3(input: S3ConfigInput, force?: boolean): Promise<SyncRunResult>
     /** Bật/tắt tự đồng bộ. 0 = tắt. */
     setAuto(minutes: number): Promise<SyncStatusDto>
     /** Ghi blob mã hoá ra file do user chọn (không cần đã bật sync). */

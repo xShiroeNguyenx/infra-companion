@@ -177,6 +177,14 @@ export const IPC = {
   SYNC_GDRIVE_LOGIN: 'sync:gdrive-login',
   SYNC_GDRIVE_LOGOUT: 'sync:gdrive-logout',
   SYNC_CONFIGURE_GDRIVE: 'sync:configure-gdrive',
+  SYNC_CONFIGURE_WEBDAV: 'sync:configure-webdav',
+  SYNC_CONFIGURE_S3: 'sync:configure-s3',
+
+  // F05 — cloud import AWS/GCP/Azure (DigitalOcean có bộ kênh IMPORT_DO_* riêng từ trước)
+  CLOUD_ACCOUNTS: 'cloud:accounts',
+  CLOUD_SAVE_ACCOUNT: 'cloud:save-account',
+  CLOUD_DELETE_ACCOUNT: 'cloud:delete-account',
+  CLOUD_LIST_INSTANCES: 'cloud:list-instances',
   /** P30 — xuất hosts ra ssh_config/CSV/JSON (bản xuất KHÔNG chứa bí mật). */
   EXPORT_HOSTS: 'export:hosts',
   /**
