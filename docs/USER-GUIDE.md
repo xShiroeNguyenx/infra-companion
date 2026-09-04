@@ -60,7 +60,8 @@ You can look at a password you stored. Edit the host → **👁 Show saved passw
 **What it is**: after unlocking, the app lands on a **Dashboard** — the home screen that lives *behind* your tabs. The **🏠 button** at the left of the tab bar returns to it anytime (it lights up while you're home); clicking any tab goes back to that tab, and closing the last tab drops you home instead of an empty screen.
 
 **What's on it**:
-- **Tools** — every tool from the `⋯` menu as **two rows of icons across the top**, spread over the full width, one click each. Hover an icon to see its name; the **📡 uptime watcher** tile stays highlighted while it's running, because that one is a toggle rather than a panel. The `⋯` menu still has the same entries — it's the way in while you're on a terminal tab and the Dashboard isn't showing.
+- **Tools** — **exactly two rows of icons across the top**, spread over the full width, one click each; the last tile is always **⊞ All**, which opens the *All features* tab (full list, descriptions, search). The grid cuts off rather than growing a third row — with the tool list only getting longer, either every tile shrinks or the grid slowly eats the Dashboard, and the full catalogue already lives one click away. Hover an icon to see its name; the **📡 uptime watcher** tile stays highlighted while it's running, because that one is a toggle rather than a panel. The `⋯` menu still has the same entries — it's the way in while you're on a terminal tab and the Dashboard isn't showing.
+- **Host groups sit directly under the tools** — the click-to-work area comes before the read-only stat tiles.
 - **Quick connect** — in the **header row next to *+ New terminal***: type `user@host[:port]` and press Enter. A confirmation drops down under the box once what you typed looks like a target.
 - **Stats** — hosts, groups, connections today / last 7 days (derived from Quick-Connect history)
 - **★ Favorites** — one click opens an SSH tab
@@ -68,9 +69,9 @@ You can look at a password you stored. Edit the host → **👁 Show saved passw
 - **Anything long-running belongs in a tab.** A dialog blocks the whole app while it's open, so the tools that take time — *Watch a log*, *Scheduled jobs*, *Rotate SSH keys*, *What is filling the disk*, *What needs patching*, *Trusted fingerprints*, alongside Monitoring, Tunnels, Processes and Services — carry a **⊞** button in their header that moves them into a tab. Moving restarts the tool, so a log you intend to watch for a while is best opened as a tab from the start.
 - **A "Needs attention" strip** at the very top — hosts that aren't responding, tunnels that failed, and replicas with a critical diagnosis. It shows up **only when there is something wrong**; a panel that is always there is a panel you stop reading. A host with no check result yet is not counted as down, and while the watcher is off the strip stays quiet entirely, because silence there means "no data", not "all clear".
 - **Host group cards** — three separate things to click, so the group isn't all-or-nothing:
-  - **the group name** (or the `⊞ N` chip) opens the **full host list** for that group — every host with its `user@host:port` and status, connect over SSH or SFTP one at a time, and *open all N panes* at the bottom. This is where you go when the group has more machines than fit on the card.
+  - **the `⊞ N` chip** (top right) opens the whole group as split panes in one tab, ready to broadcast — the group's main one-click action, in the corner where a button belongs.
   - **each host chip** connects to **just that host**. Every chip carries its own status dot, so you can see *which* machine is down, not merely that one is.
-  - **the footer** opens the whole group as split panes in one tab, ready to broadcast — the original one-click behaviour, unchanged.
+  - **the group name and the *View all hosts* footer** open the **full host list** — and it opens **in place**, right where the cards were, with a **← Back** button, instead of a popup that covers the Dashboard. Every host with its `user@host:port` and status, connect over SSH or SFTP one at a time, *open all N panes* stays available in the header. The list stays put while you open several machines in a row.
 
   The card still reads clearly as a group rather than a single host: a **full-height band in the group's colour**, the `⊞ N` count, and the group's default SSH user when it has one. Groups larger than six hosts show `+N`, which opens the same full list.
   - Dot colours: green = up, red = not answering, **grey = not checked yet**. The dots and the `x/y up` ratio come from the 📡 uptime watcher, so a group it hasn't reached yet stays grey with no ratio instead of looking like everything is down.
@@ -617,13 +618,13 @@ Pick your `~/.ssh/config` → it creates hosts, **preserves multi-hop ProxyJump*
 
 ### 15I. Import from DigitalOcean — *All features* → Import from DigitalOcean
 
-Paste an API token (control panel → API → Tokens — **read scope is enough**, and the app only ever calls one read endpoint; there is no code path that creates, changes or deletes anything on DigitalOcean), press **Fetch droplet list**, tick what you want, **Create N hosts**.
+Pick an account (or paste a new API token — control panel → API → Tokens, **read scope is enough**, and the app only ever calls one read endpoint; there is no code path that creates, changes or deletes anything on DigitalOcean), press **Fetch droplet list**, tick what you want, **Create N hosts**.
 
 Each droplet becomes a host at its **public IP**, falling back to the private IP for machines that only live inside a VPC (those are marked — you'll need a VPN or jump host to actually reach them). Where the host came from — droplet id, region, image, tags — is written into its **notes**, so six months later the host still says what it is.
 
 - **Re-importing is safe.** A droplet whose address already has a host in the vault is shown as *already here* and locked out of selection; the same guard applies within a single run. Add three droplets next month, run the import again, get three new hosts — not a second copy of the fleet.
 - **The group is reused.** Imported hosts go into a group you pick, or into *DigitalOcean* by default — and that default is found again on the next run, not created twice. Leave the SSH user (droplets default to `root`) or the key empty to inherit them from the group, which is the practical way to set auth once for the whole batch.
-- **The token is stored encrypted in the vault** (same treatment as the AI API key), never enters the UI process, and is only saved after a fetch has actually succeeded — a mistyped token can't overwrite a working one. *Delete token* forgets it.
+- **Multiple accounts.** Each token is saved under a name you choose (*Company A*, *personal*); pick the account, fetch, import — then switch to the next account for its fleet. Tokens are stored **encrypted in the vault** (same treatment as the AI API key), never enter the UI process, and a new one is only saved after a fetch with it has actually succeeded — a mistyped token can't become a saved account. *Delete this account* forgets its token with it.
 
 ### 15F. Watch a log — `⋯` → Watch a log
 

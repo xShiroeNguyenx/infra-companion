@@ -104,8 +104,29 @@ export function HelpModal({
   const [tab, setTab] = useState<HelpTab>(initialTab)
   const [checking, setChecking] = useState(false)
   const [checkResult, setCheckResult] = useState<UpdateCheckResultDto | null>(null)
+  /**
+   * Tiến trình tải bản cập nhật NGAY TRONG hộp thoại này: bấm "Tải về" xong mà nút cứ đứng im
+   * (tiến trình chỉ hiện ở banner đầu cửa sổ) thì trông như không có gì xảy ra — và khi tải
+   * xong, nút "Cài & khởi động lại" phải hiện đúng chỗ nút tải vừa đứng, khỏi đi tìm banner.
+   */
+  const [dl, setDl] = useState<{ phase: 'idle' | 'downloading' | 'ready'; percent: number }>({
+    phase: 'idle',
+    percent: 0
+  })
   const [copied, setCopied] = useState(false)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    // Nghe cả khi lệnh tải phát từ nơi khác (banner) — trạng thái ở đây vẫn phải khớp
+    const offProgress = window.infra.update.onProgress((percent) =>
+      setDl((s) => (s.phase === 'ready' ? s : { phase: 'downloading', percent }))
+    )
+    const offDownloaded = window.infra.update.onDownloaded(() => setDl({ phase: 'ready', percent: 100 }))
+    return () => {
+      offProgress()
+      offDownloaded()
+    }
+  }, [])
 
   // Mở lại bằng Ctrl+/ trong khi cửa sổ đang mở ở thẻ khác → vẫn phải nhảy sang thẻ được yêu cầu
   useEffect(() => setTab(initialTab), [initialTab])
@@ -207,8 +228,28 @@ export function HelpModal({
                 {checking ? t('help.checking') : t('help.checkUpdate')}
               </Button>
               <Button onClick={copyInfo}>{copied ? t('help.copied') : t('help.copyInfo')}</Button>
-              {checkResult?.status === 'available' && (
-                <Button onClick={() => void window.infra.update.download()}>{t('update.download')}</Button>
+              {checkResult?.status === 'available' && dl.phase === 'idle' && (
+                <Button
+                  onClick={() => {
+                    setDl({ phase: 'downloading', percent: 0 })
+                    void window.infra.update.download()
+                  }}
+                >
+                  {t('update.download')}
+                </Button>
+              )}
+              {dl.phase === 'downloading' && (
+                <Button disabled>
+                  {t('update.downloading', {
+                    version: checkResult?.status === 'available' ? checkResult.version : '…'
+                  })}{' '}
+                  {dl.percent}%
+                </Button>
+              )}
+              {dl.phase === 'ready' && (
+                <Button variant="primary" onClick={() => window.infra.update.install()}>
+                  {t('update.restart')}
+                </Button>
               )}
             </div>
             {checkResult && (

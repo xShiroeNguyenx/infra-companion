@@ -5,6 +5,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.14] — 2026-09-04
+
+### Changed
+
+- **DigitalOcean import now holds any number of accounts.** v0.2.13 stored exactly one token, which quietly assumed everyone has exactly one DigitalOcean account — pasting a second token replaced the first. There is now an **account picker**: each token is saved under a name you choose (*Company A*, *personal*), encrypted in the vault as before, and fetching reads whichever account is selected — switch the account, fetch again, import the other fleet. The token you had already saved appears as an account named *DigitalOcean*, migrated silently on first read, nothing to redo. A new token is still only saved after a fetch with it has actually succeeded, so a mistyped token can't become a saved account — and deleting an account deletes its token with it.
+- **The Dashboard puts host groups right under the tools.** The group cards — the part of the page you actually click to start working — sat below the stat tiles and the favorites, which are things you read, not things you use. And the tool grid is now **exactly two rows**, ending in an **⊞ All** tile that opens the *All features* tab: the tool list only ever grows, and the choice was between every tile getting narrower, the grid slowly eating the page, or a cut-off with the full catalogue one click away.
+- **The group card's two group-wide actions swapped places.** The `⊞ N` chip in the corner now does the group's main job — open all N hosts as panes in one tab — and the footer line reads **View all hosts**. The full list then opens **in place of the cards** with a **← Back** button, not as a popup: a popup covered the whole Dashboard just to answer "what's in this group", and closing it threw away where you were. The inline list stays put while you open several machines in a row. The **SFTP** button on each row now visibly reacts on hover — it used to take the exact same hover colour as the row underneath it, so pointing at it changed nothing on screen and it read as a label, even though clicking it (SFTP) and clicking the row (SSH) do different things.
+- **Downloading an update now shows up where you started it.** In *Help → Check for updates*, the download button turned into nothing — progress only appeared in the banner at the top of the window, and the install step lived there too. The button itself now shows the download percentage and becomes **Restart & install** the moment the download completes.
+- **The collapsed sidebar keeps a ⚙ Settings button at the bottom.** Collapsing the sidebar removed every entry point that lived in its footer; Settings is the one you notice missing.
+
+---
+
 ## [0.2.13] — 2026-09-04
 
 ### Added

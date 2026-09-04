@@ -2,10 +2,13 @@ import { ipcMain, net } from 'electron'
 import { importDroplets, parseDropletsPage } from '@infra/core'
 import {
   IPC,
+  type DoAccountDto,
+  type DoAccountInput,
   type DoConfigDto,
   type DoDropletDto,
   type DoImportOptions,
   type DoImportResult,
+  type DoListRequest,
   type DoListResult
 } from '@infra/shared'
 import { getVault, touchActivity } from './vault'
@@ -17,9 +20,9 @@ import { getVault, touchActivity } from './vault'
  * `@infra/core` (test không cần mạng). Lỗi trả về dạng MÃ (`unauthorized`/`timeout`/…)
  * chứ không phải câu chữ — renderer dịch lúc render, đổi ngôn ngữ là thông báo đổi theo.
  *
- * Token: lưu MÃ HOÁ DEK trong meta của vault (pattern ai_api_key), không bao giờ qua IPC
- * sang renderer — renderer chỉ biết `hasToken`. Chỉ ĐỌC từ API (GET /v2/droplets), không
- * có đường nào tạo/xoá/sửa gì trên DigitalOcean.
+ * Token: NHIỀU tài khoản, mỗi token mã hoá DEK trong meta của vault (pattern ai_api_key),
+ * không bao giờ qua IPC sang renderer — renderer chỉ thấy danh bạ {id, label}. Chỉ ĐỌC từ
+ * API (GET /v2/droplets), không có đường nào tạo/xoá/sửa gì trên DigitalOcean.
  */
 
 const API_URL = 'https://api.digitalocean.com/v2/droplets'
@@ -47,18 +50,24 @@ async function fetchPage(token: string, page: number): Promise<{ status: number;
 export function registerDigitalOceanIpc(): void {
   ipcMain.handle(IPC.IMPORT_DO_CONFIG, (): DoConfigDto => {
     touchActivity()
-    return { hasToken: getVault().hasDoToken() }
+    return { accounts: getVault().listDoAccounts() }
   })
 
-  ipcMain.handle(IPC.IMPORT_DO_SET_TOKEN, (_e, token: string): void => {
+  ipcMain.handle(IPC.IMPORT_DO_SAVE_ACCOUNT, (_e, input: DoAccountInput): DoAccountDto => {
     touchActivity()
-    getVault().setDoToken(token)
+    return getVault().saveDoAccount(input)
   })
 
-  ipcMain.handle(IPC.IMPORT_DO_LIST, async (_e, tokenOverride?: string): Promise<DoListResult> => {
+  ipcMain.handle(IPC.IMPORT_DO_DELETE_ACCOUNT, (_e, id: string): void => {
+    touchActivity()
+    getVault().deleteDoAccount(id)
+  })
+
+  ipcMain.handle(IPC.IMPORT_DO_LIST, async (_e, request: DoListRequest): Promise<DoListResult> => {
     touchActivity()
     const vault = getVault()
-    const token = tokenOverride?.trim() || vault.getDoToken()
+    const token =
+      request.tokenOverride?.trim() || (request.accountId ? vault.getDoToken(request.accountId) : undefined)
     if (!token) return { ok: false, error: 'noToken' }
 
     const droplets: DoDropletDto[] = []

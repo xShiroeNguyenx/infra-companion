@@ -1259,27 +1259,62 @@ export class VaultService {
   }
 
   // -------------------------------------------------------------------------
-  // DigitalOcean import (F05) — token MÃ HOÁ bằng DEK trong meta, như ai_api_key
+  // DigitalOcean import (F05) — NHIỀU tài khoản: danh bạ {id, label} là JSON thường
+  // trong meta ('do_accounts'), token MỖI tài khoản mã hoá DEK ở 'do_token:<id>'
+  // (cùng khuôn ai_api_key). v0.2.13 chỉ lưu được MỘT token ở khoá 'do_token' —
+  // lần đọc đầu tiên chuyển nó thành tài khoản "DigitalOcean" trong danh bạ.
   // -------------------------------------------------------------------------
 
-  hasDoToken(): boolean {
-    return this.readMeta('do_token') !== null
+  listDoAccounts(): Array<{ id: string; label: string }> {
+    this.migrateLegacyDoToken()
+    const raw = this.readMeta('do_accounts')
+    return raw ? (JSON.parse(raw) as Array<{ id: string; label: string }>) : []
+  }
+
+  /** token: undefined/'' = giữ token cũ (đổi tên tài khoản), chuỗi khác rỗng = đặt mới. */
+  saveDoAccount(input: { id?: string; label: string; token?: string }): { id: string; label: string } {
+    const accounts = this.listDoAccounts()
+    const id = input.id ?? randomUUID()
+    const label = input.label.trim() || 'DigitalOcean'
+    const existing = accounts.find((a) => a.id === id)
+    if (existing) existing.label = label
+    else accounts.push({ id, label })
+    this.writeMeta('do_accounts', JSON.stringify(accounts))
+    if (typeof input.token === 'string' && input.token !== '') {
+      this.writeMeta(`do_token:${id}`, encryptField(this.requireDek(), input.token))
+    }
+    return { id, label }
+  }
+
+  deleteDoAccount(id: string): void {
+    const accounts = this.listDoAccounts().filter((a) => a.id !== id)
+    this.writeMeta('do_accounts', JSON.stringify(accounts))
+    this.ensureDb().prepare('DELETE FROM meta WHERE key = ?').run(`do_token:${id}`)
   }
 
   /** Token thật để gọi API — chỉ dùng trong main process, không bao giờ qua IPC. */
-  getDoToken(): string | undefined {
-    const enc = this.readMeta('do_token')
+  getDoToken(accountId: string): string | undefined {
+    this.migrateLegacyDoToken()
+    const enc = this.readMeta(`do_token:${accountId}`)
     if (!enc) return undefined
     return decryptField(this.requireDek(), enc) ?? undefined
   }
 
-  /** token: '' = xoá, chuỗi khác rỗng = đặt mới. */
-  setDoToken(token: string): void {
-    if (token === '') {
-      this.ensureDb().prepare('DELETE FROM meta WHERE key = ?').run('do_token')
-    } else {
-      this.writeMeta('do_token', encryptField(this.requireDek(), token))
-    }
+  /**
+   * v0.2.13 → v0.2.14: token đơn ở 'do_token' thành tài khoản đầu tiên của danh bạ.
+   * Blob mã hoá chuyển NGUYÊN TRẠNG sang khoá mới (không giải mã nên không cần DEK).
+   * Nằm ở meta chứ không phải bảng nên không vào mảng MIGRATIONS của schema.
+   */
+  private migrateLegacyDoToken(): void {
+    const legacy = this.readMeta('do_token')
+    if (legacy === null) return
+    const raw = this.readMeta('do_accounts')
+    const accounts = raw ? (JSON.parse(raw) as Array<{ id: string; label: string }>) : []
+    const id = randomUUID()
+    accounts.push({ id, label: 'DigitalOcean' })
+    this.writeMeta('do_accounts', JSON.stringify(accounts))
+    this.writeMeta(`do_token:${id}`, legacy)
+    this.ensureDb().prepare('DELETE FROM meta WHERE key = ?').run('do_token')
   }
 
   // -------------------------------------------------------------------------

@@ -952,8 +952,28 @@ export interface DoDropletDto {
   exists: boolean
 }
 
+/** Một tài khoản DigitalOcean đã lưu — chỉ có nhãn, token thật không bao giờ vào DTO. */
+export interface DoAccountDto {
+  id: string
+  label: string
+}
+
 export interface DoConfigDto {
-  hasToken: boolean
+  accounts: DoAccountDto[]
+}
+
+/** token: undefined = giữ nguyên token cũ (đổi tên tài khoản), string = đặt mới. */
+export interface DoAccountInput {
+  id?: string
+  label: string
+  token?: string
+}
+
+export interface DoListRequest {
+  /** Dùng token đã lưu của tài khoản này… */
+  accountId?: string
+  /** …hoặc token vừa nhập, chưa lưu (thắng accountId nếu có cả hai). */
+  tokenOverride?: string
 }
 
 /** Lỗi liệt kê droplet trả về dạng MÃ — renderer dịch lúc render (đổi ngôn ngữ là đổi theo). */
@@ -1802,12 +1822,14 @@ export interface InfraApi {
   importer: {
     /** Mở dialog chọn file ssh_config rồi import. null = user huỷ. */
     sshConfig(): Promise<SshConfigImportResult | null>
-    /** F05 — đã lưu token DigitalOcean trong vault chưa (token thật không bao giờ qua IPC). */
+    /** F05 — các tài khoản DigitalOcean đã lưu (chỉ nhãn; token thật không bao giờ qua IPC). */
     doConfig(): Promise<DoConfigDto>
-    /** Lưu token DigitalOcean (mã hoá DEK trong vault). '' = xoá token đã lưu. */
-    doSetToken(token: string): Promise<void>
-    /** Liệt kê droplet qua API. tokenOverride: dùng token vừa nhập thay cho token đã lưu. */
-    doListDroplets(tokenOverride?: string): Promise<DoListResult>
+    /** Thêm/đổi tên tài khoản DigitalOcean; token mã hoá DEK trong vault. */
+    doSaveAccount(input: DoAccountInput): Promise<DoAccountDto>
+    /** Xoá tài khoản kèm token của nó. */
+    doDeleteAccount(id: string): Promise<void>
+    /** Liệt kê droplet qua API — theo tài khoản đã lưu hoặc token vừa nhập. */
+    doListDroplets(request: DoListRequest): Promise<DoListResult>
     /** Tạo host từ các droplet đã chọn — dedupe theo địa chỉ, không tạo bản trùng. */
     doImport(droplets: DoDropletDto[], options: DoImportOptions): Promise<DoImportResult>
   }

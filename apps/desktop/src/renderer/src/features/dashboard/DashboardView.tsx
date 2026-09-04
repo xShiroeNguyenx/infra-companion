@@ -20,7 +20,7 @@ import { useWorkspacesStore } from '../../stores/workspaces'
 import { Button } from '../../components/ui'
 import { MetricChart } from '../../components/MetricsHistoryModal'
 import { ToolGrid } from './ToolGrid'
-import { GroupHostsModal } from './GroupHostsModal'
+import { GroupHostsPanel } from './GroupHostsPanel'
 import { APP_SHORTCUTS, terminalShortcuts } from '../../lib/shortcutList'
 import { useT } from '../../i18n'
 
@@ -81,8 +81,12 @@ export function DashboardView({ active }: { active: boolean }) {
   const setModal = useUiStore((s) => s.setModal)
   const termShortcuts = useSettingsStore((s) => s.shortcuts)
   const [quick, setQuick] = useState('')
-  /** Nhóm đang mở danh sách host đầy đủ (bấm vào TÊN nhóm). null = không mở. */
-  const [groupHosts, setGroupHosts] = useState<GroupDto | null>(null)
+  /**
+   * Nhóm đang xem danh sách host đầy đủ — hiện INLINE thay lưới card (không popup), có nút
+   * quay lại. Lưu id chứ không lưu DTO: nhóm bị xoá/đổi trong lúc xem thì tự rơi về lưới card
+   * thay vì hiện bản đã cũ.
+   */
+  const [viewGroupId, setViewGroupId] = useState<string | null>(null)
 
   const watcherEnabled = useWatcherStore((s) => s.enabled)
   const hostStatuses = useWatcherStore((s) => s.statuses)
@@ -146,6 +150,8 @@ export function DashboardView({ active }: { active: boolean }) {
     [groups, hosts]
   )
 
+  const viewGroup = viewGroupId ? (groups.find((g) => g.id === viewGroupId) ?? null) : null
+
   const isQuick = QUICK_PATTERN.test(quick.trim()) || QUICK_PORT_PATTERN.test(quick.trim())
 
   const connectQuick = (): void => {
@@ -203,18 +209,9 @@ export function DashboardView({ active }: { active: boolean }) {
           </div>
         </div>
 
-        <ToolGrid />
-
-        {/* 4 ô số đếm giãn full chiều rộng cùng nhịp với lưới công cụ ở trên */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <StatTile label={t('dashboard.stats.hosts')} value={hosts.length} />
-          <StatTile label={t('dashboard.stats.groups')} value={groups.length} />
-          <StatTile label={t('dashboard.stats.today')} value={stats.today} />
-          <StatTile label={t('dashboard.stats.week')} value={stats.week} />
-        </div>
-
-        {/* Dải "Cần chú ý" — CHỈ hiện khi thật sự có vấn đề. Luôn hiện một khối kể cả khi
-            trống thì mắt sẽ học cách bỏ qua nó, và lúc có chuyện thật cũng không ai nhìn. */}
+        {/* Dải "Cần chú ý" — CHỈ hiện khi thật sự có vấn đề, và khi đó phải là thứ đầu tiên
+            đập vào mắt nên nằm TRÊN cả lưới công cụ. Luôn hiện một khối kể cả khi trống thì
+            mắt sẽ học cách bỏ qua nó, và lúc có chuyện thật cũng không ai nhìn. */}
         {attention.length > 0 && (
           <section className="border-danger/50 bg-danger/10 rounded-md border px-3 py-2.5">
             <h2 className="text-danger mb-2 text-[10px] font-semibold tracking-wider uppercase">
@@ -234,6 +231,47 @@ export function DashboardView({ active }: { active: boolean }) {
             </div>
           </section>
         )}
+
+        <ToolGrid />
+
+        {/* Nhóm host nằm NGAY DƯỚI lưới công cụ (user yêu cầu): đây là khu bấm-để-làm-việc,
+            còn mấy ô số đếm chỉ là trang trí — không được chen vào giữa. Bấm "xem tất cả host"
+            thì danh sách đầy đủ hiện INLINE ngay tại khu này (không popup), có nút quay lại. */}
+        {groupChips.length > 0 && (
+          <section>
+            <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">
+              {t('dashboard.groups')}
+            </h2>
+            {viewGroup ? (
+              <GroupHostsPanel
+                group={viewGroup}
+                hosts={hosts.filter((h) => h.groupId === viewGroup.id)}
+                onBack={() => setViewGroupId(null)}
+              />
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                {groupChips.map(({ group, hostIds }) => (
+                  <GroupCard
+                    key={group.id}
+                    group={group}
+                    hosts={hosts.filter((h) => h.groupId === group.id)}
+                    onOpenAll={() => void openSshGroup(hostIds)}
+                    onOpenHost={(hostId) => void openSsh(hostId)}
+                    onShowHosts={() => setViewGroupId(group.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* 4 ô số đếm giãn full chiều rộng cùng nhịp với lưới công cụ ở trên */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <StatTile label={t('dashboard.stats.hosts')} value={hosts.length} />
+          <StatTile label={t('dashboard.stats.groups')} value={groups.length} />
+          <StatTile label={t('dashboard.stats.today')} value={stats.today} />
+          <StatTile label={t('dashboard.stats.week')} value={stats.week} />
+        </div>
 
         <section>
           <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">
@@ -262,26 +300,6 @@ export function DashboardView({ active }: { active: boolean }) {
             </div>
           )}
         </section>
-
-        {groupChips.length > 0 && (
-          <section>
-            <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">
-              {t('dashboard.groups')}
-            </h2>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-              {groupChips.map(({ group, hostIds }) => (
-                <GroupCard
-                  key={group.id}
-                  group={group}
-                  hosts={hosts.filter((h) => h.groupId === group.id)}
-                  onOpenAll={() => void openSshGroup(hostIds)}
-                  onOpenHost={(hostId) => void openSsh(hostId)}
-                  onShowHosts={() => setGroupHosts(group)}
-                />
-              ))}
-            </div>
-          </section>
-        )}
 
         <MonitorHistorySection active={active} locale={locale} />
 
@@ -404,14 +422,6 @@ export function DashboardView({ active }: { active: boolean }) {
           <p className="text-subtle mt-1.5 text-[10px]">{t('dashboard.sc.mouseTip')}</p>
         </section>
       </div>
-
-      {groupHosts && (
-        <GroupHostsModal
-          group={groupHosts}
-          hosts={hosts.filter((h) => h.groupId === groupHosts.id)}
-          onClose={() => setGroupHosts(null)}
-        />
-      )}
     </div>
   )
 }
@@ -563,10 +573,12 @@ const GROUP_PREVIEW_HOSTS = 6
 
 /**
  * Card một nhóm host — BA vùng bấm riêng, mỗi vùng một việc:
- *  · tên nhóm  → mở danh sách đầy đủ ({@link GroupHostsModal}), chỗ duy nhất xem được hết
- *    host khi nhóm đông hơn số chip vừa card;
+ *  · tên nhóm + dòng chân "Xem tất cả host" → danh sách đầy đủ hiện INLINE tại khu nhóm
+ *    ({@link GroupHostsPanel}), chỗ duy nhất xem được hết host khi nhóm đông hơn số chip vừa card;
  *  · từng chip host → mở LẺ đúng host đó;
- *  · dòng chân   → mở CẢ nhóm thành các pane trong 1 tab (hành vi cũ, giữ nguyên).
+ *  · chip `⊞ N` góc phải → mở CẢ nhóm thành các pane trong 1 tab.
+ * (User đảo hai vùng cuối sau khi dùng thử: hành động "mở cả nhóm" xứng đáng nút gọn góc trên,
+ * còn "xem danh sách" là dòng chữ đọc được ở chân card.)
  *
  * ⚠️ Vì thế card KHÔNG còn là một `<button>` bọc ngoài như trước: `<button>` lồng `<button>`
  * là HTML không hợp lệ và trình duyệt sẽ tự gỡ lồng, mất luôn nút con.
@@ -618,11 +630,11 @@ function GroupCard({
           {group.name}
         </button>
         {/* Số host thành CHIP: nói ngay "nhiều máy", thay vì lẫn trong dòng chữ nhỏ.
-            Bấm được luôn — "5" thì việc muốn làm tiếp gần như chắc chắn là "cho xem 5 con đó". */}
+            Bấm là MỞ CẢ NHÓM thành các pane trong 1 tab — hành động chính của card. */}
         <button
           type="button"
-          onClick={onShowHosts}
-          title={t('dashboard.groupShowHosts', { name: group.name })}
+          onClick={onOpenAll}
+          title={t('sidebar.openGroup', { n: hosts.length })}
           className="border-edge bg-app text-muted hover:border-accent/60 hover:text-content shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-medium"
         >
           ⊞ {hosts.length}
@@ -672,16 +684,16 @@ function GroupCard({
         )}
       </div>
 
-      {/* Nói thẳng bấm vào thì XẢY RA GÌ — khác hẳn card Yêu thích (mở 1 tab).
-          `mt-auto` NEO XUỐNG ĐÁY: card trong cùng hàng lưới bị kéo cao bằng nhau, không neo
-          thì dòng này lửng lơ giữa card và mỗi card một chỗ. */}
+      {/* Dòng chân = XEM danh sách đầy đủ (inline, có nút quay lại) — hành động "đọc" nằm ở
+          dòng chữ đọc được. `mt-auto` NEO XUỐNG ĐÁY: card trong cùng hàng lưới bị kéo cao
+          bằng nhau, không neo thì dòng này lửng lơ giữa card và mỗi card một chỗ. */}
       <button
         type="button"
-        onClick={onOpenAll}
-        title={t('sidebar.openGroup', { n: hosts.length })}
+        onClick={onShowHosts}
+        title={t('dashboard.groupShowHosts', { name: group.name })}
         className="border-edge/70 text-subtle hover:text-accent mt-auto border-t pt-1.5 text-left text-[10px]"
       >
-        ⊞ {t('dashboard.groupOpenPanes', { n: hosts.length })}
+        ☰ {t('dashboard.groupShowAll')}
       </button>
     </div>
   )

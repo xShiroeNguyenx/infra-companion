@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { DoDropletDto, DoListErrorKind } from '@infra/shared'
+import type { DoAccountDto, DoDropletDto, DoListErrorKind } from '@infra/shared'
 import { Button, Field, Modal, Select, TextInput } from './ui'
 import { useT } from '../i18n'
 import { useDataStore } from '../stores/data'
@@ -7,16 +7,20 @@ import { errorMessage, useToastsStore } from '../stores/toasts'
 
 /** Sentinel cho option "tạo group mới" — cùng khuôn NEW_GROUP của form host. */
 const NEW_GROUP = '__new__'
+/** Sentinel cho option "thêm token mới" trong picker tài khoản. */
+const NEW_TOKEN = '__newtoken__'
 /** Trùng DO_DEFAULT_GROUP_NAME bên @infra/core — renderer không import được core (§5). */
 const DEFAULT_GROUP_NAME = 'DigitalOcean'
 
 /**
  * F05 — import host từ DigitalOcean.
  *
- * Hai bước trong một hộp thoại: (1) token → lấy danh sách droplet, (2) tick chọn → tạo host.
- * Token chỉ được LƯU (mã hoá trong vault) sau khi gọi API thành công — token gõ nhầm không
- * ghi đè token đúng đang lưu. Token thật không bao giờ về renderer, ở đây chỉ có `hasToken`.
- * Droplet đã có host trùng địa chỉ bị khoá chọn — import lại không nhân đôi danh sách host.
+ * Hai bước trong một hộp thoại: (1) chọn tài khoản (hoặc dán token mới) → lấy danh sách
+ * droplet, (2) tick chọn → tạo host. Lưu được NHIỀU tài khoản, mỗi tài khoản một token có
+ * tên gợi nhớ — token mới chỉ được LƯU (mã hoá trong vault) sau khi gọi API thành công,
+ * nên token gõ nhầm không thành tài khoản rác. Token thật không bao giờ về renderer, ở
+ * đây chỉ có danh bạ {id, label}. Droplet đã có host trùng địa chỉ bị khoá chọn —
+ * import lại không nhân đôi danh sách.
  */
 export function DoImportModal({ onClose }: { onClose: () => void }) {
   const t = useT()
@@ -24,7 +28,9 @@ export function DoImportModal({ onClose }: { onClose: () => void }) {
   const keys = useDataStore((s) => s.keys)
   const refreshAll = useDataStore((s) => s.refreshAll)
 
-  const [hasToken, setHasToken] = useState(false)
+  const [accounts, setAccounts] = useState<DoAccountDto[]>([])
+  const [accountChoice, setAccountChoice] = useState(NEW_TOKEN)
+  const [accountLabel, setAccountLabel] = useState('')
   const [token, setToken] = useState('')
   const [remember, setRemember] = useState(true)
   const [fetching, setFetching] = useState(false)
@@ -43,19 +49,35 @@ export function DoImportModal({ onClose }: { onClose: () => void }) {
     // Chạy đúng MỘT lần lúc mở; không đưa hàm nào vào deps (bài học vòng lặp effect v0.2.12)
     void window.infra.importer
       .doConfig()
-      .then((cfg) => setHasToken(cfg.hasToken))
+      .then((cfg) => {
+        setAccounts(cfg.accounts)
+        if (cfg.accounts.length > 0) setAccountChoice(cfg.accounts[0]!.id)
+      })
       .catch(() => {})
   }, [])
 
   const importable = (d: DoDropletDto): boolean => !d.exists && (d.publicIp !== null || d.privateIp !== null)
   const importableIds = useMemo(() => (droplets ?? []).filter(importable).map((d) => d.id), [droplets])
 
+  /** Đổi tài khoản = đổi nguồn dữ liệu — danh sách của tài khoản cũ không được đứng lại gây nhầm. */
+  const pickAccount = (choice: string): void => {
+    setAccountChoice(choice)
+    setDroplets(null)
+    setWarnings([])
+    setSelected(new Set())
+    setListError(null)
+    setDone(null)
+  }
+
   const fetchList = async (): Promise<void> => {
     setFetching(true)
     setListError(null)
     setDone(null)
     try {
-      const result = await window.infra.importer.doListDroplets(token.trim() || undefined)
+      const isNewToken = accountChoice === NEW_TOKEN
+      const result = await window.infra.importer.doListDroplets(
+        isNewToken ? { tokenOverride: token.trim() } : { accountId: accountChoice }
+      )
       if (!result.ok) {
         setListError({ kind: result.error, detail: result.detail })
         return
@@ -66,10 +88,15 @@ export function DoImportModal({ onClose }: { onClose: () => void }) {
       setDroplets(sorted)
       setWarnings(result.warnings)
       setSelected(new Set(sorted.filter(importable).map((d) => d.id)))
-      if (token.trim() && remember) {
-        await window.infra.importer.doSetToken(token.trim())
-        setHasToken(true)
+      if (isNewToken && token.trim() && remember) {
+        const saved = await window.infra.importer.doSaveAccount({
+          label: accountLabel.trim() || DEFAULT_GROUP_NAME,
+          token: token.trim()
+        })
+        setAccounts((list) => [...list, saved])
+        setAccountChoice(saved.id)
         setToken('')
+        setAccountLabel('')
       }
     } catch (error) {
       setListError({ kind: 'network', detail: errorMessage(error) })
@@ -78,10 +105,16 @@ export function DoImportModal({ onClose }: { onClose: () => void }) {
     }
   }
 
-  const deleteToken = async (): Promise<void> => {
+  const deleteAccount = async (): Promise<void> => {
+    const id = accountChoice
+    if (id === NEW_TOKEN) return
     try {
-      await window.infra.importer.doSetToken('')
-      setHasToken(false)
+      await window.infra.importer.doDeleteAccount(id)
+      setAccounts((list) => {
+        const next = list.filter((a) => a.id !== id)
+        pickAccount(next[0]?.id ?? NEW_TOKEN)
+        return next
+      })
     } catch (error) {
       useToastsStore.getState().push(errorMessage(error))
     }
@@ -122,40 +155,70 @@ export function DoImportModal({ onClose }: { onClose: () => void }) {
     }
   }
 
+  const isNewToken = accountChoice === NEW_TOKEN
+
   return (
     <Modal title={t('doImport.title')} onClose={onClose} closeOnBackdrop={false}>
       <div className="w-[620px] max-w-full">
         <p className="text-muted mb-3 text-xs leading-relaxed">{t('doImport.desc')}</p>
 
-        {hasToken ? (
-          <div className="mb-3 flex items-center gap-2 text-xs">
-            <span className="text-success">✓ {t('doImport.tokenSaved')}</span>
-            <button type="button" className="text-subtle hover:text-danger underline" onClick={() => void deleteToken()}>
-              {t('doImport.tokenDelete')}
-            </button>
+        <Field label={t('doImport.accountLabel')}>
+          <div className="flex items-center gap-2">
+            <Select value={accountChoice} onChange={(e) => pickAccount(e.target.value)}>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                </option>
+              ))}
+              <option value={NEW_TOKEN}>{t('doImport.accountNew')}</option>
+            </Select>
+            {!isNewToken && (
+              <button
+                type="button"
+                className="text-subtle hover:text-danger shrink-0 text-xs underline"
+                onClick={() => void deleteAccount()}
+              >
+                {t('doImport.accountDelete')}
+              </button>
+            )}
           </div>
-        ) : (
-          <Field label={t('doImport.tokenLabel')}>
-            <TextInput
-              type="password"
-              value={token}
-              placeholder={t('doImport.tokenPlaceholder')}
-              autoFocus
-              onChange={(e) => setToken(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !fetching) void fetchList()
-              }}
-            />
-            <span className="text-subtle mt-1 block text-[11px] normal-case">{t('doImport.tokenHint')}</span>
-            <span className="mt-1 flex items-center gap-1.5 text-[11px] normal-case">
-              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-              <span className="text-muted">{t('doImport.tokenRemember')}</span>
-            </span>
-          </Field>
+        </Field>
+
+        {isNewToken && (
+          <>
+            <Field label={t('doImport.tokenLabel')}>
+              <TextInput
+                type="password"
+                value={token}
+                placeholder={t('doImport.tokenPlaceholder')}
+                autoFocus
+                onChange={(e) => setToken(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !fetching && token.trim() !== '') void fetchList()
+                }}
+              />
+              <span className="text-subtle mt-1 block text-[11px] normal-case">{t('doImport.tokenHint')}</span>
+            </Field>
+            <Field label={t('doImport.accountName')}>
+              <TextInput
+                value={accountLabel}
+                placeholder={t('doImport.accountNamePh')}
+                onChange={(e) => setAccountLabel(e.target.value)}
+              />
+              <span className="mt-1 flex items-center gap-1.5 text-[11px] normal-case">
+                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+                <span className="text-muted">{t('doImport.tokenRemember')}</span>
+              </span>
+            </Field>
+          </>
         )}
 
         <div className="mb-3">
-          <Button variant="primary" disabled={fetching || (!hasToken && token.trim() === '')} onClick={() => void fetchList()}>
+          <Button
+            variant="primary"
+            disabled={fetching || (isNewToken && token.trim() === '')}
+            onClick={() => void fetchList()}
+          >
             {fetching ? t('doImport.fetching') : t('doImport.fetch')}
           </Button>
         </div>

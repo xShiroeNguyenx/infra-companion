@@ -115,17 +115,20 @@ export function ToolGrid() {
     })
   }
 
-  // Dàn đều hết chiều rộng dashboard (cột `1fr` + `w-full`), nhưng KHÔNG ép cứng 2 hàng nữa:
-  // danh sách công cụ chỉ dài thêm, mà 2 hàng thì mỗi thêm một công cụ là mọi ô hẹp lại. Quá
-  // 24 mục thì xuống 3 hàng — ô giữ được bề ngang đọc được thay vì teo dần theo thời gian.
-  const rows = items.length > 24 ? 3 : 2
-  const cols = Math.ceil(items.length / rows)
+  // ĐÚNG 2 hàng, không hơn: danh sách công cụ chỉ dài thêm theo thời gian, mà lưới cứ cao
+  // dần thì Dashboard thành trang công cụ. Quá chỗ thì CẮT — ô cuối cùng luôn là "Tất cả"
+  // mở tab Tất cả tính năng (danh sách đầy đủ, có mô tả + ô tìm), nên không công cụ nào
+  // biến mất, chỉ là không phải công cụ nào cũng có ô riêng ở đây.
+  const MAX_TILES = 20
+  const shown = items.length >= MAX_TILES ? items.slice(0, MAX_TILES - 1) : items
+  const allFeatures = splitMenuLabel(t('menu.features'))
+  const cols = Math.ceil((shown.length + 1) / 2)
 
   return (
     <section>
       <h2 className="text-subtle mb-2 text-[10px] font-semibold tracking-wider uppercase">{t('dashboard.tools')}</h2>
       <div className="grid w-full gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-        {items.map((it) => (
+        {shown.map((it) => (
           <Tile
             key={it.id}
             icon={it.icon}
@@ -135,6 +138,13 @@ export function ToolGrid() {
             onClick={it.run}
           />
         ))}
+        <Tile
+          key="all-features"
+          icon={allFeatures.icon}
+          label={t('dashboard.toolAll')}
+          title={allFeatures.name}
+          onClick={() => useTabsStore.getState().openToolTab('features')}
+        />
       </div>
     </section>
   )

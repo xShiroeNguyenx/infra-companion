@@ -136,8 +136,9 @@ const api: InfraApi = {
   importer: {
     sshConfig: () => ipcRenderer.invoke(IPC.IMPORT_SSH_CONFIG),
     doConfig: () => ipcRenderer.invoke(IPC.IMPORT_DO_CONFIG),
-    doSetToken: (token) => ipcRenderer.invoke(IPC.IMPORT_DO_SET_TOKEN, token),
-    doListDroplets: (tokenOverride) => ipcRenderer.invoke(IPC.IMPORT_DO_LIST, tokenOverride),
+    doSaveAccount: (input) => ipcRenderer.invoke(IPC.IMPORT_DO_SAVE_ACCOUNT, input),
+    doDeleteAccount: (id) => ipcRenderer.invoke(IPC.IMPORT_DO_DELETE_ACCOUNT, id),
+    doListDroplets: (request) => ipcRenderer.invoke(IPC.IMPORT_DO_LIST, request),
     doImport: (droplets, options) => ipcRenderer.invoke(IPC.IMPORT_DO_RUN, droplets, options)
   },
   exporter: {

@@ -117,6 +117,17 @@ export function Sidebar() {
         >
           »
         </button>
+        <div className="flex-1" />
+        {/* Thu gọn là mất luôn hàng nút đáy sidebar (⋯, ⓘ) — Cài đặt phải còn một đường
+            vào nhìn thấy được, neo ở góc dưới đúng vị trí quen của nó lúc chưa thu gọn. */}
+        <button
+          className="text-muted hover:bg-hover hover:text-content rounded px-1.5 py-1 text-sm leading-none"
+          title={t('settings.title')}
+          aria-label={t('settings.title')}
+          onClick={() => openAppModal('settings')}
+        >
+          ⚙
+        </button>
       </div>
     )
   }

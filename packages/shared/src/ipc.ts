@@ -89,7 +89,8 @@ export const IPC = {
 
   IMPORT_SSH_CONFIG: 'import:ssh-config',
   IMPORT_DO_CONFIG: 'import:do-config',
-  IMPORT_DO_SET_TOKEN: 'import:do-set-token',
+  IMPORT_DO_SAVE_ACCOUNT: 'import:do-save-account',
+  IMPORT_DO_DELETE_ACCOUNT: 'import:do-delete-account',
   IMPORT_DO_LIST: 'import:do-list',
   IMPORT_DO_RUN: 'import:do-run',
 
