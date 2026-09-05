@@ -7,6 +7,7 @@ import {
   applyBackground,
   applyCustomTheme,
   applyLang,
+  applyLayout,
   applyMouseCursor,
   applyTheme,
   initialSettings
@@ -23,6 +24,7 @@ const isDetached = detachedRoute === 'monitor' || detachedRoute === 'tunnels'
 
 // Áp theme + ngôn ngữ + accent + bảng màu + ảnh nền TRƯỚC khi React render để tránh nháy màu (CSP chặn inline script trong index.html)
 applyTheme(initialSettings.theme)
+applyLayout(initialSettings.layout)
 applyLang(initialSettings.language)
 applyAccent(initialSettings.accentColor)
 applyCustomTheme(initialSettings.theme, initialSettings.customColors)

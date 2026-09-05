@@ -8,6 +8,7 @@ import {
   type BgFit,
   type BgPosition,
   type Language,
+  type LayoutTheme,
   type PaneFrame,
   type StartupPage,
   type TermCursor,
@@ -19,6 +20,7 @@ import { SHORTCUT_ACTIONS, eventToCombo, isValidShortcut, type ShortcutAction } 
 import { CustomPaletteSection } from './CustomPaletteSection'
 import { LocaldevSettingsView } from '../features/localdev/LocaldevSettingsView'
 import { LayoutGlyph } from './LayoutGlyph'
+import { LayoutPreview } from './LayoutPreview'
 import { MouseCursorSection } from './MouseCursorSection'
 import { TermFontSection } from './TermFontSection'
 import { Button, Field, TextArea, TextInput } from './ui'
@@ -101,6 +103,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const t = useT()
   const {
     theme,
+    layout,
     language,
     accentColor,
     backgroundImage,
@@ -118,6 +121,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     commandGuardEnabled,
     commandGuardPatterns,
     setTheme,
+    setLayout,
     setLanguage,
     setAccentColor,
     setBackgroundImage,
@@ -222,6 +226,12 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     { value: 'contain', label: t('settings.bgFitContain') }
   ]
 
+  // Theme BỐ CỤC (khác chế độ màu): Infra = giao diện gốc; Navigator = kiểu Termius
+  const layoutOptions: Array<{ value: LayoutTheme; label: string; desc: string }> = [
+    { value: 'infra', label: t('settings.layoutInfra'), desc: t('settings.layoutInfraDesc') },
+    { value: 'navigator', label: t('settings.layoutNavigator'), desc: t('settings.layoutNavigatorDesc') }
+  ]
+
   const themeOptions: Array<{ value: ThemeMode; label: string; swatch: string }> = [
     { value: 'dark', label: t('settings.themeDark'), swatch: '#0b0e14' },
     { value: 'light', label: t('settings.themeLight'), swatch: '#f4f5f7' }
@@ -315,6 +325,35 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
 
             {section === 'appearance' && (
               <>
+                {/* Theme bố cục đứng ĐẦU mục Giao diện: nó đổi cả cách bày màn hình, các thứ dưới
+                    (chế độ màu, accent, bảng màu) chỉ tô lên bố cục đã chọn. */}
+                <Field label={t('settings.layout')}>
+                  <div className="grid grid-cols-2 gap-2">
+                    {layoutOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setLayout(opt.value)}
+                        aria-pressed={layout === opt.value}
+                        className={`flex flex-col gap-2 rounded border p-2.5 text-left ${
+                          layout === opt.value
+                            ? 'border-accent bg-accent-soft/40'
+                            : 'border-edge hover:bg-hover'
+                        }`}
+                      >
+                        <LayoutPreview layout={opt.value} />
+                        <span className="flex items-center gap-1.5 text-sm">
+                          <span className={layout === opt.value ? 'text-content font-medium' : 'text-content'}>
+                            {opt.label}
+                          </span>
+                          {layout === opt.value && <span className="text-accent text-xs">✓</span>}
+                        </span>
+                        <span className="text-subtle text-[11px] leading-relaxed">{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-subtle mt-1 text-[11px] leading-relaxed">{t('settings.layoutHint')}</p>
+                </Field>
+
                 <Field label={t('settings.theme')}>
                   <div className="grid grid-cols-2 gap-2">
                     {themeOptions.map((opt) => (

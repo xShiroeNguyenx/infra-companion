@@ -1498,7 +1498,7 @@ export const vi = {
   // Settings
   'settings.title': 'Cài đặt',
   'settings.appearance': 'Giao diện',
-  'settings.theme': 'Chủ đề',
+  'settings.theme': 'Chế độ màu',
   'settings.themeDark': 'Tối',
   'settings.themeLight': 'Sáng',
   'settings.language': 'Ngôn ngữ',
@@ -1670,7 +1670,37 @@ export const vi = {
   'settings.cmdGuardHint': 'Khi bấm Enter trên lệnh khớp danh sách dưới đây, hiện popup xác nhận. Tự bỏ qua khi đang trong trình soạn thảo/pager (vim, less…).',
   'settings.cmdGuardPatterns': 'Danh sách lệnh cần xác nhận (mỗi dòng một mẫu)',
   'settings.cmdGuardPatternsHint': 'Khớp khi lệnh bắt đầu bằng mẫu (vd: rm -rf). Dùng regex bằng cách bọc trong /…/ (vd: />\\s*/dev/sd/).',
-  'settings.cmdGuardReset': 'Khôi phục mặc định'
+  'settings.cmdGuardReset': 'Khôi phục mặc định',
+
+  // Theme bố cục (Settings → Giao diện) + theme Navigator: cột trái là menu, nội dung ở vùng chính
+  'settings.layout': 'Theme (bố cục)',
+  'settings.layoutInfra': 'Infra mặc định',
+  'settings.layoutInfraDesc': 'Cột trái liệt kê host theo nhóm và sổ ra ngay tại chỗ; Dashboard là trang chủ.',
+  'settings.layoutNavigator': 'Navigator',
+  'settings.layoutNavigatorDesc':
+    'Kiểu Termius: cột trái chỉ là menu — Hosts · Tunnels · Snippets · Keys…; bấm mục nào thì nội dung hiện ở vùng chính, không sổ ra trong cột.',
+  'settings.layoutHint':
+    'Đổi theme không đụng dữ liệu: host, nhóm, tunnel… vẫn y nguyên, chỉ cách bày màn hình khác đi. Lưu trên máy này.',
+  'nav.dashboard': 'Dashboard',
+  'nav.hosts': 'Hosts',
+  'nav.tunnels': 'Tunnels',
+  'nav.snippets': 'Snippets',
+  'nav.keys': 'SSH Keys',
+  'nav.workspaces': 'Workspaces',
+  'nav.history': 'Lịch sử',
+  'nav.tools': 'Công cụ',
+  'hosts.title': 'Hosts',
+  'hosts.groupsHeading': 'Nhóm',
+  'hosts.ungrouped': 'Chưa phân nhóm',
+  'hosts.allHosts': 'Tất cả host',
+  'hosts.newGroup': '+ Nhóm',
+  'hosts.moreActions': 'Nhập / xuất danh bạ',
+  'hosts.noMatch': 'Không có host nào khớp “{q}”',
+  'hosts.emptyHint': 'Thêm host đầu tiên, hoặc nhập từ ~/.ssh/config hay từ cloud.',
+  'hosts.production': 'PRODUCTION',
+  'history.title': 'Lịch sử kết nối',
+  'history.hint': 'Những lần kết nối gần nhất (tối đa 50, mỗi đích giữ lần mới nhất). Bấm một dòng để kết nối lại.',
+  'history.quick': 'Kết nối nhanh — chưa lưu thành host'
 }
 
 export type I18nKey = keyof typeof vi
@@ -3115,7 +3145,7 @@ export const en: Partial<Record<I18nKey, string>> = {
 
   'settings.title': 'Settings',
   'settings.appearance': 'Appearance',
-  'settings.theme': 'Theme',
+  'settings.theme': 'Color mode',
   'settings.themeDark': 'Dark',
   'settings.themeLight': 'Light',
   'settings.language': 'Language',
@@ -3285,7 +3315,36 @@ export const en: Partial<Record<I18nKey, string>> = {
   'settings.cmdGuardHint': 'When you press Enter on a command matching the list below, show a confirmation popup. Automatically skipped inside editors/pagers (vim, less…).',
   'settings.cmdGuardPatterns': 'Commands requiring confirmation (one pattern per line)',
   'settings.cmdGuardPatternsHint': 'Matches when the command starts with the pattern (e.g. rm -rf). Use a regex by wrapping it in /…/ (e.g. />\\s*/dev/sd/).',
-  'settings.cmdGuardReset': 'Restore defaults'
+  'settings.cmdGuardReset': 'Restore defaults',
+
+  'settings.layout': 'Theme (layout)',
+  'settings.layoutInfra': 'Infra default',
+  'settings.layoutInfraDesc': 'The left column lists hosts by group and unfolds them in place; the Dashboard is home.',
+  'settings.layoutNavigator': 'Navigator',
+  'settings.layoutNavigatorDesc':
+    'Termius-style: the left column is a menu — Hosts · Tunnels · Snippets · Keys…; pick an entry and it opens in the main area instead of unfolding in the column.',
+  'settings.layoutHint':
+    'Switching themes touches no data — hosts, groups and tunnels stay exactly as they are; only the screen arrangement changes. Stored on this machine.',
+  'nav.dashboard': 'Dashboard',
+  'nav.hosts': 'Hosts',
+  'nav.tunnels': 'Tunnels',
+  'nav.snippets': 'Snippets',
+  'nav.keys': 'SSH Keys',
+  'nav.workspaces': 'Workspaces',
+  'nav.history': 'History',
+  'nav.tools': 'Tools',
+  'hosts.title': 'Hosts',
+  'hosts.groupsHeading': 'Groups',
+  'hosts.ungrouped': 'Ungrouped',
+  'hosts.allHosts': 'All hosts',
+  'hosts.newGroup': '+ Group',
+  'hosts.moreActions': 'Import / export',
+  'hosts.noMatch': 'No host matches “{q}”',
+  'hosts.emptyHint': 'Add your first host, or import from ~/.ssh/config or a cloud provider.',
+  'hosts.production': 'PRODUCTION',
+  'history.title': 'Connection history',
+  'history.hint': 'Your most recent connections (up to 50, one line per target). Click a row to reconnect.',
+  'history.quick': 'Quick connect — not saved as a host'
 }
 
 export const ja: Partial<Record<I18nKey, string>> = {
@@ -4727,7 +4786,7 @@ export const ja: Partial<Record<I18nKey, string>> = {
 
   'settings.title': '設定',
   'settings.appearance': '外観',
-  'settings.theme': 'テーマ',
+  'settings.theme': '配色モード',
   'settings.themeDark': 'ダーク',
   'settings.themeLight': 'ライト',
   'settings.language': '言語',
@@ -4898,7 +4957,36 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'settings.cmdGuardHint': '下のリストに一致するコマンドで Enter を押すと確認ポップアップを表示します。エディタ／ページャ（vim, less…）内では自動的にスキップします。',
   'settings.cmdGuardPatterns': '確認が必要なコマンド（1行に1パターン）',
   'settings.cmdGuardPatternsHint': 'コマンドがパターンで始まると一致します（例: rm -rf）。/…/ で囲むと正規表現（例: />\\s*/dev/sd/）。',
-  'settings.cmdGuardReset': 'デフォルトに戻す'
+  'settings.cmdGuardReset': 'デフォルトに戻す',
+
+  'settings.layout': 'テーマ（レイアウト）',
+  'settings.layoutInfra': 'Infra 標準',
+  'settings.layoutInfraDesc': '左カラムにホストをグループ別にその場で展開。ダッシュボードがホーム。',
+  'settings.layoutNavigator': 'ナビゲーター',
+  'settings.layoutNavigatorDesc':
+    'Termius 風：左カラムは Hosts・Tunnels・Snippets・Keys… のメニューだけ。選んだ項目はカラム内に展開されず、メイン領域に表示されます。',
+  'settings.layoutHint':
+    'テーマの切替はデータに影響しません — ホスト・グループ・トンネルはそのまま。画面の配置だけが変わります。この端末に保存。',
+  'nav.dashboard': 'ダッシュボード',
+  'nav.hosts': 'ホスト',
+  'nav.tunnels': 'トンネル',
+  'nav.snippets': 'スニペット',
+  'nav.keys': 'SSH キー',
+  'nav.workspaces': 'ワークスペース',
+  'nav.history': '履歴',
+  'nav.tools': 'ツール',
+  'hosts.title': 'ホスト',
+  'hosts.groupsHeading': 'グループ',
+  'hosts.ungrouped': '未分類',
+  'hosts.allHosts': 'すべてのホスト',
+  'hosts.newGroup': '+ グループ',
+  'hosts.moreActions': 'インポート / エクスポート',
+  'hosts.noMatch': '“{q}” に一致するホストはありません',
+  'hosts.emptyHint': '最初のホストを追加するか、~/.ssh/config やクラウドからインポートしてください。',
+  'hosts.production': 'PRODUCTION',
+  'history.title': '接続履歴',
+  'history.hint': '最近の接続（最大 50 件、接続先ごとに最新のみ）。行をクリックすると再接続します。',
+  'history.quick': 'クイック接続 — ホストとして未保存'
 }
 
 export const dictionaries = { vi, en, ja }

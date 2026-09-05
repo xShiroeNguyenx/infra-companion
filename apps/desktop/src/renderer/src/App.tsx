@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
+import { NavRail } from './components/NavRail'
 import { StatusBar } from './components/StatusBar'
 import { TabsBar } from './components/TabsBar'
 import { PromptsHost } from './components/PromptsHost'
@@ -40,7 +41,8 @@ import { UpdateBanner } from './components/UpdateBanner'
 import { SftpView } from './features/sftp/SftpView'
 import { VncView } from './features/vnc/VncView'
 import { RdpDock } from './components/RdpDock'
-import { DashboardView } from './features/dashboard/DashboardView'
+import { HomeView } from './features/navigator/NavigatorHome'
+import { NAV_ITEMS, goToSection } from './features/navigator/nav'
 import { FeaturesTabView } from './components/FeaturesTabView'
 import { translate, useT } from './i18n'
 import { TerminalTabView } from './features/terminal/TerminalTabView'
@@ -103,6 +105,8 @@ export default function App() {
   const bgBlur = useSettingsStore((s) => s.backgroundBlur)
   const bgPosition = useSettingsStore((s) => s.backgroundPosition)
   const bgFit = useSettingsStore((s) => s.backgroundFit)
+  // Theme bố cục: Infra (cột host sổ tại chỗ) hay Navigator (cột trái là menu, nội dung ở vùng chính)
+  const layout = useSettingsStore((s) => s.layout)
   // Command Palette lên store chung để nút toolbar (TerminalTabView) cũng mở được
   const paletteOpen = useUiStore((s) => s.paletteOpen)
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
@@ -314,7 +318,15 @@ export default function App() {
   const locked = vaultState !== 'unlocked'
 
   const paletteCommands: Command[] = [
-    { id: 'open-dashboard', label: t('menu.dashboard'), run: () => useTabsStore.getState().showDashboard() },
+    { id: 'open-dashboard', label: t('menu.dashboard'), run: () => goToSection('dashboard') },
+    // Theme Navigator: mỗi mục trên cột trái cũng gọi được từ palette (Hosts, Tunnels, Keys…)
+    ...(layout === 'navigator'
+      ? NAV_ITEMS.filter((item) => item.id !== 'dashboard').map((item) => ({
+          id: `nav-${item.id}`,
+          label: `${item.icon} ${t(item.titleKey)}`,
+          run: () => goToSection(item.id)
+        }))
+      : []),
     { id: 'open-workspaces', label: t('menu.workspaces'), run: () => setModal('workspaces') },
     { id: 'open-bulk', label: t('menu.bulk'), run: () => setModal('bulk') },
     { id: 'open-monitor', label: t('menu.monitor'), run: () => setModal('monitor') },
@@ -444,15 +456,17 @@ export default function App() {
         />
       )}
       <div className="flex min-h-0 flex-1">
-        <Sidebar />
+        {/* Cột trái theo theme: Infra = danh sách host sổ tại chỗ; Navigator = menu, nội dung ở vùng chính */}
+        {layout === 'navigator' ? <NavRail /> : <Sidebar />}
         <div className="flex min-w-0 flex-1 flex-col">
           <UpdateBanner />
           <TabsBar />
           <div className="relative flex-1 overflow-hidden">
             {/* Tab ẩn được giấu bằng CSS (active=false), KHÔNG unmount — unmount xterm → mất scrollback */}
             <div className="relative h-full">
-              {/* Dashboard = màn hình home nằm dưới các tab: hiện khi không tab nào active (nút 🏠 / đóng hết tab) */}
-              <DashboardView active={activeId === null} />
+              {/* Home = màn hình nằm dưới các tab, hiện khi không tab nào active (nút 🏠 / đóng hết tab):
+                  Dashboard ở theme Infra, hoặc mục đang chọn trên NavRail ở theme Navigator */}
+              <HomeView active={activeId === null} />
               {tabs.map((tab) => {
                 if (tab.kind === 'sftp') return <SftpView key={tab.id} tab={tab} active={tab.id === activeId} />
                 if (tab.kind === 'vnc') return <VncView key={tab.id} tab={tab} active={tab.id === activeId} />

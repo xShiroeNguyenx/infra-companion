@@ -4,6 +4,7 @@ import { useDataStore } from '../stores/data'
 import { useLocaldevStore, stackDot, type LdStackDot } from '../stores/localdev'
 import { useTabsStore, type AppTab, type ToolTabKind } from '../stores/tabs'
 import { tabColor } from '../lib/groupColor'
+import { goToSection } from '../features/navigator/nav'
 import { RunSnippetModal } from './RunSnippetModal'
 import { useT } from '../i18n'
 
@@ -86,7 +87,7 @@ const EDGE_SCROLL_PX = 24
 /** Thanh tab trên cùng: danh sách tab + nút snippet ⚡ + nút mở tab local mới. */
 export function TabsBar() {
   const t = useT()
-  const { tabs, activeId, openLocal, showDashboard, closeTab, setActive, moveTab } = useTabsStore()
+  const { tabs, activeId, openLocal, closeTab, setActive, moveTab } = useTabsStore()
   const snippets = useDataStore((s) => s.snippets)
   // Chấm của tab localdev phản ánh stack thật (chạy/một phần/chết) — lấy từ store dùng chung
   const ldDot = useLocaldevStore(stackDot)
@@ -159,7 +160,9 @@ export function TabsBar() {
             activeId === null ? 'bg-app text-content' : 'text-muted hover:bg-hover hover:text-content'
           }`}
           title={t('tabs.openDashboard')}
-          onClick={showDashboard}
+          // Về Dashboard ở CẢ hai theme: theme Navigator còn phải đổi mục đang chọn về Dashboard,
+          // không thì 🏠 chỉ hiện lại mục đang đứng (Hosts, Tunnels…) và trông như không làm gì
+          onClick={() => goToSection('dashboard')}
         >
           🏠
         </button>

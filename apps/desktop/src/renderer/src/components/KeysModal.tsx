@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useDataStore } from '../stores/data'
 import { useToastsStore } from '../stores/toasts'
-import { Button, ConfirmModal, Field, Modal, TextArea, TextInput } from './ui'
+import { Button, ConfirmModal, Field, ModalOrPanel, TextArea, TextInput } from './ui'
 import { RevealSecretModal } from './RevealSecretModal'
 
-export function KeysModal({ onClose }: { onClose: () => void }) {
+/** Quản lý SSH key — popup, hoặc `embedded` để nhúng vào vùng chính (theme Navigator → mục Keys). */
+export function KeysModal({ onClose, embedded }: { onClose?: () => void; embedded?: boolean }) {
   const { keys, generateKey, importKey, deleteKey } = useDataStore()
   const push = useToastsStore((s) => s.push)
   const [mode, setMode] = useState<'list' | 'generate' | 'import'>('list')
@@ -28,10 +29,11 @@ export function KeysModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="SSH Keys" onClose={onClose}>
+    <ModalOrPanel embedded={embedded} title="SSH Keys" onClose={onClose}>
       {mode === 'list' && (
         <>
-          <div className="mb-3 max-h-72 overflow-y-auto">
+          {/* Nhúng vào trang thì vùng cha đã cuộn — không giới hạn chiều cao thêm một lớp nữa */}
+          <div className={embedded ? 'mb-3' : 'mb-3 max-h-72 overflow-y-auto'}>
             {keys.length === 0 && <p className="py-4 text-center text-xs text-subtle">Chưa có key nào</p>}
             {keys.map((key) => (
               <div
@@ -172,6 +174,6 @@ export function KeysModal({ onClose }: { onClose: () => void }) {
           onClose={() => setRevealing(null)}
         />
       )}
-    </Modal>
+    </ModalOrPanel>
   )
 }

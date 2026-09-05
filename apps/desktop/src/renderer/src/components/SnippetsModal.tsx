@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import type { SnippetDto } from '@infra/shared'
 import { useDataStore } from '../stores/data'
-import { Button, ConfirmModal, Field, Modal, TextArea, TextInput } from './ui'
+import { Button, ConfirmModal, Field, ModalOrPanel, TextArea, TextInput } from './ui'
 import { useT } from '../i18n'
 
-/** CRUD snippets. Biến trong script dùng cú pháp {{ten_bien}}. */
-export function SnippetsModal({ onClose }: { onClose: () => void }) {
+/**
+ * CRUD snippets. Biến trong script dùng cú pháp {{ten_bien}}.
+ * `embedded` = nhúng phẳng vào vùng chính (theme Navigator → mục Snippets) thay vì popup.
+ */
+export function SnippetsModal({ onClose, embedded }: { onClose?: () => void; embedded?: boolean }) {
   const t = useT()
   const { snippets, saveSnippet, deleteSnippet } = useDataStore()
   const [editing, setEditing] = useState<SnippetDto | 'new' | null>(null)
@@ -33,11 +36,12 @@ export function SnippetsModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="Snippets" onClose={onClose}>
+    <ModalOrPanel embedded={embedded} title="Snippets" onClose={onClose}>
       {editing === null && (
         <>
-          {/* width cố định: w-fit của Modal sẽ giãn theo dòng script dài nhất (truncate vô hiệu) */}
-          <div className="mb-3 max-h-80 w-[520px] max-w-full overflow-y-auto">
+          {/* width cố định: w-fit của Modal sẽ giãn theo dòng script dài nhất (truncate vô hiệu).
+              Nhúng vào trang thì lấy hết bề rộng và để vùng cha cuộn. */}
+          <div className={embedded ? 'mb-3 w-full' : 'mb-3 max-h-80 w-[520px] max-w-full overflow-y-auto'}>
             {snippets.length === 0 && (
               <p className="py-4 text-center text-xs text-subtle">
                 {t('snippet.empty')}
@@ -113,7 +117,7 @@ export function SnippetsModal({ onClose }: { onClose: () => void }) {
           </div>
         </form>
       )}
-    </Modal>
+    </ModalOrPanel>
   )
 }
 

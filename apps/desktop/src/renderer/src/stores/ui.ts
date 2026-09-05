@@ -32,8 +32,36 @@ export type AppModal =
   | 'help'
   | null
 
+/**
+ * Mục đang chọn trên thanh điều hướng của theme Navigator. Vùng chính (khi không tab nào
+ * active) vẽ đúng mục này thay cho Dashboard. Theme Infra không đọc giá trị này.
+ */
+export type NavSection =
+  | 'dashboard'
+  | 'hosts'
+  | 'tunnels'
+  | 'snippets'
+  | 'keys'
+  | 'workspaces'
+  | 'history'
+  | 'tools'
+
+const NAV_SECTIONS: readonly NavSection[] = [
+  'dashboard',
+  'hosts',
+  'tunnels',
+  'snippets',
+  'keys',
+  'workspaces',
+  'history',
+  'tools'
+]
+
 interface UiState {
   modal: AppModal
+  /** Theme Navigator: mục đang chọn ở cột trái (nhớ qua localStorage để mở lại đúng chỗ). */
+  navSection: NavSection
+  setNavSection: (s: NavSection) => void
   setModal: (m: AppModal) => void
   /**
    * F48 — cửa sổ AI chẩn đoán đang thu nhỏ xuống pill (session vẫn chạy nền trong store
@@ -55,6 +83,12 @@ interface UiState {
 }
 
 const SIDEBAR_KEY = 'infra.sidebar.collapsed'
+const NAV_KEY = 'infra.nav.section'
+
+function readNavSection(): NavSection {
+  const v = localStorage.getItem(NAV_KEY)
+  return (NAV_SECTIONS as readonly string[]).includes(v ?? '') ? (v as NavSection) : 'hosts'
+}
 
 /**
  * Modal toàn cục mount MỘT instance duy nhất (ở App). Sidebar/Command Palette chỉ gọi setModal.
@@ -71,6 +105,15 @@ export const useUiStore = create<UiState>((set) => ({
     // `null` là ĐÓNG modal, không phải mở gì.
     if (modal !== null) useToolUsageStore.getState().record(modal)
     set(modal === 'ai-diagnose' ? { modal, aiDiagnoseMin: false } : { modal })
+  },
+  navSection: readNavSection(),
+  setNavSection: (navSection) => {
+    try {
+      localStorage.setItem(NAV_KEY, navSection)
+    } catch {
+      /* localStorage lỗi — chỉ mất persist */
+    }
+    set({ navSection })
   },
   aiDiagnoseMin: false,
   minimizeAiDiagnose: () => set({ modal: null, aiDiagnoseMin: true }),

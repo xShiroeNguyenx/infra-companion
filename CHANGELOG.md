@@ -5,6 +5,22 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.18] — 2026-09-05
+
+### Added
+
+- **Two themes for the whole window: *Infra default* and *Navigator*** (Settings → Appearance → **Theme**). The Dark/Light switch is still there, renamed **Color mode**, because the two are independent — either theme in either color. **Infra default** is the layout you have today: the left column lists hosts by group and unfolds them in place, and the Dashboard is home. **Navigator** is the Termius-style arrangement: the left column becomes a **menu** — 🏠 Dashboard · 🖥 Hosts · 🔀 Tunnels · 📝 Snippets · 🔑 SSH Keys · 🪟 Workspaces · 🕒 History · ⊞ Tools, with Settings and Help pinned at the bottom — and **nothing unfolds inside the column**: pick an entry and its content opens in the **main area**, where the Dashboard used to be, while your terminal tabs keep working on top exactly as before (🏠 and the palette's *Dashboard* command still take you to the Dashboard). The menu shows a count next to Hosts, Tunnels, Snippets, Keys and Workspaces, and a green dot on Tunnels while one is running; every entry is also a Command Palette command. `«` (or `Ctrl+Shift+H`) narrows the menu to icons only instead of hiding it, since each entry is an icon you can still hit. Two preview thumbnails in Settings show what each theme looks like before you switch. Switching touches no data and is stored per machine; a theme JSON exported from the Custom palette now carries the layout too, and importing one without it leaves your layout alone.
+- **The Hosts page** (Navigator → Hosts) is the host book laid out in the main area: **★ Favorites** first, then your **groups as folder cards** — colour band, host count, `x/y up` from the uptime watcher, default user, a PRODUCTION badge, and the same `⋯` menu as the sidebar for *open the whole group / edit / delete* — then **every host in one flat list**, sorted by name, each row carrying its group's colour and name, so the machine you can't place in a folder is still one scroll away. Click a folder to step inside: a breadcrumb back to Hosts, the group's header with *open all N panes*, *+ Host* (with that group pre-selected) and `⋯`, and every host as a wide row — status dot, label, `user@host:port`, a badge for VNC / RDP / Telnet / Serial and for jump hops, and on hover the same actions as the sidebar row (favorite, notes, split, SFTP, duplicate, edit). **Typing in the search box flattens everything** into one list grouped by group name, so a match is never hidden inside a folder, and `user@host[:port]` still offers quick connect. *+ Host*, *+ Group* and an import/export menu (ssh_config, cloud import, export) live in the page header, and a fresh vault gets an empty state with both ways in. A host whose group no longer exists is listed under *Ungrouped* instead of disappearing.
+- **History page** (Navigator → History): every recent connection the vault remembers (up to 50), showing the host's name when it was a saved host and an explicit *quick connect — not saved as a host* note when it wasn't; click a row to reconnect.
+- **Tunnels, Snippets, SSH Keys and Workspaces open as pages** in the Navigator theme, reusing the exact dialogs you already know in embedded form — there is no second copy of any of them to drift out of sync.
+
+### Changed
+
+- The Dark/Light setting is now labelled **Color mode**; **Theme** now means the layout.
+- Filtering and grouping hosts moved into one shared pure function used by both the sidebar and the Hosts page; as a side effect, a host that points at a deleted group now lands in *Ungrouped* in the sidebar too, rather than vanishing from the column.
+
+---
+
 ## [0.2.17] — 2026-09-05
 
 ### Added

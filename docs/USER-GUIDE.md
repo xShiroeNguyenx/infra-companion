@@ -124,6 +124,27 @@ Each group header carries a single **`⋯`** button holding three things: **open
 
 ---
 
+## 1D. Themes — Infra default vs Navigator (Termius-style)
+
+**What it is**: Settings → **Appearance** → **Theme** switches the *arrangement* of the whole window. (Dark/Light is a separate setting just below it, now called **Color mode** — either theme works in either color.) Two thumbnails show what you're picking; the change applies instantly and is stored on this machine.
+
+- **Infra default** — everything described in 1B and 1C: the left column *is* the host list, groups fold and unfold in place, the Dashboard is home.
+- **Navigator** — the Termius-style layout. The left column becomes a **menu**: 🏠 Dashboard · 🖥 Hosts · 🔀 Tunnels · 📝 Snippets · 🔑 SSH Keys · 🪟 Workspaces · 🕒 History · ⊞ Tools, with ⚙ Settings and ❓ Help pinned at the bottom. **Nothing unfolds inside the column.** Click an entry and its content opens in the **main area** — the space where the Dashboard sits — while your terminal tabs keep working exactly as before above it. Counts sit next to Hosts / Tunnels / Snippets / Keys / Workspaces, and Tunnels gets a green dot while one is running. `«` (or `Ctrl+Shift+H`) narrows the menu to icons only rather than hiding it. Every entry is also a Command Palette command.
+
+**The Hosts page** (Navigator → Hosts) is the host book in the main area:
+- **★ Favorites** first, as wide rows with the group's name on the right.
+- **Groups as folder cards** — colour band, host count, `x/y up` from the uptime watcher, default user, a PRODUCTION badge, and the same **`⋯` menu** as the sidebar (*open the whole group · edit · delete*). **Click a card to step inside**: a `← Hosts` breadcrumb, the group header with **⊞ open all N panes**, **+ Host** (that group pre-selected) and `⋯`, and every host as a row.
+- **All hosts** come last as one flat list sorted by name, each row naming its group — for when you don't remember which folder a machine lives in. (Hosts with no group appear here too; a search still lists them under *Ungrouped*.)
+- A **host row** shows the status dot, label, `user@host:port`, a badge for VNC / RDP / Telnet / Serial and for jump hops (`⛓1`); hover it for the same actions as the sidebar row — favorite, notes, split, SFTP, duplicate, edit. Click the row to connect.
+- **Search** in the page header flattens everything into one list grouped by group name, so a match never hides inside a folder; type `user@host[:port]` and a *Connect to …* button appears, exactly like the sidebar's quick connect. Enter with exactly one match opens it.
+- **+ Host**, **+ Group** and a **`⋯` import/export menu** (ssh_config, cloud import, export) sit in the header. A host whose group was deleted is listed under *Ungrouped* rather than disappearing.
+
+**Other pages**: **History** lists every recent connection the vault remembers (up to 50), naming the host when it was a saved one and marking quick-connect targets as *not saved as a host* — click to reconnect. **Tunnels / Snippets / SSH Keys / Workspaces** are the dialogs you already know, embedded as pages. **Tools** is the *All features* catalogue.
+
+**Test**: Settings → Appearance → pick *Navigator* → the left column turns into the menu with *Hosts* selected; click a group card → its hosts appear with a `← Hosts` breadcrumb; open one → the terminal tab opens and 🏠 dims; click *Hosts* in the menu → you are back on the same group; type part of a host name → a flat list; press `«` → icons only; switch back to *Infra default* → the old sidebar returns with your groups still folded the way you left them.
+
+---
+
 ## 2. Managing Hosts / Groups / Keys
 
 ### Host
@@ -239,7 +260,7 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 
 Settings opens as a **full-screen page** with a category rail on the left — **Appearance**, **Background image**, **Terminal**, and **Sensitive command guard** — and a scrollable pane on the right. Press **Esc** or the **✕** in the header to close it.
 
-- **Theme**: Dark / Light. **Language**: Tiếng Việt / English / 日本語. Changes apply instantly and persist across launches.
+- **Theme** (layout): *Infra default* / *Navigator* — see **1D**. **Color mode**: Dark / Light. **Language**: Tiếng Việt / English / 日本語. Changes apply instantly and persist across launches.
 - **Background image**: set a wallpaper that shows faintly behind the **whole window** (behind both the sidebar and the terminal); chrome (sidebar/tabs/status) becomes translucent to reveal it, while modals/menus stay opaque for readability. Two ways to set it:
   - **Choose image…** — pick a local file.
   - **Paste an image link** in the box and click **Add** — works with direct image URLs (e.g. ending in `.jpg`/`.png`) and with **Google Drive** / **Dropbox** share links (the app rewrites those to a direct-download form for you). For Google Drive, set the file's sharing to **"Anyone with the link"** first — a private link returns a login page and is rejected. The link is fetched once in the background; only a local compressed copy is kept (so the wallpaper still works offline).

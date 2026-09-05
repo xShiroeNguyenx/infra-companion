@@ -103,3 +103,73 @@ export function unseenHistory<T extends { hostId: string | null; target: string 
   }
   return out
 }
+
+// ---------------------------------------------------------------------------
+// Lọc + gom host theo nhóm — dùng chung cho cột host (theme Infra) và trang Hosts (theme Navigator)
+// ---------------------------------------------------------------------------
+
+/** Phần của một host mà việc lọc/gom cần tới — generic để không kéo cả `HostDto` vào đây. */
+export interface HostLike {
+  label: string
+  hostname: string
+  username: string | null
+  groupId: string | null
+}
+
+/**
+ * Host khớp ô tìm không? So trên nhãn, hostname và username (không phân biệt hoa/thường).
+ * Chuỗi rỗng/toàn khoảng trắng khớp MỌI host — nơi gọi không phải tự kiểm "đang tìm hay không".
+ */
+export function hostMatchesQuery(host: HostLike, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  return (
+    host.label.toLowerCase().includes(q) ||
+    host.hostname.toLowerCase().includes(q) ||
+    (host.username ?? '').toLowerCase().includes(q)
+  )
+}
+
+/** Lọc danh sách host theo ô tìm — giữ nguyên thứ tự, không sửa mảng vào. */
+export function filterHosts<T extends HostLike>(hosts: readonly T[], query: string): T[] {
+  return hosts.filter((h) => hostMatchesQuery(h, query))
+}
+
+/** Một mục "nhóm + host của nó"; `group === null` là mục host chưa phân nhóm. */
+export interface HostSection<G, H> {
+  group: G | null
+  hosts: H[]
+}
+
+/**
+ * Gom host theo nhóm, giữ thứ tự nhóm như danh sách `groups` và host chưa phân nhóm xếp CUỐI.
+ *
+ *  · `includeEmptyGroups` — khi KHÔNG tìm kiếm phải hiện cả nhóm rỗng (để đổi tên/xoá được;
+ *    trước đây nhóm không host bị ẩn hẳn nên kẹt luôn). Khi đang tìm thì bỏ cho gọn.
+ *  · Host trỏ tới một `groupId` KHÔNG còn tồn tại được đưa về mục chưa phân nhóm chứ không
+ *    biến mất: một host mà không hiện ở đâu cả là lỗi im lặng khó truy hơn nhiều so với việc
+ *    nó nằm nhầm chỗ.
+ *  · Mục chưa phân nhóm chỉ xuất hiện khi thật có host — không có gì để làm với một mục trống.
+ */
+export function groupHostSections<G extends { id: string }, H extends HostLike>(
+  groups: readonly G[],
+  hosts: readonly H[],
+  includeEmptyGroups: boolean
+): HostSection<G, H>[] {
+  const known = new Set(groups.map((g) => g.id))
+  const byGroup = new Map<string | null, H[]>()
+  for (const host of hosts) {
+    const key = host.groupId !== null && known.has(host.groupId) ? host.groupId : null
+    const list = byGroup.get(key) ?? []
+    list.push(host)
+    byGroup.set(key, list)
+  }
+  const out: HostSection<G, H>[] = []
+  for (const group of groups) {
+    const list = byGroup.get(group.id) ?? []
+    if (list.length > 0 || includeEmptyGroups) out.push({ group, hosts: list })
+  }
+  const ungrouped = byGroup.get(null)
+  if (ungrouped && ungrouped.length > 0) out.push({ group: null, hosts: ungrouped })
+  return out
+}

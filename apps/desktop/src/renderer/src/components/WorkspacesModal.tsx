@@ -3,7 +3,7 @@ import { useTabsStore, type WorkspaceTab } from '../stores/tabs'
 import { useWorkspacesStore, type Workspace } from '../stores/workspaces'
 import { useToastsStore } from '../stores/toasts'
 import { useUiStore } from '../stores/ui'
-import { Button, ConfirmModal, Field, Modal, TextInput } from './ui'
+import { Button, ConfirmModal, Field, ModalOrPanel, TextInput } from './ui'
 import { useT } from '../i18n'
 
 /** Tóm tắt nội dung workspace: số tab + số pane terminal + số tab SFTP. */
@@ -15,7 +15,8 @@ function summarize(tabs: WorkspaceTab[], t: ReturnType<typeof useT>): string {
   return parts.join(' · ')
 }
 
-export function WorkspacesModal({ onClose }: { onClose: () => void }) {
+/** Lưu/mở lại workspace — popup, hoặc `embedded` nhúng vào vùng chính (theme Navigator). */
+export function WorkspacesModal({ onClose, embedded }: { onClose?: () => void; embedded?: boolean }) {
   const t = useT()
   const { workspaces, saveCurrent, rename, remove, open } = useWorkspacesStore()
   const hasOpenTabs = useTabsStore((s) => s.tabs.length > 0)
@@ -46,8 +47,8 @@ export function WorkspacesModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title={t('ws.title')} onClose={onClose}>
-      <div className="w-[min(460px,90vw)]">
+    <ModalOrPanel embedded={embedded} title={t('ws.title')} onClose={onClose}>
+      <div className={embedded ? 'w-full max-w-2xl' : 'w-[min(460px,90vw)]'}>
         <Field label={t('ws.saveCurrent')}>
           <div className="flex gap-2">
             <TextInput
@@ -133,6 +134,6 @@ export function WorkspacesModal({ onClose }: { onClose: () => void }) {
           onCancel={() => setConfirmDelete(null)}
         />
       )}
-    </Modal>
+    </ModalOrPanel>
   )
 }

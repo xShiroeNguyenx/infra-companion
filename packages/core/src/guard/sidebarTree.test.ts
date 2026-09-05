@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import {
+  filterHosts,
+  groupHostSections,
+  hostMatchesQuery,
   isGroupCollapsed,
   unseenHistory,
   visibleSidebarBlocks,
@@ -139,5 +142,82 @@ describe('unseenHistory', () => {
     const history = [entry('1', 'deploy@app-01:22', 'h1'), entry('2', 'admin@203.0.113.10:22', null)]
     unseenHistory(history, ['h1'], 8)
     expect(history).toHaveLength(2)
+  })
+})
+
+describe('hostMatchesQuery / filterHosts', () => {
+  const host = (label: string, hostname: string, username: string | null, groupId: string | null = null) => ({
+    label,
+    hostname,
+    username,
+    groupId
+  })
+  const web = host('web-01', '203.0.113.10', 'deploy')
+  const db = host('db-tunnel', 'gate.example.com', 'admin')
+
+  test('ô tìm rỗng / toàn khoảng trắng → khớp mọi host', () => {
+    expect(hostMatchesQuery(web, '')).toBe(true)
+    expect(hostMatchesQuery(web, '   ')).toBe(true)
+    expect(filterHosts([web, db], '')).toEqual([web, db])
+  })
+
+  test('khớp theo nhãn, hostname và username — không phân biệt hoa/thường', () => {
+    expect(hostMatchesQuery(web, 'WEB')).toBe(true)
+    expect(hostMatchesQuery(web, '113.10')).toBe(true)
+    expect(hostMatchesQuery(web, 'Deploy')).toBe(true)
+    expect(hostMatchesQuery(web, 'gate')).toBe(false)
+  })
+
+  test('username null không làm hỏng phép so', () => {
+    expect(hostMatchesQuery(host('x', 'y', null), 'x')).toBe(true)
+    expect(hostMatchesQuery(host('x', 'y', null), 'null')).toBe(false)
+  })
+
+  test('filterHosts giữ thứ tự và không sửa mảng vào', () => {
+    const list = [web, db]
+    expect(filterHosts(list, 'a')).toEqual([db]) // "gate"/"admin" có a; web-01 không
+    expect(list).toHaveLength(2)
+  })
+})
+
+describe('groupHostSections', () => {
+  const g = (id: string) => ({ id })
+  const host = (label: string, groupId: string | null) => ({ label, hostname: label, username: null, groupId })
+
+  test('gom theo nhóm đúng thứ tự nhóm, host chưa phân nhóm xếp CUỐI', () => {
+    const out = groupHostSections([g('prod'), g('stg')], [host('a', 'stg'), host('b', null), host('c', 'prod')], true)
+    expect(out.map((s) => s.group?.id ?? null)).toEqual(['prod', 'stg', null])
+    expect(out[0]!.hosts.map((h) => h.label)).toEqual(['c'])
+    expect(out[2]!.hosts.map((h) => h.label)).toEqual(['b'])
+  })
+
+  test('includeEmptyGroups=true → nhóm rỗng vẫn hiện (để sửa/xoá được)', () => {
+    const out = groupHostSections([g('empty')], [], true)
+    expect(out).toEqual([{ group: { id: 'empty' }, hosts: [] }])
+  })
+
+  test('includeEmptyGroups=false (đang tìm) → nhóm không host khớp bị bỏ', () => {
+    const out = groupHostSections([g('empty'), g('prod')], [host('a', 'prod')], false)
+    expect(out.map((s) => s.group?.id)).toEqual(['prod'])
+  })
+
+  test('không có host chưa phân nhóm → không tạo mục null trống', () => {
+    const out = groupHostSections([g('prod')], [host('a', 'prod')], true)
+    expect(out.some((s) => s.group === null)).toBe(false)
+  })
+
+  test('host trỏ tới groupId KHÔNG tồn tại → về mục chưa phân nhóm, không biến mất', () => {
+    const out = groupHostSections([g('prod')], [host('orphan', 'da-xoa')], true)
+    const ungrouped = out.find((s) => s.group === null)
+    expect(ungrouped?.hosts.map((h) => h.label)).toEqual(['orphan'])
+  })
+
+  test('không nhóm, không host → rỗng', () => {
+    expect(groupHostSections([], [], true)).toEqual([])
+  })
+
+  test('giữ thứ tự host trong từng nhóm như mảng vào', () => {
+    const out = groupHostSections([g('p')], [host('z', 'p'), host('a', 'p')], true)
+    expect(out[0]!.hosts.map((h) => h.label)).toEqual(['z', 'a'])
   })
 })

@@ -4,6 +4,14 @@ import { CURSOR_CUSTOM_MAX, currentAccent, isCustomCursor, resolveCursor, type C
 import { DEFAULT_SHORTCUTS, SHORTCUT_ACTIONS, isValidShortcut, type ShortcutAction } from '../lib/shortcuts'
 
 export type ThemeMode = 'dark' | 'light'
+/**
+ * Theme BỐ CỤC của app (khác với chế độ màu dark/light):
+ * - `infra`     — giao diện gốc: cột trái liệt kê host theo nhóm và sổ ra tại chỗ; Dashboard là trang chủ
+ * - `navigator` — kiểu Termius: cột trái chỉ là MENU (Hosts · Tunnels · Snippets · Keys…), bấm mục nào
+ *                 thì nội dung hiện ở VÙNG CHÍNH thay cho Dashboard, không sổ ra trong cột
+ */
+export type LayoutTheme = 'infra' | 'navigator'
+export const LAYOUT_THEMES: readonly LayoutTheme[] = ['infra', 'navigator']
 export type Language = 'vi' | 'en' | 'ja'
 /** Vị trí ảnh nền (background-position keyword). */
 export type BgPosition = 'center' | 'left' | 'right' | 'top' | 'bottom'
@@ -40,6 +48,7 @@ export interface CommandAlias {
 }
 
 const THEME_KEY = 'infra.theme'
+const LAYOUT_KEY = 'infra.layout'
 const LANG_KEY = 'infra.lang'
 const ACCENT_KEY = 'infra.accent'
 const BG_IMAGE_KEY = 'infra.bg.image'
@@ -96,6 +105,12 @@ const TERM_LH_DEFAULT = 1.2
 function readTheme(): ThemeMode {
   const v = localStorage.getItem(THEME_KEY)
   return v === 'light' ? 'light' : 'dark'
+}
+
+/** Theme bố cục — mặc định `infra` (giao diện cũ), giá trị lạ trong localStorage cũng về đó. */
+function readLayout(): LayoutTheme {
+  const v = localStorage.getItem(LAYOUT_KEY)
+  return v === 'navigator' ? 'navigator' : 'infra'
 }
 
 function readLang(): Language {
@@ -268,6 +283,10 @@ function readCustomColors(): CustomColors {
 export function applyTheme(theme: ThemeMode): void {
   document.documentElement.dataset.theme = theme
 }
+/** `data-layout` trên <html> — móc CSS cho theme bố cục (hiện chưa có rule nào cần, để sẵn). */
+export function applyLayout(layout: LayoutTheme): void {
+  document.documentElement.dataset.layout = layout
+}
 export function applyLang(lang: Language): void {
   document.documentElement.lang = lang
 }
@@ -343,6 +362,8 @@ export function applyCustomTheme(theme: ThemeMode, all: CustomColors): void {
 
 interface SettingsState {
   theme: ThemeMode
+  /** Theme bố cục: `infra` (mặc định) hay `navigator` (kiểu Termius). */
+  layout: LayoutTheme
   language: Language
   /** Màu accent tùy chỉnh (#rrggbb) — null = mặc định theo theme. */
   accentColor: string | null
@@ -387,6 +408,7 @@ interface SettingsState {
   /** Con trỏ user tự thêm từ file ảnh. */
   customCursors: CustomCursor[]
   setTheme: (t: ThemeMode) => void
+  setLayout: (l: LayoutTheme) => void
   setLanguage: (l: Language) => void
   setAccentColor: (c: string | null) => void
   /** Lưu/xoá ảnh nền. Trả về false nếu localStorage đầy (ảnh quá lớn). */
@@ -442,6 +464,7 @@ interface SettingsState {
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   theme: readTheme(),
+  layout: readLayout(),
   language: readLang(),
   accentColor: readAccent(),
   customColors: readCustomColors(),
@@ -473,6 +496,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     // Accent mặc định khác nhau giữa dark/light → dựng lại con trỏ bản tô accent
     applyMouseCursor(get().mouseCursor, get().customCursors)
     set({ theme })
+  },
+  setLayout: (layout) => {
+    localStorage.setItem(LAYOUT_KEY, layout)
+    applyLayout(layout)
+    set({ layout })
   },
   setLanguage: (language) => {
     localStorage.setItem(LANG_KEY, language)
@@ -652,9 +680,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ customColors: next })
   },
   exportThemeJson: () => {
-    const { theme, accentColor, customColors } = get()
+    const { theme, layout, accentColor, customColors } = get()
+    // `layout` đi kèm để một file theme mang được cả bố cục; bản cũ không có trường này vẫn nhập được
     return JSON.stringify(
-      { version: 1, theme, accent: accentColor, colors: customColors[theme] },
+      { version: 1, theme, layout, accent: accentColor, colors: customColors[theme] },
       null,
       2
     )
@@ -691,6 +720,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     applyAccent(accentColor)
     applyMouseCursor(get().mouseCursor, get().customCursors)
 
+    // Bố cục (tuỳ chọn, file theme bản cũ không có) — chỉ nhận giá trị hợp lệ, không có thì giữ nguyên
+    const rawLayout = raw.layout
+    if (rawLayout === 'infra' || rawLayout === 'navigator') {
+      localStorage.setItem(LAYOUT_KEY, rawLayout)
+      applyLayout(rawLayout)
+      set({ layout: rawLayout })
+    }
+
     set({ customColors: next, accentColor })
     return true
   }
@@ -699,6 +736,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 /** Đọc giá trị ban đầu mà không cần mount React (cho main.tsx). */
 export const initialSettings = {
   theme: readTheme(),
+  layout: readLayout(),
   language: readLang(),
   backgroundImage: readBgImage(),
   accentColor: readAccent(),

@@ -24,11 +24,14 @@ const SU_SSH_TEMPLATE: LoginStep[] = [
 export function HostEditorModal({
   host,
   duplicate = false,
+  defaultGroupId = null,
   onClose
 }: {
   host: HostDto | null
   /** Nhân bản: dùng host làm mẫu nhưng lưu thành host MỚI (bỏ id). */
   duplicate?: boolean
+  /** Nhóm chọn sẵn khi tạo host MỚI (bấm "+ Host" từ trong trang một nhóm). Bỏ qua khi sửa. */
+  defaultGroupId?: string | null
   onClose: () => void
 }) {
   const t = useT()
@@ -56,7 +59,7 @@ export function HostEditorModal({
   const [newKeyPassphrase, setNewKeyPassphrase] = useState('')
   const [keyBusy, setKeyBusy] = useState(false)
   const [secretRef, setSecretRef] = useState(host?.secretRef ?? '')
-  const [groupId, setGroupId] = useState(host?.groupId ?? '')
+  const [groupId, setGroupId] = useState(host?.groupId ?? defaultGroupId ?? '')
   const [newGroupName, setNewGroupName] = useState('')
   const [notes, setNotes] = useState(host?.notes ?? '')
   const [jumpChain, setJumpChain] = useState<string[]>(host?.jumpChain ?? [])
