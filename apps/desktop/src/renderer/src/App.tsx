@@ -39,6 +39,7 @@ import { PluginPanelModal } from './components/PluginPanelModal'
 import { AiExplainPanel } from './components/AiExplainPanel'
 import { UpdateBanner } from './components/UpdateBanner'
 import { SftpView } from './features/sftp/SftpView'
+import { SftpHome } from './features/sftp/SftpHome'
 import { VncView } from './features/vnc/VncView'
 import { RdpDock } from './components/RdpDock'
 import { HomeView } from './features/navigator/NavigatorHome'
@@ -355,6 +356,10 @@ export default function App() {
           { id: 'localdev-stop-all', label: t('localdev.stopAll'), run: () => void useLocaldevStore.getState().stopAll() }
         ]
       : []),
+    // Trang SFTP: ở theme Navigator đã có lệnh `nav-sftp` phía trên; theme Infra mở dạng tab
+    ...(layout !== 'navigator'
+      ? [{ id: 'open-sftp', label: t('menu.sftp'), run: () => useTabsStore.getState().openToolTab('files') }]
+      : []),
     { id: 'open-net', label: t('menu.net'), run: () => setModal('net') },
     { id: 'open-ai', label: t('menu.ai'), run: () => setModal('ai') },
     { id: 'open-ai-diagnose', label: `🩺 ${t('ai.diagnose.title')}`, run: () => setModal('ai-diagnose') },
@@ -474,6 +479,7 @@ export default function App() {
                 if (tab.kind === 'compare') return <CompareTabView key={tab.id} active={tab.id === activeId} />
                 if (tab.kind === 'localdev') return <LocaldevTabView key={tab.id} active={tab.id === activeId} />
                 if (tab.kind === 'features') return <FeaturesTabView key={tab.id} active={tab.id === activeId} />
+                if (tab.kind === 'files') return <SftpHome key={tab.id} active={tab.id === activeId} />
                 {
                   /* Mọi tab công cụ CÒN LẠI đều do ToolTabView vẽ. Kiểm theo danh sách chứ
                      không viết tay từng `kind ===`: thêm công cụ mới mà quên nối vào đây thì

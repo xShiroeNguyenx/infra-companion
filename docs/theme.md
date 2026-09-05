@@ -1,0 +1,111 @@
+# Theme bố cục — ý tưởng để dành làm sau
+
+> Ghi lại đề xuất theme thứ 3 (2026-09-05) sau khi v0.2.18 ra hai theme đầu. **Chưa làm.** Đọc kèm
+> [TIEP-TUC-PHIEN-SAU.md](./TIEP-TUC-PHIEN-SAU.md) để biết hai theme hiện có được nối vào đâu.
+
+## Hiện có gì (v0.2.18)
+
+| Theme | Cột trái | Vùng chính khi không tab nào mở | Điểm thiếu |
+|---|---|---|---|
+| **Infra mặc định** | Cây host theo nhóm, sổ ra tại chỗ, có khối tunnel/snippet/workspace bật tắt | Dashboard | Muốn xem tunnel/snippet thì bật khối → cột dài ra |
+| **Navigator** (kiểu Termius) | Menu 9 mục (có 📁 SFTP), không sổ gì | Mục đang chọn (trang Hosts, History, Tunnels…) | Bấm mục nào là **rời terminal** để về vùng chính |
+
+Cách nối: `settings.layout` (`infra.layout`) → `App.tsx` chọn `<NavRail/>` hay `<Sidebar/>`,
+`HomeView` (`features/navigator/NavigatorHome.tsx`) chọn vùng chính; mục đang chọn ở `ui.navSection`;
+danh sách mục ở `features/navigator/nav.ts`. Thêm theme = thêm một giá trị `LayoutTheme` + một nhánh ở
+hai chỗ đó + một ô chọn kèm hình xem trước trong `SettingsModal` (`LayoutPreview.tsx`).
+
+---
+
+## Đề xuất chính: **Workbench** (kiểu VS Code)
+
+**Một câu:** thanh icon dọc bên trái chọn *panel phụ* hiện gì, panel phụ nằm cạnh, còn vùng chính
+**luôn là terminal**. Duyệt danh bạ mà không phải rời màn hình đang làm việc.
+
+```
+┌──┬──────────┬──────────────────────────────────┐
+│🖥│ HOSTS    │ tab1 │ tab2 │ tab3            🏠  │
+│🔀│ ▾ Prod   │                                  │
+│📝│   app-01 │      terminal / dashboard        │
+│🔑│   app-02 │                                  │
+│🪟│ ▸ Staging│                                  │
+│🕒│          ├──────────────────────────────────┤
+│⊞ │          │ 📊 Monitoring · 🪵 Log · 🔀 Tunnel│  ← panel đáy (Ctrl+J)
+│⚙ │          │  app-01 load 0.4  RAM 62%  ...   │
+└──┴──────────┴──────────────────────────────────┘
+```
+
+### Vì sao đáng làm
+Hai theme hiện có cùng thiếu một thứ: **duyệt một loại khác (tunnel, snippet, key) trong khi terminal
+vẫn đang hiện**. Infra thì phải bật thêm khối làm cột dài; Navigator thì phải về home. Workbench tách
+ba việc ra ba vùng: *chọn loại* (activity bar) · *duyệt* (panel phụ) · *làm việc* (vùng chính). Đây là
+bố cục người dùng terminal cả ngày quen tay nhất.
+
+### Từng vùng
+- **Activity bar** (48px): chính là NavRail thu gọn. Mục đang chọn sáng; bấm lại mục đang chọn thì
+  đóng/mở panel phụ. Cài đặt + Trợ giúp ghim đáy.
+- **Panel phụ** (240–320px, **kéo đổi bề rộng**, nhớ qua localStorage): mỗi mục một nội dung.
+  - Hosts = cây group sổ tại chỗ như Infra, có ô tìm + quick-connect (dùng lại `renderGroups` của
+    `Sidebar.tsx`, cần tách ra component riêng).
+  - Tunnels / Snippets / Workspaces = ba khối đã có trong `SidebarBlocks.tsx`, bỏ giới hạn 8 dòng.
+  - Keys = `KeysModal embedded`. History = `HistoryView`. Tools = danh mục công cụ (`FeaturesTabView`
+    hoặc bản hẹp của `ToolsMenu`).
+  - `Ctrl+Shift+H` đóng panel phụ nhưng **giữ activity bar**.
+- **Panel đáy** (mới, tuỳ chọn): chỗ ở cố định cho những thứ hôm nay đang **nổi lơ lửng**: MonitorDock,
+  pill AI chẩn đoán, Watch a log, Tunnels. Có tab như VS Code, `Ctrl+J` ẩn/hiện, kéo cao thấp. Mở
+  Monitoring ở theme này là vào panel đáy thay vì dock góc phải.
+- **Vùng chính**: y hệt hiện tại; Dashboard vẫn là home khi không tab nào mở.
+
+### Tận dụng được gì
+Gần như toàn bộ: activity bar = NavRail; cây host = phần render group của Sidebar; ba khối =
+SidebarBlocks; Keys/History đã nhúng được; Monitoring đã tách khỏi vòng đời modal từ v0.1.9. Phần
+**thật sự mới**: panel đáy có tab + kéo cao thấp, và kéo đổi bề rộng panel phụ. Ước lượng công: **vừa**,
+nhỏ hơn Navigator vì không có trang mới.
+
+### Việc cần tách trước khi làm (refactor không đổi hành vi)
+1. Tách `renderGroups` + `HostRow` khỏi `Sidebar.tsx` thành `HostTree.tsx` để Infra và Workbench dùng chung.
+2. Bỏ `BLOCK_LIMIT` thành prop của ba khối trong `SidebarBlocks.tsx` (sidebar giữ 8, panel phụ không giới hạn).
+3. Cho `MonitorDock` render được ở chế độ "nhúng" (không `absolute` góc phải).
+
+### Phải quyết trước khi làm
+1. Panel đáy có trong bản đầu không, hay đợt sau (bản đầu chỉ activity bar + panel phụ đã là một theme trọn vẹn).
+2. Dashboard giữ làm home, hay đổi thành "trang trống + gợi ý" như VS Code.
+3. Mở Monitoring ở panel đáy thì có bỏ MonitorDock nổi **ở theme này** không (nghiêng về bỏ: một chỗ thôi).
+4. Tên hiển thị: "Workbench" / "Bàn làm việc" / "IDE".
+
+### Checklist test GUI (khi làm xong)
+- Đổi theme → activity bar hiện, panel phụ mở đúng mục đã nhớ, terminal đang mở không bị đụng.
+- Bấm mục đang chọn → panel đóng; bấm lại → mở, bề rộng như cũ; `Ctrl+Shift+H` tương tự.
+- Kéo bề rộng panel phụ → terminal fit lại (ResizeObserver sẵn có), khởi động lại vẫn giữ.
+- Mở Monitoring → xuất hiện ở panel đáy, không có dock nổi; `Ctrl+J` ẩn/hiện; đóng tab monitoring thì
+  polling vẫn chạy như quy ước hiện tại (chỉ nút Dừng mới tắt).
+- Đổi về Infra/Navigator → mọi thứ như cũ; MonitorDock nổi quay lại.
+
+---
+
+## Hai hướng khác (chỉ ghi ý)
+
+### Ops Console (ba cột, cho người trực production)
+Trái: danh bạ. Giữa: terminal. **Phải: cột trạng thái sống** (dải Cần chú ý, Monitoring, Tunnels
+bật/tắt tại chỗ, replication). Home là **bảng fleet**: mỗi host một ô có chấm sống/chết + sparkline
+load 24h, bấm là mở. Thêm **thanh lệnh** dưới cùng kiểu Spotlight (quick-connect, chạy snippet, bulk).
+Đây là thứ Termius không có. Công: **lớn** vì cột phải và bảng fleet là hai thứ mới hoàn toàn (dữ liệu
+thì đã có: `useWatcherStore`, `useMonitorStore`, `collectAttention`, `metrics.db`).
+
+### Launcher / Zen (bàn phím là chính)
+Không sidebar, thanh tab tự ẩn khi không hover, điều hướng duy nhất là **ô tìm ở giữa màn hình** kiểu
+Spotlight: gõ ra host, snippet, tunnel, công cụ. Home = ô tìm lớn + vài dòng gần đây. Công: **nhỏ** vì
+Command Palette đã có; giá phải trả là người mới khó khám phá tính năng. Hợp làm theme phụ, không nên
+là mặc định.
+
+---
+
+## Lưu ý chung khi thêm bất kỳ theme nào
+- Theme là **bố cục**, không đụng dữ liệu: host/nhóm/tunnel giữ nguyên, chỉ đổi cách bày. Ghi rõ trong
+  mô tả ô chọn để người dùng dám thử.
+- Mọi mảnh nên là component **nhúng được** (`embedded`) thay vì viết bản thứ hai — bài học từ
+  `ModalOrPanel` và v0.2.18.
+- Vẽ xong phải **tự chụp màn hình** bằng harness Electron (`apps/desktop/out/harness`, cách dựng ghi
+  trong handoff v0.2.18): cả ba bẫy layout của v0.2.17 lẫn lỗi menu bị cắt của v0.2.18 đều chỉ lộ khi
+  nhìn hình, typecheck/test không thấy.
+- Hình xem trước trong Settings vẽ bằng div (`LayoutPreview.tsx`) để đổi màu theo dark/light + accent.

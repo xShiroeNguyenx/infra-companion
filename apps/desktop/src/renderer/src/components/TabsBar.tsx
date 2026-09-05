@@ -25,7 +25,8 @@ const TOOL_TAB_META: Record<ToolTabKind, { label: string; icon: string }> = {
   'key-rotate': { label: 'Key rotate', icon: '🔄' },
   'disk-usage': { label: 'Disk', icon: '💾' },
   'pkg-updates': { label: 'Updates', icon: '📦' },
-  'known-hosts': { label: 'Fingerprints', icon: '🔏' }
+  'known-hosts': { label: 'Fingerprints', icon: '🔏' },
+  files: { label: 'SFTP', icon: '📁' }
 }
 
 function toolMeta(kind: AppTab['kind']): { label: string; icon: string } | undefined {

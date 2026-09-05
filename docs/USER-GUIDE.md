@@ -129,7 +129,7 @@ Each group header carries a single **`⋯`** button holding three things: **open
 **What it is**: Settings → **Appearance** → **Theme** switches the *arrangement* of the whole window. (Dark/Light is a separate setting just below it, now called **Color mode** — either theme works in either color.) Two thumbnails show what you're picking; the change applies instantly and is stored on this machine.
 
 - **Infra default** — everything described in 1B and 1C: the left column *is* the host list, groups fold and unfold in place, the Dashboard is home.
-- **Navigator** — the Termius-style layout. The left column becomes a **menu**: 🏠 Dashboard · 🖥 Hosts · 🔀 Tunnels · 📝 Snippets · 🔑 SSH Keys · 🪟 Workspaces · 🕒 History · ⊞ Tools, with ⚙ Settings and ❓ Help pinned at the bottom. **Nothing unfolds inside the column.** Click an entry and its content opens in the **main area** — the space where the Dashboard sits — while your terminal tabs keep working exactly as before above it. Counts sit next to Hosts / Tunnels / Snippets / Keys / Workspaces, and Tunnels gets a green dot while one is running. `«` (or `Ctrl+Shift+H`) narrows the menu to icons only rather than hiding it. Every entry is also a Command Palette command.
+- **Navigator** — the Termius-style layout. The left column becomes a **menu**: 🏠 Dashboard · 🖥 Hosts · 📁 SFTP · 🔀 Tunnels · 📝 Snippets · 🔑 SSH Keys · 🪟 Workspaces · 🕒 History · ⊞ Tools, with ⚙ Settings and ❓ Help pinned at the bottom. **Nothing unfolds inside the column.** Click an entry and its content opens in the **main area** — the space where the Dashboard sits — while your terminal tabs keep working exactly as before above it. Counts sit next to Hosts / Tunnels / Snippets / Keys / Workspaces, and Tunnels gets a green dot while one is running. `«` (or `Ctrl+Shift+H`) narrows the menu to icons only rather than hiding it. Every entry is also a Command Palette command.
 
 **The Hosts page** (Navigator → Hosts) is the host book in the main area:
 - **★ Favorites** first, as wide rows with the group's name on the right.
@@ -139,7 +139,7 @@ Each group header carries a single **`⋯`** button holding three things: **open
 - **Search** in the page header flattens everything into one list grouped by group name, so a match never hides inside a folder; type `user@host[:port]` and a *Connect to …* button appears, exactly like the sidebar's quick connect. Enter with exactly one match opens it.
 - **+ Host**, **+ Group** and a **`⋯` import/export menu** (ssh_config, cloud import, export) sit in the header. A host whose group was deleted is listed under *Ungrouped* rather than disappearing.
 
-**Other pages**: **History** lists every recent connection the vault remembers (up to 50), naming the host when it was a saved one and marking quick-connect targets as *not saved as a host* — click to reconnect. **Tunnels / Snippets / SSH Keys / Workspaces** are the dialogs you already know, embedded as pages. **Tools** is the *All features* catalogue.
+**Other pages**: **SFTP** is the file manager with the host chosen *afterwards* — see section 4. **History** lists every recent connection the vault remembers (up to 50), naming the host when it was a saved one and marking quick-connect targets as *not saved as a host* — click to reconnect. **Tunnels / Snippets / SSH Keys / Workspaces** are the dialogs you already know, embedded as pages. **Tools** is the *All features* catalogue.
 
 **Test**: Settings → Appearance → pick *Navigator* → the left column turns into the menu with *Hosts* selected; click a group card → its hosts appear with a `← Hosts` breadcrumb; open one → the terminal tab opens and 🏠 dims; click *Hosts* in the menu → you are back on the same group; type part of a host name → a flat list; press `«` → icons only; switch back to *Infra default* → the old sidebar returns with your groups still folded the way you left them.
 
@@ -211,6 +211,8 @@ Type `user@host` or `user@host:port` directly into the sidebar search → Enter 
 ---
 
 ## 4. SFTP (file transfer)
+
+**Two ways in.** (1) **From a host**: the 📁 button on a host row (sidebar or Hosts page) opens an SFTP tab already connected to that host. (2) **From SFTP itself** — new: 📁 **SFTP** in the Navigator menu, or in the Infra theme via `⋯` → SFTP, the Dashboard grid, *All features* or the palette (opens as a tab). The page starts with **your local files on the left** and a *Connect to host* card on the right. **Select host** lists your SSH hosts by group, favorites first, with a search box (Enter picks the only match). The chosen host's files then appear on the right, in place. **Change host** / **Disconnect** are in the header. In the Navigator theme the connection survives switching to other menu entries and back. Only SSH hosts are listed, because SFTP runs over SSH.
 
 **Open**: hover a host in the sidebar → click the 📁 icon.
 

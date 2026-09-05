@@ -19,6 +19,7 @@ export interface NavItemMeta {
 export const NAV_ITEMS: readonly NavItemMeta[] = [
   { id: 'dashboard', icon: '🏠', titleKey: 'nav.dashboard' },
   { id: 'hosts', icon: '🖥', titleKey: 'nav.hosts' },
+  { id: 'sftp', icon: '📁', titleKey: 'nav.sftp' },
   { id: 'tunnels', icon: '🔀', titleKey: 'nav.tunnels' },
   { id: 'snippets', icon: '📝', titleKey: 'nav.snippets' },
   { id: 'keys', icon: '🔑', titleKey: 'nav.keys' },

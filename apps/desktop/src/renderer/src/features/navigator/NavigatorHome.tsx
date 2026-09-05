@@ -7,6 +7,7 @@ import { WorkspacesModal } from '../../components/WorkspacesModal'
 import { useSettingsStore } from '../../stores/settings'
 import { useUiStore } from '../../stores/ui'
 import { DashboardView } from '../dashboard/DashboardView'
+import { SftpHome } from '../sftp/SftpHome'
 import { HistoryView } from './HistoryView'
 import { HostsView } from './HostsView'
 import { useT } from '../../i18n'
@@ -28,7 +29,7 @@ export function HomeView({ active }: { active: boolean }) {
 /**
  * Vùng chính của theme Navigator: vẽ mục đang chọn.
  *
- * Dashboard và Hosts luôn mounted (ẩn bằng `hidden`) — Dashboard có effect nạp lịch sử
+ * Dashboard, Hosts và SFTP luôn mounted (ẩn bằng `hidden`) — Dashboard có effect nạp lịch sử
  * monitoring theo cờ `active`, Hosts giữ nhóm đang xem. Các mục còn lại mount theo mục đang
  * chọn và chỉ ẩn khi một tab terminal đang active: chuyển sang tab rồi quay lại vẫn thấy form
  * đang điền dở, đổi mục thì bắt đầu lại — đúng kỳ vọng của một menu.
@@ -43,6 +44,8 @@ function NavigatorHome({ active }: { active: boolean }) {
     <>
       <DashboardView active={active && section === 'dashboard'} />
       <HostsView active={active && section === 'hosts'} />
+      {/* SFTP luôn mounted như Hosts: pane local đã duyệt tới đâu và phiên đang nối giữ nguyên khi đổi mục */}
+      <SftpHome active={active && section === 'sftp'} />
       {section === 'tunnels' && (
         <Section hidden={!active} icon="🔀" title={t('tunnel.title')}>
           <TunnelsModal embedded />

@@ -2,7 +2,7 @@
 
 > A next-generation desktop SSH client — everything Termius does, plus local-first vault encryption, self-hosted E2EE sync, bulk execution, real-time monitoring, embedded VNC & RDP, AI assistance with local LLM support, **a self-managed local PHP/WordPress dev stack**, and more.
 
-**Current release: v0.2.18 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
+**Current release: v0.2.19 (Phase 0–6)**  &nbsp;|&nbsp; Windows · macOS · Linux  &nbsp;|&nbsp; Electron 42 · React 19 · TypeScript
 
 🌐 **[Live landing page](https://xshiroenguyenx.github.io/infra-companion/)** &nbsp;·&nbsp; ⬇️ **[Download](https://github.com/xShiroeNguyenx/infra-companion/releases/latest)** &nbsp;·&nbsp; 📖 **[User guide](docs/USER-GUIDE.md)**
 
@@ -42,7 +42,7 @@
 - **Local terminal** — PowerShell, cmd, Git Bash, WSL shells via node-pty
 
 ### Terminal UX
-- **Two themes — Infra default and Navigator** — *Infra default* is the classic layout (host tree in the left column, Dashboard as home). *Navigator* is Termius-style: the left column is a **menu** (Dashboard · Hosts · Tunnels · Snippets · SSH Keys · Workspaces · History · Tools) and nothing unfolds inside it — pick an entry and it opens in the **main area**: a **Hosts page** with favorites, groups as folder cards you step into, wide host rows with the usual actions and a search that flattens everything; a **History page**; and Tunnels / Snippets / Keys / Workspaces as pages. Dark/Light is a separate *Color mode* (Settings → Appearance → Theme)
+- **Two themes — Infra default and Navigator** — *Infra default* is the classic layout (host tree in the left column, Dashboard as home). *Navigator* is Termius-style: the left column is a **menu** (Dashboard · Hosts · SFTP · Tunnels · Snippets · SSH Keys · Workspaces · History · Tools) and nothing unfolds inside it — pick an entry and it opens in the **main area**: a **Hosts page** with favorites, groups as folder cards you step into, wide host rows with the usual actions and a search that flattens everything; a **History page**; and Tunnels / Snippets / Keys / Workspaces as pages. Dark/Light is a separate *Color mode* (Settings → Appearance → Theme)
 - **Dashboard home screen** — the app boots into a home page behind your tabs (🏠 button): a **"Needs attention" strip** that appears only when something is actually wrong (host not responding, tunnel failed, replica with a critical diagnosis), **a single row of tool icons that orders itself by how much you use each tool** (pin the ones that should always keep a tile), quick-connect in the header next to *+ New terminal*, counters, favorite hosts, **host-group cards** (colour band; click the group name for its full host list, a host chip to open just that host, or the footer to open the whole group as splits), recent connections, saved workspaces, tunnels with live status + start/stop, and a keyboard-shortcut cheat sheet — the lists split into two columns on a wide window. Prefer boot-to-shell? Settings → Startup page → Terminal
 - **xterm.js** with WebGL renderer — smooth even at high throughput (`yes`, large `cat`)
 - **Multi-tab** with Ctrl+Shift+T / middle-click close
@@ -88,6 +88,7 @@
 - **Import** — `~/.ssh/config` (preserves multi-hop ProxyJump, deduplicates IdentityFile)
 
 ### SFTP
+- **Start from SFTP, then pick the host** — SFTP is its own entry (Navigator menu · `⋯` menu · Dashboard grid · palette): local files on the left, *Select host* on the right (SSH hosts by group, searchable), remote files appear in place; change host or disconnect from the header. The SFTP button on a host row still opens a per-host tab
 - **Dual-pane file manager** — Local ↔ Remote; double-click to navigate, `↑` for parent, `⟳` refresh
 - Upload / download with recursive directory support and transfer queue
 - **Edit remote file locally** — opens in your default editor; saves trigger auto-upload
@@ -332,7 +333,7 @@ infra-companion/
 
 ---
 
-## Known Limitations (v0.2.18)
+## Known Limitations (v0.2.19)
 
 - **Local dev stack is Windows-only** for now (OS-specific work is isolated behind a single adapter, so other platforms are a matter of writing one). `.test` domains and local HTTPS are **not wired up yet** — mkcert installs and lands on `PATH`, but issuing/trusting a certificate is still a manual `mkcert -install`. There is no WordPress downloader (point it at a folder you already have), and no local↔server deploy or public-share link yet. phpMyAdmin 5.2 does not support PHP 8.4, so the app serves it with PHP 8.3 when both are installed
 - **Domain → server mapping needs a Chromium browser** (Chrome/Edge/Brave/Vivaldi); Firefox has no equivalent flag, and the override has no effect when the machine routes through a system proxy (the proxy resolves DNS itself). Non-browser clients (Postman, MySQL clients) aren't covered — use a tunnel or the `curl --resolve` command instead

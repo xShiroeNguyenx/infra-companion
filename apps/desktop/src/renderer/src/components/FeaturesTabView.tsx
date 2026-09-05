@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { TOOLS, TOOL_CATEGORIES, splitMenuLabel } from '../lib/toolCatalog'
+import { TOOLS, TOOL_CATEGORIES, openTool, splitMenuLabel } from '../lib/toolCatalog'
 import { useLocaldevStore } from '../stores/localdev'
 import { useTabsStore } from '../stores/tabs'
-import { useUiStore } from '../stores/ui'
 import { useWatcherStore } from '../stores/watcher'
 import { TextInput } from './ui'
 import { useT } from '../i18n'
@@ -16,7 +15,6 @@ import { useT } from '../i18n'
  */
 export function FeaturesTabView({ active }: { active: boolean }) {
   const t = useT()
-  const setModal = useUiStore((s) => s.setModal)
   const openLocaldevTab = useTabsStore((s) => s.openLocaldevTab)
   const localdevEnabled = useLocaldevStore((s) => s.enabled)
   const watcherEnabled = useWatcherStore((s) => s.enabled)
@@ -69,7 +67,7 @@ export function FeaturesTabView({ active }: { active: boolean }) {
                       <button
                         key={tool.id}
                         type="button"
-                        onClick={() => setModal(tool.modal)}
+                        onClick={() => openTool(tool)}
                         className="border-edge bg-panel hover:border-accent/60 hover:bg-hover flex w-full items-start gap-2.5 rounded-md border px-3 py-2.5 text-left"
                       >
                         <span className="shrink-0 text-xl leading-none">{icon}</span>

@@ -1,5 +1,8 @@
 import type { I18nKey } from '../i18n/dict'
-import type { AppModal } from '../stores/ui'
+import { useSettingsStore } from '../stores/settings'
+import { useTabsStore, type ToolTabKind } from '../stores/tabs'
+import { useUiStore, type AppModal } from '../stores/ui'
+import { goToSection } from '../features/navigator/nav'
 
 /**
  * Danh mục CÔNG CỤ dùng chung — nguồn duy nhất cho menu `⋯`, lưới trên Dashboard và tab
@@ -14,7 +17,7 @@ import type { AppModal } from '../stores/ui'
  */
 export type ToolCategory = 'session' | 'fleet' | 'diagnostics' | 'security' | 'data' | 'app'
 
-export interface ToolEntry {
+interface ToolEntryBase {
   /** Khoá ổn định cho React + tìm kiếm. */
   id: string
   /** Nhãn menu dạng "<icon> <tên>" — icon khai MỘT chỗ, trong `dict.ts`. */
@@ -22,9 +25,41 @@ export interface ToolEntry {
   /** Mô tả một dòng, chỉ hiện ở tab "Tất cả tính năng". */
   descKey: I18nKey
   category: ToolCategory
-  modal: AppModal
   /** Có mặt trong menu `⋯` hay không. */
   common: boolean
+}
+
+/**
+ * Một công cụ mở HOẶC popup (`modal`) HOẶC tab (`tab`) — đúng một trong hai. Trước đây mọi công
+ * cụ đều là modal; trang SFTP là công cụ đầu tiên sống trong tab ngay từ đầu (nó là một vùng làm
+ * việc, không phải hộp thoại). Khoá đếm mức dùng = `modal` hoặc `tab` (cùng bảng với
+ * `ui.setModal` / `tabs.openToolTab`).
+ */
+export type ToolEntry = ToolEntryBase &
+  ({ modal: Exclude<AppModal, null>; tab?: undefined } | { modal?: undefined; tab: ToolTabKind })
+
+/** Khoá đếm mức dùng / id ô lưới của một công cụ. */
+export function toolKey(tool: ToolEntry): string {
+  return tool.modal ?? tool.tab
+}
+
+/**
+ * Mở một công cụ — nơi DUY NHẤT biết công cụ đó là popup hay tab. Ba nơi liệt kê công cụ (menu
+ * `⋯`, lưới Dashboard, tab Tất cả tính năng) gọi hàm này thay vì tự `setModal`.
+ *
+ * Trang SFTP ở theme Navigator là một MỤC trên cột trái: mở thêm tab nữa là hai bản cùng một
+ * phiên; nên ở theme đó chuyển sang mục thay vì mở tab.
+ */
+export function openTool(tool: ToolEntry): void {
+  if (tool.tab) {
+    if (tool.tab === 'files' && useSettingsStore.getState().layout === 'navigator') {
+      goToSection('sftp')
+      return
+    }
+    useTabsStore.getState().openToolTab(tool.tab)
+    return
+  }
+  useUiStore.getState().setModal(tool.modal)
 }
 
 export const TOOL_CATEGORIES: ReadonlyArray<{ id: ToolCategory; titleKey: I18nKey }> = [
@@ -41,6 +76,8 @@ export const TOOLS: readonly ToolEntry[] = [
   { id: 'workspaces', menuKey: 'menu.workspaces', descKey: 'features.dWorkspaces', category: 'session', modal: 'workspaces', common: true },
   { id: 'snippets', menuKey: 'menu.snippets', descKey: 'features.dSnippets', category: 'session', modal: 'snippets', common: true },
   { id: 'tunnels', menuKey: 'menu.tunnels', descKey: 'features.dTunnels', category: 'session', modal: 'tunnels', common: true },
+  // Trang SFTP: mở TAB (theme Infra) hoặc chuyển mục 📁 SFTP (theme Navigator) — xem openTool
+  { id: 'sftp', menuKey: 'menu.sftp', descKey: 'features.dSftp', category: 'session', tab: 'files', common: true },
   { id: 'recordings', menuKey: 'menu.recordings', descKey: 'features.dRecordings', category: 'session', modal: 'recordings', common: false },
 
   // --- Cả fleet ---

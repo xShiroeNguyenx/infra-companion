@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { TOOLS, TOOL_CATEGORIES, splitMenuLabel } from '../lib/toolCatalog'
+import { TOOLS, TOOL_CATEGORIES, openTool, splitMenuLabel } from '../lib/toolCatalog'
 import { useTabsStore } from '../stores/tabs'
 import { useUiStore, type AppModal } from '../stores/ui'
 import { useWatcherStore } from '../stores/watcher'
@@ -105,7 +105,7 @@ export function ToolsMenu({
             // mở nhầm một công cụ chạy thật (bulk, xoay key) tệ hơn hẳn việc bấm thêm một cái.
             if (e.key === 'Enter') {
               const only = sections.flatMap((s) => s.tools)
-              if (only.length === 1 && shownActions.length === 0) pick(() => setModal(only[0]!.tool.modal))
+              if (only.length === 1 && shownActions.length === 0) pick(() => openTool(only[0]!.tool))
               else if (only.length === 0 && shownActions.length === 1) pick(shownActions[0]!.run)
             }
           }}
@@ -124,7 +124,7 @@ export function ToolsMenu({
               {t(category.titleKey)}
             </div>
             {tools.map(({ tool, icon, name }) => (
-              <MenuItem key={tool.id} icon={icon} label={name} onClick={() => pick(() => setModal(tool.modal))} />
+              <MenuItem key={tool.id} icon={icon} label={name} onClick={() => pick(() => openTool(tool))} />
             ))}
             {/* Watcher là TOGGLE chứ không mở gì — thuộc nhóm "cả fleet" cùng Monitoring */}
             {category.id === 'fleet' && showWatcher && (

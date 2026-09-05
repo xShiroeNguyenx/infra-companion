@@ -5,6 +5,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.19] — 2026-09-05
+
+### Added
+
+- **SFTP is a feature of its own.** Until now SFTP only existed as a button on a host row that opened a tab for that host. It is now an entry in its own right — **📁 SFTP in the Navigator menu**, between Hosts and Tunnels; in the Infra theme through the `⋯` menu, the Dashboard grid, *All features* or the palette, where it opens as a tab. The page opens with **your local files on the left** and a *Connect to host* card on the right; **Select host** lists your SSH hosts by group (favorites first, with a search box — Enter picks the only match), and the chosen host's files appear on the right **in place**. *Change host* and *Disconnect* sit in the header; the connection survives moving to other menu entries and coming back, and the page and the tab share one session rather than opening two. Only SSH hosts are offered, since SFTP rides on SSH. The SFTP button on a host row still opens a dedicated tab, and both paths now share one set of pane, arrow and transfer-queue components.
+
+### Changed
+
+- The tool catalogue can now hold tools that open as a **tab** rather than a dialog; the `⋯` menu, the Dashboard grid and *All features* go through one opener, so a tool's usage is counted the same way whichever door it came in by.
+
+---
+
 ## [0.2.18] — 2026-09-05
 
 ### Added

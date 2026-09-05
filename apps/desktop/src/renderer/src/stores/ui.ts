@@ -39,6 +39,7 @@ export type AppModal =
 export type NavSection =
   | 'dashboard'
   | 'hosts'
+  | 'sftp'
   | 'tunnels'
   | 'snippets'
   | 'keys'
@@ -49,6 +50,7 @@ export type NavSection =
 const NAV_SECTIONS: readonly NavSection[] = [
   'dashboard',
   'hosts',
+  'sftp',
   'tunnels',
   'snippets',
   'keys',

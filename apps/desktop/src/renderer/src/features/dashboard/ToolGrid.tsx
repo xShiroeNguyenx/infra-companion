@@ -4,9 +4,8 @@ import { useT, type I18nKey } from '../../i18n'
 import { useLocaldevStore } from '../../stores/localdev'
 import { useTabsStore } from '../../stores/tabs'
 import { useToolUsageStore, TOOL_GRID_SLOTS } from '../../stores/toolUsage'
-import { useUiStore, type AppModal } from '../../stores/ui'
 import { useWatcherStore } from '../../stores/watcher'
-import { TOOLS, splitMenuLabel } from '../../lib/toolCatalog'
+import { TOOLS, openTool, splitMenuLabel, toolKey, type ToolEntry } from '../../lib/toolCatalog'
 
 /**
  * Lưới công cụ ở đầu Dashboard — **MỘT hàng** gồm {@link TOOL_GRID_SLOTS} ô + ô "Tất cả".
@@ -28,9 +27,9 @@ import { TOOLS, splitMenuLabel } from '../../lib/toolCatalog'
  * Danh sách công cụ lấy từ `lib/toolCatalog` — CÙNG nguồn với menu `⋯` và tab "Tất cả tính
  * năng". Trước đây file này khai danh sách riêng, nên thêm một công cụ là phải nhớ sửa hai chỗ.
  */
-const MODAL_TOOLS: ReadonlyArray<{ key: I18nKey; modal: AppModal }> = TOOLS.map((tool) => ({
+const CATALOG_TOOLS: ReadonlyArray<{ key: I18nKey; tool: ToolEntry }> = TOOLS.map((tool) => ({
   key: tool.menuKey,
-  modal: tool.modal
+  tool
 }))
 
 /**
@@ -95,7 +94,6 @@ function Tile({
 
 export function ToolGrid() {
   const t = useT()
-  const setModal = useUiStore((s) => s.setModal)
   const watcherEnabled = useWatcherStore((s) => s.enabled)
   const setWatcherEnabled = useWatcherStore((s) => s.setEnabled)
   const localdevEnabled = useLocaldevStore((s) => s.enabled)
@@ -113,8 +111,9 @@ export function ToolGrid() {
   // Dựng danh sách phẳng rồi mới xếp, để 2 mục đặc biệt (toggle watcher, tab Local dev)
   // có mặt đúng chỗ thay vì bị nhồi ra cuối
   const items: GridItem[] = []
-  for (const tool of MODAL_TOOLS) {
-    items.push({ id: tool.modal ?? tool.key, ...read(tool.key), run: () => setModal(tool.modal) })
+  for (const { key, tool } of CATALOG_TOOLS) {
+    // id = khoá đếm mức dùng (modal hoặc tab) → `usage[id]` khớp với chỗ `setModal`/`openToolTab` ghi
+    items.push({ id: toolKey(tool), ...read(key), run: () => openTool(tool) })
     // Watcher là TOGGLE chứ không mở gì — chèn ngay sau Monitoring cho cùng nhóm "theo dõi"
     if (tool.modal === 'monitor') {
       const w = read('menu.watcher')
