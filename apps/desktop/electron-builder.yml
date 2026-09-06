@@ -16,6 +16,9 @@ extraResources:
   # dùng window icon; nếu không set, Windows lấy icon theo AUMID — có thể bị cache sai).
   - from: build/icon.ico
     to: icon.ico
+  # Icon khay hệ thống trên mac/linux (F53) — Windows dùng icon.ico ở trên.
+  - from: build/icon.png
+    to: icon.png
 asarUnpack:
   - "**/node_modules/node-pty/**"
   - "**/node_modules/@serialport/**"

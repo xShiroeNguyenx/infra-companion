@@ -24,6 +24,7 @@ import { LayoutPreview } from './LayoutPreview'
 import { MouseCursorSection } from './MouseCursorSection'
 import { TermFontSection } from './TermFontSection'
 import { Button, Field, TextArea, TextInput } from './ui'
+import { useTrayStore } from '../stores/tray'
 
 /** Các nhóm cài đặt hiển thị ở cột điều hướng bên trái của màn hình Settings. */
 type SettingsSection =
@@ -33,6 +34,7 @@ type SettingsSection =
   | 'autocomplete'
   | 'shortcuts'
   | 'guard'
+  | 'app'
   | 'localdev'
 
 /** Cạnh tối đa khi nén ảnh nền — đủ nét cho màn 4K, đủ nhỏ để vừa localStorage. */
@@ -241,6 +243,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   // Theme Navigator: Dashboard mặc định tắt, "home" là mục menu đang nhớ (thường Hosts) — nhãn
   // phải nói "trang chính" chứ không phải "Dashboard"
   const layoutTheme = useSettingsStore((s) => s.layout)
+  const closeToTray = useTrayStore((s) => s.closeToTray)
+  const setCloseToTray = useTrayStore((s) => s.setCloseToTray)
   const startupOptions: Array<{ value: StartupPage; label: string }> = [
     { value: 'dashboard', label: layoutTheme === 'navigator' ? t('settings.startupHome') : t('settings.startupDashboard') },
     { value: 'terminal', label: t('settings.startupTerminal') }
@@ -285,6 +289,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     { id: 'autocomplete', label: t('settings.autocomplete'), icon: '⌥' },
     { id: 'shortcuts', label: t('settings.shortcuts'), icon: '⌨' },
     { id: 'guard', label: t('settings.cmdGuard'), icon: '🛡️' },
+    // Hành vi của chính app (khay hệ thống…) — không thuộc terminal hay giao diện
+    { id: 'app', label: t('settings.app'), icon: '🧭' },
     // Local dev là môi trường dev local (không phải SSH) — để cuối danh sách, mặc định TẮT
     { id: 'localdev', label: t('settings.localdev'), icon: '🧱' }
   ]
@@ -751,6 +757,28 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               </>
             )}
 
+            {section === 'app' && (
+              <>
+                <Field label={t('settings.closeToTray')}>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([true, false] as const).map((on) => (
+                      <button
+                        key={String(on)}
+                        onClick={() => setCloseToTray(on)}
+                        className={`rounded border px-2 py-2 text-sm ${
+                          closeToTray === on
+                            ? 'border-accent text-content bg-accent-soft/40'
+                            : 'border-edge text-muted hover:bg-hover'
+                        }`}
+                      >
+                        {on ? t('plugins.enable') : t('plugins.disable')}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+                <p className="text-subtle text-[11px] leading-relaxed">{t('settings.closeToTrayHint')}</p>
+              </>
+            )}
             {section === 'localdev' && <LocaldevSettingsView />}
 
             {section === 'shortcuts' && (

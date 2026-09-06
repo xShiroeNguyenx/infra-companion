@@ -1,8 +1,9 @@
 # Theme bố cục — ý tưởng để dành làm sau
 
 > Ghi lại đề xuất theme thứ 3 (2026-09-05) sau khi v0.2.18 ra hai theme đầu. **Bản đầu của Workbench đã làm
-> ở v0.2.20** (activity bar + panel phụ kéo được); **panel đáy CHƯA làm** — phần còn lại ghi bên dưới. Đọc kèm
-> [TIEP-TUC-PHIEN-SAU.md](./TIEP-TUC-PHIEN-SAU.md) để biết hai theme hiện có được nối vào đâu.
+> ở v0.2.20** (activity bar + panel phụ kéo được); **panel đáy đã làm ở v0.2.22** (`components/workbench/BottomPanel.tsx`,
+> 3 tab Monitoring / Log / Tunnels, `Ctrl+J`, state `ui.workbenchBottom*`). Đọc kèm
+> [TIEP-TUC-PHIEN-SAU.md](./TIEP-TUC-PHIEN-SAU.md) để biết các theme được nối vào đâu.
 
 ## Hiện có gì (v0.2.18)
 
@@ -10,7 +11,7 @@
 |---|---|---|---|
 | **Infra mặc định** | Cây host theo nhóm, sổ ra tại chỗ, có khối tunnel/snippet/workspace bật tắt | Dashboard | Muốn xem tunnel/snippet thì bật khối → cột dài ra |
 | **Navigator** (kiểu Termius) | Menu 9 mục (Dashboard · Hosts · SFTP · Tunnels · Snippets · Keys · Workspaces · History · Tools — **Dashboard mặc định TẮT** từ v0.2.21, home = Hosts, thanh tab không có 🏠), không sổ gì; **sửa được** qua ⚙ (tick/kéo, Hosts khoá tick; `stores/navMenu.ts` + `visibleNavMenu`/`startupNavSection` ở shared) | Mục đang chọn (trang Hosts, History, Tunnels…); trang danh sách xếp **2 cột** khi vùng chính ≥ 48rem (container query `@3xl`) | Bấm mục nào là **rời terminal** để về vùng chính |
-| **Workbench** (kiểu VS Code, v0.2.20) | Activity bar 48px + panel phụ kéo được 200–520px (Hosts = Sidebar cũ `fluid`; Tunnels/Snippets/Workspaces = khối + Quản lý…; Keys/Tools gọn; History) | Dashboard | **Chưa có panel đáy** (Monitoring / Log dưới terminal) |
+| **Workbench** (kiểu VS Code, v0.2.20) | Activity bar 48px + panel phụ kéo được 200–520px (Hosts = Sidebar cũ `fluid`; Tunnels/Snippets/Workspaces = khối + Quản lý…; Keys/Tools gọn; History) | Dashboard; **panel đáy** (v0.2.22, `Ctrl+J`): Monitoring (card lưới, thay dock nổi ở theme này) · Xem log (`LogTailModal embedded fill`) · Tunnels (`TunnelsModal embedded`), kéo mép trên 120–600px | Pill AI chẩn đoán vẫn nổi (chưa vào panel đáy) |
 
 Cách nối: `settings.layout` (`infra.layout`) → `App.tsx` chọn `<NavRail/>` hay `<Sidebar/>`,
 `HomeView` (`features/navigator/NavigatorHome.tsx`) chọn vùng chính; mục đang chọn ở `ui.navSection`;
@@ -23,7 +24,9 @@ hai chỗ đó + một ô chọn kèm hình xem trước trong `SettingsModal` (
 
 > **Đã làm:** activity bar (`components/workbench/ActivityBar.tsx`), panel phụ kéo được (`SidePanel.tsx`),
 > state `ui.workbenchPanel` / `ui.workbenchPanelWidth`, `Sidebar fluid`, khối SidebarBlocks có prop `limit`,
-> lệnh palette `wb-*`, hình xem trước. **Chưa làm:** panel đáy (mục "Panel đáy" bên dưới) và các quyết định 1–3.
+> lệnh palette `wb-*`, hình xem trước. **v0.2.22:** panel đáy (`BottomPanel.tsx`, 3 tab, `Ctrl+J`, nút ⬒ trên
+> activity bar, palette `wb-bottom-*`; Monitoring ở theme này vào panel thay dock nổi — quyết định 3 nghiêng
+> về "một chỗ thôi" đã chọn). **Chưa làm:** pill AI chẩn đoán vào panel đáy; quyết định 2 (Dashboard vẫn là home).
 
 **Một câu:** thanh icon dọc bên trái chọn *panel phụ* hiện gì, panel phụ nằm cạnh, còn vùng chính
 **luôn là terminal**. Duyệt danh bạ mà không phải rời màn hình đang làm việc.

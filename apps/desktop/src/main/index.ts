@@ -20,7 +20,8 @@ import { registerHostToolsIpc } from './ipc/hostTools'
 import { registerReplicationIpc } from './ipc/replication'
 import { registerNetToolsIpc } from './ipc/nettools'
 import { flushSyncOnQuit, registerSyncIpc } from './ipc/sync'
-import { registerPromptIpc } from './ipc/prompts'
+import { registerPromptIpc, setPromptVisibilityHook } from './ipc/prompts'
+import { createTray, notifyHiddenOnce, shouldHideOnClose } from './tray'
 import { registerSftpIpc } from './ipc/sftp'
 import { registerVncIpc } from './ipc/vnc'
 import { registerRdpIpc } from './ipc/rdp'
@@ -62,13 +63,16 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 }
 
-app.on('second-instance', () => {
-  const win = BrowserWindow.getAllWindows()[0]
-  if (win) {
-    if (win.isMinimized()) win.restore()
-    win.focus()
-  }
-})
+// Mở lần 2 (hoặc bấm icon khay) → lấy lại cửa sổ chính: đang ẩn trong khay thì hiện, thu nhỏ thì bung.
+app.on('second-instance', () => showMainWindow())
+
+function showMainWindow(): void {
+  const win = mainWin && !mainWin.isDestroyed() ? mainWin : BrowserWindow.getAllWindows()[0]
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  if (!win.isVisible()) win.show()
+  win.focus()
+}
 
 function createWindow(): BrowserWindow {
   const iconPath = windowIconPath()
@@ -127,6 +131,8 @@ function loadRenderer(win: BrowserWindow, hash?: string): void {
 // ── Cửa sổ monitor tách rời (F04): nhỏ, không khung, always-on-top; sống cả khi app chính thu nhỏ.
 //    Nhận sample qua cùng luồng broadcast của MonitorService (main), không tự mở SSH riêng.
 let mainWin: BrowserWindow | null = null
+/** Đang trong chuỗi quit thật (before-quit đã chạy) — lúc này ✕ cửa sổ phải đóng thật, không ẩn vào khay. */
+let quitting = false
 let detachedMonitorWin: BrowserWindow | null = null
 let detachedMonitorHosts: Array<{ id: string; label: string }> = []
 
@@ -290,10 +296,26 @@ void app.whenReady().then(() => {
   mainWin = win
   registerUpdaterIpc(win)
   registerDetachedMonitorIpc()
+  // F53 — ✕ = ẨN vào khay (renderer vẫn chạy, tunnel/monitoring/watcher ở main không đụng gì),
+  // trừ khi đang quit thật hoặc user tắt tuỳ chọn. Thoát hẳn: menu khay → Thoát, hoặc Cmd+Q.
+  win.on('close', (event) => {
+    if (quitting || !shouldHideOnClose()) return
+    event.preventDefault()
+    win.hide()
+    notifyHiddenOnce()
+  })
   // Đóng app chính → đóng luôn cửa sổ monitor tách rời (thu nhỏ thì KHÔNG — đó là mục đích của tính năng)
   win.on('closed', () => {
     mainWin = null
     detachedMonitorWin?.close()
+  })
+  createTray({ getWindow: () => mainWin, showWindow: showMainWindow, quit: () => app.quit() })
+  // Câu hỏi từ main (host key mới, mật khẩu) gửi tới cửa sổ chính đang ẩn → hiện nó lên, không
+  // thì câu hỏi hết giờ trong im lặng và tunnel bật từ khay "không lên" không rõ vì sao.
+  setPromptVisibilityHook((target) => {
+    if (mainWin && !mainWin.isDestroyed() && target.id === mainWin.webContents.id && !mainWin.isVisible()) {
+      showMainWindow()
+    }
   })
   // Plugin host: cần cửa sổ để gửi event panel/notify; bridge để observe/gửi output terminal
   disposePlugins = registerPluginsIpc(() => mainWin ?? BrowserWindow.getAllWindows()[0] ?? null, terminal.bridge)
@@ -303,7 +325,9 @@ void app.whenReady().then(() => {
   void localDev.initIfEnabled()
 
   app.on('activate', () => {
+    // mac: bấm icon Dock khi cửa sổ đang ẩn trong khay → hiện lại, không tạo cửa sổ thứ hai
     if (BrowserWindow.getAllWindows().length === 0) mainWin = createWindow()
+    else showMainWindow()
   })
 })
 
@@ -314,7 +338,6 @@ app.on('window-all-closed', () => {
 /** Trần cứng cho phần dọn BẤT ĐỒNG BỘ khi quit: bấm X mà app treo lâu là lỗi nghiêm trọng
  *  hơn việc tắt service không đàng hoàng. */
 const QUIT_GRACE_MS = 8_000
-let quitting = false
 
 app.on('before-quit', (event) => {
   // Lần gọi thứ 2 (do app.exit bên dưới) phải đi thẳng, nếu không sẽ lặp vô hạn.

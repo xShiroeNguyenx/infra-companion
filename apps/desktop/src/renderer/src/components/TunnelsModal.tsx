@@ -3,6 +3,7 @@ import type { TunnelRuleDto, TunnelType } from '@infra/shared'
 import { useDataStore } from '../stores/data'
 import { pinnedFirst, useTunnelFavoritesStore } from '../stores/favorites'
 import { Button, ConfirmModal, Field, ModalOrPanel, Select, TextInput } from './ui'
+import { BoltIcon } from './icons'
 import { OpenInTabButton } from './OpenInTabButton'
 import { useT } from '../i18n'
 import type { I18nKey } from '../i18n/dict'
@@ -47,6 +48,8 @@ export function TunnelsModal({ onClose, embedded }: { onClose?: () => void; embe
   const [bindPort, setBindPort] = useState('')
   const [destHost, setDestHost] = useState('127.0.0.1')
   const [destPort, setDestPort] = useState('')
+  /** F15 — bật ngay khi mở app (sau khi vault mở). Cờ đã có trong vault từ lâu, nay mới có ô tick. */
+  const [autoStart, setAutoStart] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<TunnelRuleDto | null>(null)
   /** null = form đang TẠO MỚI; có giá trị = đang SỬA rule này (saveTunnel nhận id → UPDATE). */
@@ -62,6 +65,7 @@ export function TunnelsModal({ onClose, embedded }: { onClose?: () => void; embe
     setBindPort('')
     setDestHost('127.0.0.1')
     setDestPort('')
+    setAutoStart(false)
     setError(null)
     setMode('add')
   }
@@ -75,6 +79,7 @@ export function TunnelsModal({ onClose, embedded }: { onClose?: () => void; embe
     setBindPort(String(rule.bindPort))
     setDestHost(rule.destHost ?? '127.0.0.1')
     setDestPort(rule.destPort != null ? String(rule.destPort) : '')
+    setAutoStart(rule.autoStart)
     setError(null)
     setMode('add')
   }
@@ -97,6 +102,7 @@ export function TunnelsModal({ onClose, embedded }: { onClose?: () => void; embe
       bindPort: bind,
       destHost: type === 'D' ? null : destHost.trim(),
       destPort: type === 'D' ? null : dest,
+      autoStart,
       // Tên do user đặt; trống → nhãn tự-sinh theo route (khớp routeOf để openEdit nhận là "chưa đặt tên")
       label: name.trim() || (type === 'D' ? `SOCKS5 :${bind}` : `:${bind} → ${destHost.trim()}:${dest}`)
     })
@@ -195,6 +201,31 @@ export function TunnelsModal({ onClose, embedded }: { onClose?: () => void; embe
                   >
                     <StarIcon filled={pinned} />
                   </button>
+                  {/* ⚡ tự bật khi mở app — bật/tắt ngay trên hàng (cùng ngôn ngữ với ★: sáng = đang bật).
+                      Ô tick trong form vẫn còn; đây là lối tắt vì người dùng tìm nó ở đây trước. */}
+                  <button
+                    type="button"
+                    aria-pressed={rule.autoStart}
+                    className={`shrink-0 rounded p-1 ${
+                      rule.autoStart ? 'text-warning hover:bg-hover' : 'text-subtle hover:bg-hover hover:text-warning'
+                    }`}
+                    title={rule.autoStart ? t('tunnel.autoStartOff') : t('tunnel.autoStartOn')}
+                    onClick={() =>
+                      void saveTunnel({
+                        id: rule.id,
+                        hostId: rule.hostId,
+                        type: rule.type,
+                        label: rule.label,
+                        bindHost: rule.bindHost,
+                        bindPort: rule.bindPort,
+                        destHost: rule.destHost,
+                        destPort: rule.destPort,
+                        autoStart: !rule.autoStart
+                      })
+                    }
+                  >
+                    <BoltIcon filled={rule.autoStart} />
+                  </button>
                   <Button
                     type="button"
                     variant={running ? 'default' : 'primary'}
@@ -290,6 +321,19 @@ export function TunnelsModal({ onClose, embedded }: { onClose?: () => void; embe
               </div>
             </div>
           )}
+          {/* label bọc checkbox: bấm cả dòng là tick */}
+          <label className="mb-3 flex cursor-pointer items-start gap-2">
+            <input
+              type="checkbox"
+              checked={autoStart}
+              onChange={(e) => setAutoStart(e.target.checked)}
+              className="accent-accent mt-0.5"
+            />
+            <span className="min-w-0">
+              <span className="text-content block text-xs">⚡ {t('tunnel.autoStart')}</span>
+              <span className="text-subtle block text-[10px] leading-relaxed">{t('tunnel.autoStartHint')}</span>
+            </span>
+          </label>
           {error && <p className="mb-3 text-xs text-danger">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button

@@ -21,6 +21,22 @@ export function StarIcon({ filled }: { filled: boolean }) {
   )
 }
 
+/** Tia sét "tự bật khi mở app" — SVG theo currentColor để trạng thái bật/tắt nhìn ra được (emoji ⚡ luôn cam). */
+export function BoltIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width="11"
+      height="11"
+      viewBox="0 0 16 16"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="1.3"
+    >
+      <path d="M9.2 1.5 3.5 9.2h4l-.7 5.3 5.7-7.7h-4z" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export function PencilIcon() {
   return (
     <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">

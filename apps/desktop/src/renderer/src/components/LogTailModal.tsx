@@ -18,7 +18,12 @@ const MAX_LINES = 5000
  * Panel này chạy qua kênh exec riêng: lọc/tô màu tại chỗ, tự cuộn khi đang ở đáy, và dừng
  * dứt khoát khi đóng.
  */
-export function LogTailModal({ onClose, embedded }: { onClose?: () => void; embedded?: boolean }) {
+/**
+ * `embedded` = nhúng vào tab/trang (bỏ khung popup). `fill` = vùng log lấp đầy chiều cao còn lại
+ * của chỗ nhúng thay vì tính theo `100vh` — cần cho panel đáy Workbench (cao 120–600px, không phải
+ * cả cửa sổ). Chỉ có ý nghĩa khi `embedded`.
+ */
+export function LogTailModal({ onClose, embedded, fill }: { onClose?: () => void; embedded?: boolean; fill?: boolean }) {
   const t = useT()
   const hosts = useDataStore((s) => s.hosts).filter((h) => h.protocol === 'ssh')
   // Rỗng = chưa chọn. Panel này không tự nối, nhưng mặc định sẵn một máy thì rất dễ bấm
@@ -102,7 +107,7 @@ export function LogTailModal({ onClose, embedded }: { onClose?: () => void; embe
       headerExtra={embedded ? undefined : <OpenInTabButton kind="log-tail" onDone={onClose} />}
     >
       {/* Trong tab thì dùng hết chiều rộng — log dài, càng rộng càng đỡ phải cuộn ngang */}
-      <div className={embedded ? 'w-full' : 'w-[760px] max-w-full'}>
+      <div className={embedded ? (fill ? 'flex h-full w-full flex-col' : 'w-full') : 'w-[760px] max-w-full'}>
         <div className="mb-2 flex items-center gap-2">
           <Select value={hostId} onChange={(e) => setHostId(e.target.value)} className="max-w-48" disabled={!!sessionId}>
             <option value="">{t('common.pickHost')}</option>
@@ -193,7 +198,7 @@ export function LogTailModal({ onClose, embedded }: { onClose?: () => void; embe
             setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 24)
           }}
           className={`border-edge bg-app overflow-auto rounded border p-2 font-mono text-[11px] leading-relaxed ${
-            embedded ? 'h-[calc(100vh-16rem)]' : 'h-96'
+            embedded ? (fill ? 'min-h-0 flex-1' : 'h-[calc(100vh-16rem)]') : 'h-96'
           }`}
         >
           {shown.length === 0 ? (

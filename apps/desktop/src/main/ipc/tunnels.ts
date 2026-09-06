@@ -1,6 +1,7 @@
+import { EventEmitter } from 'node:events'
 import { BrowserWindow, ipcMain, type WebContents } from 'electron'
 import { TunnelService } from '@infra/core'
-import { IPC, type TunnelRuleDto, type TunnelRuleInput } from '@infra/shared'
+import { IPC, pickAutoStartRules, type TunnelRuleDto, type TunnelRuleInput } from '@infra/shared'
 import { getVault, touchActivity } from './vault'
 import { makeHostKeyVerifier, prepareConnection } from './connection'
 
@@ -13,6 +14,41 @@ const service = new TunnelService()
 
 export function getTunnelService(): TunnelService {
   return service
+}
+
+/** Danh sách rule vừa đổi (thêm/sửa/xoá) — menu khay hệ thống dựng lại theo sự kiện này. */
+const rulesChanged = new EventEmitter()
+
+export function onTunnelRulesChanged(cb: () => void): () => void {
+  rulesChanged.on('change', cb)
+  return () => {
+    rulesChanged.off('change', cb)
+  }
+}
+
+/** Bật một rule theo id — cho menu khay (không đi qua IPC của renderer). */
+export async function startTunnelById(sender: WebContents, id: string): Promise<void> {
+  const rule = getVault().getTunnel(id)
+  if (!rule) throw new Error('Tunnel không tồn tại')
+  await startRule(sender, rule)
+}
+
+/**
+ * F15 — bật mọi rule có `autoStart`, MỘT lần cho mỗi tiến trình. Renderer gọi sau khi vault mở
+ * (kể cả mở tự động bằng DPAPI lúc khởi động). Chặn lần thứ hai ở đây, không tin renderer: khoá
+ * rồi mở lại vault, hay hai cửa sổ cùng nạp, đều không được làm bật lại tunnel user đã chủ ý dừng.
+ *
+ * Chạy song song: mỗi tunnel là một kết nối SSH riêng, và `TunnelService.start` nuốt lỗi vào
+ * state nên `allSettled` chỉ để không bị một `prepareConnection` ném lỗi (host đã xoá) làm rơi
+ * các rule còn lại. Kết quả thật tới renderer qua `TUNNELS_EVENT` như mọi lần bật khác.
+ */
+let autoStarted = false
+export async function autoStartTunnels(sender: WebContents): Promise<number> {
+  if (autoStarted) return 0
+  autoStarted = true
+  const rules = pickAutoStartRules(getVault().listTunnels())
+  await Promise.allSettled(rules.map((rule) => startRule(sender, rule)))
+  return rules.length
 }
 
 /** Bật một tunnel rule (idempotent — đang chạy thì bỏ qua). */
@@ -67,13 +103,21 @@ export function registerTunnelsIpc(): () => void {
 
   ipcMain.handle(IPC.TUNNELS_SAVE, (_event, input: TunnelRuleInput) => {
     touchActivity()
-    return getVault().saveTunnel(input)
+    const saved = getVault().saveTunnel(input)
+    rulesChanged.emit('change')
+    return saved
   })
 
   ipcMain.handle(IPC.TUNNELS_DELETE, (_event, id: string) => {
     touchActivity()
     service.stop(id)
     getVault().deleteTunnel(id)
+    rulesChanged.emit('change')
+  })
+
+  ipcMain.handle(IPC.TUNNELS_AUTOSTART, (event) => {
+    touchActivity()
+    return autoStartTunnels(event.sender)
   })
 
   ipcMain.handle(IPC.TUNNELS_START, async (event, id: string) => {

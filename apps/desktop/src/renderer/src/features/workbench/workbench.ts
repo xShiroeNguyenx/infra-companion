@@ -1,5 +1,19 @@
+import type { I18nKey } from '../../i18n'
 import { NAV_ITEMS, type NavItemMeta } from '../navigator/nav'
-import { useUiStore, type WorkbenchPanel } from '../../stores/ui'
+import { useUiStore, type WorkbenchBottomTab, type WorkbenchPanel } from '../../stores/ui'
+
+/** Ba tab của panel ĐÁY (dưới terminal) — BottomPanel, ActivityBar và palette dùng chung bộ này. */
+export interface WorkbenchBottomMeta {
+  id: WorkbenchBottomTab
+  icon: string
+  titleKey: I18nKey
+}
+
+export const WORKBENCH_BOTTOM_TABS_META: readonly WorkbenchBottomMeta[] = [
+  { id: 'monitor', icon: '📊', titleKey: 'workbench.bottomMonitor' },
+  { id: 'log', icon: '🪵', titleKey: 'workbench.bottomLog' },
+  { id: 'tunnels', icon: '🔀', titleKey: 'workbench.bottomTunnels' }
+]
 
 /**
  * Theme **Workbench** (kiểu VS Code) — phần "dữ liệu" của activity bar + panel phụ.

@@ -1801,6 +1801,19 @@ export type UpdateCheckResultDto =
    */
   | { status: 'error'; message: string; code?: 'assetsPending' }
 
+/** Ngôn ngữ giao diện — main chỉ cần nó cho menu khay hệ thống (renderer giữ từ điển đầy đủ). */
+export type UiLanguage = 'vi' | 'en' | 'ja'
+
+/**
+ * F53 — tuỳ chọn khay hệ thống, renderer gửi sang main lúc khởi động và mỗi khi đổi.
+ * Main không đọc localStorage của renderer được nên phải nhận qua IPC.
+ */
+export interface TrayPrefsDto {
+  /** Bấm ✕ cửa sổ chính = ẩn vào khay (tunnel/monitoring/watcher vẫn chạy); false = thoát như cũ. */
+  closeToTray: boolean
+  language: UiLanguage
+}
+
 export interface InfraApi {
   vault: {
     status(): Promise<VaultStatus>
@@ -1809,6 +1822,10 @@ export interface InfraApi {
     lock(): Promise<VaultStatus>
     /** Sự kiện vault bị khoá từ main (auto-lock). Trả về hàm unsubscribe. */
     onLocked(cb: () => void): () => void
+  }
+  app: {
+    /** F53 — báo main tuỳ chọn khay hệ thống (đóng-về-khay, ngôn ngữ menu khay). */
+    setTrayPrefs(prefs: TrayPrefsDto): void
   }
   data: {
     listShells(): Promise<ShellProfile[]>
@@ -1840,6 +1857,12 @@ export interface InfraApi {
     closeDetached(): void
     /** Cửa sổ tách rời đang mở? (để cửa sổ chính đổi nhãn nút) */
     onDetachedState(cb: (open: boolean) => void): () => void
+    /**
+     * F15 — bật mọi rule có `autoStart`. Gọi MỘT lần sau khi vault mở; main tự chặn lần gọi
+     * thứ hai trong cùng tiến trình. Trả về số rule đã được yêu cầu bật (kết quả thật đến qua
+     * `onState`, vì `TunnelService.start` nuốt lỗi vào state).
+     */
+    autoStart(): Promise<number>
   }
   terminal: {
     create(req: TerminalCreateRequest): Promise<TerminalCreateResponse>

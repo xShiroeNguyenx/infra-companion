@@ -3,7 +3,7 @@ import { Sidebar } from './components/Sidebar'
 import { NavRail } from './components/NavRail'
 import { ActivityBar } from './components/workbench/ActivityBar'
 import { SidePanel } from './components/workbench/SidePanel'
-import { WORKBENCH_PANELS, openWorkbenchPanel } from './features/workbench/workbench'
+import { WORKBENCH_BOTTOM_TABS_META, WORKBENCH_PANELS, openWorkbenchPanel } from './features/workbench/workbench'
 import { StatusBar } from './components/StatusBar'
 import { TabsBar } from './components/TabsBar'
 import { PromptsHost } from './components/PromptsHost'
@@ -16,6 +16,7 @@ import { BulkRunModal } from './components/BulkRunModal'
 import { NetToolboxModal } from './components/NetToolboxModal'
 import { MonitorModal } from './components/MonitorModal'
 import { MonitorDock } from './components/MonitorDock'
+import { BottomPanel } from './components/workbench/BottomPanel'
 import { MonitorTabView } from './components/MonitorTabView'
 import { CompareTabView } from './components/CompareTabView'
 import { LocaldevTabView } from './features/localdev/LocaldevTabView'
@@ -57,6 +58,7 @@ import { useToastsStore } from './stores/toasts'
 import { useUiStore } from './stores/ui'
 import { usePluginStore } from './stores/plugins'
 import { useMonitorStore } from './stores/monitor'
+import { useTrayStore } from './stores/tray'
 import { useLocaldevStore } from './stores/localdev'
 import { useFontsStore } from './stores/fonts'
 import { useWatcherStore } from './stores/watcher'
@@ -111,8 +113,12 @@ export default function App() {
   const bgFit = useSettingsStore((s) => s.backgroundFit)
   // Theme bố cục: Infra (cột host sổ tại chỗ) hay Navigator (cột trái là menu, nội dung ở vùng chính)
   const layout = useSettingsStore((s) => s.layout)
+  const language = useSettingsStore((s) => s.language)
+  // F53: đóng cửa sổ có thu vào khay không — main cần biết, gửi sang mỗi khi đổi
+  const closeToTray = useTrayStore((s) => s.closeToTray)
   // Workbench: cờ này = "panel phụ đang đóng" (activity bar vẫn còn)
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed)
+  const bottomOpen = useUiStore((s) => s.workbenchBottomOpen)
   // Command Palette lên store chung để nút toolbar (TerminalTabView) cũng mở được
   const paletteOpen = useUiStore((s) => s.paletteOpen)
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
@@ -222,10 +228,24 @@ export default function App() {
     }
   }, [])
 
+  // F53: main giữ tuỳ chọn khay (đóng-về-khay + ngôn ngữ menu khay) — gửi lúc khởi động và mỗi khi đổi
+  useEffect(() => {
+    window.infra.app.setTrayPrefs({ closeToTray, language })
+  }, [closeToTray, language])
+
+  // Workbench: Monitoring bật lên là vào panel đáy (thay cho dock nổi góc phải ở hai theme kia).
+  // Chỉ chạy khi cờ ĐỔI — user đóng panel trong lúc đang theo dõi thì không bị mở lại.
+  useEffect(() => {
+    if (layout === 'workbench' && monitorActive) useUiStore.getState().openWorkbenchBottom('monitor')
+  }, [layout, monitorActive])
+
   useEffect(() => {
     if (vaultState !== 'unlocked') return
     void useDataStore.getState().refreshAll()
     void usePluginStore.getState().refresh()
+    // F15: bật các tunnel có cờ "tự bật" — main tự chặn lần gọi thứ hai trong cùng tiến trình
+    // (khoá rồi mở lại vault không làm bật lại tunnel user đã chủ ý dừng)
+    void window.infra.tunnels.autoStart()
     if (!openedInitialTab.current) {
       openedInitialTab.current = true
       // Mặc định khởi động vào Dashboard (activeId=null = home, không cần mở gì);
@@ -304,6 +324,14 @@ export default function App() {
         event.preventDefault()
         event.stopPropagation()
         useUiStore.getState().toggleSidebar()
+      } else if (!event.shiftKey && event.code === 'KeyJ') {
+        // Ctrl+J: panel đáy của theme Workbench (kiểu VS Code). Theme khác không có panel này nên
+        // để phím đi tiếp xuống terminal (Ctrl+J là ký tự xuống dòng). Đọc layout từ store vì
+        // effect này đăng ký một lần.
+        if (useSettingsStore.getState().layout !== 'workbench') return
+        event.preventDefault()
+        event.stopPropagation()
+        useUiStore.getState().toggleWorkbenchBottom()
       } else if (!event.shiftKey && event.code === 'KeyI') {
         event.preventDefault()
         event.stopPropagation()
@@ -367,11 +395,24 @@ export default function App() {
       : []),
     // Theme Workbench: mỗi panel phụ cũng gọi được từ palette (mở panel + chuyển mục)
     ...(layout === 'workbench'
-      ? WORKBENCH_PANELS.map((p) => ({
-          id: `wb-${p.id}`,
-          label: `${p.icon} ${t(p.titleKey)}`,
-          run: () => openWorkbenchPanel(p.id)
-        }))
+      ? [
+          ...WORKBENCH_PANELS.map((p) => ({
+            id: `wb-${p.id}`,
+            label: `${p.icon} ${t(p.titleKey)}`,
+            run: () => openWorkbenchPanel(p.id)
+          })),
+          // Panel đáy: bật/tắt + mở thẳng từng tab
+          {
+            id: 'wb-bottom-toggle',
+            label: `⬒ ${t('workbench.bottomToggle')}`,
+            run: () => useUiStore.getState().toggleWorkbenchBottom()
+          },
+          ...WORKBENCH_BOTTOM_TABS_META.map((b) => ({
+            id: `wb-bottom-${b.id}`,
+            label: `⬒ ${b.icon} ${t(b.titleKey)}`,
+            run: () => useUiStore.getState().openWorkbenchBottom(b.id)
+          }))
+        ]
       : []),
     // Trang SFTP: ở theme Navigator đã có lệnh `nav-sftp` phía trên; theme Infra/Workbench mở dạng tab
     ...(layout !== 'navigator'
@@ -519,6 +560,8 @@ export default function App() {
               })}
             </div>
           </div>
+          {/* Workbench: panel đáy (Monitoring / Log / Tunnels) dưới vùng tab, Ctrl+J — terminal tự fit lại qua ResizeObserver */}
+          {layout === 'workbench' && bottomOpen && <BottomPanel />}
         </div>
       </div>
       <StatusBar />
@@ -569,7 +612,10 @@ export default function App() {
       )}
       {/* Ẩn dock góc phải khi: (a) đã tách ra cửa sổ riêng, HOẶC (b) đang mở Monitoring trong tab
           (nút – trong tab đóng tab → dock hiện lại → chuyển qua lại giữa tab và dock). */}
-      {monitorActive && !monitorDetached && !tabs.some((t) => t.kind === 'monitor') && <MonitorDock />}
+      {/* Dock nổi góc phải — trừ theme Workbench: ở đó Monitoring có chỗ cố định trong panel đáy */}
+      {layout !== 'workbench' && monitorActive && !monitorDetached && !tabs.some((t) => t.kind === 'monitor') && (
+        <MonitorDock />
+      )}
       <RdpDock />{/* tự return null khi không có tunnel RDP nào */}
       {pluginPanel && (
         <PluginPanelModal panel={pluginPanel} onClose={() => usePluginStore.getState().setPanel(null)} />

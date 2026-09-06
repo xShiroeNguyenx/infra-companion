@@ -76,7 +76,11 @@ const api: InfraApi = {
     onState: (cb) => subscribe<TunnelStateDto>(IPC.TUNNELS_EVENT, cb),
     openDetached: () => ipcRenderer.invoke(IPC.TUNNELS_OPEN_DETACHED),
     closeDetached: () => ipcRenderer.send(IPC.TUNNELS_CLOSE_DETACHED),
-    onDetachedState: (cb) => subscribe<boolean>(IPC.TUNNELS_DETACHED_STATE, cb)
+    onDetachedState: (cb) => subscribe<boolean>(IPC.TUNNELS_DETACHED_STATE, cb),
+    autoStart: () => ipcRenderer.invoke(IPC.TUNNELS_AUTOSTART)
+  },
+  app: {
+    setTrayPrefs: (prefs) => ipcRenderer.send(IPC.APP_TRAY_PREFS, prefs)
   },
   terminal: {
     create: (req: TerminalCreateRequest) => ipcRenderer.invoke(IPC.TERM_CREATE, req),

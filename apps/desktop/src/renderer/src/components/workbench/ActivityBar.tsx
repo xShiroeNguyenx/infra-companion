@@ -25,6 +25,8 @@ export function ActivityBar() {
   const panel = useUiStore((s) => s.workbenchPanel)
   const setPanel = useUiStore((s) => s.setWorkbenchPanel)
   const setModal = useUiStore((s) => s.setModal)
+  const bottomOpen = useUiStore((s) => s.workbenchBottomOpen)
+  const toggleBottom = useUiStore((s) => s.toggleWorkbenchBottom)
   const tabs = useTabsStore((s) => s.tabs)
   const activeId = useTabsStore((s) => s.activeId)
   const openToolTab = useTabsStore((s) => s.openToolTab)
@@ -84,6 +86,8 @@ export function ActivityBar() {
         )
       })}
       <div className="flex-1" />
+      {/* Panel đáy (Monitoring / Log / Tunnels dưới terminal) — sáng khi đang mở, Ctrl+J cũng bật/tắt */}
+      <RailButton icon="⬒" label={t('workbench.bottomToggle')} active={bottomOpen} flat onClick={toggleBottom} />
       <RailButton icon="⚙" label={t('settings.title')} onClick={() => setModal('settings')} />
       <RailButton icon="❓" label={t('help.title')} onClick={() => setModal('help')} />
     </div>

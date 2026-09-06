@@ -5,6 +5,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.22] — 2026-09-06
+
+### Added
+
+- **Close to the system tray.** Closing the main window now **hides** it instead of quitting: tunnels, monitoring and the uptime watcher keep running, and your terminal tabs are exactly where you left them when you come back. A **tray icon** shows how many tunnels are up in its tooltip; a left-click reopens the window and a right-click opens a menu that lists **every tunnel with a checkbox to start or stop it** without opening the app, plus *Quit*. The first time the window is hidden a notification says so, so nobody thinks the app has crashed. Settings → **Application** turns the behaviour off (✕ quits as before). If a hidden window needs your answer — a new host key, a password — it comes back on its own instead of the question timing out in silence.
+- **Tunnels that start themselves.** Every tunnel row gains a ⚡ button next to the ★ pin: click it and that tunnel **starts automatically when the app opens** — right after the vault unlocks, including the remembered auto-unlock. A lit ⚡ means it is on; the same switch also sits in the tunnel editor. Together with the tray this is "the DB tunnels are simply always there". (The flag has lived in the vault since the first tunnel release; nothing read it until now.)
+- **Workbench bottom panel.** The third theme gets the docked panel from its proposal: `Ctrl+J`, ⬒ on the activity bar or the palette opens a panel **under the terminal** with three tabs — 📊 **Monitoring** (the same cards as the floating dock, laid out in a grid), 🪵 **Log** (*Watch a log*) and 🔀 **Tunnels** (the full table with Start / Edit / Delete). Drag its top edge to resize (120–600 px); height, tab and open state are remembered. In this theme starting Monitoring opens the panel instead of the floating dock at the top right; the other two themes keep the dock. All three tabs stay mounted, so a running tail or a half-filled tunnel form survives switching tabs.
+
+### Changed
+
+- The Workbench preview thumbnail in Settings now shows the bottom panel.
+
+---
+
 ## [0.2.21] — 2026-09-06
 
 ### Changed

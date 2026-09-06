@@ -13,6 +13,17 @@ let registered = false
 const PROMPT_TIMEOUT_MS = 120_000
 
 /**
+ * F53 — móc gọi TRƯỚC mỗi câu hỏi gửi sang renderer. `main/index.ts` dùng nó để hiện lại cửa sổ
+ * chính khi nó đang ẩn trong khay: một câu hỏi (host key mới, mật khẩu) mà không ai thấy thì
+ * chỉ hết giờ rồi bị coi là từ chối, và tunnel bật từ khay "im lặng không lên" không rõ vì sao.
+ */
+let visibilityHook: ((target: WebContents) => void) | null = null
+
+export function setPromptVisibilityHook(hook: ((target: WebContents) => void) | null): void {
+  visibilityHook = hook
+}
+
+/**
  * Cho phép main hỏi renderer (host key TOFU, password Quick Connect…):
  * main gửi event kèm requestId → renderer hiện modal → trả lời qua PROMPT_ANSWER.
  */
@@ -42,6 +53,7 @@ export function askRenderer<TAnswer>(
       resolve(null) // hết giờ → coi như từ chối
     }, PROMPT_TIMEOUT_MS)
     pending.set(requestId, { resolve: (answer) => resolve(answer as TAnswer), timer })
+    visibilityHook?.(target)
     target.send(channel, { requestId, ...payload })
   })
 }

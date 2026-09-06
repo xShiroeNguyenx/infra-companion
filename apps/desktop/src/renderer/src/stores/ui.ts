@@ -54,6 +54,17 @@ export const WORKBENCH_PANEL_MIN = 200
 export const WORKBENCH_PANEL_MAX = 520
 const WORKBENCH_PANEL_DEFAULT = 260
 
+/**
+ * Panel ĐÁY của theme Workbench (dưới terminal, kiểu VS Code `Ctrl+J`): chỗ ở cố định cho những
+ * thứ vốn nổi lơ lửng góc phải — Monitoring, Xem log, Tunnels. Tab đang chọn, đang mở/đóng và
+ * chiều cao đều nhớ qua localStorage.
+ */
+export type WorkbenchBottomTab = 'monitor' | 'log' | 'tunnels'
+export const WORKBENCH_BOTTOM_TABS: readonly WorkbenchBottomTab[] = ['monitor', 'log', 'tunnels']
+export const WORKBENCH_BOTTOM_MIN = 120
+export const WORKBENCH_BOTTOM_MAX = 600
+const WORKBENCH_BOTTOM_DEFAULT = 240
+
 interface UiState {
   modal: AppModal
   /** Theme Workbench: panel phụ đang hiện gì (nhớ qua localStorage). */
@@ -62,6 +73,15 @@ interface UiState {
   /** Theme Workbench: bề rộng panel phụ (kéo mép để đổi, nhớ qua localStorage). */
   workbenchPanelWidth: number
   setWorkbenchPanelWidth: (px: number) => void
+  /** Theme Workbench: panel đáy — tab đang chọn, đang mở không, chiều cao (px). */
+  workbenchBottomTab: WorkbenchBottomTab
+  workbenchBottomOpen: boolean
+  workbenchBottomHeight: number
+  /** Mở panel đáy (và chuyển tab nếu truyền). */
+  openWorkbenchBottom: (tab?: WorkbenchBottomTab) => void
+  closeWorkbenchBottom: () => void
+  toggleWorkbenchBottom: () => void
+  setWorkbenchBottomHeight: (px: number) => void
   /** Theme Navigator: mục đang chọn ở cột trái (nhớ qua localStorage để mở lại đúng chỗ). */
   navSection: NavSection
   setNavSection: (s: NavSection) => void
@@ -89,6 +109,27 @@ const SIDEBAR_KEY = 'infra.sidebar.collapsed'
 const NAV_KEY = 'infra.nav.section'
 const WB_PANEL_KEY = 'infra.workbench.panel'
 const WB_WIDTH_KEY = 'infra.workbench.panelWidth'
+const WB_BOTTOM_TAB_KEY = 'infra.workbench.bottom.tab'
+const WB_BOTTOM_OPEN_KEY = 'infra.workbench.bottom.open'
+const WB_BOTTOM_HEIGHT_KEY = 'infra.workbench.bottom.height'
+
+function readBottomTab(): WorkbenchBottomTab {
+  const v = localStorage.getItem(WB_BOTTOM_TAB_KEY)
+  return (WORKBENCH_BOTTOM_TABS as readonly string[]).includes(v ?? '') ? (v as WorkbenchBottomTab) : 'monitor'
+}
+
+function readBottomHeight(): number {
+  const n = Number(localStorage.getItem(WB_BOTTOM_HEIGHT_KEY))
+  return Number.isFinite(n) && n >= WORKBENCH_BOTTOM_MIN && n <= WORKBENCH_BOTTOM_MAX ? Math.round(n) : WORKBENCH_BOTTOM_DEFAULT
+}
+
+function save(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    /* localStorage lỗi — chỉ mất persist */
+  }
+}
 
 function readWorkbenchPanel(): WorkbenchPanel {
   const v = localStorage.getItem(WB_PANEL_KEY)
@@ -154,6 +195,31 @@ export const useUiStore = create<UiState>((set) => ({
       /* localStorage lỗi — chỉ mất persist */
     }
     set({ workbenchPanelWidth })
+  },
+  workbenchBottomTab: readBottomTab(),
+  workbenchBottomOpen: localStorage.getItem(WB_BOTTOM_OPEN_KEY) === '1',
+  workbenchBottomHeight: readBottomHeight(),
+  openWorkbenchBottom: (tab) =>
+    set((s) => {
+      const workbenchBottomTab = tab ?? s.workbenchBottomTab
+      save(WB_BOTTOM_TAB_KEY, workbenchBottomTab)
+      save(WB_BOTTOM_OPEN_KEY, '1')
+      return { workbenchBottomTab, workbenchBottomOpen: true }
+    }),
+  closeWorkbenchBottom: () => {
+    save(WB_BOTTOM_OPEN_KEY, '0')
+    set({ workbenchBottomOpen: false })
+  },
+  toggleWorkbenchBottom: () =>
+    set((s) => {
+      const workbenchBottomOpen = !s.workbenchBottomOpen
+      save(WB_BOTTOM_OPEN_KEY, workbenchBottomOpen ? '1' : '0')
+      return { workbenchBottomOpen }
+    }),
+  setWorkbenchBottomHeight: (px) => {
+    const workbenchBottomHeight = Math.round(Math.min(WORKBENCH_BOTTOM_MAX, Math.max(WORKBENCH_BOTTOM_MIN, px)))
+    save(WB_BOTTOM_HEIGHT_KEY, String(workbenchBottomHeight))
+    set({ workbenchBottomHeight })
   },
   aiDiagnoseMin: false,
   minimizeAiDiagnose: () => set({ modal: null, aiDiagnoseMin: true }),

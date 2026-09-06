@@ -100,7 +100,8 @@ function WorkbenchPreview() {
       <div className="bg-panel border-edge flex w-[30%] flex-col gap-[3px] border-r p-1.5">
         <HostTreeLines />
       </div>
-      {/* Vùng chính = terminal: nền tối hơn, vài dòng "lệnh" — dòng prompt tô success như prompt shell */}
+      {/* Vùng chính = terminal: nền tối hơn, vài dòng "lệnh" — dòng prompt tô success như prompt shell;
+          dưới cùng là panel đáy (3 tab nhỏ + hai thanh đo) */}
       <div className="flex flex-1 flex-col gap-1 p-1.5">
         <div className="flex gap-1">
           <span className="bg-elevated border-edge-strong h-2 w-1/4 rounded-sm border" />
@@ -113,10 +114,24 @@ function WorkbenchPreview() {
           </span>
           <span className="bg-edge-strong h-1 w-3/5 rounded-sm" />
           <span className="bg-edge-strong h-1 w-2/5 rounded-sm" />
-          <span className="bg-edge-strong h-1 w-1/2 rounded-sm" />
           <span className="flex gap-1">
             <span className="bg-success/70 h-1 w-[12%] rounded-sm" />
             <span className="bg-content/70 h-1 w-[6%] rounded-sm" />
+          </span>
+        </div>
+        <div className="bg-panel border-edge-strong flex h-[26%] flex-col gap-1 rounded-sm border p-1">
+          <span className="flex gap-1.5">
+            <span className="bg-accent h-1 w-[14%] rounded-sm" />
+            <span className="bg-edge-strong h-1 w-[10%] rounded-sm" />
+            <span className="bg-edge-strong h-1 w-[12%] rounded-sm" />
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="bg-subtle/60 h-[3px] w-[18%] rounded-sm" />
+            <span className="bg-success/70 h-[3px] w-1/2 rounded-sm" />
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="bg-subtle/60 h-[3px] w-[18%] rounded-sm" />
+            <span className="bg-warning/70 h-[3px] w-2/3 rounded-sm" />
           </span>
         </div>
       </div>

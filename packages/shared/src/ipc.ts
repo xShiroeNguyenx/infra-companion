@@ -34,6 +34,8 @@ export const IPC = {
   TUNNELS_STOP: 'tunnels:stop',
   TUNNELS_STATES: 'tunnels:states',
   TUNNELS_EVENT: 'tunnels:event',
+  /** Bật mọi tunnel có cờ `autoStart` — renderer gọi MỘT lần sau khi vault mở (main tự chặn lần 2). */
+  TUNNELS_AUTOSTART: 'tunnels:autostart',
   /** Tách bảng tunnel ra CỬA SỔ RIÊNG always-on-top (như monitor) để theo dõi khi app bị che. */
   TUNNELS_OPEN_DETACHED: 'tunnels:open-detached',
   TUNNELS_CLOSE_DETACHED: 'tunnels:close-detached',
@@ -324,7 +326,11 @@ export const IPC = {
   FONTS_ADD: 'fonts:add',
   /** Đổi tên họ font đã thêm (tên này là thứ đi vào CSS font-family). */
   FONTS_RENAME: 'fonts:rename',
-  FONTS_REMOVE: 'fonts:remove'
+  FONTS_REMOVE: 'fonts:remove',
+
+  // ── F53: khay hệ thống + chạy nền ────────────────────────────────────────
+  /** Renderer báo main tuỳ chọn khay (đóng cửa sổ có thu vào khay không, ngôn ngữ menu khay). */
+  APP_TRAY_PREFS: 'app:tray-prefs'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
