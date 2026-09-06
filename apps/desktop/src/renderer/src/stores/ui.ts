@@ -59,8 +59,27 @@ const NAV_SECTIONS: readonly NavSection[] = [
   'tools'
 ]
 
+/**
+ * Mục đang mở trong PANEL PHỤ của theme Workbench. Tách khỏi `navSection`: nút 🏠 đặt
+ * `navSection = 'dashboard'` (đúng cho Navigator) mà nếu Workbench cũng đọc cờ đó thì bấm 🏠 làm
+ * panel đang xem Tunnels nhảy về Hosts. Dashboard/SFTP không phải panel (chúng là vùng làm việc).
+ */
+export type WorkbenchPanel = 'hosts' | 'tunnels' | 'snippets' | 'keys' | 'workspaces' | 'history' | 'tools'
+
+const WORKBENCH_PANELS: readonly WorkbenchPanel[] = ['hosts', 'tunnels', 'snippets', 'keys', 'workspaces', 'history', 'tools']
+/** Bề rộng panel phụ Workbench (px) — kẹp để không kéo mất terminal hay bé tới mức vô dụng. */
+export const WORKBENCH_PANEL_MIN = 200
+export const WORKBENCH_PANEL_MAX = 520
+const WORKBENCH_PANEL_DEFAULT = 260
+
 interface UiState {
   modal: AppModal
+  /** Theme Workbench: panel phụ đang hiện gì (nhớ qua localStorage). */
+  workbenchPanel: WorkbenchPanel
+  setWorkbenchPanel: (p: WorkbenchPanel) => void
+  /** Theme Workbench: bề rộng panel phụ (kéo mép để đổi, nhớ qua localStorage). */
+  workbenchPanelWidth: number
+  setWorkbenchPanelWidth: (px: number) => void
   /** Theme Navigator: mục đang chọn ở cột trái (nhớ qua localStorage để mở lại đúng chỗ). */
   navSection: NavSection
   setNavSection: (s: NavSection) => void
@@ -86,6 +105,18 @@ interface UiState {
 
 const SIDEBAR_KEY = 'infra.sidebar.collapsed'
 const NAV_KEY = 'infra.nav.section'
+const WB_PANEL_KEY = 'infra.workbench.panel'
+const WB_WIDTH_KEY = 'infra.workbench.panelWidth'
+
+function readWorkbenchPanel(): WorkbenchPanel {
+  const v = localStorage.getItem(WB_PANEL_KEY)
+  return (WORKBENCH_PANELS as readonly string[]).includes(v ?? '') ? (v as WorkbenchPanel) : 'hosts'
+}
+
+function readWorkbenchWidth(): number {
+  const n = Number(localStorage.getItem(WB_WIDTH_KEY))
+  return Number.isFinite(n) && n >= WORKBENCH_PANEL_MIN && n <= WORKBENCH_PANEL_MAX ? Math.round(n) : WORKBENCH_PANEL_DEFAULT
+}
 
 function readNavSection(): NavSection {
   const v = localStorage.getItem(NAV_KEY)
@@ -116,6 +147,25 @@ export const useUiStore = create<UiState>((set) => ({
       /* localStorage lỗi — chỉ mất persist */
     }
     set({ navSection })
+  },
+  workbenchPanel: readWorkbenchPanel(),
+  setWorkbenchPanel: (workbenchPanel) => {
+    try {
+      localStorage.setItem(WB_PANEL_KEY, workbenchPanel)
+    } catch {
+      /* localStorage lỗi — chỉ mất persist */
+    }
+    set({ workbenchPanel })
+  },
+  workbenchPanelWidth: readWorkbenchWidth(),
+  setWorkbenchPanelWidth: (px) => {
+    const workbenchPanelWidth = Math.round(Math.min(WORKBENCH_PANEL_MAX, Math.max(WORKBENCH_PANEL_MIN, px)))
+    try {
+      localStorage.setItem(WB_WIDTH_KEY, String(workbenchPanelWidth))
+    } catch {
+      /* localStorage lỗi — chỉ mất persist */
+    }
+    set({ workbenchPanelWidth })
   },
   aiDiagnoseMin: false,
   minimizeAiDiagnose: () => set({ modal: null, aiDiagnoseMin: true }),

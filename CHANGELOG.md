@@ -5,6 +5,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.20] — 2026-09-06
+
+### Added
+
+- **A third theme: Workbench** (Settings → Appearance → Theme), the VS Code arrangement. A **48px activity bar** on the far left picks what the **side panel** beside it shows — Hosts (the full host column: search, quick connect, favorites, folding groups, blocks), Tunnels, Snippets and Workspaces (start / run / open right on the row, with a *Manage…* button for the full editor), SSH Keys, History and Tools — while the **main area is always your terminal tabs**. Neither existing theme lets you look up a tunnel or a snippet while a terminal stays on screen: Infra makes the column grow, Navigator sends you home. Click the lit icon again (or `Ctrl+Shift+H`) to close the panel and keep the bar; **drag the panel's edge** to resize it, and the width is remembered. 🏠 goes home and 📁 opens the SFTP page as a tab, since those are work areas rather than lists; every panel is also a palette command. The docked bottom panel from the proposal (Monitoring / Log under the terminal) is not in this release.
+
+---
+
 ## [0.2.19] — 2026-09-05
 
 ### Added

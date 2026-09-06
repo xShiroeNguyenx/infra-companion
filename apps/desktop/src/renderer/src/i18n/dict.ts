@@ -1690,6 +1690,13 @@ export const vi = {
   'settings.layoutNavigator': 'Navigator',
   'settings.layoutNavigatorDesc':
     'Kiểu Termius: cột trái chỉ là menu — Hosts · Tunnels · Snippets · Keys…; bấm mục nào thì nội dung hiện ở vùng chính, không sổ ra trong cột.',
+  'settings.layoutWorkbench': 'Workbench',
+  'settings.layoutWorkbenchDesc':
+    'Kiểu VS Code: thanh icon dọc chọn panel phụ (Hosts, Tunnels, Snippets, Keys…) nằm cạnh; vùng chính luôn là terminal — duyệt danh bạ mà không rời màn hình đang làm việc. Kéo mép để đổi bề rộng panel.',
+  'workbench.resize': 'Kéo để đổi bề rộng panel',
+  'keys.none': 'Chưa có key nào',
+  'keys.copyPub': 'Copy pub',
+  'keys.copiedPub': 'Đã copy public key',
   'settings.layoutHint':
     'Đổi theme không đụng dữ liệu: host, nhóm, tunnel… vẫn y nguyên, chỉ cách bày màn hình khác đi. Lưu trên máy này.',
   'nav.dashboard': 'Dashboard',
@@ -3346,6 +3353,13 @@ export const en: Partial<Record<I18nKey, string>> = {
   'settings.layoutNavigator': 'Navigator',
   'settings.layoutNavigatorDesc':
     'Termius-style: the left column is a menu — Hosts · Tunnels · Snippets · Keys…; pick an entry and it opens in the main area instead of unfolding in the column.',
+  'settings.layoutWorkbench': 'Workbench',
+  'settings.layoutWorkbenchDesc':
+    'VS Code-style: a vertical icon bar picks a side panel (Hosts, Tunnels, Snippets, Keys…) next to it, and the main area is always the terminal — browse without leaving what you are working on. Drag the edge to resize the panel.',
+  'workbench.resize': 'Drag to resize the panel',
+  'keys.none': 'No keys yet',
+  'keys.copyPub': 'Copy pub',
+  'keys.copiedPub': 'Public key copied',
   'settings.layoutHint':
     'Switching themes touches no data — hosts, groups and tunnels stay exactly as they are; only the screen arrangement changes. Stored on this machine.',
   'nav.dashboard': 'Dashboard',
@@ -5000,6 +5014,13 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'settings.layoutNavigator': 'ナビゲーター',
   'settings.layoutNavigatorDesc':
     'Termius 風：左カラムは Hosts・Tunnels・Snippets・Keys… のメニューだけ。選んだ項目はカラム内に展開されず、メイン領域に表示されます。',
+  'settings.layoutWorkbench': 'Workbench',
+  'settings.layoutWorkbenchDesc':
+    'VS Code 風：縦のアイコンバーでサイドパネル（Hosts・Tunnels・Snippets・Keys…）を選び、メイン領域は常にターミナル。作業画面を離れずに一覧を参照できます。端をドラッグして幅を変更。',
+  'workbench.resize': 'ドラッグでパネル幅を変更',
+  'keys.none': 'キーはまだありません',
+  'keys.copyPub': '公開鍵をコピー',
+  'keys.copiedPub': '公開鍵をコピーしました',
   'settings.layoutHint':
     'テーマの切替はデータに影響しません — ホスト・グループ・トンネルはそのまま。画面の配置だけが変わります。この端末に保存。',
   'nav.dashboard': 'ダッシュボード',

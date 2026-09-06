@@ -55,8 +55,12 @@ type OpenModal =
   | { kind: 'notes'; host: HostDto }
   | null
 
-/** Cột trái: Quick Connect / tìm kiếm, hosts theo group, lịch sử, menu công cụ. */
-export function Sidebar() {
+/**
+ * Cột trái: Quick Connect / tìm kiếm, hosts theo group, lịch sử, menu công cụ.
+ * `fluid` = nhúng vào panel phụ của theme Workbench: lấy hết bề rộng cha (panel tự có viền/nền),
+ * thay cho cột 240px cố định.
+ */
+export function Sidebar({ fluid = false }: { readonly fluid?: boolean } = {}) {
   const t = useT()
   const { hosts, groups, history, refreshAll, deleteGroup } = useDataStore()
   const { openSsh, openQuick, openSshGroup } = useTabsStore()
@@ -188,7 +192,13 @@ export function Sidebar() {
   }
 
   return (
-    <div className="border-edge bg-panel flex w-60 shrink-0 flex-col border-r select-none">
+    <div
+      className={
+        fluid
+          ? 'flex w-full min-w-0 flex-col select-none'
+          : 'border-edge bg-panel flex w-60 shrink-0 flex-col border-r select-none'
+      }
+    >
       <div className="p-2">
         <div className="flex items-center gap-1">
           <input

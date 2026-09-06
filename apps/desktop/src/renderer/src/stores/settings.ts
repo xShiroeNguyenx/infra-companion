@@ -9,9 +9,11 @@ export type ThemeMode = 'dark' | 'light'
  * - `infra`     — giao diện gốc: cột trái liệt kê host theo nhóm và sổ ra tại chỗ; Dashboard là trang chủ
  * - `navigator` — kiểu Termius: cột trái chỉ là MENU (Hosts · Tunnels · Snippets · Keys…), bấm mục nào
  *                 thì nội dung hiện ở VÙNG CHÍNH thay cho Dashboard, không sổ ra trong cột
+ * - `workbench` — kiểu VS Code: thanh icon 48px chọn PANEL PHỤ (host, tunnel, snippet…) nằm cạnh; vùng chính
+ *                 luôn là terminal, duyệt danh bạ mà không rời màn hình đang làm việc
  */
-export type LayoutTheme = 'infra' | 'navigator'
-export const LAYOUT_THEMES: readonly LayoutTheme[] = ['infra', 'navigator']
+export type LayoutTheme = 'infra' | 'navigator' | 'workbench'
+export const LAYOUT_THEMES: readonly LayoutTheme[] = ['infra', 'navigator', 'workbench']
 export type Language = 'vi' | 'en' | 'ja'
 /** Vị trí ảnh nền (background-position keyword). */
 export type BgPosition = 'center' | 'left' | 'right' | 'top' | 'bottom'
@@ -110,7 +112,7 @@ function readTheme(): ThemeMode {
 /** Theme bố cục — mặc định `infra` (giao diện cũ), giá trị lạ trong localStorage cũng về đó. */
 function readLayout(): LayoutTheme {
   const v = localStorage.getItem(LAYOUT_KEY)
-  return v === 'navigator' ? 'navigator' : 'infra'
+  return v === 'navigator' || v === 'workbench' ? v : 'infra'
 }
 
 function readLang(): Language {
@@ -722,7 +724,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
     // Bố cục (tuỳ chọn, file theme bản cũ không có) — chỉ nhận giá trị hợp lệ, không có thì giữ nguyên
     const rawLayout = raw.layout
-    if (rawLayout === 'infra' || rawLayout === 'navigator') {
+    if (rawLayout === 'infra' || rawLayout === 'navigator' || rawLayout === 'workbench') {
       localStorage.setItem(LAYOUT_KEY, rawLayout)
       applyLayout(rawLayout)
       set({ layout: rawLayout })

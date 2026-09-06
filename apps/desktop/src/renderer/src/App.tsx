@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { NavRail } from './components/NavRail'
+import { ActivityBar } from './components/workbench/ActivityBar'
+import { SidePanel } from './components/workbench/SidePanel'
+import { WORKBENCH_PANELS, openWorkbenchPanel } from './features/workbench/workbench'
 import { StatusBar } from './components/StatusBar'
 import { TabsBar } from './components/TabsBar'
 import { PromptsHost } from './components/PromptsHost'
@@ -108,6 +111,8 @@ export default function App() {
   const bgFit = useSettingsStore((s) => s.backgroundFit)
   // Theme bố cục: Infra (cột host sổ tại chỗ) hay Navigator (cột trái là menu, nội dung ở vùng chính)
   const layout = useSettingsStore((s) => s.layout)
+  // Workbench: cờ này = "panel phụ đang đóng" (activity bar vẫn còn)
+  const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed)
   // Command Palette lên store chung để nút toolbar (TerminalTabView) cũng mở được
   const paletteOpen = useUiStore((s) => s.paletteOpen)
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
@@ -356,7 +361,15 @@ export default function App() {
           { id: 'localdev-stop-all', label: t('localdev.stopAll'), run: () => void useLocaldevStore.getState().stopAll() }
         ]
       : []),
-    // Trang SFTP: ở theme Navigator đã có lệnh `nav-sftp` phía trên; theme Infra mở dạng tab
+    // Theme Workbench: mỗi panel phụ cũng gọi được từ palette (mở panel + chuyển mục)
+    ...(layout === 'workbench'
+      ? WORKBENCH_PANELS.map((p) => ({
+          id: `wb-${p.id}`,
+          label: `${p.icon} ${t(p.titleKey)}`,
+          run: () => openWorkbenchPanel(p.id)
+        }))
+      : []),
+    // Trang SFTP: ở theme Navigator đã có lệnh `nav-sftp` phía trên; theme Infra/Workbench mở dạng tab
     ...(layout !== 'navigator'
       ? [{ id: 'open-sftp', label: t('menu.sftp'), run: () => useTabsStore.getState().openToolTab('files') }]
       : []),
@@ -462,7 +475,16 @@ export default function App() {
       )}
       <div className="flex min-h-0 flex-1">
         {/* Cột trái theo theme: Infra = danh sách host sổ tại chỗ; Navigator = menu, nội dung ở vùng chính */}
-        {layout === 'navigator' ? <NavRail /> : <Sidebar />}
+        {layout === 'navigator' ? (
+          <NavRail />
+        ) : layout === 'workbench' ? (
+          <>
+            <ActivityBar />
+            {!sidebarCollapsed && <SidePanel />}
+          </>
+        ) : (
+          <Sidebar />
+        )}
         <div className="flex min-w-0 flex-1 flex-col">
           <UpdateBanner />
           <TabsBar />

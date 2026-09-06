@@ -18,14 +18,15 @@ import { useT } from '../i18n'
  * không phải luồn thêm prop qua Sidebar.
  */
 
-/** Số dòng tối đa mỗi khối — sidebar là chỗ "đi tới nhanh", không phải nơi xem toàn bộ danh sách. */
+/** Số dòng tối đa mỗi khối MẶC ĐỊNH — sidebar là chỗ "đi tới nhanh", không phải nơi xem toàn bộ danh sách.
+ *  Panel phụ của theme Workbench truyền `limit={Infinity}`: ở đó khối LÀ danh sách. */
 const BLOCK_LIMIT = 8
 
 /**
  * Khối Tunnels — chấm trạng thái + nút bật/tắt tại chỗ, cùng cách trình bày với Dashboard.
  * Tunnel được ghim nổi lên đầu (dùng lại `pinnedFirst`, cùng thứ tự với mọi nơi khác).
  */
-export function TunnelsBlock() {
+export function TunnelsBlock({ limit = BLOCK_LIMIT }: { readonly limit?: number } = {}) {
   const t = useT()
   const tunnels = useDataStore((s) => s.tunnels)
   const tunnelStates = useDataStore((s) => s.tunnelStates)
@@ -38,7 +39,7 @@ export function TunnelsBlock() {
   return (
     <>
       {pinnedFirst(tunnels, favIds)
-        .slice(0, BLOCK_LIMIT)
+        .slice(0, limit)
         .map((rule) => {
           const state = tunnelStates[rule.id]?.status ?? 'stopped'
           const detail = tunnelStates[rule.id]?.detail
@@ -87,7 +88,7 @@ export function TunnelsBlock() {
  * **chọn pane đích**. Chạy một snippet lên pane sai là tai nạn có thật, nên bước chọn đích
  * không được bỏ chỉ vì lối vào ngắn hơn.
  */
-export function SnippetsBlock() {
+export function SnippetsBlock({ limit = BLOCK_LIMIT }: { readonly limit?: number } = {}) {
   const t = useT()
   const snippets = useDataStore((s) => s.snippets)
   const [running, setRunning] = useState<SnippetDto | null>(null)
@@ -96,7 +97,7 @@ export function SnippetsBlock() {
 
   return (
     <>
-      {snippets.slice(0, BLOCK_LIMIT).map((snippet) => (
+      {snippets.slice(0, limit).map((snippet) => (
         <button
           key={snippet.id}
           className="text-muted hover:bg-hover hover:text-content block w-full truncate rounded px-2 py-1 text-left text-[11px]"
@@ -112,7 +113,7 @@ export function SnippetsBlock() {
 }
 
 /** Khối Workspaces — bấm là mở lại cả bộ tab/pane đã lưu. */
-export function WorkspacesBlock() {
+export function WorkspacesBlock({ limit = BLOCK_LIMIT }: { readonly limit?: number } = {}) {
   const t = useT()
   const workspaces = useWorkspacesStore((s) => s.workspaces)
   const open = useWorkspacesStore((s) => s.open)
@@ -121,7 +122,7 @@ export function WorkspacesBlock() {
 
   return (
     <>
-      {workspaces.slice(0, BLOCK_LIMIT).map((ws) => (
+      {workspaces.slice(0, limit).map((ws) => (
         <button
           key={ws.id}
           className="text-muted hover:bg-hover hover:text-content flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[11px]"

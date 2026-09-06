@@ -1,6 +1,7 @@
 # Theme bố cục — ý tưởng để dành làm sau
 
-> Ghi lại đề xuất theme thứ 3 (2026-09-05) sau khi v0.2.18 ra hai theme đầu. **Chưa làm.** Đọc kèm
+> Ghi lại đề xuất theme thứ 3 (2026-09-05) sau khi v0.2.18 ra hai theme đầu. **Bản đầu của Workbench đã làm
+> ở v0.2.20** (activity bar + panel phụ kéo được); **panel đáy CHƯA làm** — phần còn lại ghi bên dưới. Đọc kèm
 > [TIEP-TUC-PHIEN-SAU.md](./TIEP-TUC-PHIEN-SAU.md) để biết hai theme hiện có được nối vào đâu.
 
 ## Hiện có gì (v0.2.18)
@@ -9,6 +10,7 @@
 |---|---|---|---|
 | **Infra mặc định** | Cây host theo nhóm, sổ ra tại chỗ, có khối tunnel/snippet/workspace bật tắt | Dashboard | Muốn xem tunnel/snippet thì bật khối → cột dài ra |
 | **Navigator** (kiểu Termius) | Menu 9 mục (có 📁 SFTP), không sổ gì | Mục đang chọn (trang Hosts, History, Tunnels…) | Bấm mục nào là **rời terminal** để về vùng chính |
+| **Workbench** (kiểu VS Code, v0.2.20) | Activity bar 48px + panel phụ kéo được 200–520px (Hosts = Sidebar cũ `fluid`; Tunnels/Snippets/Workspaces = khối + Quản lý…; Keys/Tools gọn; History) | Dashboard | **Chưa có panel đáy** (Monitoring / Log dưới terminal) |
 
 Cách nối: `settings.layout` (`infra.layout`) → `App.tsx` chọn `<NavRail/>` hay `<Sidebar/>`,
 `HomeView` (`features/navigator/NavigatorHome.tsx`) chọn vùng chính; mục đang chọn ở `ui.navSection`;
@@ -17,7 +19,11 @@ hai chỗ đó + một ô chọn kèm hình xem trước trong `SettingsModal` (
 
 ---
 
-## Đề xuất chính: **Workbench** (kiểu VS Code)
+## Đề xuất chính: **Workbench** (kiểu VS Code) — ✅ bản đầu đã làm ở v0.2.20
+
+> **Đã làm:** activity bar (`components/workbench/ActivityBar.tsx`), panel phụ kéo được (`SidePanel.tsx`),
+> state `ui.workbenchPanel` / `ui.workbenchPanelWidth`, `Sidebar fluid`, khối SidebarBlocks có prop `limit`,
+> lệnh palette `wb-*`, hình xem trước. **Chưa làm:** panel đáy (mục "Panel đáy" bên dưới) và các quyết định 1–3.
 
 **Một câu:** thanh icon dọc bên trái chọn *panel phụ* hiện gì, panel phụ nằm cạnh, còn vùng chính
 **luôn là terminal**. Duyệt danh bạ mà không phải rời màn hình đang làm việc.

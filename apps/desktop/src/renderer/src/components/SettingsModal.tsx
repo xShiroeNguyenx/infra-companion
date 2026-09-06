@@ -229,7 +229,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   // Theme BỐ CỤC (khác chế độ màu): Infra = giao diện gốc; Navigator = kiểu Termius
   const layoutOptions: Array<{ value: LayoutTheme; label: string; desc: string }> = [
     { value: 'infra', label: t('settings.layoutInfra'), desc: t('settings.layoutInfraDesc') },
-    { value: 'navigator', label: t('settings.layoutNavigator'), desc: t('settings.layoutNavigatorDesc') }
+    { value: 'navigator', label: t('settings.layoutNavigator'), desc: t('settings.layoutNavigatorDesc') },
+    { value: 'workbench', label: t('settings.layoutWorkbench'), desc: t('settings.layoutWorkbenchDesc') }
   ]
 
   const themeOptions: Array<{ value: ThemeMode; label: string; swatch: string }> = [
@@ -328,7 +329,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 {/* Theme bố cục đứng ĐẦU mục Giao diện: nó đổi cả cách bày màn hình, các thứ dưới
                     (chế độ màu, accent, bảng màu) chỉ tô lên bố cục đã chọn. */}
                 <Field label={t('settings.layout')}>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {layoutOptions.map((opt) => (
                       <button
                         key={opt.value}
