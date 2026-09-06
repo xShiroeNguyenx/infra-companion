@@ -1,17 +1,27 @@
+import { useMemo, useState } from 'react'
+import { orderedNavMenu, resolveNavigatorSection, NAV_MENU_LOCKED, type NavMenuId } from '@infra/shared'
 import { useDataStore } from '../stores/data'
+import { useNavMenuStore } from '../stores/navMenu'
 import { useTabsStore } from '../stores/tabs'
 import { useUiStore, type NavSection } from '../stores/ui'
 import { useWorkspacesStore } from '../stores/workspaces'
-import { NAV_ITEMS, goToSection } from '../features/navigator/nav'
+import { NAV_ITEM_BY_ID, goToSection, useNavMenu } from '../features/navigator/nav'
+import { BlockLayoutPanel } from './BlockLayoutPanel'
+import { GearIcon } from './icons'
 import { useT } from '../i18n'
 
 /**
  * Cột trái của theme **Navigator** — thay cho `Sidebar` khi user chọn theme này.
  *
- * Nó KHÔNG liệt kê host. Nó là một dãy mục (Dashboard · Hosts · Tunnels · Snippets · Keys ·
- * Workspaces · History · Tools) và bấm mục nào thì nội dung hiện ở vùng chính — đúng cách
- * Termius làm, và là điều user yêu cầu: "menu bên trái không sổ ra nữa, phần tử con hiện ở
- * giao diện chính".
+ * Nó KHÔNG liệt kê host. Nó là một dãy mục (Hosts · SFTP · Tunnels · Snippets · Keys ·
+ * Workspaces · History · Tools, và Dashboard nếu user bật) và bấm mục nào thì nội dung hiện ở
+ * vùng chính — đúng cách Termius làm, và là điều user yêu cầu: "menu bên trái không sổ ra nữa,
+ * phần tử con hiện ở giao diện chính". Theme này bắt đầu thẳng từ Hosts; thanh tab không có 🏠
+ * vì chính các mục ở đây đã là đường về vùng chính.
+ *
+ * Menu **sửa được** như khối sidebar của theme Infra: nút ⚙ ở hàng đầu mở hộp tick mục nào hiện
+ * và kéo sắp thứ tự (Hosts khoá tick vì nó là trang chính; Dashboard mặc định tắt). Mục đã tắt
+ * vẫn gọi được từ palette.
  *
  * Nút `«` (hoặc Ctrl+Shift+H) thu cột về dạng chỉ-icon 48px thay vì biến mất hẳn như Sidebar:
  * ở đây mỗi mục là một icon rõ nghĩa nên thu gọn vẫn dùng được, không cần mở lại để bấm.
@@ -20,7 +30,7 @@ export function NavRail() {
   const t = useT()
   const collapsed = useUiStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
-  const section = useUiStore((s) => s.navSection)
+  const section = resolveNavigatorSection(useUiStore((s) => s.navSection))
   const setModal = useUiStore((s) => s.setModal)
   const activeId = useTabsStore((s) => s.activeId)
   const hosts = useDataStore((s) => s.hosts)
@@ -29,6 +39,8 @@ export function NavRail() {
   const snippets = useDataStore((s) => s.snippets)
   const keys = useDataStore((s) => s.keys)
   const workspaces = useWorkspacesStore((s) => s.workspaces)
+  const items = useNavMenu()
+  const [layoutOpen, setLayoutOpen] = useState(false)
 
   // Mục chỉ SÁNG khi vùng chính đang hiện nó (không tab nào active). Đang ở tab terminal thì
   // không mục nào sáng — sáng một mục mà màn hình đang là terminal thì nó nói sai.
@@ -47,12 +59,26 @@ export function NavRail() {
     <div
       className={`border-edge bg-panel flex shrink-0 flex-col border-r select-none ${collapsed ? 'w-12' : 'w-52'}`}
     >
-      {/* Hàng đầu: tên app + nút thu/mở. Thu gọn thì chỉ còn nút `»` để mở lại. */}
-      <div className={`flex items-center py-2 ${collapsed ? 'justify-center' : 'gap-2 pr-1.5 pl-3'}`}>
+      {/* Hàng đầu: tên app + ⚙ bố cục + nút thu/mở. Thu gọn thì chỉ còn nút `»` để mở lại —
+          hộp cấu hình không có chỗ đứng trong 48px nên ⚙ cũng ẩn theo. */}
+      <div className={`flex items-center py-2 ${collapsed ? 'justify-center' : 'gap-1 pr-1.5 pl-3'}`}>
         {!collapsed && (
-          <span className="text-content min-w-0 flex-1 truncate text-xs font-semibold tracking-wide">
-            Infra Companion
-          </span>
+          <>
+            <span className="text-content min-w-0 flex-1 truncate text-xs font-semibold tracking-wide">
+              Infra Companion
+            </span>
+            <button
+              className={`hover:bg-hover shrink-0 rounded px-1 py-1 leading-none ${
+                layoutOpen ? 'text-accent' : 'text-subtle hover:text-content'
+              }`}
+              title={t('nav.layoutTitle')}
+              aria-label={t('nav.layoutTitle')}
+              aria-expanded={layoutOpen}
+              onClick={() => setLayoutOpen((v) => !v)}
+            >
+              <GearIcon />
+            </button>
+          </>
         )}
         <button
           className="text-subtle hover:bg-hover hover:text-content shrink-0 rounded px-1.5 py-1 text-sm leading-none"
@@ -64,8 +90,14 @@ export function NavRail() {
         </button>
       </div>
 
+      {layoutOpen && !collapsed && (
+        <div className="px-1.5">
+          <NavLayoutPanel onClose={() => setLayoutOpen(false)} />
+        </div>
+      )}
+
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-1.5 py-1">
-        {NAV_ITEMS.map((item) => (
+        {items.map((item) => (
           <NavButton
             key={item.id}
             icon={item.icon}
@@ -86,6 +118,46 @@ export function NavRail() {
         <NavButton icon="❓" label={t('help.title')} collapsed={collapsed} onClick={() => setModal('help')} />
       </div>
     </div>
+  )
+}
+
+/**
+ * Hộp cấu hình menu Navigator: đủ 9 mục theo thứ tự đang dùng (kể cả mục đang tắt — đây là chỗ
+ * duy nhất bật lại được, vd Dashboard), Hosts khoá tick. Phần vẽ dùng chung với sidebar Infra
+ * (`BlockLayoutPanel`).
+ */
+function NavLayoutPanel({ onClose }: { readonly onClose: () => void }) {
+  const t = useT()
+  const order = useNavMenuStore((s) => s.order)
+  const enabled = useNavMenuStore((s) => s.enabled)
+  const toggle = useNavMenuStore((s) => s.toggle)
+  const move = useNavMenuStore((s) => s.move)
+  const reset = useNavMenuStore((s) => s.reset)
+
+  const rows = useMemo(() => {
+    return orderedNavMenu(order).map((id: NavMenuId) => {
+      const item = NAV_ITEM_BY_ID.get(id)
+      const locked = NAV_MENU_LOCKED.includes(id)
+      return {
+        id,
+        icon: item?.icon ?? '',
+        label: item ? t(item.titleKey) : id,
+        on: locked || enabled.includes(id),
+        locked
+      }
+    })
+  }, [order, enabled, t])
+
+  return (
+    <BlockLayoutPanel
+      title={t('nav.layoutTitle')}
+      rows={rows}
+      lockedHint={t('nav.layoutLocked')}
+      onToggle={toggle}
+      onMove={move}
+      onReset={reset}
+      onClose={onClose}
+    />
   )
 }
 

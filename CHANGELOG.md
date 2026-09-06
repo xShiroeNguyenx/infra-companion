@@ -5,6 +5,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.21] — 2026-09-06
+
+### Changed
+
+- **The Navigator theme starts at Hosts.** Dashboard is **off by default** in the Navigator menu (turn it back on in *Menu layout*, below), so the theme opens on Hosts; the 🏠 button disappears from the tab bar in this theme, since every menu entry already brings you back to the main area, and the *Startup page* setting reads *Home page* there. *Infra default* and *Workbench* keep their Dashboard and their 🏠. If an earlier version remembered you on Dashboard, the app now opens on Hosts instead of a page that is not on the menu; the same goes for any entry you have hidden.
+- **The Navigator menu is yours to arrange**, the way the sidebar blocks of the Infra theme already were. A ⚙ at the top of the menu opens *Menu layout*: tick which entries show and **drag to reorder** — Dashboard, SFTP, Tunnels, Snippets, SSH Keys, Workspaces, History and Tools can each be shown or hidden; Hosts stays on because it is the home page, but it can be moved. A hidden entry is still reachable from the Command Palette. *Reset to default layout* restores the original order. Stored per machine, separately from the Infra sidebar's configuration.
+- **Two columns for the list pages.** Tunnels, Snippets, SSH Keys, Workspaces and History lay their rows out in **two columns** when the area they sit in is wide enough (about 770 px), and fall back to one column in a narrower window or in the Workbench side panel. This follows the list wherever it is embedded, so a Tunnels tool tab in the Infra theme gets the same treatment.
+
+---
+
 ## [0.2.20] — 2026-09-06
 
 ### Added

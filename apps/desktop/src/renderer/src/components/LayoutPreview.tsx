@@ -6,8 +6,8 @@ import type { LayoutTheme } from '../stores/settings'
  *
  *  · `infra`     — cột trái là cây host (ô tìm, ★ yêu thích, nhóm sổ ra), vùng chính là Dashboard
  *                  (hàng ô công cụ + card nhóm);
- *  · `navigator` — cột trái là dãy mục icon + nhãn (mục thứ hai đang chọn), vùng chính là trang
- *                  Hosts (header + thẻ thư mục nhóm);
+ *  · `navigator` — cột trái là dãy mục icon + nhãn (mục ĐẦU — Hosts — đang chọn, theme này không
+ *                  có Dashboard), vùng chính là trang Hosts (header + thẻ thư mục nhóm);
  *  · `workbench` — thanh icon 48px + panel phụ (cây host), vùng chính là terminal (vài dòng lệnh).
  */
 export function LayoutPreview({ layout }: { layout: LayoutTheme }) {
@@ -18,14 +18,14 @@ export function LayoutPreview({ layout }: { layout: LayoutTheme }) {
       {/* Cột trái */}
       <div className={`bg-panel border-edge flex flex-col gap-[3px] border-r p-1.5 ${navigator ? 'w-[30%]' : 'w-[36%]'}`}>
         {navigator ? (
-          ['w-3/5', 'w-1/2', 'w-2/3', 'w-3/5', 'w-1/2', 'w-2/3'].map((w, i) => (
+          ['w-1/2', 'w-2/5', 'w-3/5', 'w-1/2', 'w-2/3', 'w-3/5'].map((w, i) => (
             <div
               key={i}
-              className={`flex items-center gap-1 rounded-sm px-0.5 py-[2px] ${i === 1 ? 'bg-accent-soft/60' : ''}`}
-              style={i === 1 ? { boxShadow: 'inset 1px 0 0 var(--c-accent)' } : undefined}
+              className={`flex items-center gap-1 rounded-sm px-0.5 py-[2px] ${i === 0 ? 'bg-accent-soft/60' : ''}`}
+              style={i === 0 ? { boxShadow: 'inset 1px 0 0 var(--c-accent)' } : undefined}
             >
-              <span className={`size-1.5 shrink-0 rounded-sm ${i === 1 ? 'bg-accent' : 'bg-subtle/70'}`} />
-              <span className={`h-1 rounded-sm ${w} ${i === 1 ? 'bg-content/70' : 'bg-edge-strong'}`} />
+              <span className={`size-1.5 shrink-0 rounded-sm ${i === 0 ? 'bg-accent' : 'bg-subtle/70'}`} />
+              <span className={`h-1 rounded-sm ${w} ${i === 0 ? 'bg-content/70' : 'bg-edge-strong'}`} />
             </div>
           ))
         ) : (

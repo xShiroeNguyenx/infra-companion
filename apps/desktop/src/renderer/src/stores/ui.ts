@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { startupNavSection, type NavMenuId } from '@infra/shared'
+import { useNavMenuStore } from './navMenu'
 import { useToolUsageStore } from './toolUsage'
 
 export type AppModal =
@@ -34,30 +36,10 @@ export type AppModal =
 
 /**
  * Mục đang chọn trên thanh điều hướng của theme Navigator. Vùng chính (khi không tab nào
- * active) vẽ đúng mục này thay cho Dashboard. Theme Infra không đọc giá trị này.
+ * active) vẽ đúng mục này. Theme Infra/Workbench không đọc giá trị này (🏠 của chúng vẫn gọi
+ * `goToSection('dashboard')` — vô hại, vùng chính ở đó luôn là Dashboard).
  */
-export type NavSection =
-  | 'dashboard'
-  | 'hosts'
-  | 'sftp'
-  | 'tunnels'
-  | 'snippets'
-  | 'keys'
-  | 'workspaces'
-  | 'history'
-  | 'tools'
-
-const NAV_SECTIONS: readonly NavSection[] = [
-  'dashboard',
-  'hosts',
-  'sftp',
-  'tunnels',
-  'snippets',
-  'keys',
-  'workspaces',
-  'history',
-  'tools'
-]
+export type NavSection = NavMenuId
 
 /**
  * Mục đang mở trong PANEL PHỤ của theme Workbench. Tách khỏi `navSection`: nút 🏠 đặt
@@ -118,9 +100,15 @@ function readWorkbenchWidth(): number {
   return Number.isFinite(n) && n >= WORKBENCH_PANEL_MIN && n <= WORKBENCH_PANEL_MAX ? Math.round(n) : WORKBENCH_PANEL_DEFAULT
 }
 
+/**
+ * Mục mở app vào: chỉ nhận mục đang CÓ trên menu Navigator, còn lại về Hosts. Ca thật: bản
+ * v0.2.20 nhớ `dashboard` (khi đó Dashboard mặc định bật), nay Dashboard mặc định tắt — mở app
+ * mà rơi vào Dashboard với menu không sáng mục nào thì trái với "bắt đầu từ Hosts". Trong phiên
+ * thì `setNavSection` nhận mọi mục hợp lệ (palette vẫn mở được mục đã tắt).
+ */
 function readNavSection(): NavSection {
-  const v = localStorage.getItem(NAV_KEY)
-  return (NAV_SECTIONS as readonly string[]).includes(v ?? '') ? (v as NavSection) : 'hosts'
+  const menu = useNavMenuStore.getState()
+  return startupNavSection(localStorage.getItem(NAV_KEY), menu.order, menu.enabled)
 }
 
 /**

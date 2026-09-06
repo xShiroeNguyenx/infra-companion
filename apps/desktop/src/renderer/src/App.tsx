@@ -324,10 +324,14 @@ export default function App() {
   const locked = vaultState !== 'unlocked'
 
   const paletteCommands: Command[] = [
-    { id: 'open-dashboard', label: t('menu.dashboard'), run: () => goToSection('dashboard') },
-    // Theme Navigator: mỗi mục trên cột trái cũng gọi được từ palette (Hosts, Tunnels, Keys…)
+    // Theme Navigator: Dashboard đã nằm trong bộ `nav-*` bên dưới — không thêm lệnh trùng.
     ...(layout === 'navigator'
-      ? NAV_ITEMS.filter((item) => item.id !== 'dashboard').map((item) => ({
+      ? []
+      : [{ id: 'open-dashboard', label: t('menu.dashboard'), run: () => goToSection('dashboard') }]),
+    // Theme Navigator: mỗi mục cũng gọi được từ palette — ĐỦ bộ, kể cả mục user đã tắt trên cột
+    // trái (tắt là bỏ khỏi cột, không phải cấm dùng; palette là lối vào còn lại của nó).
+    ...(layout === 'navigator'
+      ? NAV_ITEMS.map((item) => ({
           id: `nav-${item.id}`,
           label: `${item.icon} ${t(item.titleKey)}`,
           run: () => goToSection(item.id)

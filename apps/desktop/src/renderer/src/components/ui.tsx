@@ -93,7 +93,9 @@ export function ModalOrPanel({
   headerExtra?: ReactNode
   closeOnBackdrop?: boolean
 }) {
-  if (embedded) return <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{children}</div>
+  // `@container`: danh sách bên trong tự xếp 2 cột khi vùng nhúng đủ rộng (`@3xl:grid-cols-2`) —
+  // trang Navigator / tab công cụ thì 2 cột, panel phụ Workbench 200–520px thì vẫn 1 cột.
+  if (embedded) return <div className="@container min-h-0 flex-1 overflow-y-auto px-4 py-3">{children}</div>
   return (
     <Modal title={title} onClose={onClose} headerExtra={headerExtra} closeOnBackdrop={closeOnBackdrop}>
       {children}

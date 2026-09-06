@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ShellProfile, SnippetDto } from '@infra/shared'
 import { useDataStore } from '../stores/data'
 import { useLocaldevStore, stackDot, type LdStackDot } from '../stores/localdev'
+import { useSettingsStore } from '../stores/settings'
 import { useTabsStore, type AppTab, type ToolTabKind } from '../stores/tabs'
 import { tabColor } from '../lib/groupColor'
 import { goToSection } from '../features/navigator/nav'
@@ -88,6 +89,7 @@ const EDGE_SCROLL_PX = 24
 /** Thanh tab trên cùng: danh sách tab + nút snippet ⚡ + nút mở tab local mới. */
 export function TabsBar() {
   const t = useT()
+  const layout = useSettingsStore((s) => s.layout)
   const { tabs, activeId, openLocal, closeTab, setActive, moveTab } = useTabsStore()
   const snippets = useDataStore((s) => s.snippets)
   // Chấm của tab localdev phản ánh stack thật (chạy/một phần/chết) — lấy từ store dùng chung
@@ -153,21 +155,23 @@ export function TabsBar() {
 
   return (
     <div className="border-edge bg-panel flex h-9 shrink-0 items-stretch gap-px border-b pl-1 select-none">
-      <div className="flex items-center">
-        {/* 🏠 CHÍNH LÀ Dashboard (home, không phải tab) — sáng khi không tab nào active */}
-        <button
-          aria-selected={activeId === null}
-          className={`flex h-7 items-center rounded px-2 ${
-            activeId === null ? 'bg-app text-content' : 'text-muted hover:bg-hover hover:text-content'
-          }`}
-          title={t('tabs.openDashboard')}
-          // Về Dashboard ở CẢ hai theme: theme Navigator còn phải đổi mục đang chọn về Dashboard,
-          // không thì 🏠 chỉ hiện lại mục đang đứng (Hosts, Tunnels…) và trông như không làm gì
-          onClick={() => goToSection('dashboard')}
-        >
-          🏠
-        </button>
-      </div>
+      {/* 🏠 CHÍNH LÀ Dashboard (home, không phải tab) — sáng khi không tab nào active.
+          Theme Navigator KHÔNG có nút này: cột trái đã là menu, bấm mục nào cũng về vùng chính,
+          còn Dashboard ở đó chỉ là một mục tuỳ chọn (mặc định tắt) nên 🏠 không có gì để trỏ tới. */}
+      {layout !== 'navigator' && (
+        <div className="flex items-center">
+          <button
+            aria-selected={activeId === null}
+            className={`flex h-7 items-center rounded px-2 ${
+              activeId === null ? 'bg-app text-content' : 'text-muted hover:bg-hover hover:text-content'
+            }`}
+            title={t('tabs.openDashboard')}
+            onClick={() => goToSection('dashboard')}
+          >
+            🏠
+          </button>
+        </div>
+      )}
       <div
         ref={stripRef}
         className="flex flex-1 items-stretch gap-px overflow-x-auto"

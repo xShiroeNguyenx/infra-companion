@@ -40,17 +40,22 @@ export function SnippetsModal({ onClose, embedded }: { onClose?: () => void; emb
       {editing === null && (
         <>
           {/* width cố định: w-fit của Modal sẽ giãn theo dòng script dài nhất (truncate vô hiệu).
-              Nhúng vào trang thì lấy hết bề rộng và để vùng cha cuộn. */}
-          <div className={embedded ? 'mb-3 w-full' : 'mb-3 max-h-80 w-[520px] max-w-full overflow-y-auto'}>
+              Nhúng vào trang thì lấy hết bề rộng, để vùng cha cuộn, và xếp 2 cột khi vùng nhúng
+              đủ rộng (container query, cha là `@container` trong ModalOrPanel). */}
+          <div
+            className={`mb-3 grid max-w-full content-start gap-1.5 ${
+              embedded ? 'w-full @3xl:grid-cols-2' : 'max-h-80 w-[520px] overflow-y-auto'
+            }`}
+          >
             {snippets.length === 0 && (
-              <p className="py-4 text-center text-xs text-subtle">
+              <p className="col-span-full py-4 text-center text-xs text-subtle">
                 {t('snippet.empty')}
               </p>
             )}
             {snippets.map((snippet) => (
               <div
                 key={snippet.id}
-                className="mb-1.5 flex items-center gap-2 rounded border border-edge bg-input px-3 py-2"
+                className="flex min-w-0 items-center gap-2 rounded border border-edge bg-input px-3 py-2"
               >
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-xs text-content">{snippet.label}</div>

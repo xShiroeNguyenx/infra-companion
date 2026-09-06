@@ -32,13 +32,16 @@ export function KeysModal({ onClose, embedded }: { onClose?: () => void; embedde
     <ModalOrPanel embedded={embedded} title="SSH Keys" onClose={onClose}>
       {mode === 'list' && (
         <>
-          {/* Nhúng vào trang thì vùng cha đã cuộn — không giới hạn chiều cao thêm một lớp nữa */}
-          <div className={embedded ? 'mb-3' : 'mb-3 max-h-72 overflow-y-auto'}>
-            {keys.length === 0 && <p className="py-4 text-center text-xs text-subtle">Chưa có key nào</p>}
+          {/* Nhúng vào trang thì vùng cha đã cuộn — không giới hạn chiều cao thêm một lớp nữa —
+              và xếp 2 cột khi vùng nhúng đủ rộng (container query, cha là `@container`). */}
+          <div className={`mb-3 grid content-start gap-1.5 ${embedded ? '@3xl:grid-cols-2' : 'max-h-72 overflow-y-auto'}`}>
+            {keys.length === 0 && (
+              <p className="col-span-full py-4 text-center text-xs text-subtle">Chưa có key nào</p>
+            )}
             {keys.map((key) => (
               <div
                 key={key.id}
-                className="mb-1.5 flex items-center gap-2 rounded border border-edge bg-input px-3 py-2"
+                className="flex min-w-0 items-center gap-2 rounded border border-edge bg-input px-3 py-2"
               >
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm text-content">{key.label}</div>

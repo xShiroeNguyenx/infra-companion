@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { resolveNavigatorSection } from '@infra/shared'
 import { FeaturesTabView } from '../../components/FeaturesTabView'
 import { KeysModal } from '../../components/KeysModal'
 import { SnippetsModal } from '../../components/SnippetsModal'
@@ -15,8 +16,9 @@ import { useT } from '../../i18n'
 /**
  * Vùng "home" của app — thứ hiện khi KHÔNG tab nào active (`activeId === null`).
  *
- *  · theme **Infra** → Dashboard, y như trước;
- *  · theme **Navigator** → mục đang chọn trên NavRail (Dashboard chỉ là một trong các mục).
+ *  · theme **Infra** / **Workbench** → Dashboard, y như trước;
+ *  · theme **Navigator** → mục đang chọn trên NavRail (Dashboard chỉ là một mục, mặc định tắt;
+ *    home là Hosts).
  *
  * Đặt quyết định này ở một chỗ để App.tsx không phải biết theme nào đang bật.
  */
@@ -30,16 +32,22 @@ export function HomeView({ active }: { active: boolean }) {
  * Vùng chính của theme Navigator: vẽ mục đang chọn.
  *
  * Dashboard, Hosts và SFTP luôn mounted (ẩn bằng `hidden`) — Dashboard có effect nạp lịch sử
- * monitoring theo cờ `active`, Hosts giữ nhóm đang xem. Các mục còn lại mount theo mục đang
- * chọn và chỉ ẩn khi một tab terminal đang active: chuyển sang tab rồi quay lại vẫn thấy form
- * đang điền dở, đổi mục thì bắt đầu lại — đúng kỳ vọng của một menu.
+ * monitoring theo cờ `active`, Hosts giữ nhóm đang xem, SFTP giữ pane local đã duyệt tới đâu và
+ * phiên đang nối. Các mục còn lại mount theo mục đang chọn và chỉ ẩn khi một tab terminal đang
+ * active: chuyển sang tab rồi quay lại vẫn thấy form đang điền dở, đổi mục thì bắt đầu lại —
+ * đúng kỳ vọng của một menu.
+ *
+ * `navSection` đi qua `resolveNavigatorSection` (giá trị lạ → Hosts). Mục user đã TẮT trên menu
+ * vẫn vẽ được — palette và "mở SFTP" từ danh mục công cụ vẫn tới được nó; chỉ lúc MỞ APP mới
+ * loại mục đã tắt (xem `readNavSection` ở stores/ui.ts).
  *
  * Tunnels / Snippets / Keys / Workspaces dùng lại ĐÚNG component của popup ở chế độ `embedded`
- * (cùng cách ToolTabView làm) nên không có bản UI thứ hai phải bảo trì.
+ * (cùng cách ToolTabView làm) nên không có bản UI thứ hai phải bảo trì. Ở bề rộng vùng chính
+ * chúng tự xếp danh sách thành 2 cột (container query trong từng component).
  */
 function NavigatorHome({ active }: { active: boolean }) {
   const t = useT()
-  const section = useUiStore((s) => s.navSection)
+  const section = resolveNavigatorSection(useUiStore((s) => s.navSection))
   return (
     <>
       <DashboardView active={active && section === 'dashboard'} />

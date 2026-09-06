@@ -13,6 +13,9 @@ const LOCALES = { vi: 'vi-VN', en: 'en-US', ja: 'ja-JP' } as const
  * Dòng trỏ về host đã lưu hiện TÊN host (bấm là mở đúng host, kể cả khi địa chỉ đã đổi); dòng
  * quick-connect chưa lưu hiện nguyên chuỗi đích và nói rõ nó chưa được lưu — đó là gợi ý ngầm
  * "cái này hay dùng thì lưu thành host đi".
+ *
+ * Mỗi dòng là một thẻ riêng (không phải danh sách `divide-y`) để xếp được 2 cột khi vùng chứa
+ * đủ rộng — trang Navigator thì 2 cột, panel phụ Workbench 200–520px thì 1 cột (container query).
  */
 export function HistoryView() {
   const t = useT()
@@ -23,20 +26,20 @@ export function HistoryView() {
   const openQuick = useTabsStore((s) => s.openQuick)
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-      <div className="mx-auto max-w-[1000px]">
+    <div className="@container min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div>
         <p className="text-subtle mb-3 text-[11px] leading-relaxed">{t('history.hint')}</p>
         {history.length === 0 ? (
           <p className="text-subtle py-10 text-center text-xs">{t('dashboard.noRecent')}</p>
         ) : (
-          <div className="border-edge bg-panel divide-edge/70 divide-y rounded border">
+          <div className="grid content-start gap-1.5 @3xl:grid-cols-2">
             {history.map((entry) => {
               const host = entry.hostId ? hosts.find((h) => h.id === entry.hostId) : undefined
               return (
                 <button
                   key={entry.id}
                   type="button"
-                  className="hover:bg-hover flex w-full items-center gap-3 px-3 py-2 text-left"
+                  className="border-edge bg-panel hover:bg-hover flex w-full min-w-0 items-center gap-3 rounded border px-3 py-2 text-left"
                   title={t('sidebar.connectTo', { target: host?.label ?? entry.target })}
                   onClick={() => {
                     if (entry.hostId) void openSsh(entry.hostId)

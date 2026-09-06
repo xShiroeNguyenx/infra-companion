@@ -238,8 +238,11 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     { value: 'light', label: t('settings.themeLight'), swatch: '#f4f5f7' }
   ]
 
+  // Theme Navigator: Dashboard mặc định tắt, "home" là mục menu đang nhớ (thường Hosts) — nhãn
+  // phải nói "trang chính" chứ không phải "Dashboard"
+  const layoutTheme = useSettingsStore((s) => s.layout)
   const startupOptions: Array<{ value: StartupPage; label: string }> = [
-    { value: 'dashboard', label: t('settings.startupDashboard') },
+    { value: 'dashboard', label: layoutTheme === 'navigator' ? t('settings.startupHome') : t('settings.startupDashboard') },
     { value: 'terminal', label: t('settings.startupTerminal') }
   ]
 

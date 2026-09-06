@@ -48,7 +48,8 @@ export function WorkspacesModal({ onClose, embedded }: { onClose?: () => void; e
 
   return (
     <ModalOrPanel embedded={embedded} title={t('ws.title')} onClose={onClose}>
-      <div className={embedded ? 'w-full max-w-2xl' : 'w-[min(460px,90vw)]'}>
+      {/* Nhúng: lấy hết bề rộng để danh sách bên dưới xếp được 2 cột khi vùng nhúng đủ rộng */}
+      <div className={embedded ? 'w-full' : 'w-[min(460px,90vw)]'}>
         <Field label={t('ws.saveCurrent')}>
           <div className="flex gap-2">
             <TextInput
@@ -72,9 +73,9 @@ export function WorkspacesModal({ onClose, embedded }: { onClose?: () => void; e
         {workspaces.length === 0 ? (
           <p className="text-subtle py-3 text-center text-xs leading-relaxed">{t('ws.empty')}</p>
         ) : (
-          <div className="flex flex-col gap-1.5">
+          <div className={`grid content-start gap-1.5 ${embedded ? '@3xl:grid-cols-2' : ''}`}>
             {workspaces.map((ws) => (
-              <div key={ws.id} className="border-edge bg-input/40 flex items-center gap-2 rounded border px-2.5 py-2">
+              <div key={ws.id} className="border-edge bg-input/40 flex min-w-0 items-center gap-2 rounded border px-2.5 py-2">
                 <div className="min-w-0 flex-1">
                   {editingId === ws.id ? (
                     <input

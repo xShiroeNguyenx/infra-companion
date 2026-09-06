@@ -135,10 +135,15 @@ export function TunnelsModal({ onClose, embedded }: { onClose?: () => void; embe
       {mode === 'list' && (
         <>
           {/* width cố định: w-fit của Modal sẽ giãn theo label dài nhất (truncate vô hiệu).
-              Trong tab thì bỏ trần chiều cao — tab đã có sẵn cả màn hình. */}
-          <div className={`mb-3 max-w-full overflow-y-auto ${embedded ? 'w-full' : 'max-h-80 w-[520px]'}`}>
+              Trong tab/trang thì bỏ trần chiều cao — đã có sẵn cả màn hình — và xếp 2 cột khi
+              vùng nhúng đủ rộng (container query, cha là `@container` trong ModalOrPanel). */}
+          <div
+            className={`mb-3 grid max-w-full content-start gap-1.5 ${
+              embedded ? 'w-full @3xl:grid-cols-2' : 'max-h-80 w-[520px] overflow-y-auto'
+            }`}
+          >
             {tunnels.length === 0 && (
-              <p className="py-4 text-center text-xs text-subtle">{t('tunnel.empty')}</p>
+              <p className="col-span-full py-4 text-center text-xs text-subtle">{t('tunnel.empty')}</p>
             )}
             {ordered.map((rule) => {
               const state = tunnelStates[rule.id]?.status ?? 'stopped'
@@ -151,7 +156,8 @@ export function TunnelsModal({ onClose, embedded }: { onClose?: () => void; embe
               return (
                 <div
                   key={rule.id}
-                  className="mb-1.5 flex items-center gap-2 rounded border border-edge bg-input px-3 py-2"
+                  // min-w-0: ô grid mặc định không co dưới nội dung → truncate vô hiệu ở 2 cột
+                  className="flex min-w-0 items-center gap-2 rounded border border-edge bg-input px-3 py-2"
                   // Vạch vàng trái đánh dấu tunnel được ghim — cùng ngôn ngữ với khối Yêu thích ở sidebar
                   style={pinned ? { boxShadow: 'inset 2px 0 0 var(--c-warning)' } : undefined}
                 >

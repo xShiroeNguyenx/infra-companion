@@ -9,7 +9,7 @@
 | Theme | Cột trái | Vùng chính khi không tab nào mở | Điểm thiếu |
 |---|---|---|---|
 | **Infra mặc định** | Cây host theo nhóm, sổ ra tại chỗ, có khối tunnel/snippet/workspace bật tắt | Dashboard | Muốn xem tunnel/snippet thì bật khối → cột dài ra |
-| **Navigator** (kiểu Termius) | Menu 9 mục (có 📁 SFTP), không sổ gì | Mục đang chọn (trang Hosts, History, Tunnels…) | Bấm mục nào là **rời terminal** để về vùng chính |
+| **Navigator** (kiểu Termius) | Menu 9 mục (Dashboard · Hosts · SFTP · Tunnels · Snippets · Keys · Workspaces · History · Tools — **Dashboard mặc định TẮT** từ v0.2.21, home = Hosts, thanh tab không có 🏠), không sổ gì; **sửa được** qua ⚙ (tick/kéo, Hosts khoá tick; `stores/navMenu.ts` + `visibleNavMenu`/`startupNavSection` ở shared) | Mục đang chọn (trang Hosts, History, Tunnels…); trang danh sách xếp **2 cột** khi vùng chính ≥ 48rem (container query `@3xl`) | Bấm mục nào là **rời terminal** để về vùng chính |
 | **Workbench** (kiểu VS Code, v0.2.20) | Activity bar 48px + panel phụ kéo được 200–520px (Hosts = Sidebar cũ `fluid`; Tunnels/Snippets/Workspaces = khối + Quản lý…; Keys/Tools gọn; History) | Dashboard | **Chưa có panel đáy** (Monitoring / Log dưới terminal) |
 
 Cách nối: `settings.layout` (`infra.layout`) → `App.tsx` chọn `<NavRail/>` hay `<Sidebar/>`,

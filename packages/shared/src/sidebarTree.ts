@@ -46,19 +46,32 @@ export function visibleSidebarBlocks(
   order: readonly string[],
   enabled: readonly string[]
 ): SidebarBlockId[] {
-  const known = new Set<string>(DEFAULT_SIDEBAR_BLOCKS)
-  const seen = new Set<string>()
-  const ordered: SidebarBlockId[] = []
-  for (const id of order) {
-    if (!known.has(id) || seen.has(id)) continue
-    seen.add(id)
-    ordered.push(id as SidebarBlockId)
-  }
-  for (const id of DEFAULT_SIDEBAR_BLOCKS) {
-    if (!seen.has(id)) ordered.push(id)
-  }
   const on = new Set(enabled)
-  return ordered.filter((id) => on.has(id))
+  return mergeKnownOrder(order, DEFAULT_SIDEBAR_BLOCKS).filter((id) => on.has(id))
+}
+
+/**
+ * Hợp nhất một thứ tự ĐÃ LƯU với danh sách id đang được biết: giữ đúng thứ tự user đặt cho
+ * những id còn tồn tại, bỏ id lạ và id trùng, rồi nối các id biết mà thứ tự lưu chưa có vào
+ * cuối theo thứ tự mặc định. Kết quả LUÔN là hoán vị đầy đủ của `known` — kể cả mục đang tắt —
+ * nên dùng được cho cả chỗ render (lọc thêm theo "đang bật") và hộp cấu hình (hiện đủ để bật lại).
+ *
+ * Dùng chung cho khối sidebar (theme Infra) và mục menu (theme Navigator): hai nơi cùng một
+ * bài toán "thứ tự đến từ localStorage nên có thể cũ hoặc bị sửa tay".
+ */
+export function mergeKnownOrder<T extends string>(order: readonly string[], known: readonly T[]): T[] {
+  const knownSet = new Set<string>(known)
+  const seen = new Set<string>()
+  const out: T[] = []
+  for (const id of order) {
+    if (!knownSet.has(id) || seen.has(id)) continue
+    seen.add(id)
+    out.push(id as T)
+  }
+  for (const id of known) {
+    if (!seen.has(id)) out.push(id)
+  }
+  return out
 }
 
 /**
