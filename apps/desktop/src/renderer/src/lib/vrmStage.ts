@@ -241,7 +241,14 @@ export interface VrmStage {
    * `anchor` = **ghim nhân vật tại chỗ**. Bắt buộc cho clip tự chạy: nhiều clip dời cả người đi
    * tới 39 cm ngang, mà khung hình ôm sát thân nên nhân vật đi thẳng ra ngoài rồi mới quay lại.
    */
-  playAnimation(bytes: Uint8Array | null, opts?: { once?: boolean; anchor?: boolean }): Promise<void>
+  /**
+   * Phát một clip `.vrma`. Trả về **thời lượng clip (giây)**, `0` khi gỡ clip (`bytes === null`).
+   *
+   * Trả thời lượng chứ không `void`: clip trong danh mục có `durationSec` đo sẵn, nhưng clip user
+   * tự nạp từ thư mục thì không — mà `useVrmMotion` cần con số đó để hẹn giờ trả quyền về lớp tự
+   * sinh. Đọc từ chính file là nguồn duy nhất đúng, và stage vốn đã có nó trong tay.
+   */
+  playAnimation(bytes: Uint8Array | null, opts?: { once?: boolean; anchor?: boolean }): Promise<number>
   /** Dừng vòng lặp render và giải phóng toàn bộ tài nguyên GPU. */
   dispose(): void
 }
@@ -1830,7 +1837,7 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
       mixer = null
       clipEndsAt = 0
       anchorHips = opts?.anchor === true
-      if (!bytes) return
+      if (!bytes) return 0
 
       const vrmaMod = await import('@pixiv/three-vrm-animation')
       const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js')
@@ -1859,6 +1866,7 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
         }
         action.play()
         mixer = m
+        return clip.duration
       } finally {
         URL.revokeObjectURL(url)
       }

@@ -20,7 +20,10 @@ import {
   VRM_ZOOM_MIN,
   zoomStep,
   type AppEventSeverity,
+  VRM_ROLE_LABELS,
+  type VrmAnimationFile,
   type VrmModelDto,
+  type VrmMotionRoleName,
   type VrmSampleModel,
   type VrmSampleProgress,
   type VrmSettingsDto
@@ -37,7 +40,7 @@ import {
   VrmSpeechBubble,
   type RadialAction
 } from './VrmRadialMenu'
-import { VrmSettingsFrame } from './VrmSettingsFrame'
+import { SettingsField, SettingsGroup, SettingsToggle, VrmSettingsFrame } from './VrmSettingsFrame'
 import { useEventsStore } from '../stores/events'
 import { useUiStore } from '../stores/ui'
 import { useToolUsageStore } from '../stores/toolUsage'
@@ -123,7 +126,31 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
    * Gắn ở component CHA vì bốn chỗ kích hoạt nằm rải rác: chạm vào người và mở chat ở shell bên
    * dưới, còn cảnh báo thì đến từ store sự kiện ở đây. Khai SAU `settings` — nó đọc `reactToEvents`.
    */
-  const motion = useVrmMotion(stageReady, settings?.reactToEvents !== false)
+  /**
+   * Clip user tự nạp từ thư mục + vai trò đã gán.
+   *
+   * Giữ **ngoài** `settings` vì chỉ có đường dẫn và bảng vai trò là được ghi xuống đĩa; `files`
+   * (nội dung clip) chỉ sống trong phiên — chép `.vrma` vào `userData` là tạo thêm một bản trong
+   * thư mục app, đúng cái giấy phép bộ pixiv cấm.
+   */
+  const [folderClips, setFolderClips] = useState<{ dir: string; files: VrmAnimationFile[] } | null>(null)
+  const [folderRoles, setFolderRoles] = useState<Record<string, VrmMotionRoleName>>({})
+
+  // Nạp lại thư mục đã nhớ từ phiên trước — im lặng khi chưa nhớ gì (`canceled`)
+  useEffect(() => {
+    void (async () => {
+      const saved = await window.infra.vrm.getFolderMotions()
+      setFolderRoles(saved.roles)
+      if (!saved.dir) return
+      const res = await window.infra.vrm.reloadAnimationDir()
+      if (res.ok) setFolderClips({ dir: res.dir, files: res.files })
+    })()
+  }, [])
+
+  const motion = useVrmMotion(stageReady, settings?.reactToEvents !== false, {
+    files: folderClips?.files ?? [],
+    roles: folderRoles
+  })
   /**
    * Đọc `motion` từ ref trong effect nghe sự kiện.
    *
@@ -503,6 +530,71 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
     }
   }, [])
 
+  /**
+   * Nạp CẢ THƯ MỤC `.vrma`.
+   *
+   * Nạp xong **phát luôn clip đầu tiên**: user bấm nút này là để xem chuyển động, không phải để
+   * có thêm một danh sách. Danh sách vẫn hiện ra bên dưới để đổi sang clip khác.
+   */
+  const pickAnimationDir = useCallback(async () => {
+    const res = await window.infra.vrm.pickAnimationDir()
+    if (!res.ok) {
+      if (res.reason === 'canceled') return
+      setLoad({
+        kind: 'error',
+        message:
+          res.reason === 'empty'
+            ? 'Thư mục này không có file .vrma nào đọc được.'
+            : `Không đọc được thư mục${res.detail ? `: ${res.detail}` : ''}`
+      })
+      return
+    }
+    setFolderClips({ dir: res.dir, files: res.files })
+    // Báo phần bỏ sót — nạp 7 file mà chỉ thấy 6 thì user cần biết vì sao
+    if (res.skipped.length > 0 || res.truncated) {
+      const parts: string[] = []
+      if (res.skipped.length > 0) parts.push(`bỏ qua ${res.skipped.length} file không đọc được`)
+      if (res.truncated) parts.push(`chỉ lấy ${res.files.length} file đầu`)
+      speak(`Đã nạp ${res.files.length} chuyển động — ${parts.join(', ')}.`)
+    }
+    const first = res.files[0]
+    if (!first) return
+    try {
+      await stageRef.current?.playAnimation(first.bytes)
+      setAnimationName(first.name)
+    } catch (e) {
+      setAnimationName(null)
+      setLoad({ kind: 'error', message: (e as Error).message })
+    }
+  }, [speak])
+
+  /**
+   * Gán (hoặc bỏ gán) vai trò tự chạy cho một clip thư mục.
+   *
+   * Ghi xuống đĩa NGAY chứ không đợi đóng panel: user gán xong là mong nó nhớ, mà panel này
+   * đóng bằng nhiều đường (Esc, bấm ra ngoài, tắt trợ lý ảo) — đợi một "lúc lưu" là mất.
+   */
+  const setClipRole = useCallback((name: string, role: VrmMotionRoleName | null) => {
+    setFolderRoles((prev) => {
+      const next = { ...prev }
+      if (role) next[name] = role
+      else delete next[name]
+      void window.infra.vrm.setFolderMotions({ roles: next })
+      return next
+    })
+  }, [])
+
+  /** Phát một clip đã nạp sẵn từ thư mục. */
+  const playFolderClip = useCallback(async (clip: VrmAnimationFile) => {
+    try {
+      await stageRef.current?.playAnimation(clip.bytes)
+      setAnimationName(clip.name)
+    } catch (e) {
+      setAnimationName(null)
+      setLoad({ kind: 'error', message: (e as Error).message })
+    }
+  }, [])
+
   return (
     <VrmStageShell
       boxRef={boxRef}
@@ -614,14 +706,21 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
       }
       /**
        * HÀM dựng cột, không phải phần tử dựng sẵn: khung cài đặt hai cột gọi nó **hai lần**
-       * (`'left'` · `'right'`) để đặt vào hai khe hai bên nhân vật. Chế độ có khung gọi một lần
-       * với `undefined` và nhận cả hai, xếp chồng như trước.
+       * (`'left'` · `'right'`) để đặt vào hai khe hai bên nhân vật, và một lần nữa cho `'footer'`
+       * (thanh chân). Chế độ có khung gọi một lần với `undefined` và nhận tất cả, xếp chồng.
+       *
+       * ⚠️ **`'footer'` KHÔNG được bọc thêm thẻ nào.** Thanh chân là một hàng ngang
+       * (`flex ... justify-end` ở `VrmSettingsFrame`), nên bọc một `div flex-col` quanh nó là hai
+       * nút xếp CHỒNG lên nhau và chiếm hết bề ngang khung — user chụp được. Cùng lý do,
+       * `ModelInfo` chỉ thuộc cột trái: lọt vào thanh chân thì URL giấy phép trải ngang cả màn hình.
        */
       controls={
         settings
           ? (only) => (
-              <div className="flex flex-col gap-2">
-                {only !== 'right' && active && <ModelInfo model={active} open={only !== undefined} />}
+              <Wrap plain={only === 'footer'}>
+                {/* Chỉ ở chế độ panel NHỎ: trong bảng cài đặt lớn nó nằm trong nhóm "Model đang
+                    dùng" của cột trái, có khung như mọi nhóm khác */}
+                {only === undefined && active && <ModelInfo model={active} />}
                 <VrmControls
                   models={models}
                   active={active}
@@ -634,17 +733,40 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
                   onRemoveModel={(id) => void removeModel(id)}
                   onCloseCharacter={onClose}
                   onPickAnimation={() => void pickAnimation()}
+                  onPickAnimationDir={() => void pickAnimationDir()}
+                  folderClips={folderClips}
+                  folderRoles={folderRoles}
+                  onSetClipRole={setClipRole}
+                  onPlayFolderClip={(c) => void playFolderClip(c)}
+                  onClearFolderClips={() => {
+                    setFolderClips(null)
+                    // Quên luôn đường dẫn: bấm ✕ là "tôi không dùng thư mục này nữa", mà giữ lại
+                    // thì mở app lần sau nó tự hiện về và trông như nút ✕ không ăn
+                    void window.infra.vrm.setFolderMotions({ dir: null })
+                  }}
                   onClearAnimation={() => {
                     void stageRef.current?.playAnimation(null)
                     setAnimationName(null)
                   }}
                 />
-              </div>
+              </Wrap>
             )
           : null
       }
     />
   )
+}
+
+/**
+ * Bọc nội dung thành cột dọc — TRỪ thanh chân, vốn là một hàng ngang.
+ *
+ * `plain` trả thẳng `children` không thêm thẻ nào: thanh chân đã có `flex justify-end` của
+ * `VrmSettingsFrame`, bọc thêm một `flex-col` vào là hai nút xếp chồng và chiếm hết bề ngang
+ * khung (user chụp được). Một component nhỏ thay vì `only === 'footer' ? ... : ...` hai lần —
+ * nhánh ba-ngôi quanh một khối JSX 30 dòng là chỗ rất dễ sửa nhầm một bên.
+ */
+function Wrap({ plain, children }: { readonly plain: boolean; readonly children: React.ReactNode }) {
+  return plain ? <>{children}</> : <div className="flex flex-col gap-3">{children}</div>
 }
 
 /**
@@ -692,7 +814,7 @@ function VrmStageShell({
   readonly chromeless: boolean
   readonly overlay: React.ReactNode
   /** Dựng nội dung cài đặt — gọi hai lần cho hai cột, hoặc một lần không tham số cho bản xếp chồng. */
-  readonly controls: ((only?: 'left' | 'right') => React.ReactNode) | null
+  readonly controls: ((only?: 'left' | 'right' | 'footer') => React.ReactNode) | null
   /** Tỉ lệ ngang/dọc thật của model, `null` khi chưa dựng xong. */
   readonly stageAspect: number | null
   readonly stage: VrmStage | null
@@ -1441,9 +1563,18 @@ function VrmStageShell({
                 items={[
                   // Dừng đứng đầu để lúc đang chạy clip thì nó ở ngay tầm mắt
                   ...(motion.playing ? [{ id: '__stop', label: '■ Dừng' }] : []),
+                  /**
+                   * Clip di chuyển đánh dấu bằng `›` chứ không phải 🚶.
+                   *
+                   * Cột chỉ rộng 112px và mỗi mục nay là một thẻ có viền, nên emoji (rộng gần
+                   * bằng hai ký tự, và không ngắt dòng chung với chữ) đẩy "Bước thể dục" xuống
+                   * hai dòng — nhìn thấy trên ảnh harness. Dấu một ký tự giữ nguyên ý "clip này
+                   * làm nhân vật đi khỏi chỗ", tooltip nói đủ phần còn lại.
+                   */
                   ...motion.clips.map((c) => ({
                     id: c.id,
-                    label: `${c.label}${c.locomotion ? ' 🚶' : ''}`,
+                    label: `${c.label}${c.locomotion ? ' ›' : ''}`,
+                    hint: c.locomotion ? `${c.label} — trợ lý ảo sẽ đi khỏi chỗ đứng` : c.label,
                     active: motion.playing === c.id
                   }))
                 ]}
@@ -1484,8 +1615,20 @@ function VrmStageShell({
        * `VrmSettingsFrame`. Hộp `settingsBox` là hộp nhân vật cũng dùng để đứng vào khe.
        */}
       {chromeless && showSettings && controls && (
-        <VrmSettingsFrame box={settingsBox} right={controls('right')} onClose={() => setShowSettings(false)}>
-          {controls('left')}
+        /**
+         * Cột **Model · Chuyển động** đứng BÊN TRÁI, cột công tắc bên phải (user đổi chỗ).
+         *
+         * Hai tên `'left'`/`'right'` của `VrmControls` là tên NỘI DUNG, không phải vị trí — đổi
+         * chỗ là đổi ở đây, không đụng vào bên trong. Đừng đổi tên chúng theo vị trí: lần sau
+         * hoán đổi nữa là tên lại sai, mà tên nội dung thì luôn đúng.
+         */
+        <VrmSettingsFrame
+          box={settingsBox}
+          right={controls('left')}
+          footer={controls('footer')}
+          onClose={() => setShowSettings(false)}
+        >
+          {controls('right')}
         </VrmSettingsFrame>
       )}
     </>
@@ -1504,6 +1647,12 @@ function VrmControls({
   onPick,
   onRemoveModel,
   onPickAnimation,
+  onPickAnimationDir,
+  folderClips,
+  folderRoles,
+  onSetClipRole,
+  onPlayFolderClip,
+  onClearFolderClips,
   onClearAnimation,
   onCloseCharacter,
   onDownloaded,
@@ -1520,6 +1669,15 @@ function VrmControls({
   /** Bỏ model khỏi danh sách (không xoá file gốc). */
   readonly onRemoveModel: (id: string) => void
   readonly onPickAnimation: () => void
+  /** Nạp cả thư mục `.vrma` — xem `pickAnimationDir`. */
+  readonly onPickAnimationDir: () => void
+  /** Clip đã nạp từ thư mục, `null` = chưa nạp thư mục nào. */
+  readonly folderClips: { dir: string; files: VrmAnimationFile[] } | null
+  /** `tên file` → vai trò tự chạy đã gán. Thiếu khoá = chỉ chạy khi user tự bấm. */
+  readonly folderRoles: Record<string, VrmMotionRoleName>
+  readonly onSetClipRole: (name: string, role: VrmMotionRoleName | null) => void
+  readonly onPlayFolderClip: (clip: VrmAnimationFile) => void
+  readonly onClearFolderClips: () => void
   readonly onClearAnimation: () => void
   /** Tắt hẳn nhân vật — chuyển từ menu vòng tròn về đây cho khỏi bấm nhầm. */
   readonly onCloseCharacter: () => void
@@ -1531,7 +1689,7 @@ function VrmControls({
    * đủ cao để tràn, mà bảng này ngắn nên dồn hết vào cột trái và chừa cột phải trống — đúng lỗi
    * user chụp được. Bỏ trống = vẽ cả hai, xếp chồng (chế độ có khung).
    */
-  readonly only?: 'left' | 'right'
+  readonly only?: 'left' | 'right' | 'footer'
 }) {
   /**
    * Trần cỡ: THẤP khi đang ở khung cài đặt (`only` có giá trị) — khe giữa hẹp, to hơn là nhân vật
@@ -1539,145 +1697,96 @@ function VrmControls({
    * dùng một trần này.
    */
   const zoomCap = only !== undefined ? VRM_ZOOM_MAX_IN_SETTINGS : VRM_ZOOM_MAX
-  /** Mục dùng HẰNG NGÀY: công tắc, cỡ, đổi model. */
+  /**
+   * Cột TRÁI — mục dùng HẰNG NGÀY, chia thành ba nhóm có tiêu đề.
+   *
+   * Cấu trúc mượn `desktop-companion` (`.set-group` + `.set-toggle`): bản cũ để bốn checkbox, một
+   * thanh trượt, một dropdown và một bảng phím trôi nổi cạnh nhau, mắt không có mốc nào để biết
+   * cái nào thuộc cái nào (user chụp và nói "hơi rối"). Tiêu đề in hoa cỡ nhỏ tạo mốc mà gần như
+   * không tốn chiều cao, còn khung quanh mỗi công tắc biến một đám chữ rời thành danh sách.
+   */
   const left = (
-    <div className="flex flex-col gap-2">
-      <div className="text-subtle flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        <label className="flex items-center gap-1.5">
-          <input type="checkbox" checked={settings.springBones} onChange={(e) => onPatch({ springBones: e.target.checked })} />
-          Tóc/váy đu đưa
-        </label>
-        <label className="flex items-center gap-1.5">
-          FPS
+    <>
+      <SettingsGroup title="🎭 Hiển thị">
+        <SettingsToggle
+          label="Tóc/váy đu đưa"
+          checked={settings.springBones}
+          title="Tắt đi nếu máy yếu — đây là phần tốn CPU nhất"
+          onChange={(v) => onPatch({ springBones: v })}
+        />
+        <SettingsToggle
+          label="Nhìn theo chuột"
+          checked={settings.lookAtCursor}
+          onChange={(v) => onPatch({ lookAtCursor: v })}
+        />
+        <SettingsToggle
+          label="Hiện lúc mở app"
+          checked={settings.autoShow}
+          onChange={(v) => onPatch({ autoShow: v })}
+        />
+        <SettingsField label="Giới hạn FPS">
           <select
-            className="bg-elevated border-edge rounded border px-1 py-0.5"
+            className="bg-elevated border-edge rounded border px-2 py-1 text-xs"
             value={settings.fpsCap}
             onChange={(e) => onPatch({ fpsCap: Number(e.target.value) === 60 ? 60 : 30 })}
           >
-            <option value={30}>30</option>
-            <option value={60}>60</option>
+            <option value={30}>30 — tiết kiệm pin</option>
+            <option value={60}>60 — mượt hơn</option>
           </select>
-        </label>
-        <label className="flex items-center gap-1.5">
-          <input type="checkbox" checked={settings.autoShow} onChange={(e) => onPatch({ autoShow: e.target.checked })} />
-          Hiện lúc mở app
-        </label>
-        <label className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={settings.lookAtCursor}
-            onChange={(e) => onPatch({ lookAtCursor: e.target.checked })}
-          />
-          Nhìn theo chuột
-        </label>
-        <label className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={settings.reactToEvents}
-            onChange={(e) => onPatch({ reactToEvents: e.target.checked })}
-          />
-          Phản ứng khi có cảnh báo
-        </label>
-        <label
-          className="flex items-center gap-1.5"
-          title="App đang ở khay hoặc thu nhỏ mà có cảnh báo thì trợ lý ảo hiện ở góc màn hình để báo; bấm vào là mở lại app"
-        >
-          <input
-            type="checkbox"
-            checked={settings.desktopOverlay}
-            disabled={!settings.reactToEvents}
-            onChange={(e) => onPatch({ desktopOverlay: e.target.checked })}
-          />
-          Hiện ngoài desktop khi app ở khay
-        </label>
-      </div>
+        </SettingsField>
+        <SettingsField label="Cỡ">
+          <div className="text-subtle flex items-center gap-2 text-xs">
+            {/* Thanh trượt, giá trị VÀ nhãn % đều theo `zoomCap`: cỡ đã lưu 300% mà nhãn nói 300%
+                trong khi người trên màn hình đang bị kẹp 120% là nhãn nói dối. */}
+            <input
+              type="range"
+              className="min-w-0 flex-1"
+              min={VRM_ZOOM_MIN}
+              max={zoomCap}
+              step={0.05}
+              value={Math.min(settings.zoom, zoomCap)}
+              onChange={(e) => onPatch({ zoom: Number(e.target.value) })}
+            />
+            <span className="w-10 shrink-0 text-right tabular-nums">
+              {Math.round(Math.min(settings.zoom, zoomCap) * 100)}%
+            </span>
+            {(settings.zoom !== 1 || settings.rotationY !== 0) && (
+              <button
+                className="border-edge hover:bg-elevated shrink-0 rounded border px-1.5 py-0.5"
+                title="Về cỡ và góc mặc định"
+                onClick={() => onPatch({ zoom: 1, rotationY: 0 })}
+              >
+                ↺
+              </button>
+            )}
+          </div>
+        </SettingsField>
+      </SettingsGroup>
 
-      <div className="text-subtle flex items-center gap-2 text-xs">
-        <span className="shrink-0">Cỡ</span>
-        {/* Thanh trượt, giá trị VÀ nhãn % đều theo `zoomCap`: cỡ đã lưu 300% mà nhãn nói 300% trong
-            khi người trên màn hình đang bị kẹp 120% là nhãn nói dối. */}
-        <input
-          type="range"
-          className="min-w-0 flex-1"
-          min={VRM_ZOOM_MIN}
-          max={zoomCap}
-          step={0.05}
-          value={Math.min(settings.zoom, zoomCap)}
-          onChange={(e) => onPatch({ zoom: Number(e.target.value) })}
+      <SettingsGroup title="🔔 Thông báo">
+        <SettingsToggle
+          label="Phản ứng khi có cảnh báo"
+          checked={settings.reactToEvents}
+          onChange={(v) => onPatch({ reactToEvents: v })}
         />
-        <span className="w-10 shrink-0 text-right tabular-nums">{Math.round(Math.min(settings.zoom, zoomCap) * 100)}%</span>
-        {(settings.zoom !== 1 || settings.rotationY !== 0) && (
-          <button
-            className="border-edge hover:bg-elevated shrink-0 rounded border px-1.5 py-0.5"
-            title="Về cỡ và góc mặc định"
-            onClick={() => onPatch({ zoom: 1, rotationY: 0 })}
-          >
-            ↺
-          </button>
-        )}
-      </div>
+        <SettingsToggle
+          label="Hiện ngoài desktop khi app ở khay"
+          checked={settings.desktopOverlay}
+          disabled={!settings.reactToEvents}
+          title="App đang ở khay hoặc thu nhỏ mà có cảnh báo thì trợ lý ảo hiện ở góc màn hình để báo; bấm vào là mở lại app"
+          onChange={(v) => onPatch({ desktopOverlay: v })}
+        />
+      </SettingsGroup>
 
-      {/* Biểu cảm và trang phục KHÔNG còn ở đây: model thật khai 30–40 biểu cảm, xổ dọc thì
-          dài quá màn hình. Chúng mở bằng chuột phải → menu vòng tròn → bảng hai bên nhân vật
-          (`VrmSidePanel`), chia hai cột nên mắt quét nhanh hơn hẳn một cột dài. */}
-
-      {/* Đổi model nhanh — để NGOÀI phần thu gọn vì đây là thứ hay dùng nhất sau các công tắc */}
-      {models.length > 1 && active && (
-        <div className="flex gap-1">
-          <select
-            className="bg-elevated border-edge min-w-0 flex-1 rounded border px-2 py-1 text-xs"
-            value={active.id}
-            onChange={(e) => onPatch({ activeId: e.target.value })}
-          >
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-                {m.missing ? ' (mất file)' : ''}
-              </option>
-            ))}
-          </select>
-          {/* Xoá model ĐANG CHỌN: `<select>` gốc không gắn được nút cho từng dòng.
-              Bảng chuột-phải (`VrmSidePanel`) thì xoá được bất kỳ dòng nào. */}
-          <button
-            className="border-edge text-subtle hover:text-danger hover:border-danger rounded border px-2 py-1 text-xs"
-            title={`Bỏ "${active.label}" khỏi danh sách (không xoá file gốc)`}
-            onClick={() => onRemoveModel(active.id)}
-          >
-            🗑
-          </button>
-        </div>
-      )}
-
-      {/**
-       * Hai mục dùng THƯA — thêm nhân vật, nạp file chuyển động — gộp vào một khối bung ra.
-       *
-       * Bảng này mở ngay cạnh nhân vật, mà nhân vật hay đứng sát đáy màn hình; để mọi thứ mở sẵn
-       * thì bảng cao quá và phần dưới lọt ra ngoài màn hình (user chụp được). Các công tắc hằng
-       * ngày ở trên vẫn mở sẵn, còn hai mục này là việc làm vài lần rồi thôi.
-       */}
       {/**
        * Bảng tra thao tác — thay cho tooltip dài.
        *
        * Mọi thao tác với nhân vật đều vô hình (nhấn giữ, Ctrl+kéo, Shift+kéo, Ctrl+lăn), nên phải
        * có MỘT chỗ tra được. Trước đây nhét hết vào `title` của khung nhân vật: Windows vẽ ra một
        * dải chữ chạy gần hết màn hình, tự hiện mỗi lần rê chuột và che mất chính nhân vật.
-       * Ở đây thì user chủ động mở khi cần, và nhân vật vẫn tự kể dần qua các câu gợi ý.
        */}
-    </div>
-  )
-
-  /** Mục dùng THƯA: bảng tra thao tác, thêm nhân vật, chuyển động, tắt nhân vật. */
-  const right = (
-    <div className="flex flex-col gap-2">
-      {/* Mở sẵn khi ở khung cài đặt lớn (`only` có giá trị): khung đã rộng, giấu đi chỉ bắt user
-          bấm thêm một lần. Chế độ panel nhỏ thì vẫn thu gọn vì chỗ chật. */}
-      <details className="group" open={only !== undefined}>
-        <summary className="text-subtle hover:text-content flex cursor-pointer list-none items-center gap-1 text-xs">
-          <span className="group-open:hidden">▸</span>
-          <span className="hidden group-open:inline">▾</span>
-          Thao tác với trợ lý ảo
-        </summary>
-        <div className="text-subtle mt-1.5 space-y-1 text-[11px]">
+      <SettingsGroup title="🖱 Thao tác">
+        <div className="text-subtle space-y-1 text-[11px]">
           {[
             ['Click', 'trợ lý ảo phản ứng'],
             ['Nhấn giữ', 'mở khung chat'],
@@ -1693,16 +1802,61 @@ function VrmControls({
             </div>
           ))}
         </div>
-      </details>
+      </SettingsGroup>
+    </>
+  )
+  /**
+   * Cột PHẢI: thêm trợ lý ảo · chuyển động · tắt.
+   *
+   * ⚠️ **Cân theo CHIỀU CAO, không theo chủ đề.** Bảng tra thao tác từng ở đây cho hợp nghĩa
+   * "mục dùng thưa", nhưng khi nạp-cả-thư-mục thêm vào cột này ba khối nữa (hai nút, dòng gợi ý,
+   * danh sách clip) thì phải dài gấp **2,6 lần** trái — user chụp được và nói "mất cân đối".
+   * Bảng thao tác là khối TĨNH, cao cố định, không phụ thuộc user nạp gì, nên nó là thứ dời sang
+   * trái rẻ nhất: lệch còn ~2 dòng.
+   *
+   * Thêm khối mới vào đây thì đo lại: cột trái gần như đứng yên (model info + công tắc + cỡ +
+   * chọn model), cột phải mới là cột phình theo nội dung.
+   */
+  const right = (
+    <>
+      {/* Điều kiện là `active`, KHÔNG phải `models.length > 1`: chỉ có một model thì vẫn cần thấy
+          nó là model nào, tác giả ai, giấy phép gì — ô CHỌN mới là thứ vô nghĩa khi chỉ có một */}
+      {active && (
+        <SettingsGroup title="🧑‍🎤 Trợ lý ảo">
+          {/* Thông tin model đi CÙNG ô chọn model — tách sang cột kia thì phải liếc qua liếc lại
+              giữa "đang dùng cái gì" và "đổi sang cái nào" */}
+          <ModelInfo model={active} open />
+          {/* Ô chọn chỉ có nghĩa khi có từ 2 model — một model thì nó là dropdown một dòng */}
+          {models.length > 1 && (
+            <div className="flex gap-1">
+              <select
+                className="bg-elevated border-edge min-w-0 flex-1 rounded border px-2 py-1 text-xs"
+                value={active.id}
+                onChange={(e) => onPatch({ activeId: e.target.value })}
+              >
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                    {m.missing ? ' (mất file)' : ''}
+                  </option>
+                ))}
+              </select>
+              {/* Xoá model ĐANG CHỌN: `<select>` gốc không gắn được nút cho từng dòng.
+                  Bảng chuột-phải (`VrmSidePanel`) thì xoá được bất kỳ dòng nào. */}
+              <button
+                className="border-edge text-subtle hover:text-danger hover:border-danger rounded border px-2 py-1 text-xs"
+                title={`Bỏ "${active.label}" khỏi danh sách (không xoá file gốc)`}
+                onClick={() => onRemoveModel(active.id)}
+              >
+                🗑
+              </button>
+            </div>
+          )}
+        </SettingsGroup>
+      )}
 
-      <details className="group border-edge border-t pt-2" open={only !== undefined}>
-        <summary className="text-subtle hover:text-content flex cursor-pointer list-none items-center gap-1 text-xs">
-          <span className="group-open:hidden">▸</span>
-          <span className="hidden group-open:inline">▾</span>
-          Thêm trợ lý ảo · Chuyển động
-        </summary>
-
-        <div className="mt-2 flex flex-col gap-2">
+      <SettingsGroup title="🎬 Chuyển động">
+        <div className="flex flex-col gap-2">
           {/* Tải model mẫu — cũng để Ở ĐÂY, không chỉ ở màn hình mời chọn: ai đã có sẵn một model
               thì không bao giờ thấy màn hình đó, nên sẽ không biết có model mẫu để tải. */}
           {/* Khung lớn thì hiện bản đầy đủ (có mô tả model); panel nhỏ mới cần bản gọn */}
@@ -1711,6 +1865,13 @@ function VrmControls({
           <div className="flex flex-wrap items-center gap-1">
             <button className="border-edge hover:bg-elevated rounded border px-2 py-1 text-xs" onClick={onPickAnimation}>
               🎞 Nạp file .vrma
+            </button>
+            <button
+              className="border-edge hover:bg-elevated rounded border px-2 py-1 text-xs"
+              title="Chọn một thư mục và nạp mọi file .vrma trong đó"
+              onClick={onPickAnimationDir}
+            >
+              📂 Nạp cả thư mục
             </button>
             {animationName && (
               <>
@@ -1727,36 +1888,127 @@ function VrmControls({
               </>
             )}
           </div>
-        </div>
-      </details>
 
-      <div className="flex items-center gap-2">
-        <button className="border-edge hover:bg-elevated rounded border px-2 py-1 text-xs" onClick={onPick}>
-          📂 Chọn model khác
-        </button>
-        {/**
-         * "Tắt nhân vật" chuyển từ menu vòng tròn về ĐÂY.
-         *
-         * Ở vòng tròn nó nằm ngay cạnh các mục hay dùng (biểu cảm, trang phục, công cụ) nên rất
-         * dễ bấm nhầm, mà bấm nhầm là mất luôn nhân vật — phải đi mở lại từ Dashboard. Việc
-         * "tắt" là việc làm một lần, hợp với chỗ cài đặt hơn là chỗ thao tác hằng ngày.
-         */}
-        <button
-          className="border-edge text-subtle hover:text-danger hover:border-danger ml-auto rounded border px-2 py-1 text-xs"
-          onClick={onCloseCharacter}
-        >
-          ✕ Tắt trợ lý ảo
-        </button>
-      </div>
-    </div>
+          {/**
+           * Chỉ CHỈ CHỖ, không tải hộ.
+           *
+           * Bộ chuyển động chính thức của pixiv cấm *"distributing these motions or their
+           * alterations … in a way that can be rigged or extracted"* — nên app không được đặt
+           * file đó vào repo, vào release, hay tự tải về hộ user. Nhưng điều khoản **cho phép
+           * dùng** (kể cả thương mại, chỉ cần ghi credit), nên đường hợp lệ là: user tự tải, app
+           * nạp từ máy họ. Dòng này rút ngắn đúng cái khoảng cách đó.
+           */}
+          <p className="text-subtle text-[11px] leading-relaxed">
+            Chưa có clip nào?{' '}
+            <a
+              href="https://vroid.booth.pm/items/5512385"
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent hover:underline"
+              title="Bộ 7 chuyển động miễn phí của VRoid Project (pixiv) trên BOOTH. App không tải hộ: giấy phép cho phép bạn dùng nhưng cấm phát tán lại file, nên bạn tải rồi app nạp từ máy bạn."
+            >
+              tải bộ 7 clip miễn phí của VRoid Project
+            </a>{' '}
+            rồi giải nén và nạp cả thư mục.
+          </p>
+
+          {folderClips && folderClips.files.length > 0 && (
+            <div className="border-edge flex flex-col gap-1 rounded border p-1.5">
+              <div className="flex items-center gap-1">
+                <span className="text-subtle min-w-0 flex-1 truncate text-[11px]" title={folderClips.dir}>
+                  📂 {folderClips.files.length} clip · {folderClips.dir}
+                </span>
+                <button
+                  className="border-edge hover:bg-elevated rounded border px-1.5 py-0.5 text-[11px]"
+                  title="Bỏ danh sách này"
+                  onClick={onClearFolderClips}
+                >
+                  ✕
+                </button>
+              </div>
+              {/* Cuộn trong khung: bộ vài chục clip sẽ đẩy mọi thứ bên dưới ra khỏi panel */}
+              <div className="flex max-h-40 flex-col gap-0.5 overflow-y-auto">
+                {folderClips.files.map((c) => (
+                  <div key={c.name} className="flex items-center gap-1">
+                    <button
+                      className={`hover:bg-elevated min-w-0 flex-1 truncate rounded px-1.5 py-0.5 text-left text-[11px] ${
+                        animationName === c.name ? 'bg-accent/20 text-accent' : 'text-content'
+                      }`}
+                      title={`Phát thử ${c.name}`}
+                      onClick={() => onPlayFolderClip(c)}
+                    >
+                      {c.name}
+                    </button>
+                    {/**
+                     * Vai trò tự chạy — **để trống = chỉ chạy khi bấm**.
+                     *
+                     * Gán ở đây thì clip này THẮNG clip CC0 mặc định của cùng vai trò; vai trò
+                     * không gán thì vẫn dùng clip mặc định như cũ, nên gán vài cái không làm mất
+                     * chuyển động nào đang có.
+                     */}
+                    <select
+                      className="bg-elevated border-edge text-subtle w-24 shrink-0 rounded border px-1 py-0.5 text-[10px]"
+                      value={folderRoles[c.name] ?? ''}
+                      title="Chạy tự động khi nào — để trống thì chỉ chạy khi bạn bấm"
+                      onChange={(e) => onSetClipRole(c.name, (e.target.value || null) as VrmMotionRoleName | null)}
+                    >
+                      <option value="">— khi bấm —</option>
+                      {VRM_ROLE_LABELS.map((r) => (
+                        <option key={r.value} value={r.value}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </SettingsGroup>
+    </>
+  )
+
+  /**
+   * Thanh CHÂN — hai nút hành động, luôn nhìn thấy dù cột có cuộn.
+   *
+   * Trước đây chúng nằm cuối cột phải, mà cột đó dài ra theo số clip user nạp nên bị đẩy xuống
+   * dưới vùng cuộn. Nút hành động không được trốn sau một thanh cuộn.
+   *
+   * `only === undefined` (panel nhỏ, không có khung cài đặt) thì KHÔNG có chỗ cho thanh chân —
+   * nơi gọi tự nối `footer` vào cuối nội dung, xem nhánh cuối hàm.
+   */
+  const footer = (
+    <>
+      <button className="border-edge hover:bg-elevated rounded border px-2.5 py-1.5 text-xs" onClick={onPick}>
+        📂 Chọn model khác
+      </button>
+      {/**
+       * "Tắt nhân vật" chuyển từ menu vòng tròn về ĐÂY.
+       *
+       * Ở vòng tròn nó nằm ngay cạnh các mục hay dùng (biểu cảm, trang phục, công cụ) nên rất
+       * dễ bấm nhầm, mà bấm nhầm là mất luôn nhân vật — phải đi mở lại từ Dashboard. Việc
+       * "tắt" là việc làm một lần, hợp với chỗ cài đặt hơn là chỗ thao tác hằng ngày.
+       */}
+      <button
+        className="border-edge text-subtle hover:text-danger hover:border-danger rounded border px-2.5 py-1.5 text-xs"
+        onClick={onCloseCharacter}
+      >
+        ✕ Tắt trợ lý ảo
+      </button>
+    </>
   )
 
   if (only === 'left') return left
   if (only === 'right') return right
+  if (only === 'footer') return footer
+  // Chế độ panel NHỎ (có khung, không phải bảng cài đặt lớn): xếp chồng, `footer` nối vào cuối vì
+  // ở đây không có thanh chân riêng
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       {left}
       {right}
+      <div className="border-edge flex items-center gap-2 border-t pt-2">{footer}</div>
     </div>
   )
 }
@@ -1941,12 +2193,15 @@ function ModelInfo({ model, open }: { readonly model: VrmModelDto; readonly open
         <span className="text-subtle shrink-0 text-[10px] group-open:hidden">Chi tiết ▾</span>
         <span className="text-subtle hidden shrink-0 text-[10px] group-open:inline">Thu gọn ▴</span>
       </summary>
-      <div className="text-subtle mt-1 space-y-0.5 text-[11px]">
-        <div>
+      {/* `min-w-0` trên CHÍNH thẻ này, không chỉ trên dòng con: `truncate` chỉ cắt khi tổ tiên
+          gần nhất cho phép co lại. Thiếu nó thì URL giấy phép (dài 200+ ký tự, có model dùng
+          chuỗi query kể hết mọi quyền) đẩy cả cột rộng ra và trải ngang màn hình — user chụp được. */}
+      <div className="text-subtle mt-1 min-w-0 space-y-0.5 text-[11px]">
+        <div className="truncate" title={`VRM ${model.spec} · ${mb} MB${model.meta.author ? ` · ${model.meta.author}` : ''}`}>
           VRM {model.spec} · {mb} MB
           {model.meta.author ? ` · ${model.meta.author}` : ''}
         </div>
-        {model.meta.commercialUse && <div>Dùng thương mại: {model.meta.commercialUse}</div>}
+        {model.meta.commercialUse && <div className="truncate">Dùng thương mại: {model.meta.commercialUse}</div>}
         {model.meta.licenseUrl && (
           <div className="truncate" title={model.meta.licenseUrl}>
             Giấy phép: {model.meta.licenseUrl}
@@ -2061,3 +2316,12 @@ function VrmMotionPanel({
     </VrmMiniPanel>
   )
 }
+
+/**
+ * Lối vào cho harness đo bố cục (`_harness/settings/cols.tsx`) — **không dùng trong app**.
+ *
+ * `VrmControls` là component nội bộ, mà câu hỏi "hai cột cài đặt có cân nhau không" chỉ trả lời
+ * được bằng số đo từ layout thật. Export một alias thay vì để harness chép lại component: bản
+ * chép sẽ lệch khỏi bản thật ngay lần sửa kế tiếp, và lúc đó harness đo một thứ không còn tồn tại.
+ */
+export { VrmControls as VrmControlsForHarness }

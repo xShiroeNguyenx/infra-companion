@@ -431,7 +431,15 @@ export default function App() {
     { id: 'open-monitor', label: t('menu.monitor'), run: () => setModal('monitor') },
     { id: 'open-notifications', label: t('menu.notifications'), run: () => setModal('notifications') },
     { id: 'open-http-checks', label: t('menu.httpChecks'), run: () => setModal('http-checks') },
-    { id: 'open-client-import', label: t('menu.clientImport'), run: () => setModal('client-import') },
+    {
+      id: 'open-client-import',
+      label: t('menu.clientImport'),
+      // Nhãn menu rút gọn còn "Nhập từ client khác…" (bốn tên client làm nó bị cắt trong sidebar),
+      // nhưng người ta tìm bằng đúng tên client mình đang dùng — palette lọc cả `hint` nên gõ
+      // "putty" / "moba" / "winscp" / "termius" vẫn ra
+      hint: 'PuTTY MobaXterm WinSCP Termius',
+      run: () => setModal('client-import')
+    },
     { id: 'open-inventory', label: t('menu.inventory'), run: () => useTabsStore.getState().openToolTab('inventory') },
     { id: 'open-runbooks', label: t('menu.runbooks'), run: () => setModal('runbooks') },
     { id: 'open-jobs', label: t('menu.jobs'), run: () => setModal('jobs') },

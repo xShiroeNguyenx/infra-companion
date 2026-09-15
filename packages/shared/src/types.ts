@@ -2588,6 +2588,14 @@ export interface InfraApi {
     setSettings(patch: Partial<import('./vrm').VrmSettingsDto>): Promise<import('./vrm').VrmSettingsDto>
     /** Chọn file `.vrma` và trả luôn bytes — file animation nhỏ nên không cần tách 2 lượt. */
     pickAnimation(): Promise<import('./vrm').VrmAnimationPickResult>
+    /** Nạp cả thư mục `.vrma` — chỉ đọc từ máy user, không tải từ đâu cả. */
+    pickAnimationDir(): Promise<import('./vrm').VrmAnimationDirResult>
+    /** Đọc lại thư mục đã nhớ từ phiên trước, không mở hộp thoại. */
+    reloadAnimationDir(): Promise<import('./vrm').VrmAnimationDirResult>
+    getFolderMotions(): Promise<import('./vrm').VrmFolderMotionsDto>
+    setFolderMotions(
+      patch: Partial<import('./vrm').VrmFolderMotionsDto>
+    ): Promise<import('./vrm').VrmFolderMotionsDto>
     /**
      * Bộ trang phục **do user tự đặt** cho một model.
      *

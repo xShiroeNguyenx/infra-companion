@@ -25,6 +25,14 @@ import { useT, type I18nKey } from '../i18n'
 export interface ToolsMenuAction {
   id: string
   labelKey: I18nKey
+  /**
+   * Từ khoá phụ cho ô tìm, không hiện trên UI.
+   *
+   * Cho mục có nhãn ngắn hơn thứ người ta gõ: "Nhập từ client khác…" không chứa chữ "PuTTY",
+   * mà đó đúng là từ người dùng sẽ tìm — họ nhớ tên client mình đang dùng, không nhớ cách app
+   * gọi tính năng này.
+   */
+  keywords?: string
   run: () => void
 }
 
@@ -77,7 +85,9 @@ export function ToolsMenu({
   }, [needle, searching, t])
 
   const showWatcher = !searching || watcherName.name.toLowerCase().includes(needle)
-  const shownActions = actions.filter((a) => !searching || t(a.labelKey).toLowerCase().includes(needle))
+  const shownActions = actions.filter(
+    (a) => !searching || `${t(a.labelKey)} ${a.keywords ?? ''}`.toLowerCase().includes(needle)
+  )
   const nothing = sections.length === 0 && !showWatcher && shownActions.length === 0
 
   if (!open) return null

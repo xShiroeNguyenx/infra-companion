@@ -494,6 +494,38 @@ tưởng là model hợp lệ.
 or extracted"* — đặt file vào repo hay release là đúng hành vi đó. User tự tải rồi dùng nút "Nạp
 file .vrma" thì hợp lệ, đó là chuyện giữa họ và pixiv.
 
+**Đường hợp lệ app đang hỗ trợ** (v0.4.4), gồm đúng hai việc và không hơn:
+
+1. **Chỉ chỗ** — dòng chữ dưới hai nút nạp, link tới <https://vroid.booth.pm/items/5512385> (shop
+   chính thức "VRoid Project", miễn phí, đúng bộ 7 clip). App **không** tải hộ.
+2. **Nạp cả thư mục** — `VRM_PICK_ANIMATION_DIR` quét **một cấp**, lọc `.vrma` (không phân biệt
+   hoa thường: bộ tải trên Windows hay ra `.VRMA`), trần `VRMA_DIR_MAX_FILES` = 60 file. Nội dung
+   clip giữ **trong state renderer, KHÔNG ghi xuống đĩa** — chép vào `userData` là tạo thêm một
+   bản nữa trong thư mục app, đúng cái điều khoản cấm.
+3. **Gán vai trò + nhớ qua phiên** — file `vrm-folder-motions.json` ở `userData` chỉ chứa
+   **đường dẫn thư mục** và map `tên file → vai trò`; `VRM_RELOAD_ANIMATION_DIR` đọc lại lúc panel
+   dựng xong. Vai trò gán được: `idle`/`chat`/`poke`/`alert`/`recover`/`inspect` — **không có
+   `manual`** vì không gán gì đã là "chỉ chạy khi bấm".
+
+**Hai nguồn clip đi CHUNG một cơ chế ưu tiên.** `useVrmMotion.play()` xét `PRIORITY` + mốc `until`
+TRƯỚC khi chọn clip, rồi mới thử nguồn thư mục (`runFolder`) và cuối cùng rơi về danh mục CC0.
+Làm hai cơ chế song song thì clip cảnh báo của nguồn này sẽ cắt ngang clip cảnh báo của nguồn kia
+và không bên nào biết bên nào đang chạy. **Clip user gán THẮNG clip CC0 cùng vai trò** — gán tay là
+lựa chọn tường minh, mà vẫn chạy clip mặc định thì việc gán vô nghĩa.
+
+⚠️ `playAnimation` nay trả **`number`** (thời lượng clip, giây) thay vì `void`: clip trong danh mục
+có `durationSec` đo sẵn, clip tự nạp thì không — thiếu con số đó thì không hẹn được giờ trả quyền
+về lớp tự sinh và nhân vật đứng nguyên tư thế cuối clip mãi mãi. Đọc từ chính file là nguồn duy
+nhất đúng, và stage vốn đã có nó trong tay (`clip.duration`).
+
+⚠️ **Đường KHÔNG được làm**: app tự tải từ URL của pixiv về `userData`. Nghe như "user vẫn là
+người tải" nhưng thực chất là tự động hoá việc lấy file và đưa vào kho của app. Muốn làm thì phải
+xin phép pixiv trước (form ở cuối Readme của bộ đó).
+
+Lưu ý điều khoản **cho phép dùng thương mại** (chỉ cần ghi credit `Animation credits to pixiv
+Inc.'s VRoid Project`) — vướng mắc không nằm ở chỗ app này là sản phẩm, mà chỉ ở chỗ *phát tán
+lại file*.
+
 ### Nơi tải: Release của chính repo này
 
 App tải từ **Release của repo này**, tag `vrm-motions-v1`, mirror là nguồn cũ:

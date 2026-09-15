@@ -33,6 +33,7 @@ export function VrmSettingsFrame({
   box,
   children,
   right,
+  footer,
   onClose
 }: {
   readonly box: SettingsFrameBox
@@ -41,6 +42,14 @@ export function VrmSettingsFrame({
   /** Cột PHẢI — hai thuộc tính riêng, không tách một `children` gộp: tách gộp thì nơi gọi phải
    *  nhớ đúng thứ tự phần tử, mà quên thứ tự thì lỗi im lặng (một cột trống). */
   readonly right: ReactNode
+  /**
+   * Thanh CHÂN cố định — các nút phải luôn nhìn thấy dù cột có cuộn.
+   *
+   * Trước đây "Chọn model khác" và "Tắt trợ lý ảo" nằm cuối cột phải, mà cột đó dài ra theo số
+   * clip user nạp nên hai nút bị đẩy xuống dưới vùng cuộn. Nút hành động không được trốn sau một
+   * thanh cuộn.
+   */
+  readonly footer?: ReactNode
   readonly onClose: () => void
 }) {
   useEffect(() => {
@@ -103,16 +112,109 @@ export function VrmSettingsFrame({
           className="grid min-h-0 flex-1 px-4 py-3"
           style={{ gridTemplateColumns: `1fr ${gap}px 1fr`, gridTemplateRows: 'minmax(0, 1fr)' }}
         >
-          <div className="bg-elevated/70 pointer-events-auto min-h-0 min-w-0 overflow-y-auto overscroll-contain rounded-lg p-2">
-            {children}
-          </div>
+          <div className={COL_CLASS}>{children}</div>
           {/* Khe giữa để trống — nhân vật đứng ở đây, chuột xuyên qua tới nhân vật */}
           <div aria-hidden data-vrm-settings-gap />
-          <div className="bg-elevated/70 pointer-events-auto min-h-0 min-w-0 overflow-y-auto overscroll-contain rounded-lg p-2">
-            {right}
-          </div>
+          <div className={COL_CLASS}>{right}</div>
         </div>
+        {footer && (
+          <div className="border-edge pointer-events-auto flex shrink-0 items-center justify-end gap-2 border-t px-4 py-2.5">
+            {footer}
+          </div>
+        )}
       </div>
     </>
+  )
+}
+
+/**
+ * Cột kính: viền + bo + nền mờ, đủ để mắt thấy "đây là một vùng" thay vì chữ trôi trên nền 3D.
+ *
+ * Mượn cách của `desktop-companion` (`.set-col`) nhưng **bỏ `backdrop-filter`**: blur đè lên canvas
+ * WebGL vẽ liên tục là mỗi khung hình phải tính lại blur — đã có model lag vì GPU. Nền đục 70% +
+ * nhân vật mờ 55% là đủ đọc mà không tốn gì.
+ */
+const COL_CLASS =
+  'bg-elevated/70 border-edge/60 pointer-events-auto flex min-h-0 min-w-0 flex-col gap-3 overflow-y-auto overscroll-contain rounded-xl border p-3'
+
+/**
+ * Một NHÓM trong cột: tiêu đề nhỏ in hoa + đường kẻ, rồi tới nội dung.
+ *
+ * Mượn `.set-group > h3` của `desktop-companion`. Lý do nó đáng có: bảng cũ để mọi thứ trôi nổi
+ * cạnh nhau — bốn checkbox, một thanh trượt, một dropdown, một bảng phím — mắt không có mốc nào
+ * để biết cái nào thuộc cái nào. Tiêu đề in hoa cỡ nhỏ tạo mốc mà gần như không tốn chiều cao.
+ *
+ * Màu theo `--c-accent` của app chứ không lấy tông hồng của bên kia: bảng này sống trong theme
+ * user đã chọn, một màu cứng sẽ chọi với mọi theme khác.
+ */
+export function SettingsGroup({
+  title,
+  children
+}: {
+  readonly title: string
+  readonly children: ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className="text-accent border-edge/50 flex items-center gap-1.5 border-b pb-1 text-[10px] font-bold tracking-wider uppercase">
+        {title}
+      </h3>
+      {children}
+    </div>
+  )
+}
+
+/**
+ * Hàng công tắc: nhãn bên trái, ô tick bên phải, cả hàng có khung.
+ *
+ * Khung là thứ tạo khác biệt lớn nhất so với bản cũ: checkbox trần nằm cạnh nhau trông như một
+ * đám chữ rời, còn mỗi cái một khung thì thành một danh sách đọc được. Cả hàng là `<label>` nên
+ * bấm vào chữ cũng tick — vùng bấm rộng gấp mấy lần cái ô 13px.
+ */
+export function SettingsToggle({
+  label,
+  checked,
+  disabled,
+  title,
+  onChange
+}: {
+  readonly label: string
+  readonly checked: boolean
+  readonly disabled?: boolean
+  readonly title?: string
+  readonly onChange: (v: boolean) => void
+}) {
+  return (
+    <label
+      className={`border-edge/40 flex items-center gap-2 rounded-lg border px-2 py-1.5 text-xs ${
+        disabled ? 'opacity-50' : 'hover:border-edge hover:bg-hover/40 cursor-pointer'
+      }`}
+      title={title}
+    >
+      <span className="text-content min-w-0 flex-1">{label}</span>
+      <input
+        type="checkbox"
+        className="accent-accent shrink-0"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+    </label>
+  )
+}
+
+/** Một trường có nhãn nhỏ phía trên — dùng cho dropdown, thanh trượt, ô nhập. */
+export function SettingsField({
+  label,
+  children
+}: {
+  readonly label: string
+  readonly children: ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-subtle text-[11px]">{label}</span>
+      {children}
+    </div>
   )
 }

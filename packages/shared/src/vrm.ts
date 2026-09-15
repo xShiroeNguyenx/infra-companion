@@ -47,6 +47,131 @@ export type VrmAnimationPickResult =
   | { ok: true; name: string; bytes: Uint8Array }
   | { ok: false; reason: 'canceled' | 'tooLarge' | 'io'; detail?: string }
 
+/**
+ * Trần số file khi nạp CẢ THƯ MỤC.
+ *
+ * Người ta trỏ nhầm vào `D:\` hay thư mục Downloads là chuyện thường; không có trần thì app
+ * ngồi đọc hàng nghìn file vào RAM. Bộ `.vrma` thật chỉ vài chục file là cùng.
+ */
+export const VRMA_DIR_MAX_FILES = 60
+
+/** Một clip đọc được từ thư mục user chọn — chưa nạp vào sân khấu, chỉ để hiện ra cho chọn. */
+export interface VrmAnimationFile {
+  /** Tên file kèm đuôi, dùng làm nhãn trên UI. */
+  name: string
+  bytes: Uint8Array
+}
+
+/**
+ * Kết quả nạp cả thư mục `.vrma`.
+ *
+ * `empty` tách riêng khỏi `io`: trỏ vào thư mục không có clip nào là **thao tác đúng cú pháp
+ * nhưng sai chỗ**, và câu trả lời hữu ích là "thư mục này không có file .vrma nào" chứ không
+ * phải một lỗi đọc đĩa.
+ *
+ * `skipped` = file `.vrma` bị bỏ vì quá lớn hoặc đọc hỏng. Báo ra chứ không nuốt: nạp 7 file mà
+ * chỉ thấy 6 thì user cần biết vì sao, không thì tưởng app đếm sai.
+ */
+export type VrmAnimationDirResult =
+  | { ok: true; dir: string; files: VrmAnimationFile[]; skipped: string[]; truncated: boolean }
+  | { ok: false; reason: 'canceled' | 'empty' | 'io'; detail?: string }
+
+/**
+ * Lọc tên file `.vrma` trong một thư mục rồi xếp theo tên.
+ *
+ * Tách ra khỏi handler IPC để **test được** — code trong `apps/**` không được vitest quét.
+ *
+ * `.toLowerCase()` chứ không so đuôi trần: Windows không phân biệt hoa thường nên bộ tải về hay
+ * có `.VRMA`, mà so trần thì chúng biến mất lặng lẽ và user chỉ thấy "thư mục này không có file
+ * .vrma nào" trong khi nhìn vào thì rõ ràng là có.
+ *
+ * `localeCompare` cho `VRMA_02` đứng trước `VRMA_10` theo cảm nhận thông thường của người đọc.
+ */
+export function pickVrmaNames(entries: readonly string[]): string[] {
+  return entries.filter((n) => n.toLowerCase().endsWith('.vrma')).sort((a, b) => a.localeCompare(b))
+}
+
+/**
+ * Thư mục clip user đã nạp + vai trò họ gán cho từng file — nhớ qua các phiên.
+ *
+ * ⚠️ **Chỉ lưu ĐƯỜNG DẪN, không lưu nội dung file.** Chép `.vrma` vào `userData` là tạo thêm một
+ * bản trong thư mục app, đúng cái giấy phép bộ pixiv cấm (xem `vrmMotion.ts`). Mở app lần sau thì
+ * đọc lại từ thư mục gốc; file bị xoá hay dời thì báo rõ thay vì im lặng bỏ qua.
+ *
+ * File riêng `vrm-folder-motions.json`, **không** nhét vào `VrmSettingsDto`: đây là dữ liệu khác
+ * loại (một danh sách có thể dài), và `readSettings()` có quy tắc chuẩn hoá từng trường mà một
+ * map lồng nhau không hợp với khuôn đó.
+ */
+export interface VrmFolderMotionsDto {
+  /** Thư mục user đã chọn; `null` = chưa nạp lần nào. */
+  dir: string | null
+  /**
+   * `tên file` → vai trò tự chạy. Thiếu khoá = clip đó chỉ chạy khi user tự bấm.
+   *
+   * Khoá là TÊN FILE chứ không phải chỉ số: user thêm/bớt file trong thư mục thì chỉ số trượt
+   * hết, còn tên thì vẫn trỏ đúng clip.
+   */
+  roles: Record<string, VrmMotionRoleName>
+}
+
+/**
+ * Vai trò gán được cho clip tự nạp.
+ *
+ * Cố ý **không** có `manual`: không gán gì đã là "chỉ chạy khi bấm" rồi. Cũng không dùng lại
+ * `VrmMotionRole` của `vrmMotion.ts` để tránh vòng import giữa hai file cùng tầng — hai bộ giá
+ * trị trùng nhau và có test chốt điều đó.
+ */
+export type VrmMotionRoleName = 'idle' | 'chat' | 'poke' | 'alert' | 'recover' | 'inspect'
+
+/** Nhãn tiếng Việt cho dropdown chọn vai trò. Thứ tự này là thứ tự hiện trên UI. */
+export const VRM_ROLE_LABELS: readonly { value: VrmMotionRoleName; label: string }[] = [
+  { value: 'idle', label: 'Lúc rảnh' },
+  { value: 'chat', label: 'Khi mở chat' },
+  { value: 'poke', label: 'Khi chạm vào' },
+  { value: 'alert', label: 'Khi có cảnh báo' },
+  { value: 'recover', label: 'Khi hết cảnh báo' },
+  { value: 'inspect', label: 'Khi đọc lâu' }
+]
+
+export const DEFAULT_VRM_FOLDER_MOTIONS: VrmFolderMotionsDto = { dir: null, roles: {} }
+
+/**
+ * Chuẩn hoá dữ liệu đọc từ đĩa — file JSON ngoài vault, ai cũng sửa được bằng tay.
+ *
+ * Bỏ khoá có vai trò lạ thay vì giữ nguyên: một chuỗi không thuộc `VrmMotionRoleName` lọt vào
+ * `nextFolderClipForRole` sẽ không khớp vai trò nào và clip đó im lặng không bao giờ chạy — user
+ * thấy "gán rồi mà không chạy" và không có cách nào biết vì sao.
+ */
+export function cleanFolderMotions(raw: unknown): VrmFolderMotionsDto {
+  const o = (raw ?? {}) as Partial<VrmFolderMotionsDto>
+  const valid = new Set<string>(VRM_ROLE_LABELS.map((r) => r.value))
+  const roles: Record<string, VrmMotionRoleName> = {}
+  if (o.roles && typeof o.roles === 'object') {
+    for (const [name, role] of Object.entries(o.roles as Record<string, unknown>)) {
+      if (typeof role === 'string' && valid.has(role)) roles[name] = role as VrmMotionRoleName
+    }
+  }
+  return { dir: typeof o.dir === 'string' && o.dir.length > 0 ? o.dir : null, roles }
+}
+
+/**
+ * Clip kế tiếp cho một vai trò trong nhóm clip tự nạp — **xoay vòng**, cùng lẽ với
+ * `nextMotionForRole` của danh mục CC0: bốc ngẫu nhiên thì có lúc ra cùng một clip hai ba lần
+ * liền, mà ở nhịp 90–180 giây user sẽ thấy đúng cái đó lặp lại và nghĩ tính năng hỏng.
+ */
+export function nextFolderClipForRole(
+  roles: Record<string, VrmMotionRoleName>,
+  available: readonly string[],
+  role: VrmMotionRoleName,
+  lastName: string | null
+): string | null {
+  const pool = available.filter((n) => roles[n] === role)
+  if (pool.length === 0) return null
+  if (pool.length === 1 || lastName === null) return pool[0]!
+  const i = pool.findIndex((n) => n === lastName)
+  return pool[i < 0 ? 0 : (i + 1) % pool.length]!
+}
+
 export interface VrmSettingsDto {
   /** Model đang chọn. `null` = chưa chọn gì, panel hiện màn hình mời chọn file. */
   activeId: string | null

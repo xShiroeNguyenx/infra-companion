@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { nextMotionForRole, VRM_MOTIONS, type VrmMotionClip, type VrmMotionRole } from '@infra/shared'
+import {
+  nextFolderClipForRole,
+  nextMotionForRole,
+  VRM_MOTIONS,
+  type VrmMotionClip,
+  type VrmMotionRole,
+  type VrmMotionRoleName
+} from '@infra/shared'
 import type { VrmStage } from './vrmStage'
 
 /**
@@ -44,7 +51,23 @@ export interface VrmMotionApi {
   playing: string | null
 }
 
-export function useVrmMotion(stage: VrmStage | null, enabled: boolean): VrmMotionApi {
+/**
+ * Clip user tự nạp từ thư mục, kèm vai trò họ gán — nguồn thứ hai bên cạnh danh mục CC0.
+ *
+ * Để `useVrmMotion` biết cả hai nguồn thay vì dựng một cơ chế tự chạy song song: thứ phải dùng
+ * chung là **luật ưu tiên** (`PRIORITY`) và mốc `until`. Hai cơ chế riêng thì clip cảnh báo của
+ * nguồn này sẽ cắt ngang clip cảnh báo của nguồn kia, và không bên nào biết bên nào đang chạy.
+ */
+export interface FolderMotionInput {
+  files: readonly { name: string; bytes: Uint8Array }[]
+  roles: Record<string, VrmMotionRoleName>
+}
+
+export function useVrmMotion(
+  stage: VrmStage | null,
+  enabled: boolean,
+  folder?: FolderMotionInput | null
+): VrmMotionApi {
   const [installed, setInstalled] = useState<string[]>([])
   const [downloading, setDownloading] = useState(false)
   const [playing, setPlaying] = useState<string | null>(null)
@@ -54,6 +77,8 @@ export function useVrmMotion(stage: VrmStage | null, enabled: boolean): VrmMotio
   const cache = useRef(new Map<string, Uint8Array>())
   /** Clip vừa chạy của TỪNG vai trò — để xoay vòng, xem `nextMotionForRole`. */
   const lastByRole = useRef(new Map<VrmMotionRole, string>())
+  /** Như trên nhưng cho clip THƯ MỤC — khoá là tên file, nên phải là bản đồ riêng. */
+  const lastFolderByRole = useRef(new Map<VrmMotionRoleName, string>())
   const stopTimer = useRef<number | null>(null)
 
   useEffect(() => {
@@ -111,19 +136,67 @@ export function useVrmMotion(stage: VrmStage | null, enabled: boolean): VrmMotio
     [stage]
   )
 
+  /**
+   * Phát một clip THƯ MỤC cho vai trò `role`; trả `true` nếu có clip để phát.
+   *
+   * Thời lượng đọc từ chính file (`playAnimation` trả về) chứ không có sẵn như clip trong danh
+   * mục — đó là lý do `playAnimation` được đổi sang trả `number`. Không có con số đó thì không
+   * hẹn được giờ trả quyền về lớp tự sinh, và nhân vật đứng nguyên tư thế cuối clip mãi mãi.
+   */
+  const runFolder = useCallback(
+    (role: VrmMotionRoleName): boolean => {
+      if (!stage || !folder || folder.files.length === 0) return false
+      const names = folder.files.map((f) => f.name)
+      const name = nextFolderClipForRole(folder.roles, names, role, lastFolderByRole.current.get(role) ?? null)
+      if (!name) return false
+      const file = folder.files.find((f) => f.name === name)
+      if (!file) return false
+      lastFolderByRole.current.set(role, name)
+      // `anchor: true` như mọi clip TỰ CHẠY: nhiều clip dời cả người đi, mà khung ôm sát thân nên
+      // nhân vật đi thẳng ra ngoài rồi vài giây sau mới quay lại
+      void stage.playAnimation(file.bytes, { once: true, anchor: true }).then((durationSec) => {
+        setPlaying(name)
+        const secs = durationSec > 0 ? durationSec : 3
+        current.current = { role, until: performance.now() + secs * 1000 }
+        if (stopTimer.current !== null) clearTimeout(stopTimer.current)
+        stopTimer.current = window.setTimeout(() => {
+          stopTimer.current = null
+          current.current = null
+          setPlaying(null)
+        }, secs * 1000 + 120)
+      })
+      return true
+    },
+    [stage, folder]
+  )
+
   const play = useCallback(
     (role: VrmMotionRole) => {
       if (!enabled || !stage) return
+      // Clip đang chạy còn hạn và ưu tiên cao hơn (hoặc bằng) → để yên, đừng cắt ngang.
+      // Xét TRƯỚC khi chọn clip: hai nguồn dùng chung luật này, nếu không thì clip của nguồn
+      // này sẽ cắt ngang clip cùng vai trò của nguồn kia.
+      const cur = current.current
+      if (cur && performance.now() < cur.until && PRIORITY[cur.role] >= PRIORITY[role]) return
+
+      /**
+       * **Clip user tự gán THẮNG clip mặc định** ở cùng vai trò.
+       *
+       * Gán tay là một lựa chọn tường minh — gán "Khi chạm vào" cho `VRMA_06` mà app vẫn chạy
+       * clip CC0 thì việc gán chẳng có nghĩa gì. Vai trò nào user không gán thì vẫn rơi về danh
+       * mục CC0 như cũ, nên bật tính năng này không làm mất chuyển động nào đang có.
+       *
+       * `manual` không nằm trong `VrmMotionRoleName` (không gán được) nên bỏ qua nhánh này.
+       */
+      if (role !== 'manual' && runFolder(role)) return
+
       // Xoay vòng trong nhóm clip của vai trò đó — `idle` có hai clip luân phiên
       const clip = nextMotionForRole(role, lastByRole.current.get(role) ?? null, installed)
       if (!clip) return
-      // Clip đang chạy còn hạn và ưu tiên cao hơn (hoặc bằng) → để yên, đừng cắt ngang
-      const cur = current.current
-      if (cur && performance.now() < cur.until && PRIORITY[cur.role] >= PRIORITY[role]) return
       lastByRole.current.set(role, clip.id)
       run(clip, false)
     },
-    [enabled, stage, installed, run]
+    [enabled, stage, installed, run, runFolder]
   )
 
   const playById = useCallback(

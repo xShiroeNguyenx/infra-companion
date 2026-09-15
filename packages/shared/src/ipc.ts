@@ -477,6 +477,24 @@ export const IPC = {
   VRM_SET_SETTINGS: 'vrm:set-settings',
   /** Chọn file animation `.vrma` và đọc luôn bytes — file nhỏ (vài trăm KB), không cần 2 lượt. */
   VRM_PICK_ANIMATION: 'vrm:pick-animation',
+  /**
+   * Chọn cả THƯ MỤC `.vrma` và đọc mọi clip trong đó.
+   *
+   * Bộ chuyển động người ta tải về thường là một thư mục nhiều file (bộ chính thức của pixiv là
+   * 7 file) — bắt chọn từng cái là bấm 7 lần cho một việc. Chỉ đọc từ máy user, **không tải
+   * về từ đâu cả**: bộ của pixiv cấm phân phối lại ở dạng trích xuất được, nên đường hợp lệ
+   * duy nhất là user tự tải rồi app nạp.
+   */
+  VRM_PICK_ANIMATION_DIR: 'vrm:pick-animation-dir',
+  /**
+   * Đọc lại thư mục `.vrma` đã nhớ từ phiên trước (không mở hộp thoại).
+   *
+   * Chỉ nhớ **đường dẫn**, không chép file — xem `VrmFolderMotionsDto`.
+   */
+  VRM_RELOAD_ANIMATION_DIR: 'vrm:reload-animation-dir',
+  /** Thư mục clip đã nhớ + vai trò gán cho từng file. */
+  VRM_GET_FOLDER_MOTIONS: 'vrm:get-folder-motions',
+  VRM_SET_FOLDER_MOTIONS: 'vrm:set-folder-motions',
   /** Bộ trang phục user tự lưu cho một model — file riêng `vrm-outfits.json`. */
   VRM_LIST_OUTFITS: 'vrm:list-outfits',
   VRM_SAVE_OUTFIT: 'vrm:save-outfit',

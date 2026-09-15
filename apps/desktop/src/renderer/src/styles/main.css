@@ -206,3 +206,17 @@ body,
   border-radius: 3px;
   background-clip: border-box;
 }
+
+/* ── Vùng cuộn KHÔNG hiện thanh cuộn ───────────────────────────────────────────
+   Dùng cho hai cột nổi cạnh trợ lý ảo (`VrmSidePanel`): cột chỉ rộng 112px, một
+   thanh cuộn ở đó ăn mất 10px và cắt ngang thẻ — mà cột lại nằm đè lên nhân vật
+   nên mọi pixel thừa đều che mất người. Vẫn cuộn được bằng con lăn và bàn phím.
+
+   ⚠️ CHỈ `::-webkit-scrollbar`, **không** `scrollbar-width: none` — xem cảnh báo ở
+   đầu khối scrollbar phía trên: Chromium ≥121 thấy `scrollbar-width` là vô hiệu hoá
+   toàn bộ `::-webkit-scrollbar-*` trên element đó, và ở đây hậu quả sẽ ngược hẳn ý
+   định (thanh cuộn native to đùng thay vì biến mất). */
+.scroll-hidden::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}

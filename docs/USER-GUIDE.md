@@ -1192,6 +1192,14 @@ A small figure stands beside your work. It follows your cursor, blinks, breathes
 
 **The chat bubble** is the same assistant as the rest of the app, so it uses the provider and key you already configured. Ask it to open something — *"open tunnels"*, *"mở cài đặt"* — and it opens that tool instead of answering. That match is made by keyword, not sent to the model: opening a panel is either right or wrong, and going through a language model only adds latency and a chance to be wrong. **⛶** moves the conversation into the full AI column; **💬** on that column sends it back to the bubble.
 
+**Your own motion clips.** Besides the thirteen CC0 clips the app can download, you can play any `.vrma` file from your machine: **🎞 Nạp file .vrma** for one, **📂 Nạp cả thư mục** for a whole pack — it scans one folder, plays the first clip and lists the rest to switch between.
+
+Each clip in that list has a dropdown to give it a job: *lúc rảnh*, *khi mở chat*, *khi chạm vào*, *khi có cảnh báo*, *khi hết cảnh báo*, *khi đọc lâu*. A clip you assign takes over that moment from the built-in one; roles you leave blank keep using the CC0 clips, so assigning a few takes nothing away. Blank means the clip plays only when you click it. Assign several to the same role and they alternate.
+
+The folder is remembered, so the clips and their roles come back next time you open the app. Only the **path** and the role table are saved — never the files, which would put a second copy of licensed clips inside the app's own folder.
+
+pixiv's VRoid Project gives away a [seven-animation pack](https://vroid.booth.pm/items/5512385) on BOOTH. Its licence lets you use the clips — commercially too, with the credit line *"Animation credits to pixiv Inc.'s VRoid Project"* — but forbids redistributing the files in a form that can be extracted. So the app links to the download and reads what you fetched; it never ships those clips or fetches them for you. The thirteen it *does* download are CC0 from three authors on BOOTH, which does permit redistribution.
+
 **Outfits.** A VRM file carries no notion of an outfit — measured on real models, there is only a pile of separate meshes, machine-generated names, or everything merged into one. So an outfit here is a combination of visible parts that **you** save and name. The one you were wearing comes back next time you open the app.
 
 **The radial menu** puts the two things you reach for most at the ends of its vertical axis: chat at the top, settings at the bottom. Its **centre is a button** — **✕ Đóng** closes the menu, and inside the Tools sub-ring it becomes **↩ Menu** and steps back to the main ring.

@@ -222,7 +222,7 @@ export function VrmSidePanel({
   onClose
 }: {
   readonly title: string
-  readonly items: readonly { id: string; label: string; active?: boolean }[]
+  readonly items: readonly { id: string; label: string; active?: boolean; hint?: string }[]
   readonly activeId?: string | null
   /** Vùng nhân vật trên màn hình — hai cột bám hai bên vùng này. */
   readonly anchor: { left: number; top: number; width: number; height: number }
@@ -271,13 +271,14 @@ export function VrmSidePanel({
    * sau, mà hai cột thì luôn cân đối hai bên dù khung người rộng hẹp bao nhiêu.
    */
   /**
-   * Bề rộng cột: **hẹp có chủ ý**.
+   * Bề rộng cột: **hẹp có chủ ý**, nhưng đủ cho một thẻ có viền.
    *
-   * Nội dung là tên biểu cảm (`neutral`, `blinkLeft`, `happy`) và tên bộ đồ — chuỗi ngắn, 96px
-   * đủ cho hầu hết, dài hơn thì cắt bớt và có tooltip. Bản trước 124px nên hai cột che mất phần
-   * lớn nhân vật, mà thấy nhân vật lúc đang chọn chính là điểm của kiểu bố cục này.
+   * Nội dung là tên biểu cảm (`neutral`, `blinkLeft`, `happy`), tên chuyển động và tên bộ đồ —
+   * chuỗi ngắn. Từng là 96px hồi mỗi mục còn là dòng chữ trần; nay mỗi mục là thẻ có viền +
+   * padding ngang nên 96px chỉ còn ~76px cho chữ và "Bước thể dục" xuống ba dòng. 112px đủ cho
+   * hầu hết tên hai từ mà vẫn hẹp — che nhiều hơn thế thì mất chính cái nhân vật đang muốn xem.
    */
-  const W = 96
+  const W = 112
   const GAP = 8
   /** Chờm lên thân người mỗi bên (px) — đủ để hai cột ôm sát mà không che mặt. */
   /**
@@ -340,8 +341,22 @@ export function VrmSidePanel({
    * model nên một hằng số dùng chung là đủ, không cần đọc xương lúc chạy.
    */
   const KNEE_FRAC = 0.71
+  /**
+   * Chiều cao ĐỦ cho cột dài hơn, không hơn — để danh sách ngắn khỏi chừa một mảng trống ở đáy.
+   *
+   * Vẫn là **một** con số dùng cho cả hai cột (không phải mỗi cột tự co): `items` chia đôi mà lẻ
+   * thì cột trái nhiều hơn cột phải một mục, để mỗi cột tự co là ra hai khối cao thấp lệch nhau
+   * trông như lỗi dựng hình.
+   *
+   * Ước 34px/thẻ (viền + padding + một dòng chữ) — đo trên ảnh harness. Thẻ hai dòng sẽ vượt
+   * chút ít, phần thân cuộn lo nốt; thà hụt vài px còn hơn chừa trống cả trăm px.
+   */
+  const ROW_H = 34
+  const CHROME_H = 16 + 20 + 8 // tiêu đề + chân + padding dọc
+  const needed = Math.max(cols[0]!.length, cols[1]!.length) * ROW_H + CHROME_H
   const colHeight = Math.min(
     COL_MAX,
+    needed,
     Math.max(COL_MIN, Math.min(anchor.height * KNEE_FRAC, window.innerHeight - anchor.top - GAP * 2))
   )
 
@@ -379,38 +394,54 @@ export function VrmSidePanel({
             transform: shown ? 'none' : `translateX(${side === 0 ? -8 : 8}px)`
           }}
         >
-          <div className="flex h-4 shrink-0 items-center justify-between px-1.5">
-            {/* Tiêu đề chỉ ở cột trái, nút đóng chỉ ở cột phải — lặp cả hai là thừa chỗ */}
-            <span className="text-subtle truncate text-[10px] font-semibold">{side === 0 ? title : ''}</span>
-            {side === 1 && (
-              <button
-                className="text-subtle hover:text-content shrink-0 px-0.5 text-xs leading-none"
-                aria-label="Đóng"
-                onClick={onClose}
-              >
-                ✕
-              </button>
-            )}
+          {/**
+           * Tiêu đề ở CẢ HAI cột, căn giữa (mượn `.companion-side-title`).
+           *
+           * Bản trước chỉ đặt ở cột trái cho đỡ lặp, nhưng hai cột đứng cách nhau cả thân người
+           * nên cột phải thành một danh sách không tên — mắt phải bắc cầu qua nhân vật mới biết
+           * nó là gì. Lặp một từ rẻ hơn nhiều so với bắt người ta suy ra.
+           *
+           * Cột phải thêm `(tiếp)`: hai tiêu đề y hệt cạnh nhau trông như hai danh sách khác
+           * nhau tình cờ trùng tên, chứ không phải một danh sách bị cắt đôi.
+           */}
+          <div className="flex h-4 shrink-0 items-center justify-center px-1.5">
+            <span className="text-accent truncate text-[10px] font-semibold">
+              {side === 0 || cols[1]!.length === 0 ? title : `${title} (tiếp)`}
+            </span>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-1">
+          {/* `scroll-hidden`: cuộn được nhưng không hiện thanh — cột rộng 112px mà thanh cuộn ăn
+              10px thì cắt ngang thẻ, và cột lại đang đè lên nhân vật nên mọi pixel thừa đều che
+              mất người. Định nghĩa ở `styles/main.css` kèm cảnh báo vì sao không dùng
+              `scrollbar-width: none`. */}
+          <div className="scroll-hidden flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-1.5 py-0.5">
             {col.map((it) => (
-              <div key={it.id} className="group flex items-center">
+              <div key={it.id} className="group relative">
+                {/**
+                 * Mỗi mục là một THẺ có viền + nền, không phải dòng chữ trần (mượn
+                 * `.companion-model-option`).
+                 *
+                 * Dòng trần trên nền 3D nhiều chi tiết thì chữ dính vào hình phía sau và không
+                 * thấy đâu là vùng bấm được. Viền mảnh + nền 8% đủ tách chữ khỏi nền mà vẫn
+                 * thấy nhân vật xuyên qua — mà thấy nhân vật lúc đang chọn chính là điểm của
+                 * kiểu bố cục này.
+                 */}
                 <button
-                  className={`min-w-0 flex-1 truncate rounded px-1.5 py-0.5 text-left text-[11px] ${
+                  className={`w-full rounded-lg border px-2 py-1.5 text-left text-[11px] leading-snug break-words ${
                     (activeId != null && it.id === activeId) || it.active
-                      ? 'bg-accent/30 text-content'
-                      : 'text-subtle hover:bg-base/60 hover:text-content'
+                      ? 'border-accent/70 bg-accent/30 text-content'
+                      : 'border-edge/40 text-subtle hover:border-accent/50 hover:bg-accent/15 hover:text-content bg-white/[0.06]'
                   }`}
-                  title={it.label}
+                  title={it.hint ?? it.label}
                   onClick={() => onPick(it.id)}
                 >
                   {it.label}
                 </button>
-                {/* Chỉ hiện khi rê chuột vào dòng: danh sách này để CHỌN, nút xoá lúc nào cũng
-                    nằm cạnh mỗi dòng thì vừa chật vừa dễ bấm nhầm */}
+                {/* Chỉ hiện khi rê chuột vào thẻ: danh sách này để CHỌN, nút xoá lúc nào cũng
+                    nằm cạnh mỗi dòng thì vừa chật vừa dễ bấm nhầm. `absolute` để nó không đẩy
+                    chữ của thẻ co lại mỗi lần rê qua. */}
                 {onRemove && (
                   <button
-                    className="text-subtle hover:text-danger shrink-0 px-1 text-[11px] opacity-0 group-hover:opacity-100"
+                    className="text-subtle hover:text-danger absolute top-1 right-1 rounded px-1 text-[11px] opacity-0 group-hover:opacity-100"
                     title="Bỏ khỏi danh sách (không xoá file gốc)"
                     onClick={() => onRemove(it.id)}
                   >
@@ -419,6 +450,24 @@ export function VrmSidePanel({
                 )}
               </div>
             ))}
+          </div>
+          {/**
+           * Nút đóng ở CHÂN cột phải, hình tròn (mượn `.companion-side-close` + `.side-foot`).
+           *
+           * Ở chân chứ không ở đầu: phần thân mới cuộn, nên nút luôn nằm đáy cột và không bao
+           * giờ bị cuộn khuất. Cột trái giữ một khoảng trống bằng đúng chừng ấy (`side-spacer`
+           * bên kia) để hai cột thẳng hàng nhau ở đáy.
+           */}
+          <div className="flex h-5 shrink-0 items-center justify-end px-1.5">
+            {side === 1 && (
+              <button
+                className="border-edge/50 text-subtle hover:border-accent hover:bg-accent/25 hover:text-content grid h-4 w-4 place-items-center rounded-full border text-[10px] leading-none"
+                aria-label="Đóng"
+                onClick={onClose}
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
       ))}

@@ -5,6 +5,33 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.4.4] — 2026-09-15
+
+### Added
+
+- **Load a whole folder of `.vrma` clips at once.** Motion packs arrive as a folder of files — the official VRoid Project set is seven — and loading them one at a time meant seven trips through a file dialog. **📂 Nạp cả thư mục** scans one folder, loads every clip it finds, plays the first one immediately and lists the rest to switch between. Nothing is copied to disk: the clips are read from where you keep them and held only for the session.
+- **Give your own clips a job.** Each clip in the folder list has a dropdown: play it when the assistant is idle, when the chat opens, when you touch it, when an alert fires, when everything recovers, or while you are reading a long diff. A clip you assign **wins over the built-in one** for that moment; roles you leave unset keep using the CC0 clips as before, so assigning a few takes nothing away. Leave the dropdown blank and the clip only plays when you click it.
+- **The folder is remembered between sessions.** Reopen the app and the clips and their roles come straight back. Only the **path** and the role table are stored — never the files themselves, which would put a second copy of licensed clips inside the app's own folder. If the folder has moved or been deleted, the app says so rather than quietly forgetting.
+- **A pointer to the official free motion pack**, next to the load buttons. pixiv's VRoid Project gives away seven `.vrma` animations on BOOTH, and their licence permits use — including commercial use, with a credit line — but forbids redistributing the files in a form that can be extracted. So the app links to the download and reads what you fetched; it never ships the clips or fetches them for you.
+
+### Changed
+
+- **"Import from PuTTY / MobaXterm / WinSCP / Termius…" is now just "Import from another client…".** Four product names made the menu entry wide enough to be clipped in the sidebar. Searching still works by the name you actually remember — typing *putty*, *moba*, *winscp* or *termius* in the command palette or the tools menu finds it, and the full list stays in the feature description.
+
+### Fixed
+
+- **Folders are scanned case-insensitively.** A pack downloaded on Windows often carries `.VRMA`, which a plain suffix comparison drops silently — the app would report an empty folder while you were looking straight at the files.
+- **The assistant's settings panel is organised into labelled groups.** Four checkboxes, a slider, a dropdown and a gesture table used to sit loose beside each other with nothing to say which belonged to which. Settings now fall under small captioned headings — Hiển thị, Thông báo, Thao tác on the left; Trợ lý ảo, Chuyển động on the right — each column sits on its own panel, and every toggle is a framed row you can click anywhere on rather than a bare checkbox. The layout follows Desktop Companion's settings window; the colours stay with whichever theme you have chosen.
+- **The two columns beside the assistant match too.** Expressions, outfits, motions and model switching used to be bare lines of text floating over the 3D scene, where they blended into whatever was behind them. Each entry is now a framed card, the selected one is highlighted, both columns carry a caption (the second reads *(tiếp)*, so a split list does not look like two lists that happen to share a name), and the close button sits at the foot of the column where scrolling cannot hide it. Columns are also only as tall as the longer list rather than a fixed height that left a blank slab at the bottom.
+- **The action buttons moved to a footer bar.** *Chọn model khác* and *Tắt trợ lý ảo* used to sit at the end of the right-hand column, which grows with every clip you load — far enough that they scrolled out of sight. They now sit at the bottom of the frame and stay put.
+- **The two columns of the assistant's settings are balanced again.** Adding the folder loader put three more blocks in the right-hand column, leaving it 2.6× as tall as the left. The gesture reference moved across to balance them: it is a fixed block that never grows, so it is the cheapest thing to move, and the right-hand column is the one that stretches with what you load. Measured with the real component: 45px apart with a seven-clip pack loaded, against 144px before.
+
+### Notes
+
+- The folder scan reads one level deep and stops at 60 files. Pointing it at a drive root or a Downloads folder would otherwise pull thousands of files into memory with no sign of what it was doing; a real motion pack is a flat folder of a few dozen at most. Files too large or unreadable are skipped and reported rather than swallowed, so a pack of seven that loads six tells you why.
+
+---
+
 ## [0.4.3] — 2026-09-15
 
 ### Changed

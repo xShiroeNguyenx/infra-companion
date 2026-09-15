@@ -1,15 +1,18 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { createWriteStream } from 'node:fs'
-import { open, readFile, rm, rename, stat, mkdir, writeFile } from 'node:fs/promises'
+import { open, readdir, readFile, rm, rename, stat, mkdir, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { VRM_PROBE_BYTES, probeVrm } from '@infra/core'
 import {
+  cleanFolderMotions,
   cleanPos,
+  DEFAULT_VRM_FOLDER_MOTIONS,
   DEFAULT_VRM_SETTINGS,
   IPC,
+  pickVrmaNames,
   sampleDownloadCap,
   VRM_MAX_BYTES,
   VRM_MAX_MODELS,
@@ -17,8 +20,12 @@ import {
   VRM_SAMPLE_MODELS,
   VRM_ZOOM_MAX,
   VRM_ZOOM_MIN,
+  VRMA_DIR_MAX_FILES,
   VRMA_MAX_BYTES,
+  type VrmAnimationDirResult,
+  type VrmAnimationFile,
   type VrmAnimationPickResult,
+  type VrmFolderMotionsDto,
   type VrmModelDto,
   type VrmOutfit,
   type VrmOutfitFile,
@@ -348,6 +355,72 @@ async function downloadSample(id: string): Promise<VrmSampleResult> {
  * rồi mới đổi tên. Khác ở chỗ tải **cả bộ một lượt** — 13 clip ~4 MB, bắt user bấm từng cái là
  * phiền hơn giá trị nhận lại.
  */
+/**
+ * ==== Clip `.vrma` do user tự nạp từ thư mục của họ ====
+ *
+ * Khác hẳn thư viện CC0 ở trên: **không tải, không chép**. App chỉ nhớ đường dẫn thư mục và vai
+ * trò user gán cho từng tên file; nội dung đọc thẳng từ chỗ user để. Lý do là giấy phép — bộ
+ * chính thức của pixiv cấm phân phối lại ở dạng trích xuất được, mà chép vào `userData` là tạo
+ * thêm đúng một bản như thế.
+ */
+function folderMotionsPath(): string {
+  return join(app.getPath('userData'), 'vrm-folder-motions.json')
+}
+
+async function readFolderMotions(): Promise<VrmFolderMotionsDto> {
+  try {
+    return cleanFolderMotions(JSON.parse(await readFile(folderMotionsPath(), 'utf8')))
+  } catch {
+    // Chưa có file (lần đầu) hoặc JSON hỏng — cả hai đều là "chưa nhớ gì", không phải lỗi
+    return { ...DEFAULT_VRM_FOLDER_MOTIONS }
+  }
+}
+
+async function writeFolderMotions(v: VrmFolderMotionsDto): Promise<void> {
+  await writeFile(folderMotionsPath(), JSON.stringify(cleanFolderMotions(v), null, 2), 'utf8')
+}
+
+/**
+ * Đọc mọi `.vrma` trong một thư mục. Dùng chung cho cả lượt user chọn tay lẫn lượt tự đọc lại
+ * lúc khởi động — hai đường phải cho ra cùng kết quả, tách bản sao là chờ chúng lệch nhau.
+ *
+ * KHÔNG đệ quy: quét một cấp thôi. Trỏ nhầm vào ổ đĩa mà đi đệ quy là app treo hàng chục giây
+ * không dấu hiệu gì — mà bộ `.vrma` thật luôn phẳng trong một thư mục.
+ */
+async function readAnimationDir(dir: string): Promise<VrmAnimationDirResult> {
+  try {
+    const entries = await readdir(dir, { withFileTypes: true })
+    const names = pickVrmaNames(entries.filter((e) => e.isFile()).map((e) => e.name))
+    if (names.length === 0) return { ok: false, reason: 'empty' }
+
+    // Cắt bớt TRƯỚC khi đọc: trần là để khỏi nuốt hàng nghìn file vào RAM, đọc xong mới cắt
+    // thì đã muộn
+    const truncated = names.length > VRMA_DIR_MAX_FILES
+    const take = truncated ? names.slice(0, VRMA_DIR_MAX_FILES) : names
+
+    const files: VrmAnimationFile[] = []
+    const skipped: string[] = []
+    for (const name of take) {
+      const full = join(dir, name)
+      try {
+        if ((await stat(full)).size > VRMA_MAX_BYTES) {
+          skipped.push(name)
+          continue
+        }
+        files.push({ name, bytes: new Uint8Array(await readFile(full)) })
+      } catch {
+        // Một file hỏng không được làm hỏng cả lượt nạp — ghi tên lại rồi đi tiếp
+        skipped.push(name)
+      }
+    }
+    // Mọi file đều hỏng thì đây không còn là "nạp được một phần" nữa
+    if (files.length === 0) return { ok: false, reason: 'empty' }
+    return { ok: true, dir, files, skipped, truncated }
+  } catch (e) {
+    return { ok: false, reason: 'io', detail: (e as Error).message }
+  }
+}
+
 function motionsDir(): string {
   return join(app.getPath('userData'), 'vrm-motions')
 }
@@ -581,6 +654,53 @@ export function registerVrmIpc(): () => void {
       return { ok: false, reason: 'io', detail: (e as Error).message }
     }
   })
+
+  /**
+   * Nạp CẢ THƯ MỤC `.vrma` — bộ chuyển động tải về thường là một thư mục nhiều file.
+   *
+   * **Chỉ đọc từ máy user, không tải từ đâu cả.** Bộ chính thức của pixiv cấm phân phối lại ở
+   * dạng trích xuất được, nên đường hợp lệ duy nhất là user tự tải rồi app nạp — xem chú thích
+   * đầu `packages/shared/src/vrmMotion.ts`.
+   *
+   * KHÔNG đệ quy: quét một cấp thôi. Trỏ nhầm vào ổ đĩa hay thư mục Downloads mà đi đệ quy là
+   * app treo hàng chục giây không dấu hiệu gì — mà bộ `.vrma` thật luôn phẳng trong một thư mục.
+   */
+  ipcMain.handle(IPC.VRM_PICK_ANIMATION_DIR, async (): Promise<VrmAnimationDirResult> => {
+    const res = await dialog.showOpenDialog({
+      title: 'Chọn thư mục chứa file .vrma',
+      properties: ['openDirectory']
+    })
+    if (res.canceled || res.filePaths.length === 0) return { ok: false, reason: 'canceled' }
+    const dir = res.filePaths[0]!
+    const out = await readAnimationDir(dir)
+    // Nhớ thư mục để phiên sau tự đọc lại. Giữ nguyên `roles`: user chọn lại đúng thư mục cũ thì
+    // vai trò đã gán phải còn nguyên, mà khoá là tên file nên thư mục khác cũng không lẫn.
+    if (out.ok) await writeFolderMotions({ ...(await readFolderMotions()), dir })
+    return out
+  })
+
+  /**
+   * Đọc lại thư mục đã nhớ, KHÔNG mở hộp thoại — renderer gọi lúc panel dựng xong.
+   *
+   * Chưa nạp lần nào thì trả `canceled`: không có gì để đọc, mà đó không phải lỗi nên renderer
+   * chỉ việc im lặng bỏ qua. Thư mục bị xoá/dời thì rơi vào `io` và user thấy câu nói được lý do.
+   */
+  ipcMain.handle(IPC.VRM_RELOAD_ANIMATION_DIR, async (): Promise<VrmAnimationDirResult> => {
+    const { dir } = await readFolderMotions()
+    if (!dir) return { ok: false, reason: 'canceled' }
+    return readAnimationDir(dir)
+  })
+
+  ipcMain.handle(IPC.VRM_GET_FOLDER_MOTIONS, (): Promise<VrmFolderMotionsDto> => readFolderMotions())
+
+  ipcMain.handle(
+    IPC.VRM_SET_FOLDER_MOTIONS,
+    async (_e, patch: Partial<VrmFolderMotionsDto>): Promise<VrmFolderMotionsDto> => {
+      const next = cleanFolderMotions({ ...(await readFolderMotions()), ...patch })
+      await writeFolderMotions(next)
+      return next
+    }
+  )
 
   ipcMain.handle(IPC.VRM_GET_SETTINGS, (): Promise<VrmSettingsDto> => readSettings())
 

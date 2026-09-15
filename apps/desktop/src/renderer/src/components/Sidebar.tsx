@@ -336,7 +336,13 @@ export function Sidebar({ fluid = false }: { readonly fluid?: boolean } = {}) {
           actions={[
             { id: 'create-group', labelKey: 'menu.createGroup', run: () => setModal({ kind: 'group', group: null }) },
             { id: 'import-ssh-config', labelKey: 'menu.import', run: () => void runImport() },
-            { id: 'import-clients', labelKey: 'menu.clientImport', run: () => useUiStore.getState().setModal('client-import') }
+            {
+              id: 'import-clients',
+              labelKey: 'menu.clientImport',
+              // Nhãn rút gọn không còn tên client nào, mà đó lại là từ người ta gõ khi tìm
+              keywords: 'PuTTY MobaXterm WinSCP Termius',
+              run: () => useUiStore.getState().setModal('client-import')
+            }
           ]}
         />
       </div>
