@@ -7,6 +7,19 @@ trọng nhất, vì gần như mọi con số ở đây đều là kết quả �
 Quy ước: đường dẫn tương đối từ gốc repo. "Đo được" nghĩa là có script đo thật trên model thật,
 không phải ước lượng.
 
+### Muốn sửa gì thì đọc mục nào
+
+| Việc | Mục |
+|---|---|
+| Đổi tư thế, chuyển động tự sinh của nhân vật | **2**, 3, 4 |
+| Sửa bất cứ thứ gì **bám cạnh** nhân vật (cột, bảng, lề, né dock) | **11** ← đọc trước, đây là chỗ sai nhiều nhất |
+| Thêm/sửa mục trong bảng cài đặt | **12** |
+| Clip `.vrma` — thêm clip, đổi nguồn tải, gán vai trò | 10.3, **13** |
+| Thêm trường cấu hình / IPC mới | **9** |
+| Đo lại sau khi sửa | **8** |
+| Trước khi đưa file model/clip nào vào repo | **10** ← giấy phép |
+| "Sao cái này lại thế?" | **14** (bảng lỗi đã sửa) |
+
 ---
 
 ## 1. Bản đồ file
@@ -17,15 +30,31 @@ không phải ước lượng.
 | `packages/shared/src/vrmIdle.ts` | Tầng ưu tiên, nhịp chớp mắt/liếc/cử chỉ, phản ứng khi click, vòng tự xoay. |
 | `packages/shared/src/vrmChat.ts` | Chat AI trên đầu nhân vật, nhận lệnh "mở tunnel…", câu gợi ý thao tác. |
 | `packages/shared/src/vrmOutfit.ts` | Bộ trang phục user tự lưu. |
-| `packages/shared/src/vrmFraming.ts` | Căn khung hình, biểu cảm theo sự kiện, dấu xoay theo phiên bản VRM. |
-| `packages/shared/src/vrm.ts` | DTO cấu hình (`VrmSettingsDto`). |
+| `packages/shared/src/vrmFraming.ts` | Căn khung hình, biểu cảm theo sự kiện, dấu xoay theo phiên bản VRM, **hình học bố cục** (`vrmBodyRect` · `vrmSideMargin` · `vrmLeftBesideDock` — xem mục 11). |
+| `packages/shared/src/vrmMotion.ts` | Danh mục 13 clip `.vrma` CC0 tải theo yêu cầu + luật xoay vòng theo vai trò. |
+| `packages/shared/src/vrmSample.ts` | Model mẫu tải theo yêu cầu. |
+| `packages/shared/src/vrm.ts` | DTO cấu hình (`VrmSettingsDto`), clip tự nạp (`VrmFolderMotionsDto`, `pickVrmaNames`, `nextFolderClipForRole`). |
 | `apps/desktop/src/renderer/src/lib/vrmStage.ts` | **Sân khấu 3D**. Không phụ thuộc React. Nơi duy nhất chạm vào xương. |
-| `apps/desktop/src/renderer/src/components/VrmPanel.tsx` | Khung React, chuột/phím, menu tròn, cài đặt. |
-| `apps/desktop/src/renderer/src/components/VrmRadialMenu.tsx` | Menu tròn, bảng hai bên, bong bóng chat + bong bóng thoại. |
+| `apps/desktop/src/renderer/src/lib/useVrmMotion.ts` | Chạy clip theo vai trò — **hai nguồn** (danh mục CC0 + clip user tự nạp) đi chung một luật ưu tiên. |
+| `apps/desktop/src/renderer/src/components/VrmPanel.tsx` | Khung React, chuột/phím, menu tròn, nội dung bảng cài đặt. |
+| `apps/desktop/src/renderer/src/components/VrmSettingsFrame.tsx` | **Khung** bảng cài đặt hai cột + `SettingsGroup`/`SettingsToggle`/`SettingsField`. Cố ý chỉ phụ thuộc `react` + `@infra/shared` để harness bundle được. |
+| `apps/desktop/src/renderer/src/components/VrmRadialMenu.tsx` | Menu tròn, bảng hai bên (`VrmSidePanel`), bong bóng chat + bong bóng thoại. |
 | `apps/desktop/src/renderer/src/components/VrmOverlayApp.tsx` | Nhân vật hiện **ngoài desktop** khi app ở khay. |
 | `apps/desktop/src/main/overlay.ts` | Cửa sổ overlay ở main: khi nào hiện, khi nào ẩn. |
-| `apps/desktop/src/main/ipc/vrm.ts` | Danh bạ model, cấu hình, trang phục — ghi xuống `userData`. |
+| `apps/desktop/src/main/ipc/vrm.ts` | Danh bạ model, cấu hình, trang phục, thư mục clip — ghi xuống `userData`. |
 | `packages/core/src/vrm/*.test.ts` | Test cho mọi hàm thuần ở trên. |
+
+**File ghi ở `userData`** (ngoài vault, JSON thường — ai cũng sửa tay được nên mọi hàm đọc phải
+chuẩn hoá lại):
+
+| File | Chứa gì |
+|---|---|
+| `vrm-models.json` | Danh bạ **đường dẫn** model (không chép file). |
+| `vrm-settings.json` | `VrmSettingsDto`. |
+| `vrm-outfits.json` | Bộ trang phục user tự lưu. |
+| `vrm-folder-motions.json` | Thư mục `.vrma` user nạp + `tên file → vai trò`. **Chỉ đường dẫn**, xem mục 10.3. |
+| `vrm-motions/` | 13 clip CC0 đã tải (chỉ thư mục này chứa file thật). |
+| `vrm-samples/` | Model mẫu đã tải. |
 
 **Ranh giới bắt buộc**: mọi thứ tính toán nằm ở `packages/shared` (renderer dùng được, có test).
 `apps/**` không được vitest quét nên đừng đặt logic ở đó.
@@ -341,7 +370,24 @@ unset ELECTRON_RUN_AS_NODE
 
 Kết quả in ra console, ảnh lưu ở `_harness/shots/`.
 
-**Bốn cái bẫy của harness** (đều đã sập ít nhất một lần):
+**Ba harness đo BỐ CỤC** (không cần model, chạy nhanh — dùng mỗi khi sửa UI):
+
+```bash
+unset ELECTRON_RUN_AS_NODE
+./node_modules/.bin/electron.cmd apps/desktop/_harness/settings/run.cjs    # vị trí nhân vật trong khe
+./node_modules/.bin/electron.cmd apps/desktop/_harness/settings/cols.cjs   # cân hai cột + thanh chân
+./node_modules/.bin/electron.cmd apps/desktop/_harness/settings/side.cjs   # hai cột nổi cạnh nhân vật
+```
+
+- `run.cjs` — 21 ca × 3 cỡ cửa sổ, **assert** chứ không chỉ chụp. Chạy sau mọi thay đổi khung.
+- `cols.cjs` — in chiều cao mỗi cột ở 0/7/30 clip + `footH` (>60px = hai nút xếp chồng).
+- `side.cjs` — dựng `VrmSidePanel` cạnh một ô giả chỗ nhân vật.
+
+Cả ba dựng **component THẬT** (`VrmSettingsFrame`, `VrmControls` qua alias `VrmControlsForHarness`,
+`VrmSidePanel`). Đừng chép lại component vào harness: bản chép lệch khỏi bản thật ngay lần sửa kế
+tiếp, và lúc đó harness đo một thứ không còn tồn tại.
+
+**Bảy cái bẫy của harness** (đều đã sập ít nhất một lần):
 
 1. Đặt harness **trong** `apps/desktop`, không phải gốc repo — nếu không Tailwind không sinh class.
 2. `show: true` bắt buộc. `show: false` chặn `requestAnimationFrame`, animation đứng im và trông
@@ -349,6 +395,18 @@ Kết quả in ra console, ảnh lưu ở `_harness/shots/`.
 3. `capturePage` ném lỗi khi cửa sổ đang vẽ WebGL liên tục — phải thử lại vài lần, đừng kết luận
    trang hỏng.
 4. Đo ở **kích thước khung thật**. Khung nhỏ cho 120 FPS ở mọi model.
+5. **Phải chép CSS đã build của app** (`out/renderer/assets/*.css`) vào thư mục harness — xem
+   `cols.cjs`. Không có Tailwind thì mọi class thành vô nghĩa, layout đo ra sai mà **không lỗi nào
+   báo**. Hai harness ảnh đã thất bại vì đúng chỗ này.
+6. **Stub `window.infra.vrm`** những gì component gọi lúc mount (`listSamples`…). Thiếu thì cả cây
+   ném lỗi và số đo ra `null`.
+7. **Harness bỏ qua phần nào thì phần đó không được kiểm.** `cols.tsx` từng tự ghép hai cột bằng
+   tay thay vì dựng `VrmSettingsFrame` thật — nên nó không có thanh chân, và đúng chỗ đó lọt một
+   lỗi ra tới user. Dựng khung thật, đừng "ghép cho nhanh".
+
+⚠️ **Canvas WebGL không đọc pixel ra được**: `preserveDrawingBuffer` tắt nên `drawImage(canvas)`
+trả ảnh rỗng. Muốn đo bề ngang nhân vật thì dùng `stage.aspect` (nó vốn đo từ pixel đã vẽ), đừng
+tự quét alpha từ ngoài.
 
 ---
 
@@ -359,6 +417,21 @@ Kết quả in ra console, ảnh lưu ở `_harness/shots/`.
 1. `packages/shared/src/vrm.ts` — khai báo + `DEFAULT_VRM_SETTINGS`
 2. `apps/desktop/src/main/ipc/vrm.ts` — hàm `readSettings()`
 3. `apps/desktop/src/main/ipc/vrm.ts` — object `clean` trong handler ghi
+
+### 9.1 Thêm một IPC mới — đủ 4 chỗ
+
+1. `packages/shared/src/ipc.ts` — khoá trong `IPC`
+2. `apps/desktop/src/main/ipc/vrm.ts` — `ipcMain.handle(...)`
+3. `apps/desktop/src/preload/index.ts` — hàm trong `vrm: {...}`
+4. `packages/shared/src/types.ts` — chữ ký trong khai báo `window.infra.vrm`
+
+Thiếu (4) thì typecheck đỏ ngay; thiếu (3) thì renderer gọi vào `undefined` **lúc chạy**.
+
+### 9.2 Không nhét mọi thứ vào `VrmSettingsDto`
+
+Dữ liệu dạng **danh sách** thì làm file riêng ở `userData` (như `vrm-folder-motions.json`):
+`readSettings()` có quy tắc chuẩn hoá từng trường mà một map lồng nhau không hợp với khuôn đó.
+File riêng vẫn phải có hàm `clean*()` của nó — JSON ngoài vault, ai cũng sửa tay được.
 
 ---
 
@@ -494,7 +567,7 @@ tưởng là model hợp lệ.
 or extracted"* — đặt file vào repo hay release là đúng hành vi đó. User tự tải rồi dùng nút "Nạp
 file .vrma" thì hợp lệ, đó là chuyện giữa họ và pixiv.
 
-**Đường hợp lệ app đang hỗ trợ** (v0.4.4), gồm đúng hai việc và không hơn:
+**Đường hợp lệ app đang hỗ trợ** (v0.4.4), gồm đúng ba việc và không hơn:
 
 1. **Chỉ chỗ** — dòng chữ dưới hai nút nạp, link tới <https://vroid.booth.pm/items/5512385> (shop
    chính thức "VRoid Project", miễn phí, đúng bộ 7 clip). App **không** tải hộ.
@@ -621,7 +694,161 @@ lần) chứ không lặp liên tục, và có trần 25s cho clip tự chạy.
 
 ---
 
-## 11. Danh sách lỗi đã sửa, để không lặp lại
+## 11. Hình học bố cục — **đọc trước khi sửa bất cứ thứ gì bám cạnh nhân vật**
+
+Mục này tồn tại vì **một** hiểu nhầm đã gây ra bốn lỗi riêng biệt mà user phải chụp màn hình báo.
+
+### 12.1 Thẻ nhân vật rộng gấp 2,2 lần người
+
+`vrmStage` đặt `aspect = measureDrawn × VRM_WIDTH_MARGIN ÷ frameH`, nên thẻ DOM của nhân vật
+**rộng gấp `VRM_WIDTH_MARGIN` (2,2) lần thân người nhìn thấy**. Phần dư là **lề trong suốt** chừa
+cho clip giang tay khỏi bị cắt (clip "máy bay" dang tay rộng 3,55× thân lúc đứng).
+
+Đo trên một model thật (`aspect` 1,7875, zoom 0,55):
+
+| | px |
+|---|---|
+| Thẻ (`width = H × aspect`) | **433** |
+| Thân người (`measureDrawn`) | **197** |
+| Lề trong suốt **mỗi bên** | **118** |
+
+⚠️ **Mọi phép "bám mép / né cột / sát lề" trừ theo mép THẺ đều hụt đúng một lề vô hình.** Bốn lỗi
+đã dính, cùng gốc này:
+
+| Triệu chứng user thấy | Chỗ quên chia |
+|---|---|
+| Hai cột hai bên cách nhau rất xa | `anchorRect()` trả vùng thẻ |
+| Nhân vật không sát cột chat khi mở dock | `window.innerWidth - dockW - width` |
+| Lề phải mặc định "hở ra quá nhiều" | `CHROMELESS_RIGHT_GAP` đo từ mép thẻ |
+| Kéo nhân vật "đụng tường" khi còn cách mép cả gang tay | hook kéo kẹp theo mép thẻ |
+
+### 12.2 Ba hàm phải dùng, đừng tự tính lại
+
+Ở `packages/shared/src/vrmFraming.ts` (hàm thuần → **test được**; để inline trong JSX thì vitest
+không quét, đó đúng là lý do bốn lỗi trên không có test nào chặn):
+
+| Hàm | Trả về |
+|---|---|
+| `vrmBodyRect(cardRect)` | Vùng **thân người** từ vùng thẻ. Chia bề ngang cho 2,2, giữ nguyên tâm và chiều cao (lề chỉ chừa hai bên). |
+| `vrmSideMargin(cardWidth)` | Lề trong suốt **một bên** — cộng lại khi cần mép thân từ mép thẻ. |
+| `vrmLeftBesideDock(posX, cardW, dockW, viewportW)` | `left` để thân người **chạm** mép cột dock AI. |
+
+`vrmLeftBesideDock` là phép **HÚT SÁT**, không phải phép chặn: mở dock là nhân vật dời tới cạnh
+cột bất kể đang đứng đâu; đóng dock thì về chỗ user đã kéo (vị trí lưu không bị ghi đè vì thẻ
+`pointer-events-none` lúc dock mở). Bản đầu dùng `Math.min` nên nhân vật đứng giữa màn hình không
+lấn dock thì đứng nguyên đó — user chụp lại "vẫn chưa sát".
+
+### 12.3 `CHROMELESS_RIGHT_GAP` = 86, đo từ THÂN NGƯỜI
+
+Lề phải ở vị trí mặc định. **Không** phải lề thẩm mỹ — nó là chỗ chừa cho hai thứ:
+
+- cột chọn chuyển động rộng 96px, chờm lên người 18px, chừa 8px khỏi mép → `96 − 18 + 8 = 86`
+- khung chat nhỏ 320px nổi trên đầu, căn giữa theo thân → cần `(320 − thân) ÷ 2` ≈ 62px
+
+86 bao trọn cả hai. Nơi dùng phải **trừ `vrmSideMargin`** vì `right` đặt mép thẻ; số âm là đúng và
+an toàn (phần thò ra ngoài cửa sổ chỉ là lề trong suốt).
+
+### 12.4 Hai cột `VrmSidePanel`
+
+- `W = 112px` — từng là 96px hồi mỗi mục còn là dòng chữ trần; nay mỗi mục là thẻ có viền +
+  padding nên 96px chỉ còn ~76px cho chữ và "Bước thể dục" xuống ba dòng.
+- `OVERLAP_MIN = 18px` — chờm lên **thân người thật** (6,8% mỗi bên), đủ hết khoảng hở mà hai cột
+  vẫn nằm ngoài vai. Nền cột trong mờ nên vẫn thấy nhân vật phía sau.
+- Chiều cao **co theo nội dung** nhưng là **một** con số cho cả hai cột: `items` chia đôi mà lẻ thì
+  cột trái nhiều hơn một mục, để mỗi cột tự co là ra hai khối cao thấp lệch nhau.
+- Dời **cả cặp** khi chạm mép cửa sổ, không kẹp từng cột: nhân vật hay đứng sát mép phải, kẹp
+  riêng sẽ đẩy cột phải ngược vào giữa người (đo được che 43–76% thân).
+- Thanh cuộn ẩn bằng class `.scroll-hidden` ở `styles/main.css`. ⚠️ **Chỉ `::-webkit-scrollbar`,
+  KHÔNG `scrollbar-width: none`** — Chromium ≥121 thấy `scrollbar-width` là vô hiệu hoá toàn bộ
+  `::-webkit-scrollbar-*` trên element đó, kết quả ngược hẳn ý định (thanh native to đùng).
+
+---
+
+## 12. Bảng cài đặt — cấu trúc và cách thêm mục
+
+Style mượn từ project `desktop-companion` (`app/settings.html` + `app/media/companion.css`), giữ
+màu theo `--c-accent` của theme user đang chọn.
+
+### 13.1 Ba component dùng chung
+
+Ở `VrmSettingsFrame.tsx` — **không** tách file riêng, vì file đó cố ý chỉ phụ thuộc `react` +
+`@infra/shared` để harness bundle được bằng esbuild:
+
+| Component | Dùng cho |
+|---|---|
+| `SettingsGroup` | Nhóm có tiêu đề in hoa 10px + đường kẻ. |
+| `SettingsToggle` | Hàng công tắc có khung; cả hàng là `<label>` nên bấm chữ cũng tick. |
+| `SettingsField` | Trường có nhãn nhỏ phía trên (dropdown, thanh trượt). |
+
+### 13.2 `only` — một component, bốn lần gọi
+
+`VrmControls` nhận `only: 'left' | 'right' | 'footer' | undefined`:
+
+| Giá trị | Trả về |
+|---|---|
+| `'left'` | Hiển thị · Thông báo · Thao tác |
+| `'right'` | Trợ lý ảo (info + chọn model) · Chuyển động |
+| `'footer'` | Hai nút hành động — **một hàng ngang** |
+| `undefined` | Tất cả, xếp chồng (chế độ panel nhỏ) |
+
+⚠️ Hai tên `'left'`/`'right'` là tên **NỘI DUNG**, không phải vị trí. Đổi chỗ hai cột thì đổi ở
+nơi gọi `VrmSettingsFrame`; đừng đổi tên chúng theo vị trí, lần hoán đổi sau là tên lại sai.
+
+⚠️ `'footer'` **không được bọc thêm thẻ nào** (`Wrap plain` lo việc này). Thanh chân đã có
+`flex justify-end` của khung; bọc một `flex-col` vào là hai nút xếp chồng chiếm hết bề ngang.
+
+⚠️ **Mở rộng union `only` thì phải rà lại MỌI phép `!==` trên nó.** Thêm `'footer'` mà quên
+`only !== 'right'` ở chỗ render `ModelInfo` → URL giấy phép trải ngang cả màn hình.
+
+### 13.3 Cân hai cột
+
+Cột trái gần như đứng yên, cột **phải** mới phình theo nội dung (số clip user nạp). Thêm khối mới
+thì đo lại bằng harness `cols.cjs`; lệch dưới ~15% là chấp nhận được.
+
+Chuỗi dài phải có **`min-w-0` trên chính thẻ cha**, không chỉ `truncate` trên dòng con: `truncate`
+chỉ cắt khi tổ tiên gần nhất cho phép co lại. URL giấy phép của model có cái dài 200+ ký tự (chuỗi
+query kể hết mọi quyền) và nó đẩy cả cột rộng ra.
+
+---
+
+## 13. Clip `.vrma` — hai nguồn, một cơ chế
+
+### 14.1 Nguồn 1: danh mục CC0 (`vrmMotion.ts`)
+
+13 clip, tải theo yêu cầu vào `userData/vrm-motions/`. Mỗi clip có `id`, `role`, `durationSec` đo
+sẵn, `sha256` ghim. Tải từ **Release của chính repo** (tag `vrm-motions-v1`), mirror là nguồn cũ —
+xem mục 10.3.
+
+### 14.2 Nguồn 2: thư mục user tự nạp
+
+User trỏ vào thư mục `.vrma` của họ; app **chỉ đọc, không chép**. Lý do là giấy phép — xem 10.3.
+
+- `VRM_PICK_ANIMATION_DIR` quét **một cấp** (đệ quy vào ổ đĩa là treo hàng chục giây không dấu
+  hiệu), lọc qua `pickVrmaNames()` (**`.toLowerCase()`** — bộ tải trên Windows hay ra `.VRMA`),
+  trần `VRMA_DIR_MAX_FILES` = 60 **cắt trước khi đọc**.
+- `VRM_RELOAD_ANIMATION_DIR` đọc lại thư mục đã nhớ lúc panel dựng xong.
+- `vrm-folder-motions.json` giữ **đường dẫn + `tên file → vai trò`**. Khoá là tên file chứ không
+  phải chỉ số: user thêm/bớt file thì chỉ số trượt hết.
+- `cleanFolderMotions()` **bỏ** vai trò lạ. Giữ nguyên thì clip đó im lặng không bao giờ chạy và
+  user không có cách nào biết vì sao.
+
+### 14.3 Hai nguồn đi CHUNG luật ưu tiên
+
+`useVrmMotion.play(role)` theo đúng thứ tự:
+
+1. Xét `PRIORITY` + mốc `until` — **trước** khi chọn clip. Làm hai cơ chế song song thì clip cảnh
+   báo của nguồn này cắt ngang clip cảnh báo của nguồn kia và không bên nào biết bên nào đang chạy.
+2. Thử `runFolder(role)` — **clip user gán THẮNG** clip CC0 cùng vai trò. Gán tay là lựa chọn
+   tường minh; vẫn chạy clip mặc định thì việc gán vô nghĩa.
+3. Rơi về `nextMotionForRole(...)` của danh mục CC0.
+
+⚠️ `stage.playAnimation()` trả về **`number`** (thời lượng clip, giây), không phải `void`. Clip
+danh mục có `durationSec` đo sẵn, clip tự nạp thì không — thiếu con số đó thì không hẹn được giờ
+trả quyền về lớp tự sinh và nhân vật đứng nguyên tư thế cuối clip mãi mãi.
+
+---
+
+## 14. Danh sách lỗi đã sửa, để không lặp lại
 
 | Triệu chứng | Nguyên nhân thật |
 |---|---|
@@ -647,3 +874,13 @@ lần) chứ không lặp liên tục, và có trần 25s cho clip tự chạy.
 | Một model ra thẻ rộng bằng chiều cao | `measureDrawn` vẽ khung vuông nên bề ngang bão hoà ở `frameH` |
 | Nhân vật thò đáy 22px, lệch phải 62px trong khung | Tính `left/top` theo kích thước **đã co**; `transform-origin: bottom center` giữ đáy và tâm của thẻ **gốc** |
 | Đổi model làm mất bảng cài đặt | Trạng thái `loading` bị coi là "không có nhân vật" → effect dọn mọi lớp nổi |
+| Hai cột hai bên cách nhau rất xa | `anchorRect()` trả vùng **thẻ**, mà thẻ rộng gấp 2,2 lần người → hai cột cách nhau đúng bề ngang thẻ |
+| Nhân vật không sát cột chat khi mở dock AI | Cùng gốc: trừ theo mép thẻ. Và bản đầu chỉ **chặn** (`Math.min`) nên nhân vật đứng giữa màn hình thì đứng nguyên đó — phải là phép **hút sát** |
+| Lề phải mặc định "hở ra quá nhiều" | `CHROMELESS_RIGHT_GAP` đo từ mép thẻ; với model rộng thành 210px thay vì 86px |
+| URL giấy phép trải ngang cả màn hình | `truncate` không ăn vì thiếu **`min-w-0` trên thẻ cha**; URL của model có cái dài 200+ ký tự |
+| Hai nút thanh chân xếp chồng, chiếm hết bề ngang | `controls()` bọc `<div flex-col>` quanh **cả** footer, mà footer là hàng ngang |
+| `ModelInfo` lọt vào thanh chân | Mở rộng union `only` thêm `'footer'` mà quên rà lại `only !== 'right'` |
+| Ẩn thanh cuộn lại ra thanh **native to hơn** | `scrollbar-width: none` làm Chromium ≥121 vô hiệu hoá toàn bộ `::-webkit-scrollbar-*` |
+| Tên clip xuống 2–3 dòng trong cột | Emoji 🚶 rộng gần 2 ký tự và không ngắt dòng chung với chữ; cột chỉ 112px |
+| Clip user tự nạp đứng nguyên tư thế cuối mãi mãi | `playAnimation` trả `void` nên không có `durationSec` để hẹn giờ trả quyền về lớp tự sinh |
+| Thư mục `.vrma` báo "không có file nào" dù nhìn rõ là có | So đuôi trần, không `.toLowerCase()` — bộ tải trên Windows hay ra `.VRMA` |
