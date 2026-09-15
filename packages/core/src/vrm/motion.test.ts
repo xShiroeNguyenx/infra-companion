@@ -23,6 +23,24 @@ describe('thư viện chuyển động', () => {
     }
   })
 
+  it('tải từ Release của CHÍNH repo này, không phụ thuộc repo bên thứ ba', () => {
+    // Nguồn cũ là `raw.githubusercontent.com` của một repo lạ: repo đó đổi tên / xoá file / đổi
+    // branch / chuyển private là cả bộ clip chết với mọi bản đã cài. Đây là chốt chặn để không ai
+    // vô tình trỏ ngược lại — nguồn ngoài chỉ được nằm ở `mirrors`.
+    for (const c of VRM_MOTIONS) {
+      expect(c.url.startsWith('https://github.com/xShiroeNguyenx/infra-companion/releases/download/'), c.id).toBe(true)
+      expect(c.url.endsWith(`/${c.fileName}`), c.id).toBe(true)
+    }
+  })
+
+  it('mọi clip đều có mirror dự phòng, và mọi nguồn đều HTTPS', () => {
+    for (const c of VRM_MOTIONS) {
+      // Một nguồn duy nhất là một điểm hỏng duy nhất — link ngoài chắc chắn chết theo thời gian
+      expect(c.mirrors?.length ?? 0, c.id).toBeGreaterThan(0)
+      for (const u of [c.url, ...(c.mirrors ?? [])]) expect(u.startsWith('https://'), `${c.id}: ${u}`).toBe(true)
+    }
+  })
+
   it('id và tên file không trùng nhau', () => {
     expect(new Set(VRM_MOTIONS.map((c) => c.id)).size).toBe(VRM_MOTIONS.length)
     expect(new Set(VRM_MOTIONS.map((c) => c.fileName)).size).toBe(VRM_MOTIONS.length)

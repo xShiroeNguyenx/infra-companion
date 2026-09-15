@@ -169,6 +169,84 @@ export function characterSlotInSettings(
   }
 }
 
+/**
+ * Quy vùng **THẺ** nhân vật về vùng **THÂN NGƯỜI NHÌN THẤY** — dùng cho mọi thứ bám cạnh người.
+ *
+ * Thẻ rộng gấp `VRM_WIDTH_MARGIN` (2,2×) lần người; phần dư là **lề trong suốt** chừa cho clip
+ * giang tay. Thân người nằm **giữa** thẻ, nên bám theo mép thẻ là bám theo một cái lề vô hình.
+ *
+ * Đã dính thật: hai cột của `VrmSidePanel` đặt tại `anchor.left` và `anchor.left + anchor.width`
+ * — tức hai mép THẺ — nên khoảng cách giữa chúng bằng bề ngang thẻ. Ở cỡ mặc định (người ~150px)
+ * thẻ rộng ~330px, hai cột **cách nhau 330px** trong khi người chỉ chiếm 150px ở giữa: nhìn ra
+ * đúng "hai cột cách rất xa nhau", và càng rõ sau khi kéo nhân vật vì lúc đó mắt có mốc so sánh.
+ *
+ * Chiều cao KHÔNG chia: lề chỉ chừa hai bên, `H` đã là chiều cao người.
+ *
+ * Kết quả trả về **bằng đúng `measureDrawn`** — bề ngang đo từ pixel đã vẽ lúc đứng nghỉ, vì
+ * `vrmStage` đặt `aspect = measureDrawn × VRM_WIDTH_MARGIN ÷ frameH`. Nên đây là bề ngang
+ * **mắt nhìn thấy**, không phải một ước lượng: đo trên model thật `aspect` 1,32 → thẻ 581px,
+ * thân 264px. Ai cần chờm lên người (hai cột của `VrmSidePanel`) thì tính phần trăm trên số
+ * này là ra đúng phần thân bị che.
+ */
+export function vrmBodyRect(card: { left: number; top: number; width: number; height: number }): {
+  left: number
+  top: number
+  width: number
+  height: number
+} {
+  const width = card.width / VRM_WIDTH_MARGIN
+  return {
+    left: card.left + (card.width - width) / 2,
+    top: card.top,
+    width,
+    height: card.height
+  }
+}
+
+/**
+ * Lề trong suốt **một bên** của thẻ nhân vật (px) — phần thẻ thò ra ngoài thân người mỗi bên.
+ *
+ * Mọi phép "đứng sát mép" / "né một cột" phải bù số này, nếu không nhân vật dừng lại khi người
+ * còn cách đích nguyên một cái lề vô hình. Đo trên model thật (`aspect` 1,32): thẻ 581px, thân
+ * 264px → lề **158px** mỗi bên — đúng bằng khoảng trống user chụp được giữa nhân vật và cột chat
+ * khi dock AI mở.
+ */
+export function vrmSideMargin(cardWidth: number): number {
+  return Math.round((cardWidth - cardWidth / VRM_WIDTH_MARGIN) / 2)
+}
+
+/**
+ * `left` của thẻ nhân vật khi cột dock AI mở — **hút sát mép trái cột chat**.
+ *
+ * Không phải phép "né cho khỏi đè" mà là phép **dời tới**: mở dock là nhân vật đi sang đứng cạnh
+ * cột chat, bỏ qua chỗ user đã kéo; đóng dock thì `dockW = 0` và chỗ cũ trở lại nguyên vẹn (vị
+ * trí đã lưu không bị ghi đè — xem `pointer-events-none` lúc dock mở, không có gì ghi lại được).
+ *
+ * User yêu cầu rõ điều này sau khi thử bản chỉ-chặn: ở đó nhân vật đứng giữa màn hình vẫn giữ
+ * nguyên chỗ, vì `Math.min` chỉ kẹp khi nó lấn vào dock — mà "đứng xa" thì không lấn gì cả.
+ *
+ * Mép phải tính theo **THÂN NGƯỜI** (`+ sideMargin`), không phải mép thẻ: thẻ rộng gấp
+ * `VRM_WIDTH_MARGIN` lần người nên trừ nguyên bề ngang thẻ thì người dừng cách cột đúng một lề
+ * trong suốt — đo trên model thật (`aspect` 1,79 ở zoom 0,55): thẻ 433px, lề **118px** mỗi bên,
+ * đúng bằng khoảng hở user chụp được.
+ *
+ * `gap = 0` là user chọn: thân người chạm hẳn mép cột chat. An toàn vì phần thẻ chờm sang dock
+ * là lề TRONG SUỐT, và thẻ đã `pointer-events-none` khi dock mở nên không che hay chặn chuột
+ * của cột chat.
+ */
+export function vrmLeftBesideDock(
+  posX: number,
+  cardWidth: number,
+  dockW: number,
+  viewportW: number,
+  gap = 0
+): number {
+  if (dockW <= 0) return posX
+  const snapped = viewportW - dockW - cardWidth + vrmSideMargin(cardWidth) - gap
+  // Kẹp ≥ 0: cửa sổ hẹp + dock rộng có thể cho ra số âm, khi đó nhân vật chui ra ngoài mép trái
+  return Math.max(0, snapped)
+}
+
 /** Trần phóng to/thu nhỏ (Ctrl + lăn chuột). */
 export const VRM_ZOOM_MIN = 0.5
 export const VRM_ZOOM_MAX = 3

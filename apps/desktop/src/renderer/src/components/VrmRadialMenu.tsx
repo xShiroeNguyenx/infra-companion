@@ -62,11 +62,19 @@ export function VrmRadialMenu({
   x,
   y,
   actions,
+  center,
   onDismiss
 }: {
   readonly x: number
   readonly y: number
   readonly actions: readonly RadialAction[]
+  /**
+   * Hành động ở TÂM vòng khi không rê chuột lên nút nào.
+   *
+   * Không truyền = vòng chính → tâm là "✕ Đóng". Truyền = vòng con → tâm thành "↩ <label>",
+   * bấm là lùi về vòng trước. Xem chú thích tại chỗ render.
+   */
+  readonly center?: { label: string; onSelect: () => void }
   readonly onDismiss: () => void
 }) {
   const ref = useRef<HTMLDivElement | null>(null)
@@ -158,14 +166,38 @@ export function VrmRadialMenu({
           )
         })}
 
-        {/* Nhãn hiện ở GIỮA vòng khi rê chuột — nút chỉ có icon, ghi chữ lên nút thì
-            nút phải to gấp ba và vòng tròn không còn vừa cạnh nhân vật */}
-        <div
-          className="bg-elevated/95 border-edge text-content pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border px-2.5 py-1 text-center text-[11px] whitespace-nowrap shadow-lg transition-opacity"
-          style={{ opacity: hint ? 1 : 0 }}
+        {/**
+         * TÂM vòng tròn — vừa là nhãn, vừa là **nút bấm được**.
+         *
+         * Ba trạng thái, theo đúng thứ tự ưu tiên:
+         * 1. Đang rê chuột lên một nút → hiện nhãn nút đó (nút chỉ có icon, ghi chữ lên nút thì
+         *    nút phải to gấp ba và vòng tròn không còn vừa cạnh nhân vật).
+         * 2. Không rê gì, vòng CHÍNH → "✕ Đóng", bấm là đóng menu.
+         * 3. Không rê gì, vòng CON (có `center`) → "↩ Menu", bấm là về vòng trước.
+         *
+         * Vì sao đưa đường-quay-lại vào tâm thay vì để một nút trên vành: vành là nơi đặt các
+         * lựa chọn cùng cấp, còn "lùi một bước" là thao tác khác loại — lẫn vào vành thì nó
+         * chiếm một chỗ và người ta vẫn phải đi tìm. Tâm luôn ở dưới con trỏ ngay sau khi mở
+         * vòng, nên là chỗ rẻ nhất để với tới.
+         */}
+        <button
+          className={`pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full border px-2.5 py-1 text-center text-[11px] whitespace-nowrap shadow-lg backdrop-blur transition-colors duration-150 ${
+            hint
+              ? 'bg-elevated/95 border-edge text-content cursor-default'
+              : 'bg-elevated/90 border-edge-strong text-subtle hover:border-accent hover:bg-accent/30 hover:text-accent cursor-pointer'
+          }`}
+          title={hint ?? (center ? center.label : 'Đóng menu')}
+          aria-label={hint ?? (center ? center.label : 'Đóng menu')}
+          onClick={() => {
+            // Đang rê lên một nút vành thì tâm chỉ là nhãn — bấm vào không làm gì, tránh đóng
+            // nhầm khi con trỏ vừa lướt qua tâm trên đường tới nút
+            if (hint) return
+            if (center) center.onSelect()
+            else onDismiss()
+          }}
         >
-          {hint ?? ''}
-        </div>
+          {hint ?? (center ? `↩ ${center.label}` : '✕ Đóng')}
+        </button>
       </div>
     </div>
   )
@@ -252,14 +284,23 @@ export function VrmSidePanel({
    * Chờm lên thân người mỗi bên (px) — **tự co theo chỗ trống hai bên**.
    *
    * Bản trước chờm cố định 26px bất kể màn hình còn rộng bao nhiêu, nên nhân vật bị che khá
-   * nhiều một cách không cần thiết. Nay: còn chỗ thì tách hẳn ra (`OVERLAP_MIN`, chỉ chờm 4px cho
-   * hai cột vẫn "ôm" lấy người), hết chỗ mới chờm sâu dần tới `OVERLAP_MAX`.
+   * nhiều một cách không cần thiết. Nay: còn chỗ thì chờm `OVERLAP_MIN`, hết chỗ mới chờm sâu
+   * dần tới `OVERLAP_MAX`.
    *
-   * Vì sao không bao giờ chờm 0: tách rời hẳn thì hai cột trông như hai hộp rời rạc đứng cạnh
-   * nhân vật, mất dáng "menu vây quanh" — mà đó là lý do chọn kiểu bố cục này.
+   * ⚠️ `OVERLAP_MIN` là **18px, không phải 4px** như bản trước — user yêu cầu "sát vô nhân vật
+   * xíu nữa, đè lên xíu cũng được".
+   *
+   * Đây là chờm vào **thân người thật**, không phải vào lề: `anchor.width` nay đã qua
+   * `vrmBodyRect` nên bằng `measureDrawn` — bề ngang **đo từ pixel đã vẽ** lúc đứng nghỉ. Đo
+   * trên model thật: `aspect` 1,32 → thẻ 581px, thân **264px**. Nên mỗi px chờm là một px đè
+   * lên người, và nền cột trong mờ (`bg-elevated/55` + blur) là thứ giữ cho vẫn thấy nhân vật.
+   *
+   * Vì sao 18 chứ không hơn: 18px trên thân 264px là **6,8% mỗi bên** — đủ để hết hẳn khoảng hở
+   * user khoanh đỏ mà hai cột vẫn nằm ngoài vai. Chờm sâu hơn thì bắt đầu liếm vào tay áo và
+   * tóc, mà thấy nhân vật lúc đang chọn chính là điểm của kiểu bố cục này.
    */
-  const OVERLAP_MIN = 4
-  const OVERLAP_MAX = 30
+  const OVERLAP_MIN = 18
+  const OVERLAP_MAX = 34
   /**
    * Chỗ trống hai bên nhân vật, tính **sau khi đã dời cả cặp** (xem `shift` bên dưới): cặp cột
    * luôn được kéo vào trong cửa sổ, nên thứ quyết định độ chờm là **tổng bề ngang còn lại**, không
@@ -467,7 +508,7 @@ export function VrmOutfitPanel({
              chắn: model gộp hết vào một mesh (`Body (merged)`), hoặc mesh tách nhưng mang tên
              máy sinh (`U_Char_0/1/2`). Khẳng định "tác giả đã gộp" là đoán. */
           <p className="text-subtle px-1 py-3 text-[11px] leading-relaxed">
-            Nhân vật này không có trang phục tách rời để thay — file chỉ chứa một khối duy nhất, không chia thành các
+            Trợ lý ảo này không có trang phục tách rời để thay — file chỉ chứa một khối duy nhất, không chia thành các
             món riêng.
           </p>
         ) : (

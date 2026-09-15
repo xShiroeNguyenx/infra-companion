@@ -5,7 +5,10 @@ import {
   settingsFrameBox,
   VRM_WIDTH_MARGIN,
   VRM_ZOOM_MAX,
-  VRM_ZOOM_MAX_IN_SETTINGS
+  VRM_ZOOM_MAX_IN_SETTINGS,
+  vrmBodyRect,
+  vrmLeftBesideDock,
+  vrmSideMargin
 } from '@infra/shared'
 
 /**
@@ -173,3 +176,85 @@ describe('khung cài đặt hai cột + chỗ đứng nhân vật', () => {
     expect(s.scale).toBeGreaterThanOrEqual(0.9)
   })
 })
+
+describe('vrmBodyRect — quy vùng thẻ về vùng thân người', () => {
+  it('bề ngang chia cho VRM_WIDTH_MARGIN, thân nằm GIỮA thẻ', () => {
+    const body = vrmBodyRect({ left: 100, top: 50, width: 330, height: 440 })
+    expect(body.width).toBeCloseTo(330 / VRM_WIDTH_MARGIN, 6)
+    // Lề chia đều hai bên: tâm thẻ và tâm thân trùng nhau
+    expect(body.left + body.width / 2).toBeCloseTo(100 + 330 / 2, 6)
+  })
+
+  it('KHÔNG đụng tới chiều cao — lề chỉ chừa hai bên', () => {
+    const body = vrmBodyRect({ left: 0, top: 77, width: 330, height: 440 })
+    expect(body.top).toBe(77)
+    expect(body.height).toBe(440)
+  })
+
+  it('giữ nguyên tâm dù thẻ đứng ở đâu — kéo nhân vật đi không làm lệch', () => {
+    // Đúng ca user gặp: kéo nhân vật một đoạn rồi mở bảng. Tâm thân phải đi theo tâm thẻ,
+    // không được lệch thêm một khoảng cố định nào.
+    for (const left of [0, 250, 900, 1600]) {
+      const body = vrmBodyRect({ left, top: 0, width: 330, height: 440 })
+      expect(body.left + body.width / 2, `left=${left}`).toBeCloseTo(left + 165, 6)
+    }
+  })
+
+  it('hai cột bám thân KHÔNG hở khoảng trống vô hình', () => {
+    // Đây là chốt chặn cho lỗi thật: hai cột của VrmSidePanel đặt tại hai mép vùng trả về.
+    // Dùng thẳng vùng THẺ thì chúng cách nhau 330px trong khi người chỉ 150px — hở 180px.
+    const card = { left: 500, top: 60, width: 330, height: 440 }
+    const body = vrmBodyRect(card)
+    const hoTruoc = card.width - body.width
+    expect(hoTruoc).toBeGreaterThan(150) // bug cũ: hở hơn 150px
+    expect(body.width).toBeCloseTo(150, 0) // sau khi sửa: bám đúng 150px thân người
+  })
+})
+
+describe('vrmSideMargin / vrmLeftBesideDock — nhân vật đứng sát cột dock AI', () => {
+  // Model user đang dùng, đã đo thật: aspect 1,7875 ở zoom 0,55 → H=242, thẻ 433px
+  const CARD = 433
+  const BODY = CARD / VRM_WIDTH_MARGIN
+
+  it('lề mỗi bên = nửa phần thẻ dôi ra ngoài thân người', () => {
+    expect(vrmSideMargin(CARD)).toBe(118)
+    // Cộng lại ra đúng bề ngang thẻ (sai lệch < 1px vì `vrmSideMargin` làm tròn)
+    expect(Math.abs(vrmSideMargin(CARD) * 2 + BODY - CARD)).toBeLessThan(1)
+  })
+
+  it('dock đóng thì giữ NGUYÊN chỗ user đã kéo', () => {
+    expect(vrmLeftBesideDock(700, CARD, 0, 1903)).toBe(700)
+  })
+
+  it('mở dock → HÚT SÁT cột chat, thân người chạm hẳn mép', () => {
+    // Đúng ca user chụp: cửa sổ 1903px, dock AI ~383px
+    const left = vrmLeftBesideDock(1528, CARD, 383, 1903)
+    const bodyRight = left + vrmSideMargin(CARD) + BODY
+    expect(Math.abs(bodyRight - (1903 - 383))).toBeLessThan(1) // chạm hẳn, gap = 0
+  })
+
+  it('HÚT SÁT kể cả khi user để nhân vật ở xa — đây là dời tới, không phải chỉ chặn', () => {
+    /**
+     * Bản trước dùng `Math.min` nên chỉ kẹp khi nhân vật lấn vào dock; user để nó ở giữa màn
+     * hình thì không lấn gì cả và nó đứng nguyên đó, cách cột chat rất xa — user chụp được và
+     * nói "vẫn chưa sát". Nay mọi vị trí đều bị hút về cạnh cột.
+     */
+    const xa = vrmLeftBesideDock(50, CARD, 383, 1903)
+    const gan = vrmLeftBesideDock(1528, CARD, 383, 1903)
+    expect(xa).toBe(gan)
+    expect(xa).toBeGreaterThan(50)
+  })
+
+  it('không phụ thuộc bề ngang một model cụ thể', () => {
+    for (const card of [240, 433, 581, 800]) {
+      const left = vrmLeftBesideDock(5000, card, 300, 1600)
+      const bodyRight = left + vrmSideMargin(card) + card / VRM_WIDTH_MARGIN
+      expect(Math.abs(bodyRight - (1600 - 300)), `thẻ=${card}`).toBeLessThan(1)
+    }
+  })
+
+  it('cửa sổ hẹp + dock rộng: không đẩy nhân vật ra ngoài mép trái', () => {
+    expect(vrmLeftBesideDock(200, 800, 700, 900)).toBeGreaterThanOrEqual(0)
+  })
+})
+

@@ -12,6 +12,9 @@ import {
   pickHint,
   sampleErrorMessage,
   statusForEvent,
+  vrmBodyRect,
+  vrmLeftBesideDock,
+  vrmSideMargin,
   VRM_ZOOM_MAX,
   VRM_ZOOM_MAX_IN_SETTINGS,
   VRM_ZOOM_MIN,
@@ -55,14 +58,22 @@ import { useT } from '../i18n'
  */
 
 /**
- * Khoảng chừa từ mép phải khi nhân vật ở vị trí mặc định (px).
+ * Khoảng chừa từ mép phải cửa sổ tới mép phải **THÂN NGƯỜI** khi nhân vật ở vị trí mặc định (px).
  *
- * Không phải lề thẩm mỹ: các bảng nổi **trên đầu** nhân vật căn giữa theo thân người (chat rộng
- * 320px, cài đặt 256px) trong khi thân chỉ ~150px. Đứng sát mép thì bảng bị kẹp lại cho khỏi
- * tràn màn hình và lệch hẳn sang trái so với nhân vật. Chừa ~nửa hiệu bề rộng thì bảng rộng
- * nhất vẫn nằm đúng giữa.
+ * ⚠️ Đo từ **thân người**, không phải mép thẻ — nơi dùng phải trừ `vrmSideMargin`. Bản trước đo
+ * từ mép thẻ nên với model rộng, lề thật phình lên gấp mấy lần: đo trên model user (thẻ 433px,
+ * lề trong suốt 118px mỗi bên) ra **210px** thay vì 92px — user chụp được và nói "hở ra quá
+ * nhiều luôn rồi".
+ *
+ * Con số 86 là **vừa đủ**, tính từ thứ thật sự cần chỗ:
+ * - Cột chọn chuyển động bên phải rộng 96px, chờm lên người 18px (`OVERLAP_MIN`), chừa 8px
+ *   khỏi mép cửa sổ → 96 − 18 + 8 = **86px**.
+ * - Khung chat nhỏ (320px) nổi trên đầu, căn giữa theo thân: cần (320 − thân) ÷ 2 ≈ 62px cho
+ *   model này — nhỏ hơn 86 nên đã được bao trọn.
+ *
+ * Giữ đúng ý ban đầu: nhân vật sát mép phải, chỉ hở vừa đủ để hai cột và khung chat không bị kẹp.
  */
-const CHROMELESS_RIGHT_GAP = 92
+const CHROMELESS_RIGHT_GAP = 86
 
 /**
  * Mở panel nhân vật lúc khởi động nếu user đã bật "Hiện lúc mở app".
@@ -448,7 +459,7 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
       const target = models.find((m) => m.id === id)
       if (!target) return
       const ok = window.confirm(
-        `Bỏ "${target.label}" khỏi danh sách?\n\nFile .vrm gốc trong máy KHÔNG bị xoá. Các bộ trang phục đã lưu cho nhân vật này sẽ mất.`
+        `Bỏ "${target.label}" khỏi danh sách?\n\nFile .vrm gốc trong máy KHÔNG bị xoá. Các bộ trang phục đã lưu cho trợ lý ảo này sẽ mất.`
       )
       if (!ok) return
 
@@ -578,7 +589,7 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
             <div className="flex items-center justify-center">
               <span
                 className="border-accent/70 size-8 animate-spin rounded-full border-2 border-t-transparent"
-                title="Đang nạp nhân vật mới…"
+                title="Đang nạp trợ lý ảo mới…"
               />
             </div>
           ) : (
@@ -929,11 +940,19 @@ function VrmStageShell({
     return actions
   }, [pinnedIds, t, onSpeak])
 
-  /** Vùng nhân vật trên màn hình, để bảng hai bên bám đúng hai mép. */
+  /**
+   * Vùng **THÂN NGƯỜI** trên màn hình, để bảng hai bên bám đúng hai mép người.
+   *
+   * ⚠️ Phải quy về thân người bằng `vrmBodyRect`, **không** dùng thẳng vùng thẻ: thẻ rộng gấp
+   * `VRM_WIDTH_MARGIN` (2,2×) lần người, phần dư là lề trong suốt cho clip giang tay. Dùng mép
+   * thẻ thì hai cột của `VrmSidePanel` cách nhau đúng bề ngang thẻ — đo ở cỡ mặc định: người
+   * ~150px mà hai cột cách 330px, tức **hở 180px** mỗi bên toàn khoảng trống. Đúng lỗi user
+   * chụp được ("hai cột cách rất xa nhau").
+   */
   const anchorRect = (): { left: number; top: number; width: number; height: number } => {
     const r = boxRef.current?.getBoundingClientRect()
     return r
-      ? { left: r.left, top: r.top, width: r.width, height: r.height }
+      ? vrmBodyRect({ left: r.left, top: r.top, width: r.width, height: r.height })
       : { left: 0, top: 56, width: 200, height: 440 }
   }
 
@@ -975,6 +994,8 @@ function VrmStageShell({
    * xuống `VrmSettingsFrame`, `settingsSlot` đặt nhân vật. Trước đây khung tự tính lại từ bề ngang
    * ĐO ĐƯỢC của thẻ nhân vật (đã bị `scale` co lại) nên khe bên khung khác khe bên nhân vật.
    */
+  /** Lề trong suốt mỗi bên của thẻ — xem `vrmSideMargin`. */
+  const sideMargin = vrmSideMargin(width)
   const settingsBox = settingsFrameBox(window.innerWidth, window.innerHeight, width)
   const settingsSlot = characterSlotInSettings(settingsBox, width, H)
   // Hai thứ trên đọc cỡ màn hình lúc render: đổi cỡ cửa sổ khi bảng đang mở thì phải render lại,
@@ -1028,10 +1049,35 @@ function VrmStageShell({
                 transformOrigin: 'bottom center'
               }
             : pos
-              ? // Đã kéo tay: giữ đúng chỗ user đặt, CHỈ đẩy sang trái khi chỗ đó lọt vào vùng dock
-                { left: dockW > 0 ? Math.min(pos.x, window.innerWidth - dockW - width - 8) : pos.x, top: pos.y }
+              ? /**
+                 * Đã kéo tay: giữ đúng chỗ user đặt, CHỈ đẩy sang trái khi chỗ đó lọt vào vùng dock.
+                 *
+                 * Cộng lại `sideMargin`: giới hạn phải tính theo mép **THÂN NGƯỜI**, không phải mép
+                 * thẻ. Thiếu nó thì nhân vật dừng khi người còn cách cột dock 158px — user chụp được
+                 * và mô tả đúng: "cho model gần sát lại khung chat".
+                 */
+                { left: vrmLeftBesideDock(pos.x, width, dockW, window.innerWidth), top: pos.y }
               : chromeless
-                ? { right: CHROMELESS_RIGHT_GAP + dockW }
+                ? /**
+                   * Vị trí MẶC ĐỊNH (chưa kéo tay).
+                   *
+                   * Dock mở → **hút sát cột chat** như nhánh đã-kéo-tay ở trên: `right` đo từ mép
+                   * phải cửa sổ, nên để thân người chạm mép trái cột thì `right` phải là bề rộng
+                   * dock TRỪ đi lề trong suốt bên phải của thẻ.
+                   *
+                   * ⚠️ Dock ĐÓNG thì giữ nguyên `CHROMELESS_RIGHT_GAP`, **không** trừ `sideMargin`:
+                   * nó không phải lề thẩm mỹ mà là chỗ chừa cho **bảng nổi trên đầu** (chat 320px)
+                   * khỏi bị kẹp mép cửa sổ. Trừ đi thì số ra âm và người thò ra ngoài màn hình.
+                   */
+                  {
+                    right:
+                      dockW > 0
+                        ? Math.max(0, dockW - sideMargin)
+                        : // Cả hai hằng số đo từ THÂN NGƯỜI, mà `right` đặt mép THẺ → trừ lề trong
+                          // suốt. Số âm là đúng và an toàn: phần thẻ thò ra ngoài cửa sổ chỉ là lề
+                          // trong suốt, thân người vẫn nằm trọn trong màn hình.
+                          CHROMELESS_RIGHT_GAP - sideMargin
+                  }
                 : { top: 56 }
         }
         /**
@@ -1262,7 +1308,27 @@ function VrmStageShell({
               x={menu.x}
               y={menu.y}
               onDismiss={() => setMenu(null)}
+              /**
+               * THỨ TỰ CÓ CHỦ Ý — vòng chia đều từ 12 giờ thuận chiều kim đồng hồ, nên với 8 nút:
+               * index 0 = đỉnh, index 4 = đáy.
+               *
+               * User yêu cầu: **chat ở trên cùng, cài đặt ở dưới cùng**. Hai thứ này neo hai
+               * đầu trục dọc nên dễ nhắm nhất — chat là việc dùng nhiều nhất, cài đặt là việc
+               * ít nhưng phải tìm thấy ngay. Các mục còn lại xếp theo cụm: ngoại hình bên phải
+               * (biểu cảm → trang phục → chuyển động), đổi model và reset bên trái.
+               */
               actions={[
+                {
+                  id: 'chat',
+                  icon: '💬',
+                  label: 'Hỏi trợ lý AI',
+                  // Bỏ thu nhỏ: chọn "hỏi" mà ra bong bóng chỉ đọc được thì user phải bấm thêm
+                  // một lần nữa mới gõ được — trạng thái mini là của lần trước, không phải ý bây giờ
+                  onSelect: () => {
+                    useVrmChatStore.getState().setMini(false)
+                    setChatOpen(true)
+                  }
+                },
                 {
                   id: 'expr',
                   icon: '😊',
@@ -1278,25 +1344,7 @@ function VrmStageShell({
                     markHintDone('outfit')
                   }
                 },
-                {
-                  id: 'chat',
-                  icon: '💬',
-                  label: 'Hỏi trợ lý AI',
-                  // Bỏ thu nhỏ: chọn "hỏi" mà ra bong bóng chỉ đọc được thì user phải bấm thêm
-                  // một lần nữa mới gõ được — trạng thái mini là của lần trước, không phải ý bây giờ
-                  onSelect: () => {
-                    useVrmChatStore.getState().setMini(false)
-                    setChatOpen(true)
-                  }
-                },
-                {
-                  id: 'tools',
-                  icon: '🧰',
-                  label: 'Công cụ',
-                  onSelect: () => setToolRing({ x: menu.x, y: menu.y })
-                },
                 { id: 'motion', icon: '🎬', label: 'Chuyển động', onSelect: () => setSide('motion') },
-                { id: 'models', icon: '🧑‍🎤', label: 'Đổi nhân vật', onSelect: () => setSide('models') },
                 { id: 'settings', icon: '⚙', label: 'Cài đặt', onSelect: () => setShowSettings(true) },
                 {
                   id: 'reset',
@@ -1304,6 +1352,13 @@ function VrmStageShell({
                   label: 'Về cỡ & góc mặc định',
                   onSelect: () => onResetView()
                 },
+                { id: 'models', icon: '🧑‍🎤', label: 'Đổi trợ lý ảo', onSelect: () => setSide('models') },
+                {
+                  id: 'tools',
+                  icon: '🧰',
+                  label: 'Công cụ',
+                  onSelect: () => setToolRing({ x: menu.x, y: menu.y })
+                }
               ]}
             />
           )}
@@ -1335,19 +1390,21 @@ function VrmStageShell({
               x={toolRing.x}
               y={toolRing.y}
               onDismiss={() => setToolRing(null)}
-              actions={[
-                ...pinnedToolActions,
-                {
-                  id: 'back',
-                  icon: '↩',
-                  label: 'Quay lại',
-                  // Không có nút này thì muốn về menu chính phải đóng rồi chuột phải lại từ đầu
-                  onSelect: () => {
-                    setMenu({ x: toolRing.x, y: toolRing.y })
-                    setToolRing(null)
-                  }
+              /**
+               * Đường quay lại nằm ở TÂM, không phải một nút trên vành.
+               *
+               * Vành là chỗ của các lựa chọn cùng cấp; "lùi một bước" khác loại nên lẫn vào đó
+               * thì vừa chiếm một ô vừa phải đi tìm. Tâm thì luôn nằm ngay dưới con trỏ lúc vòng
+               * vừa mở.
+               */
+              center={{
+                label: 'Menu',
+                onSelect: () => {
+                  setMenu({ x: toolRing.x, y: toolRing.y })
+                  setToolRing(null)
                 }
-              ]}
+              }}
+              actions={pinnedToolActions}
             />
           )}
 
@@ -1398,7 +1455,7 @@ function VrmStageShell({
             ))}
           {side === 'models' && (
             <VrmSidePanel
-              title="Nhân vật"
+              title="Trợ lý ảo"
               items={models.map((m) => ({ id: m.id, label: m.label + (m.missing ? ' (mất file)' : '') }))}
               activeId={activeModelId}
               onPick={(id) => {
@@ -1523,7 +1580,7 @@ function VrmControls({
         </label>
         <label
           className="flex items-center gap-1.5"
-          title="App đang ở khay hoặc thu nhỏ mà có cảnh báo thì nhân vật hiện ở góc màn hình để báo; bấm vào là mở lại app"
+          title="App đang ở khay hoặc thu nhỏ mà có cảnh báo thì trợ lý ảo hiện ở góc màn hình để báo; bấm vào là mở lại app"
         >
           <input
             type="checkbox"
@@ -1618,11 +1675,11 @@ function VrmControls({
         <summary className="text-subtle hover:text-content flex cursor-pointer list-none items-center gap-1 text-xs">
           <span className="group-open:hidden">▸</span>
           <span className="hidden group-open:inline">▾</span>
-          Thao tác với nhân vật
+          Thao tác với trợ lý ảo
         </summary>
         <div className="text-subtle mt-1.5 space-y-1 text-[11px]">
           {[
-            ['Click', 'nhân vật phản ứng'],
+            ['Click', 'trợ lý ảo phản ứng'],
             ['Nhấn giữ', 'mở khung chat'],
             ['Kéo', 'níu — thả ra bật về'],
             ['Ctrl + kéo', 'di chuyển'],
@@ -1642,7 +1699,7 @@ function VrmControls({
         <summary className="text-subtle hover:text-content flex cursor-pointer list-none items-center gap-1 text-xs">
           <span className="group-open:hidden">▸</span>
           <span className="hidden group-open:inline">▾</span>
-          Thêm nhân vật · Chuyển động
+          Thêm trợ lý ảo · Chuyển động
         </summary>
 
         <div className="mt-2 flex flex-col gap-2">
@@ -1688,7 +1745,7 @@ function VrmControls({
           className="border-edge text-subtle hover:text-danger hover:border-danger ml-auto rounded border px-2 py-1 text-xs"
           onClick={onCloseCharacter}
         >
-          ✕ Tắt nhân vật
+          ✕ Tắt trợ lý ảo
         </button>
       </div>
     </div>
@@ -1767,7 +1824,7 @@ function SampleDownload({
   return (
     <>
       {!compact && (
-        <p className="text-subtle text-xs leading-relaxed">Chưa có model? Tải một nhân vật mẫu về dùng ngay.</p>
+        <p className="text-subtle text-xs leading-relaxed">Chưa có model? Tải một trợ lý ảo mẫu về dùng ngay.</p>
       )}
       {pending.map((s) => (
         <div key={s.id} className="border-edge bg-elevated/40 w-full rounded border p-2.5 text-left">
@@ -1990,7 +2047,7 @@ function VrmMotionPanel({
                   <span className="min-w-0 flex-1 truncate">{c.label}</span>
                   {/* Clip di chuyển: nhân vật rời khỏi chỗ đứng, nên báo trước chứ đừng để user
                       bấm rồi mới thấy nhân vật trôi ra khỏi khung */}
-                  {c.locomotion && <span title="Nhân vật sẽ di chuyển khỏi chỗ đứng">🚶</span>}
+                  {c.locomotion && <span title="Trợ lý ảo sẽ di chuyển khỏi chỗ đứng">🚶</span>}
                   <span className="shrink-0 tabular-nums opacity-60">{c.durationSec.toFixed(0)}s</span>
                 </button>
               )

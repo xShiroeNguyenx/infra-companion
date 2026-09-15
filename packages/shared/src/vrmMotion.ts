@@ -43,7 +43,10 @@ export interface VrmMotionClip {
   licenseUrl: string
   /** Trang gốc của tác giả — nguồn đáng tin hơn nơi phân phối lại. */
   sourceUrl: string
+  /** Nơi tải. Trỏ vào GitHub Release của chính repo này — xem `RELEASE`. */
   url: string
+  /** Dự phòng khi link chính hỏng. */
+  mirrors?: readonly string[]
   sha256: string
   sizeBytes: number
   fileName: string
@@ -57,7 +60,21 @@ export interface VrmMotionClip {
   locomotion?: boolean
 }
 
-const RAW = 'https://raw.githubusercontent.com/SanHsien/voxavatar/main/public/assets/animations'
+/**
+ * Nơi tải chính: **Release của chính repo này**, cùng lý do như model mẫu (`vrmSample.ts`).
+ *
+ * Trước đây trỏ thẳng vào `raw.githubusercontent.com` của một repo bên thứ ba. Đó đúng là điều
+ * `vrmSample.ts` đã cảnh báo: repo đó đổi tên, xoá file, đổi branch hay chuyển private là **cả 13
+ * clip chết ngay** với mọi bản đã cài, mà mình không làm được gì. Giấy phép CC0 cho phép host lại,
+ * nên host lại.
+ *
+ * Tag `vrm-motions-v1` **tách khỏi tag phát hành app**: bộ clip không đổi theo phiên bản app, gắn
+ * vào tag app thì mỗi lần phát hành lại phải đính kèm 4 MB đó thêm một lần.
+ */
+const RELEASE = 'https://github.com/xShiroeNguyenx/infra-companion/releases/download/vrm-motions-v1'
+
+/** Mirror: nguồn cũ, giữ làm dự phòng — `sha256` ghim nên nội dung vẫn được bảo đảm. */
+const MIRROR = 'https://raw.githubusercontent.com/SanHsien/voxavatar/main/public/assets/animations'
 const CC0 = 'CC0 1.0'
 const CC0_URL = 'https://creativecommons.org/publicdomain/zero/1.0/'
 const REROFUMI = { author: 'へすい / rerofumi', sourceUrl: 'https://booth.pm/ja/items/5527394' }
@@ -84,7 +101,8 @@ function clip(
     license: CC0,
     licenseUrl: CC0_URL,
     sourceUrl: src.sourceUrl,
-    url: `${RAW}/${id}.vrma`,
+    url: `${RELEASE}/${id}.vrma`,
+    mirrors: [`${MIRROR}/${id}.vrma`],
     sha256,
     sizeBytes,
     fileName: `${id}.vrma`,

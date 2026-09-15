@@ -494,6 +494,76 @@ tưởng là model hợp lệ.
 or extracted"* — đặt file vào repo hay release là đúng hành vi đó. User tự tải rồi dùng nút "Nạp
 file .vrma" thì hợp lệ, đó là chuyện giữa họ và pixiv.
 
+### Nơi tải: Release của chính repo này
+
+App tải từ **Release của repo này**, tag `vrm-motions-v1`, mirror là nguồn cũ:
+
+```
+https://github.com/xShiroeNguyenx/infra-companion/releases/download/vrm-motions-v1/<id>.vrma
+mirror: https://raw.githubusercontent.com/SanHsien/voxavatar/main/public/assets/animations/<id>.vrma
+```
+
+**Vì sao đổi**: bản trước trỏ thẳng vào `raw.githubusercontent.com` của repo bên thứ ba
+`SanHsien/voxavatar`. Đó đúng là điều mục 10.2 đã cảnh báo — repo đó đổi tên, xoá file, đổi
+branch `main` hay chuyển private là **cả 13 clip chết ngay với mọi bản đã cài**, và không có gì
+mình làm được. Khác model mẫu, `.vrma` khi đó còn **không có mirror** nên hỏng là hỏng hẳn.
+Giấy phép CC0 cho phép host lại, nên host lại. Nguồn cũ giữ làm mirror.
+
+Mặt an toàn không đổi: `sha256` ghim trong source nên nguồn nào đưa file khác đều bị vứt — mirror
+**không** nới lỏng bảo đảm nội dung, chỉ thêm đường tải.
+
+**Đăng lên GitHub** (làm một lần, không lặp mỗi lần phát hành app):
+
+File đã chuẩn bị sẵn: `D:\vrm\_release\motions\` — 13 file, 4.206.596 byte, sha256 đã đối chiếu
+khớp hằng số trong code. Nếu cần làm lại từ đầu thì tải từ mirror rồi kiểm:
+
+```bash
+IDS="idle-01 drink-water speaking-01 pose-motion failed-apology success-cheer review-phone
+     reaction-startle airplane-02 walk run-slow exercise-step airplane-05"
+for id in $IDS; do
+  curl -sL -o "$id.vrma" "https://raw.githubusercontent.com/SanHsien/voxavatar/main/public/assets/animations/$id.vrma"
+done
+sha256sum *.vrma    # đối chiếu từng dòng với hằng số trong packages/shared/src/vrmMotion.ts
+```
+
+Qua trang web (máy này chưa cài `gh` CLI):
+
+1. Mở https://github.com/xShiroeNguyenx/infra-companion/releases/new
+2. Ô **Choose a tag**: gõ `vrm-motions-v1` rồi bấm **Create new tag: vrm-motions-v1 on publish**
+3. **Release title**: `Thư viện chuyển động VRMA`
+4. **Describe this release**:
+   ```
+   13 clip chuyển động .vrma (CC0) cho tính năng trợ lý ảo 3D.
+   Tác giả: へすい / rerofumi · sashii · JenJell. Giấy phép: CC0 1.0.
+   https://booth.pm/ja/items/5527394
+   https://booth.pm/ja/items/6412084
+   https://booth.pm/ja/items/7861818
+   ```
+5. Kéo thả **cả 13 file** trong `D:\vrm\_release\motions\` vào ô **Attach binaries**
+6. Chờ tải xong rồi bấm **Publish release**
+
+Lệnh tương đương nếu có `gh` CLI:
+
+```bash
+gh release create vrm-motions-v1 D:/vrm/_release/motions/*.vrma \
+  --title "Thư viện chuyển động VRMA" \
+  --notes "13 clip .vrma (CC0) — rerofumi · sashii · JenJell"
+```
+
+Kiểm sau khi đăng — **phải đủ 13 dòng có `content-length`**, thiếu file nào thì clip đó rơi về
+mirror (vẫn chạy, nhưng mất đúng cái vừa sửa):
+
+```bash
+for id in $IDS; do
+  printf "%-18s " "$id"
+  curl -sIL "https://github.com/xShiroeNguyenx/infra-companion/releases/download/vrm-motions-v1/$id.vrma" \
+    | grep -i "^content-length" | tail -1
+done
+```
+
+**Tag tách riêng là cố ý**, cùng lý do như `vrm-sample-v1`: bộ clip không đổi theo phiên bản app,
+gắn vào tag phát hành thì mỗi lần ra bản mới lại phải đính kèm 4 MB đó thêm một lần.
+
 **Vai trò clip** (`VrmMotionRole`): `idle` · `chat` · `poke` · `alert` · `recover` · `inspect` ·
 `manual`. Vai trò `idle` có **nhiều clip luân phiên** — xoay vòng qua `nextMotionForRole`, không
 bốc ngẫu nhiên vì ngẫu nhiên sẽ ra cùng một clip hai ba lần liền.

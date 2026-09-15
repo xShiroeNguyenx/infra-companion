@@ -1166,7 +1166,7 @@ Four tabs, one for each question you actually arrive with.
 
 ---
 
-## 16F. 3D character — `⋯` → 🧑‍🎤 Character
+## 16F. 3D assistant — `⋯` → 🧑‍🎤 Assistant
 
 A small figure stands beside your work. It follows your cursor, blinks, breathes and shifts its weight — and when something in your fleet breaks, it changes expression and tells you what happened.
 
@@ -1176,7 +1176,7 @@ A small figure stands beside your work. It follows your cursor, blinks, breathes
 
 **When something breaks.** A monitoring threshold, replication falling behind, a tunnel error or a failed URL check makes it react: a fitting expression, a worried posture held for a few seconds, and the alert's title in a speech bubble above its head. During a storm of alerts it always shows the newest rather than queueing them — a queue means watching old news scroll past while you wait to see the current state.
 
-**When the app is in the tray.** Minimise it and alerts still reach you: the character appears in the corner of your desktop in a transparent frameless window. It **does not take focus** from whatever you are typing in, fades after fifteen seconds, and stays as long as your cursor rests on it. Click it and the app comes back. Turn this off in the character's settings.
+**When the app is in the tray.** Minimise it and alerts still reach you: the character appears in the corner of your desktop in a transparent frameless window. It **does not take focus** from whatever you are typing in, fades after fifteen seconds, and stays as long as your cursor rests on it. Click it and the app comes back. Turn this off in the assistant's settings.
 
 **Interacting with it** — all of it is invisible, so the character occasionally mentions one of these in its own voice, and only the ones you have not used yet:
 
@@ -1188,13 +1188,15 @@ A small figure stands beside your work. It follows your cursor, blinks, breathes
 | **Ctrl + drag** | Moves it somewhere else (the position is remembered) |
 | **Shift + drag** | Turns it around |
 | **Ctrl + scroll** | Bigger or smaller |
-| **Right-click** | Radial menu: expressions, outfits, tools, models, settings |
+| **Right-click** | Radial menu: chat at the top, settings at the bottom, expressions and outfits down the right |
 
 **The chat bubble** is the same assistant as the rest of the app, so it uses the provider and key you already configured. Ask it to open something — *"open tunnels"*, *"mở cài đặt"* — and it opens that tool instead of answering. That match is made by keyword, not sent to the model: opening a panel is either right or wrong, and going through a language model only adds latency and a chance to be wrong. **⛶** moves the conversation into the full AI column; **💬** on that column sends it back to the bubble.
 
 **Outfits.** A VRM file carries no notion of an outfit — measured on real models, there is only a pile of separate meshes, machine-generated names, or everything merged into one. So an outfit here is a combination of visible parts that **you** save and name. The one you were wearing comes back next time you open the app.
 
-**Settings** (the ⚙ in the radial menu) cover hair and skirt physics, frame cap, whether it appears at startup, cursor following, reacting to alerts, the desktop overlay, and size. **Details** next to the model name shows what the file declares about its author and licence — the app does not police licences, but staying silent would leave you unaware that a model forbids commercial use.
+**The radial menu** puts the two things you reach for most at the ends of its vertical axis: chat at the top, settings at the bottom. Its **centre is a button** — **✕ Đóng** closes the menu, and inside the Tools sub-ring it becomes **↩ Menu** and steps back to the main ring.
+
+**Settings** (the ⚙ at the bottom of the radial menu) cover hair and skirt physics, frame cap, whether it appears at startup, cursor following, reacting to alerts, the desktop overlay, and size. **Details** next to the model name shows what the file declares about its author and licence — the app does not police licences, but staying silent would leave you unaware that a model forbids commercial use.
 
 ---
 

@@ -69,7 +69,7 @@ export function VrmSettingsFrame({
         data-vrm-overlay
         data-vrm-settings-content
         role="dialog"
-        aria-label="Cài đặt nhân vật"
+        aria-label="Cài đặt trợ lý ảo"
         style={place}
         className="pointer-events-none fixed z-50 flex flex-col"
       >
@@ -79,7 +79,7 @@ export function VrmSettingsFrame({
           className="border-edge pointer-events-auto flex shrink-0 items-center justify-between border-b px-4"
           style={{ height: SETTINGS_HEADER_H }}
         >
-          <span className="text-content text-sm font-semibold">⚙ Cài đặt nhân vật</span>
+          <span className="text-content text-sm font-semibold">⚙ Cài đặt trợ lý ảo</span>
           <button
             className="text-subtle hover:bg-hover hover:text-content rounded px-1.5 py-0.5 text-sm leading-none"
             aria-label="Đóng"

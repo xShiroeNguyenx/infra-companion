@@ -367,36 +367,47 @@ async function installedMotions(): Promise<string[]> {
   return out
 }
 
-/** Tải một clip; trả `true` nếu sau lượt này file đã nằm đúng chỗ với sha256 khớp. */
+/**
+ * Tải một clip; trả `true` nếu sau lượt này file đã nằm đúng chỗ với sha256 khớp.
+ *
+ * **Thử lần lượt `url` rồi tới từng `mirrors`** — cùng khuôn với model mẫu. Link bên ngoài chắc
+ * chắn sẽ chết theo thời gian, nên một nguồn duy nhất là một điểm hỏng duy nhất. `sha256` ghim
+ * nghĩa là mirror **không** nới lỏng bảo đảm nội dung: nguồn nào đưa file khác đều bị vứt.
+ */
 async function downloadOneMotion(c: (typeof VRM_MOTIONS)[number], signal: AbortSignal): Promise<boolean> {
   const finalPath = join(motionsDir(), c.fileName)
   const partPath = `${finalPath}.part`
-  try {
-    const res = await fetch(c.url, { signal, redirect: 'follow' })
-    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
-    const hash = createHash('sha256')
-    const cap = sampleDownloadCap(c.sizeBytes)
-    let received = 0
-    const tap = async function* (src: AsyncIterable<Uint8Array>): AsyncGenerator<Uint8Array> {
-      for await (const chunk of src) {
-        received += chunk.byteLength
-        if (received > cap) throw new Error('nội dung lớn hơn dự kiến')
-        hash.update(chunk)
-        yield chunk
+  for (const url of [c.url, ...(c.mirrors ?? [])]) {
+    try {
+      const res = await fetch(url, { signal, redirect: 'follow' })
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
+      const hash = createHash('sha256')
+      const cap = sampleDownloadCap(c.sizeBytes)
+      let received = 0
+      const tap = async function* (src: AsyncIterable<Uint8Array>): AsyncGenerator<Uint8Array> {
+        for await (const chunk of src) {
+          received += chunk.byteLength
+          if (received > cap) throw new Error('nội dung lớn hơn dự kiến')
+          hash.update(chunk)
+          yield chunk
+        }
       }
+      await pipeline(Readable.fromWeb(res.body as never), tap, createWriteStream(partPath), { signal })
+      if (hash.digest('hex') !== c.sha256) {
+        // Mã băm lệch = nội dung khác cái đã kiểm. Thử nguồn kế: nguồn này hỏng hoặc đã bị thay.
+        await rm(partPath, { force: true })
+        continue
+      }
+      await rm(finalPath, { force: true }).catch(() => {})
+      await rename(partPath, finalPath)
+      return true
+    } catch {
+      await rm(partPath, { force: true }).catch(() => {})
+      // User bấm huỷ thì dừng hẳn, đừng chạy tiếp sang mirror
+      if (signal.aborted) return false
     }
-    await pipeline(Readable.fromWeb(res.body as never), tap, createWriteStream(partPath), { signal })
-    if (hash.digest('hex') !== c.sha256) {
-      await rm(partPath, { force: true })
-      return false
-    }
-    await rm(finalPath, { force: true }).catch(() => {})
-    await rename(partPath, finalPath)
-    return true
-  } catch {
-    await rm(partPath, { force: true }).catch(() => {})
-    return false
   }
+  return false
 }
 
 export function registerVrmIpc(): () => void {

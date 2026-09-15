@@ -5,6 +5,23 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.4.3] — 2026-09-15
+
+### Changed
+
+- **The character is now called your "virtual assistant"** throughout the interface — in the tool menu, the radial menu, the settings panel and the feature list, in all three languages (`Trợ lý ảo` · `Assistant` · `アシスタント`).
+- **The radial menu is laid out around the two things you reach for most.** Chat sits at the top of the circle and Settings at the bottom — the two ends of the vertical axis, the easiest points to hit without looking. Appearance is grouped down the right-hand side (expressions, outfit, motion), model and reset down the left.
+- **The centre of the radial menu is a button.** With nothing hovered it reads **✕ Đóng** and closes the menu; inside the Tools sub-ring it reads **↩ Menu** and steps back to the main ring. The back button used to sit on the rim, where it took up one of the slots and still had to be hunted for — the centre is already under the cursor the moment the ring opens. Hovering a rim button still shows that button's label there, and clicking it then does nothing, so brushing across the centre on the way to a button cannot close the menu by accident.
+- **Motion clips are downloaded from this project's own release** (tag `vrm-motions-v1`) instead of straight from a third party's GitHub repository, with the old source kept as a mirror. The clips are CC0, so hosting them here is allowed — and a repository outside our control can be renamed, emptied or made private at any time, which would have killed all thirteen clips for everyone who had already installed the app. The pinned SHA-256 for each file is unchanged, so a mirror grants no leeway on content: any source handing over a different file is still rejected. Each clip now also falls back through its mirrors instead of giving up after one failed URL.
+
+### Fixed
+
+- **The side panels hug the character instead of leaving a wide gap on each side.** The character's element is 2.2× as wide as the visible figure — the surplus is transparent margin so a clip that flings the arms out is not clipped — and the two columns were anchored to the *element's* edges. At default size that left them 330px apart around a 150px figure: roughly 90px of empty space on each side. They now anchor to the figure itself and overlap it slightly, so they read as a menu wrapped around the character rather than two boxes parked nearby.
+- **The character moves up beside the AI column when you open it.** It used to stay wherever you had dragged it, only being pushed left if it would have overlapped the column — so a character standing in the middle of the window simply stayed there, far from the chat you had just opened. Closing the column returns it to your position, which is never overwritten.
+- **The default resting position no longer leaves a wide margin at the right edge.** The gap was measured from the edge of the character's element rather than from the figure, so for a wide model it swelled to more than twice its intended size. It is now measured from the figure and sized by what actually needs the room: the 96px motion column, and the small chat bubble that floats above the character's head.
+
+---
+
 ## [0.4.2] — 2026-09-14
 
 ### Fixed
