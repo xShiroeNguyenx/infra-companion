@@ -34,7 +34,14 @@ const STATUS_STYLE: Record<ReplTableDiffDto['status'], string> = {
   'missing-on-master': 'text-danger font-semibold',
   'engine-differs': 'text-warning',
   'collation-differs': 'text-warning',
-  'rows-differ': 'text-warning',
+  /**
+   * `text-subtle` chứ KHÔNG phải `text-warning`: đây là **gợi ý đi đếm**, không phải kết luận.
+   *
+   * Nguồn của nó là `TABLE_ROWS` ước lượng, mà InnoDB cho con số lệch 40–50% giữa hai máy có
+   * cùng dữ liệu. Tô cảnh báo ở đây là nói với user một điều tool không biết — và họ tin, rồi
+   * đi đếm tay thấy đủ, rồi mất niềm tin vào cả những cảnh báo thật.
+   */
+  'rows-suspect': 'text-subtle',
   same: 'text-subtle'
 }
 
@@ -43,7 +50,7 @@ const STATUS_KEY = {
   'missing-on-master': 'repl.cmp.st.missingMaster',
   'engine-differs': 'repl.cmp.st.engine',
   'collation-differs': 'repl.cmp.st.collation',
-  'rows-differ': 'repl.cmp.st.rows',
+  'rows-suspect': 'repl.cmp.st.rows',
   same: 'repl.cmp.st.same'
 } as const
 
@@ -68,12 +75,22 @@ export function TableDiffTable({
     <table className="w-full text-[11px]">
       <thead className="bg-panel text-subtle sticky top-0 text-left">
         <tr>
+          {/**
+           * Mọi cột đều ghim, **cột cuối nuốt phần dư**.
+           *
+           * Ở tab, bảng rộng gấp đôi modal. Bản đầu chỉ ghim bốn cột số và để cột tên co giãn —
+           * nhưng tên bảng chỉ ~180px, nên nó phình ra hơn 1000px và mấy con số dạt hẳn sang mép
+           * phải, cách tên cả màn hình. Nay tên bảng cũng ghim (đủ cho tên dài, dài hơn thì
+           * `break-all` xuống dòng), và một cột đệm vô hình cuối bảng ăn hết chỗ thừa.
+           */}
           {selectable && <th className="w-6 px-2 py-1.5" />}
-          <th className="px-2 py-1.5 font-medium">{t('repl.cmp.table')}</th>
-          <th className="px-2 py-1.5 font-medium">{t('repl.cmp.status')}</th>
-          <th className="px-2 py-1.5 text-right font-medium">{t('repl.cmp.rowsMaster')}</th>
-          <th className="px-2 py-1.5 text-right font-medium">{t('repl.cmp.rowsReplica')}</th>
-          <th className="px-2 py-1.5 text-right font-medium">Δ</th>
+          <th className="w-96 px-2 py-1.5 font-medium">{t('repl.cmp.table')}</th>
+          <th className="w-28 px-2 py-1.5 font-medium">{t('repl.cmp.status')}</th>
+          <th className="w-32 px-2 py-1.5 text-right font-medium">{t('repl.cmp.rowsMaster')}</th>
+          <th className="w-32 px-2 py-1.5 text-right font-medium">{t('repl.cmp.rowsReplica')}</th>
+          <th className="w-28 px-2 py-1.5 text-right font-medium">Δ</th>
+          {/* Cột đệm: hút hết bề ngang thừa để năm cột trên đứng sát nhau bên trái */}
+          <th />
         </tr>
       </thead>
       <tbody className="divide-edge/60 divide-y">
@@ -110,12 +127,14 @@ export function TableDiffTable({
                     ? `+${d.rowDelta.toLocaleString()}`
                     : d.rowDelta.toLocaleString()}
               </td>
+              {/* Ô đệm cho cột hút chỗ thừa — xem chú thích ở `<thead>` */}
+              <td />
             </tr>
           )
         })}
         {diffs.length === 0 && (
           <tr>
-            <td colSpan={selectable ? 6 : 5} className="text-subtle px-2 py-6 text-center">
+            <td colSpan={selectable ? 7 : 6} className="text-subtle px-2 py-6 text-center">
               {emptyText}
             </td>
           </tr>
@@ -142,6 +161,16 @@ export function ChecksumSection({ rows }: { rows: ReplChecksumRowDto[] }) {
   return (
     <Section title={t('repl.cmp.exact')} count={rows.length}>
       <table className="w-full text-[11px]">
+        {/* Không có `<thead>` để gắn bề ngang, nên ghim bằng `<colgroup>`. Cột cuối để trống =
+            hút hết chỗ thừa, đúng cách bảng kiểm kê làm — ở tab rộng, số không được dạt sang
+            mép phải cách tên bảng cả màn hình. */}
+        <colgroup>
+          <col className="w-96" />
+          <col className="w-32" />
+          <col className="w-32" />
+          <col className="w-28" />
+          <col />
+        </colgroup>
         <tbody className="divide-edge/60 divide-y">
           {rows.map((r) => {
             const bad = isChecksumMismatch(r)
@@ -159,6 +188,8 @@ export function ChecksumSection({ rows }: { rows: ReplChecksumRowDto[] }) {
                 <td className={`px-2 py-1 text-[10px] ${bad ? 'text-danger font-semibold' : 'text-subtle'}`}>
                   {r.error ?? (bad ? t('repl.cmp.mismatch') : t('repl.cmp.match'))}
                 </td>
+                {/* Ô đệm — xem chú thích ở `<colgroup>` */}
+                <td />
               </tr>
             )
           })}
@@ -174,6 +205,14 @@ export function SchemaSection({ title, diffs }: { title: string; diffs: ReplSche
   return (
     <Section title={title} count={diffs.length}>
       <table className="w-full text-[11px]">
+        {/* Hai chữ ký (master / slave) cần so với nhau nên đặt CẠNH nhau và rộng bằng nhau;
+            cột cuối để trống hút chỗ thừa, không để hai chữ ký dạt ra hai đầu màn hình. */}
+        <colgroup>
+          <col className="w-96" />
+          <col className="w-64" />
+          <col className="w-64" />
+          <col />
+        </colgroup>
         <tbody className="divide-edge/60 divide-y">
           {diffs.map((d) => (
             <tr key={`${d.table}::${d.item}`}>
@@ -184,6 +223,8 @@ export function SchemaSection({ title, diffs }: { title: string; diffs: ReplSche
               <td className="text-muted px-2 py-1 font-mono text-[10px]">
                 {d.replicaSignature ?? t('repl.cmp.absent')}
               </td>
+              {/* Ô đệm — xem chú thích ở `<colgroup>` */}
+              <td />
             </tr>
           ))}
         </tbody>
@@ -197,6 +238,15 @@ export function VarsSection({ variables }: { variables: ReplVarDiffDto[] }) {
   return (
     <Section title={t('repl.cmp.vars')} count={variables.length}>
       <table className="w-full text-[11px]">
+        {/* Tên biến và hai giá trị đều ngắn và cố định; **lời giải thích** mới là thứ dài và đáng
+            nuốt phần dư. Không ghim thì ở tab rộng, `MIXED` / `STATEMENT` trôi ra giữa màn hình
+            cách tên biến cả gang tay. */}
+        <colgroup>
+          <col className="w-56" />
+          <col className="w-28" />
+          <col className="w-28" />
+          <col />
+        </colgroup>
         <tbody className="divide-edge/60 divide-y">
           {variables.map((v) => (
             <tr key={v.name} className={v.expected ? 'opacity-60' : ''}>

@@ -26,8 +26,19 @@ export type VrmMotionRole =
   | 'alert'
   /** Khi mọi thứ trở lại bình thường. */
   | 'recover'
-  /** Khi mở công cụ cần ngồi đọc lâu (so sánh config, replication). */
+  /**
+   * Khi mở công cụ theo LOẠI VIỆC — xem `VrmActivity` ở `vrmActivity.ts`.
+   *
+   * `inspect` có từ đầu (so config, replication); năm cái còn lại thêm sau vì 43/45 công cụ mở ra
+   * mà nhân vật đứng im — mà "có ai đó ở cạnh trong lúc làm việc" mới là điểm của cả tính năng.
+   * Tên trùng khớp `VrmActivity` để một loại việc chỉ có một tên duy nhất trong cả hệ thống.
+   */
   | 'inspect'
+  | 'bulk'
+  | 'transfer'
+  | 'logs'
+  | 'security'
+  | 'monitor'
   /** Không tự chạy — chỉ khi user chọn trong menu 🎬. */
   | 'manual'
 
@@ -149,9 +160,31 @@ export function motionForRole(role: VrmMotionRole): VrmMotionClip | null {
   return VRM_MOTIONS.find((m) => m.role === role) ?? null
 }
 
-/** Tất cả clip của một vai trò — vai trò `idle` có nhiều clip luân phiên. */
-export function motionsForRole(role: VrmMotionRole): VrmMotionClip[] {
-  return VRM_MOTIONS.filter((m) => m.role === role)
+/**
+ * Vai trò THẬT SỰ đang dùng của một clip: user gán đè nếu có, không thì lấy mặc định trong danh mục.
+ *
+ * Một chỗ duy nhất quyết định điều này — `motionsForRole` và UI đều gọi vào đây. Để hai nơi tự
+ * đọc `overrides` là chờ chúng lệch nhau, mà lệch ở đây nghĩa là dropdown hiện một đằng còn clip
+ * chạy một nẻo.
+ */
+export function effectiveRole(
+  clip: VrmMotionClip,
+  overrides?: Record<string, VrmMotionRole>
+): VrmMotionRole {
+  return overrides?.[clip.id] ?? clip.role
+}
+
+/**
+ * Tất cả clip của một vai trò — vai trò `idle` có nhiều clip luân phiên.
+ *
+ * `overrides` là bảng user gán đè (`VrmFolderMotionsDto.builtinRoles`). Không truyền = dùng vai
+ * trò mặc định của danh mục.
+ */
+export function motionsForRole(
+  role: VrmMotionRole,
+  overrides?: Record<string, VrmMotionRole>
+): VrmMotionClip[] {
+  return VRM_MOTIONS.filter((m) => effectiveRole(m, overrides) === role)
 }
 
 /**
@@ -167,9 +200,10 @@ export function motionsForRole(role: VrmMotionRole): VrmMotionClip[] {
 export function nextMotionForRole(
   role: VrmMotionRole,
   lastId: string | null,
-  available: readonly string[]
+  available: readonly string[],
+  overrides?: Record<string, VrmMotionRole>
 ): VrmMotionClip | null {
-  const pool = motionsForRole(role).filter((m) => available.includes(m.id))
+  const pool = motionsForRole(role, overrides).filter((m) => available.includes(m.id))
   if (pool.length === 0) return null
   if (pool.length === 1 || lastId === null) return pool[0]!
   const i = pool.findIndex((m) => m.id === lastId)

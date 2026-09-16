@@ -24,7 +24,8 @@ export const DEFAULT_REPL_SETTINGS: ReplSettingsDto = {
   defaults: { lagSec: 60, applyGapBytes: null, threads: true, error: true, writable: true, probe: true },
   perPair: {},
   webhookUrl: '',
-  osNotify: true
+  osNotify: true,
+  skipTables: {}
 }
 
 function settingsPath(): string {
@@ -83,11 +84,22 @@ function sanitize(raw: unknown): ReplSettingsDto {
       if (clean) perPair[pairId] = clean
     }
   }
+  // Danh sách bảng bỏ qua: cắt trắng, bỏ mục rỗng, bỏ cụm không còn mục nào — file JSON này
+  // nằm ngoài vault nên ai cũng sửa tay được
+  const skipTables: ReplSettingsDto['skipTables'] = {}
+  if (s.skipTables && typeof s.skipTables === 'object') {
+    for (const [pairId, list] of Object.entries(s.skipTables)) {
+      if (!Array.isArray(list)) continue
+      const clean = list.filter((x): x is string => typeof x === 'string').map((x) => x.trim()).filter((x) => x !== '')
+      if (clean.length > 0) skipTables[pairId] = clean
+    }
+  }
   return {
     defaults: saneThresholds(s.defaults, DEFAULT_REPL_SETTINGS.defaults),
     perPair,
     webhookUrl: typeof s.webhookUrl === 'string' ? s.webhookUrl.trim() : '',
-    osNotify: typeof s.osNotify === 'boolean' ? s.osNotify : true
+    osNotify: typeof s.osNotify === 'boolean' ? s.osNotify : true,
+    skipTables
   }
 }
 

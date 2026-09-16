@@ -49,7 +49,7 @@ function run(over: Partial<ReplRunSaveInput> = {}): ReplRunSaveInput {
         {
           schema: 'shop',
           name: 'orders',
-          status: 'rows-differ',
+          status: 'rows-suspect',
           master: null,
           replica: null,
           rowDelta: -12,

@@ -1194,7 +1194,9 @@ A small figure stands beside your work. It follows your cursor, blinks, breathes
 
 **Your own motion clips.** Besides the thirteen CC0 clips the app can download, you can play any `.vrma` file from your machine: **🎞 Nạp file .vrma** for one, **📂 Nạp cả thư mục** for a whole pack — it scans one folder, plays the first clip and lists the rest to switch between.
 
-Each clip in that list has a dropdown to give it a job: *lúc rảnh*, *khi mở chat*, *khi chạm vào*, *khi có cảnh báo*, *khi hết cảnh báo*, *khi đọc lâu*. A clip you assign takes over that moment from the built-in one; roles you leave blank keep using the CC0 clips, so assigning a few takes nothing away. Blank means the clip plays only when you click it. Assign several to the same role and they alternate.
+Every clip — the thirteen built-in ones and your own — sits in one list with a dropdown to give it a job: *lúc rảnh*, *khi mở chat*, *khi chạm vào*, *khi có cảnh báo*, *khi hết cảnh báo*, *khi đọc lâu*. A clip you assign takes over that moment from the built-in one; roles you leave blank keep using the CC0 clips, so assigning a few takes nothing away. Blank means the clip plays only when you click it. Assign several to the same role and they alternate.
+
+The built-in clips already have a role, so their dropdown shows it prefixed with ↺ — leave it to keep the default, pick another moment to override it, or choose *chỉ khi bấm* to stop it running on its own. Only the ones you change are remembered.
 
 The folder is remembered, so the clips and their roles come back next time you open the app. Only the **path** and the role table are saved — never the files, which would put a second copy of licensed clips inside the app's own folder.
 
@@ -1203,6 +1205,8 @@ pixiv's VRoid Project gives away a [seven-animation pack](https://vroid.booth.pm
 **Outfits.** A VRM file carries no notion of an outfit — measured on real models, there is only a pile of separate meshes, machine-generated names, or everything merged into one. So an outfit here is a combination of visible parts that **you** save and name. The one you were wearing comes back next time you open the app.
 
 **The radial menu** puts the two things you reach for most at the ends of its vertical axis: chat at the top, settings at the bottom. Its **centre is a button** — **✕ Đóng** closes the menu, and inside the Tools sub-ring it becomes **↩ Menu** and steps back to the main ring.
+
+**The first time you open it**, with no model loaded yet, you get just the two ways to get one: download the CC0 sample (Sendagaya Shino, 14 MB, fetched on demand rather than shipped inside the app) or pick a `.vrm` already on your disk — only the path is remembered, no copy is kept. The ✕ in the corner closes it again if you would rather not.
 
 **Settings** (the ⚙ at the bottom of the radial menu) cover hair and skirt physics, frame cap, whether it appears at startup, cursor following, reacting to alerts, the desktop overlay, and size. **Details** next to the model name shows what the file declares about its author and licence — the app does not police licences, but staying silent would leave you unaware that a model forbids commercial use.
 

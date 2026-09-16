@@ -9,6 +9,7 @@ import {
   diffSchemaEntries,
   diffVariables,
   isFilteredOut,
+  matchesSkipList,
   matchesWildPattern,
   normalizeColumns,
   normalizeIndexes,
@@ -92,8 +93,32 @@ describe('diffInventory', () => {
 
   it('chênh số dòng lớn → báo kèm delta có dấu', () => {
     const diffs = diffInventory([table({ rowsEstimate: 10_000 })], [table({ rowsEstimate: 4_000 })])
-    expect(diffs[0].status).toBe('rows-differ')
+    expect(diffs[0].status).toBe('rows-suspect')
     expect(diffs[0].rowDelta).toBe(-6_000) // slave thiếu 6000 dòng
+  })
+
+  it('lệch 10% trên bảng lớn → KHÔNG báo (nhiễu thống kê InnoDB, đây là ca user gặp)', () => {
+    /**
+     * Đúng bug user báo: "count bằng tay thấy đủ data nhưng tool báo thiếu".
+     *
+     * `TABLE_ROWS` của InnoDB là ước lượng từ mẫu ngẫu nhiên vài trang index — MySQL docs nói
+     * sai lệch 40–50% là bình thường, và hai máy tính thống kê độc lập vào những thời điểm khác
+     * nhau. Ngưỡng 5% cũ khiến gần như mọi bảng lớn đều bị báo dù dữ liệu y hệt.
+     */
+    const diffs = diffInventory([table({ rowsEstimate: 1_000_000 })], [table({ rowsEstimate: 900_000 })])
+    expect(diffs[0].status).toBe('same')
+  })
+
+  it('lệch 25% vẫn chưa báo — dưới ngưỡng 30%', () => {
+    const diffs = diffInventory([table({ rowsEstimate: 1_000_000 })], [table({ rowsEstimate: 750_000 })])
+    expect(diffs[0].status).toBe('same')
+  })
+
+  it('lệch 60% mới đáng ngờ — và trạng thái là ĐÁNG NGỜ, không phải kết luận', () => {
+    // Tên `rows-suspect` chứ không phải `rows-differ`: nguồn là số ước lượng, chỉ `COUNT(*)` mới
+    // kết luận được. UI hiện nó màu chữ thường + nhãn "Nên đếm lại", không tô cảnh báo.
+    const diffs = diffInventory([table({ rowsEstimate: 1_000_000 })], [table({ rowsEstimate: 400_000 })])
+    expect(diffs[0].status).toBe('rows-suspect')
   })
 
   it('bảng nhỏ chênh vài dòng không bị báo (dưới rowsMinDelta)', () => {
@@ -106,7 +131,7 @@ describe('diffInventory', () => {
       rowsMinDelta: 1,
       rowsTolerancePct: 1
     })
-    expect(diffs[0].status).toBe('rows-differ')
+    expect(diffs[0].status).toBe('rows-suspect')
   })
 
   it('bảng bị filter → đánh dấu filtered và xếp xuống cuối', () => {
@@ -273,5 +298,51 @@ describe('câu đếm / checksum', () => {
     // Engine không hỗ trợ checksum → NULL, phải phân biệt với 0
     expect(readChecksumRow([{ Table: 'app.orders', Checksum: null }])).toBeNull()
     expect(readChecksumRow([])).toBeNull()
+  })
+})
+
+/**
+ * Bảng user TỰ khai "đừng báo lệch".
+ *
+ * Đường này cần thiết vì rất nhiều người sync tay một số bảng mà **không** khai
+ * `Replicate_Ignore_Table` trong MySQL — nên không có gì để đọc từ `SHOW REPLICA STATUS`, và họ
+ * chính là người thấy tool báo lệch những bảng họ biết thừa là sẽ lệch.
+ */
+describe('matchesSkipList — danh sách bảng bỏ qua tự khai', () => {
+  it('danh sách rỗng / không truyền → không bỏ qua gì', () => {
+    expect(matchesSkipList('app', 'orders')).toBe(false)
+    expect(matchesSkipList('app', 'orders', [])).toBe(false)
+  })
+
+  it('khớp đúng `schema.table`', () => {
+    expect(matchesSkipList('app', 'sessions', ['app.sessions'])).toBe(true)
+    expect(matchesSkipList('app', 'orders', ['app.sessions'])).toBe(false)
+  })
+
+  it('`%` và `_` như MySQL — người đã quen wild_ignore_table không phải học cú pháp thứ hai', () => {
+    expect(matchesSkipList('app', 'tmp_2024', ['app.tmp_%'])).toBe(true)
+    expect(matchesSkipList('logs', 'access', ['logs.%'])).toBe(true)
+    expect(matchesSkipList('app', 'orders', ['app.tmp_%'])).toBe(false)
+  })
+
+  it('gõ mỗi tên database = cả database đó', () => {
+    expect(matchesSkipList('logs', 'access', ['logs'])).toBe(true)
+    expect(matchesSkipList('app', 'orders', ['logs'])).toBe(false)
+  })
+
+  it('không phân biệt hoa thường, bỏ qua khoảng trắng thừa và mục rỗng', () => {
+    expect(matchesSkipList('App', 'Sessions', ['  app.sessions  '])).toBe(true)
+    expect(matchesSkipList('app', 'orders', ['', '   '])).toBe(false)
+  })
+
+  it('bảng trong danh sách bỏ qua bị đánh dấu `filtered` và xếp xuống cuối', () => {
+    const diffs = diffInventory(
+      [table({ schema: 'app', name: 'sessions' }), table({ schema: 'app', name: 'orders' })],
+      [table({ schema: 'app', name: 'orders' })],
+      { skipTables: ['app.sessions'] }
+    )
+    // `sessions` thiếu ở replica nhưng user đã khai là cố ý → xuống cuối
+    expect(diffs[diffs.length - 1].name).toBe('sessions')
+    expect(diffs[diffs.length - 1].filtered).toBe(true)
   })
 })

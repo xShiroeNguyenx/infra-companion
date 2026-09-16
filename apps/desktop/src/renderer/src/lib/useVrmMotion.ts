@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  effectiveRole,
   nextFolderClipForRole,
   nextMotionForRole,
   VRM_MOTIONS,
@@ -24,8 +25,19 @@ import type { VrmStage } from './vrmStage'
 const PRIORITY: Record<VrmMotionRole, number> = {
   idle: 0,
   manual: 1,
-  // Mở công cụ đọc lâu: trên idle nhưng dưới mọi thứ user vừa chạm vào
+  /**
+   * Sáu loại việc đều **trên idle nhưng dưới mọi thứ user vừa chạm vào**.
+   *
+   * Cùng một mức: mở hai công cụ liên tiếp thì cái sau thắng (không `>=` nên không chen), mà đó
+   * đúng là điều mong đợi — user vừa chuyển sang việc khác. Cho chúng khác mức nhau thì mở
+   * "xem log" rồi mở "chạy hàng loạt" sẽ ra kết quả khác với thứ tự ngược lại, không có lý do gì.
+   */
   inspect: 1,
+  bulk: 1,
+  transfer: 1,
+  logs: 1,
+  security: 1,
+  monitor: 1,
   chat: 2,
   poke: 2,
   recover: 3,
@@ -61,6 +73,14 @@ export interface VrmMotionApi {
 export interface FolderMotionInput {
   files: readonly { name: string; bytes: Uint8Array }[]
   roles: Record<string, VrmMotionRoleName>
+  /**
+   * Vai trò user GÁN ĐÈ cho clip CC0 (`id` → vai trò). Thiếu khoá = dùng mặc định của danh mục.
+   *
+   * Để chung `FolderMotionInput` dù không liên quan tới thư mục: cả hai cùng đọc từ một file
+   * (`vrm-folder-motions.json`) và cùng chảy vào một phép chọn clip. Tách thành prop thứ hai chỉ
+   * làm nơi gọi phải nhớ truyền đủ hai thứ luôn đi cùng nhau.
+   */
+  builtinRoles?: Record<string, VrmMotionRole>
 }
 
 export function useVrmMotion(
@@ -80,6 +100,14 @@ export function useVrmMotion(
   /** Như trên nhưng cho clip THƯ MỤC — khoá là tên file, nên phải là bản đồ riêng. */
   const lastFolderByRole = useRef(new Map<VrmMotionRoleName, string>())
   const stopTimer = useRef<number | null>(null)
+  /**
+   * Bảng gán đè, giữ trong ref để `run()` đọc được mà không phải nằm trong deps của nó.
+   *
+   * `run` đã `useCallback([stage])`; thêm `folder` vào deps là hàm mới mỗi lần user gõ một ký tự
+   * ở chỗ khác trong panel, kéo theo `play` dựng lại và mọi effect phụ thuộc nó chạy lại.
+   */
+  const overridesRef = useRef<Record<string, VrmMotionRole> | undefined>(undefined)
+  overridesRef.current = folder?.builtinRoles
 
   useEffect(() => {
     void window.infra.vrm.listMotions().then((r) => setInstalled(r.installed))
@@ -108,7 +136,11 @@ export function useVrmMotion(
          */
         void stage?.playAnimation(bytes, { once: !loop, anchor: !(loop && clip.locomotion) })
         setPlaying(clip.id)
-        current.current = { role: clip.role, until: performance.now() + clip.durationSec * 1000 }
+        // Vai trò HIỆU LỰC, không phải `clip.role`: user gán đè thì luật ưu tiên phải theo cái họ
+        // gán — gán "Khi có cảnh báo" cho một clip vốn là `idle` mà `PRIORITY` vẫn tính là idle
+        // thì nó bị mọi thứ khác cắt ngang ngay.
+        const role = effectiveRole(clip, overridesRef.current)
+        current.current = { role, until: performance.now() + clip.durationSec * 1000 }
         if (stopTimer.current !== null) clearTimeout(stopTimer.current)
         /**
          * Hẹn giờ dọn state **dài hơn clip một chút**: stage tự gỡ mixer khi clip hết (`once`),
@@ -191,12 +223,12 @@ export function useVrmMotion(
       if (role !== 'manual' && runFolder(role)) return
 
       // Xoay vòng trong nhóm clip của vai trò đó — `idle` có hai clip luân phiên
-      const clip = nextMotionForRole(role, lastByRole.current.get(role) ?? null, installed)
+      const clip = nextMotionForRole(role, lastByRole.current.get(role) ?? null, installed, folder?.builtinRoles)
       if (!clip) return
       lastByRole.current.set(role, clip.id)
       run(clip, false)
     },
-    [enabled, stage, installed, run, runFolder]
+    [enabled, stage, installed, run, runFolder, folder?.builtinRoles]
   )
 
   const playById = useCallback(

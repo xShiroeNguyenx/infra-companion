@@ -123,10 +123,32 @@ function create(d: OverlayDeps): BrowserWindow {
   })
   w.setAlwaysOnTop(true, 'floating')
   w.setMenuBarVisibility(false)
+  /**
+   * Renderer CHẾT → bỏ hẳn cửa sổ, đợt sau dựng lại từ đầu.
+   *
+   * Không bắt thì `win.isDestroyed()` vẫn `false` và `ready` vẫn `true`, nên `flush()` gửi IPC
+   * vào hư không rồi `showInactive()` một cửa sổ **trong suốt rỗng** — main báo thành công, user
+   * thì không thấy gì. Đúng triệu chứng đã gặp: lần đầu có nhân vật, những lần sau im lặng.
+   *
+   * `destroy()` chứ không chỉ gán cờ: phải để `'closed'` chạy và dọn `win`/`ready`/`pending` ở
+   * một chỗ duy nhất, nếu không lần sau lại rơi vào đúng trạng thái nửa sống nửa chết này.
+   */
+  w.webContents.on('render-process-gone', (_e, details) => {
+    console.error('[overlay] renderer gone:', details.reason)
+    if (!w.isDestroyed()) w.destroy()
+  })
+  // Nạp hỏng (route sai, file thiếu) cũng là cửa sổ vô dụng — cùng cách xử lý
+  w.webContents.on('did-fail-load', (_e, code, desc) => {
+    // -3 = ABORTED: xảy ra khi chính ta destroy giữa chừng, không phải lỗi nạp
+    if (code === -3) return
+    console.error('[overlay] load failed:', code, desc)
+    if (!w.isDestroyed()) w.destroy()
+  })
   w.on('closed', () => {
     win = null
     ready = false
     pending = []
+    held = false
     clearHide()
   })
   place(w)
@@ -150,6 +172,28 @@ export function overlayOnEvent(ev: AppEventDto): void {
       if (!win || win.isDestroyed()) {
         // Lần đầu: dựng cửa sổ, `flush()` sẽ chạy khi renderer báo READY
         win = create(d)
+        return
+      }
+      /**
+       * Cửa sổ còn đó nhưng renderer CHƯA/KHÔNG còn sẵn sàng → dựng lại, đừng gọi `flush()`.
+       *
+       * `flush()` thoát sớm khi `!ready` và **không để lại dấu vết gì** — thông báo nằm mãi trong
+       * `pending` còn user thì không thấy gì. Có hai đường rơi vào đây: renderer chết giữa chừng
+       * (nay `render-process-gone` dọn được, nhưng sự kiện có thể tới trước khi nó kịp bắn), và
+       * lần nạp đầu quá lâu mà user vừa mở app lên rồi thu lại — `READY` khi đó rơi vào nhánh
+       * `else pending = []` nên `ready` vẫn true, nhưng nếu không thì cửa sổ treo ở nửa vời.
+       *
+       * Huỷ rồi dựng lại là đường an toàn: tốn vài giây nạp model, đổi lại thông báo chắc chắn
+       * tới được user — đúng mục đích của cả tính năng này.
+       */
+      if (!ready) {
+        console.error('[overlay] window alive but renderer not ready — rebuilding')
+        // Chụp `pending` TRƯỚC `destroy()`: `'closed'` chạy ĐỒNG BỘ bên trong destroy (đã đo
+        // bằng Electron thật) và nó xoá `pending` — chụp sau là mất sạch thông báo đang chờ.
+        const keep = [...pending]
+        win.destroy()
+        win = create(d)
+        pending = keep
         return
       }
       flush()

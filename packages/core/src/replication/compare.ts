@@ -85,7 +85,19 @@ export type TableDiffStatus =
   | 'missing-on-master'
   | 'engine-differs'
   | 'collation-differs'
-  | 'rows-differ'
+  /**
+   * **ĐÁNG NGỜ, chưa phải kết luận.** Số dòng ước lượng lệch nhiều — cần `COUNT(*)` để biết chắc.
+   *
+   * Trước đây trạng thái này tên là `rows-differ` và UI tô đỏ như một lỗi thật. Sai: nguồn của
+   * nó là `information_schema.TABLES.TABLE_ROWS`, mà với InnoDB đó là con số optimizer **ước
+   * lượng từ mẫu ngẫu nhiên vài trang index** — MySQL docs nói sai lệch 40–50% là bình thường,
+   * và hai máy tính thống kê độc lập vào những thời điểm khác nhau. Hai server có dữ liệu y hệt
+   * vẫn ra hai con số khác nhau.
+   *
+   * Hậu quả user gặp: "count bằng tay thấy đủ data nhưng tool báo thiếu". Đúng — hai bên đang
+   * đếm bằng hai cách khác nhau, và cách của tool là cách không đếm.
+   */
+  | 'rows-suspect'
   | 'same'
 
 export interface TableDiff {
@@ -105,10 +117,17 @@ export interface DiffInventoryOptions {
   filters?: ReplFilters
   /**
    * Chênh lệch số dòng ước lượng dưới tỉ lệ này thì bỏ qua (InnoDB thống kê rất lệch).
-   * Mặc định 5%, và luôn bỏ qua chênh dưới `rowsMinDelta` dòng.
+   * Mặc định **30%**, và luôn bỏ qua chênh dưới `rowsMinDelta` dòng — xem `rows-suspect`.
    */
   rowsTolerancePct?: number
   rowsMinDelta?: number
+  /**
+   * Bảng user TỰ khai là "biết trước sẽ lệch, đừng báo" — `schema.table`, hỗ trợ `%` như MySQL.
+   *
+   * Cần riêng, không gộp vào `filters`: nhiều người sync tay một số bảng mà **không** dùng
+   * `Replicate_Ignore_Table` của MySQL, nên không có gì để đọc từ `SHOW REPLICA STATUS`.
+   */
+  skipTables?: string[]
 }
 
 /**
@@ -120,7 +139,7 @@ export function diffInventory(
   replica: TableInfo[],
   options: DiffInventoryOptions = {}
 ): TableDiff[] {
-  const tolerancePct = options.rowsTolerancePct ?? 5
+  const tolerancePct = options.rowsTolerancePct ?? 30
   const minDelta = options.rowsMinDelta ?? 100
   const key = (t: TableInfo): string => `${t.schema}.${t.name}`
   const masterMap = new Map(master.map((t) => [key(t), t]))
@@ -131,7 +150,12 @@ export function diffInventory(
     const m = masterMap.get(k) ?? null
     const r = replicaMap.get(k) ?? null
     const info = m ?? r!
-    const filtered = options.filters ? isFilteredOut(info.schema, info.name, options.filters) : false
+    // Hai đường độc lập dẫn tới "chênh lệch này là CỐ Ý": filter của MySQL, và danh sách user tự
+    // khai. Người sync tay thường không dùng `Replicate_Ignore_Table` nên đường thứ hai là đường
+    // duy nhất họ có.
+    const filtered =
+      (options.filters ? isFilteredOut(info.schema, info.name, options.filters) : false) ||
+      matchesSkipList(info.schema, info.name, options.skipTables)
 
     let status: TableDiffStatus = 'same'
     let rowDelta: number | null = null
@@ -143,8 +167,18 @@ export function diffInventory(
       if (m.rowsEstimate !== null && r.rowsEstimate !== null) {
         rowDelta = r.rowsEstimate - m.rowsEstimate
         const base = Math.max(m.rowsEstimate, r.rowsEstimate, 1)
+        /**
+         * Ngưỡng **30%**, không phải 5%.
+         *
+         * `TABLE_ROWS` của InnoDB lệch 40–50% giữa hai máy có cùng dữ liệu là chuyện bình thường
+         * (thống kê lấy mẫu ngẫu nhiên, mỗi máy tính vào một thời điểm khác). Ngưỡng 5% cũ khiến
+         * gần như mọi bảng lớn đều bị báo — user đếm tay thấy đủ mà tool vẫn kêu thiếu.
+         *
+         * 30% không phải "đúng" mà là mức mà **con số này còn nói được gì đó**: dưới đó thì nhiễu
+         * thống kê lấn hết tín hiệu. Ai cần biết chắc thì bấm Đếm (`COUNT(*)`).
+         */
         const significant = Math.abs(rowDelta) >= minDelta && (Math.abs(rowDelta) / base) * 100 >= tolerancePct
-        if (status === 'same' && significant) status = 'rows-differ'
+        if (status === 'same' && significant) status = 'rows-suspect'
       }
     }
     out.push({ schema: info.schema, name: info.name, status, master: m, replica: r, rowDelta, filtered })
@@ -155,7 +189,7 @@ export function diffInventory(
     'missing-on-master': 1,
     'engine-differs': 2,
     'collation-differs': 3,
-    'rows-differ': 4,
+    'rows-suspect': 4,
     same: 5
   }
   return out.sort(
@@ -191,6 +225,24 @@ export function matchesWildPattern(pattern: string, value: string): boolean {
  * HẠ mức một chênh lệch xuống "cố ý" trong báo cáo so lệch — không bao giờ dùng để giấu lỗi
  * replication thật, nên đoán sai cũng không gây hậu quả nghiêm trọng.
  */
+/**
+ * Bảng có nằm trong danh sách user TỰ khai "đừng báo lệch" không.
+ *
+ * Nhận `schema.table` hoặc `schema.%` / `%.tmp_%` — cùng ký tự đại diện với MySQL (`%` nhiều ký
+ * tự, `_` một ký tự) để người đã quen viết `Replicate_Wild_Ignore_Table` không phải học cú pháp
+ * thứ hai. Mục trống bị bỏ qua, so không phân biệt hoa thường.
+ */
+export function matchesSkipList(schema: string, table: string, skip?: readonly string[]): boolean {
+  if (!skip || skip.length === 0) return false
+  const full = `${schema}.${table}`
+  return skip.some((raw) => {
+    const p = raw.trim()
+    if (p === '') return false
+    // Không có dấu chấm = user gõ tên database → hiểu là "cả database đó"
+    return matchesWildPattern(p.includes('.') ? p : `${p}.%`, full)
+  })
+}
+
 export function isFilteredOut(schema: string, table: string, filters: ReplFilters): boolean {
   if (!filters.any) return false
   const full = `${schema}.${table}`

@@ -43,7 +43,7 @@ const row = (over: Partial<ReplChecksumRowDto>): ReplChecksumRowDto => ({
 describe('buildScanRun', () => {
   test('không lưu bảng khớp — lịch sử chỉ giữ mục lệch', () => {
     const { payload, counts } = buildScanRun({
-      tables: [table('orders', 'rows-differ'), table('users', 'same'), table('logs', 'same')],
+      tables: [table('orders', 'rows-suspect'), table('users', 'same'), table('logs', 'same')],
       columns: [],
       indexes: [],
       variables: []
@@ -54,7 +54,7 @@ describe('buildScanRun', () => {
 
   test('bảng ngoài phạm vi replication vẫn lưu nhưng KHÔNG tính là lệch', () => {
     const { payload, counts } = buildScanRun({
-      tables: [table('orders', 'rows-differ'), table('sessions', 'missing-on-replica', true)],
+      tables: [table('orders', 'rows-suspect'), table('sessions', 'missing-on-replica', true)],
       columns: [],
       indexes: [],
       variables: []
@@ -74,7 +74,7 @@ describe('buildScanRun', () => {
   })
 
   test('vượt trần thì cắt và BÁO đã cắt — không im lặng để tưởng là đủ', () => {
-    const many = Array.from({ length: 12 }, (_, i) => table(`t${i}`, 'rows-differ'))
+    const many = Array.from({ length: 12 }, (_, i) => table(`t${i}`, 'rows-suspect'))
     const { payload, counts } = buildScanRun({ tables: many, columns: [], indexes: [], variables: [] }, 5)
     expect(payload.tables).toHaveLength(5)
     expect(payload.truncated).toBe(true)

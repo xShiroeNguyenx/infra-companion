@@ -80,7 +80,22 @@ export function ReplicationModal({ onClose, embedded }: { onClose?: () => void; 
       onClose={onClose}
       headerExtra={embedded ? undefined : <OpenInTabButton kind="replication" onDone={onClose} />}
     >
-      <div className="w-[820px] max-w-full">
+      {/**
+       * Mở dạng TAB: chừa **15% mỗi bên**, modal thì giữ trần 820px.
+       *
+       * Ép 820px trong tab thì chữ bị cắt mà nửa màn hình phải bỏ trống; nhưng để tràn hết cũng
+       * không đọc được — dòng lịch sử kéo dài cả màn hình, mắt phải quét từ mép này sang mép kia
+       * mới ghép được một bản ghi.
+       *
+       * `70%` (chứ không `70vw`): tính theo **vùng nội dung tab** — đúng thứ user nhìn thấy —
+       * chứ không phải cả màn hình gồm cả sidebar. Kẹp trong `[900px, 1600px]`: cửa sổ 1100px thì
+       * 70% chỉ còn 770px và bảng so lệch (5 cột số) bắt đầu chật, lúc đó thà tràn sát mép còn
+       * hơn cắt mất cột; còn màn hình siêu rộng thì trần 1600px giữ cho dòng không dài quá tay.
+       */}
+      <div
+        className={embedded ? 'mx-auto w-full min-w-0' : 'w-[820px] max-w-full'}
+        style={embedded ? { maxWidth: 'max(900px, min(70%, 1600px))' } : undefined}
+      >
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Select className="!w-64" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
             <option value="">{t('repl.choosePair')}</option>

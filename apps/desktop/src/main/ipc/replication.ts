@@ -14,6 +14,9 @@ import {
   clampPollInterval,
   diagnose,
   readMasterSnapshot,
+  normalizeReplicaStatus,
+  queryFirstSupported,
+  replicaStatusSqlFor,
   diffInventory,
   diffSchemaEntries,
   diffVariables,
@@ -463,19 +466,39 @@ export function registerReplicationIpc(): () => void {
           master.probe.queryRows(INDEXES_SQL),
           replica.probe.queryRows(INDEXES_SQL)
         ])
-        // Lấy bộ lọc replication từ sample gần nhất CỦA CHÍNH SLAVE ĐÓ để đánh dấu chênh lệch CỐ Ý
+        /**
+         * Bộ lọc replication — **hỏi thẳng slave**, không lấy từ snapshot trong RAM.
+         *
+         * `lastSnapshots` chỉ có sau khi đã poll ít nhất một lần. Mở app rồi bấm So sánh ngay thì
+         * nó rỗng → `isFilteredOut` không chạy → bảng bị `Replicate_Ignore_Table` vẫn bị tính là
+         * lệch, đúng thứ user báo. Dùng snapshot làm dự phòng khi câu hỏi thất bại (thiếu quyền
+         * `REPLICATION CLIENT` chẳng hạn) — có filter cũ còn hơn không có gì.
+         */
         const key = replicaId ? snapshotKey(pairId, replicaId) : null
         const snapshot = key
           ? lastSnapshots.get(key)
           : [...lastSnapshots.entries()].find(([k]) => k.startsWith(`${pairId}::`))?.[1]
-        const filters = snapshot?.sample.replica?.filters
+        let filters = snapshot?.sample.replica?.filters
+        try {
+          // `null` = chưa biết phiên bản → thử `SHOW SLAVE STATUS` trước rồi `SHOW REPLICA STATUS`,
+          // phủ được mọi bản kể cả MySQL 8.4 (đã xoá câu cũ)
+          const statusRows = await queryFirstSupported(replica.probe, replicaStatusSqlFor(null))
+          if (statusRows[0]) filters = normalizeReplicaStatus(statusRows[0]).filters
+        } catch {
+          // Giữ filter từ snapshot; so sánh vẫn chạy được, chỉ là có thể báo thừa vài bảng
+        }
         const [mVars, rVars] = await Promise.all([
           master.probe.queryRows(VARS_SQL),
           replica.probe.queryRows(VARS_SQL)
         ])
         const result: ReplCompareResultDto = {
           ok: true,
-          tables: diffInventory(normalizeTableRows(mTables), normalizeTableRows(rTables), { filters }),
+          tables: diffInventory(normalizeTableRows(mTables), normalizeTableRows(rTables), {
+            filters,
+            // Bảng user tự khai "biết trước sẽ lệch" — đường duy nhất cho người sync tay mà
+            // không dùng `Replicate_Ignore_Table` của MySQL
+            skipTables: settings.skipTables[pairId] ?? []
+          }),
           columns: diffSchemaEntries(normalizeColumns(mCols), normalizeColumns(rCols)),
           indexes: diffSchemaEntries(normalizeIndexes(mIdx), normalizeIndexes(rIdx)),
           variables: diffVariables(

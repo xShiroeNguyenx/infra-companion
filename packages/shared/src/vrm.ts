@@ -112,6 +112,17 @@ export interface VrmFolderMotionsDto {
    * hết, còn tên thì vẫn trỏ đúng clip.
    */
   roles: Record<string, VrmMotionRoleName>
+  /**
+   * `id clip CC0` → vai trò user GÁN ĐÈ lên mặc định. Thiếu khoá = dùng vai trò trong danh mục.
+   *
+   * Khoá là `id` (`idle-01`, `pose-motion`…) chứ không phải tên file: danh mục ở `vrmMotion.ts`
+   * định danh bằng id, và id không đổi kể cả khi đổi tên file hay nơi tải.
+   *
+   * ⚠️ Chỉ ghi khoá cho clip user **thật sự đổi**. Ghi cả 13 khoá "cho đủ" thì lần sau sửa vai
+   * trò mặc định trong code sẽ không tới được ai — họ đã bị đóng băng ở giá trị cũ mà không hề
+   * chọn gì.
+   */
+  builtinRoles: Record<string, VrmMotionRoleName | 'manual'>
 }
 
 /**
@@ -121,7 +132,19 @@ export interface VrmFolderMotionsDto {
  * `VrmMotionRole` của `vrmMotion.ts` để tránh vòng import giữa hai file cùng tầng — hai bộ giá
  * trị trùng nhau và có test chốt điều đó.
  */
-export type VrmMotionRoleName = 'idle' | 'chat' | 'poke' | 'alert' | 'recover' | 'inspect'
+export type VrmMotionRoleName =
+  | 'idle'
+  | 'chat'
+  | 'poke'
+  | 'alert'
+  | 'recover'
+  // Sáu loại việc — trùng tên với `VrmActivity` ở `vrmActivity.ts`
+  | 'inspect'
+  | 'bulk'
+  | 'transfer'
+  | 'logs'
+  | 'security'
+  | 'monitor'
 
 /** Nhãn tiếng Việt cho dropdown chọn vai trò. Thứ tự này là thứ tự hiện trên UI. */
 export const VRM_ROLE_LABELS: readonly { value: VrmMotionRoleName; label: string }[] = [
@@ -130,10 +153,16 @@ export const VRM_ROLE_LABELS: readonly { value: VrmMotionRoleName; label: string
   { value: 'poke', label: 'Khi chạm vào' },
   { value: 'alert', label: 'Khi có cảnh báo' },
   { value: 'recover', label: 'Khi hết cảnh báo' },
-  { value: 'inspect', label: 'Khi đọc lâu' }
+  // Sáu loại việc — nhãn phải khớp `ACTIVITY_LABELS`, có test chốt điều đó
+  { value: 'inspect', label: 'Khi đọc lâu' },
+  { value: 'bulk', label: 'Khi chạy hàng loạt' },
+  { value: 'transfer', label: 'Khi truyền file' },
+  { value: 'logs', label: 'Khi xem log' },
+  { value: 'security', label: 'Khi làm bảo mật' },
+  { value: 'monitor', label: 'Khi xem giám sát' }
 ]
 
-export const DEFAULT_VRM_FOLDER_MOTIONS: VrmFolderMotionsDto = { dir: null, roles: {} }
+export const DEFAULT_VRM_FOLDER_MOTIONS: VrmFolderMotionsDto = { dir: null, roles: {}, builtinRoles: {} }
 
 /**
  * Chuẩn hoá dữ liệu đọc từ đĩa — file JSON ngoài vault, ai cũng sửa được bằng tay.
@@ -151,7 +180,22 @@ export function cleanFolderMotions(raw: unknown): VrmFolderMotionsDto {
       if (typeof role === 'string' && valid.has(role)) roles[name] = role as VrmMotionRoleName
     }
   }
-  return { dir: typeof o.dir === 'string' && o.dir.length > 0 ? o.dir : null, roles }
+  /**
+   * Override cho clip CC0 — nhận thêm `'manual'`, khác `roles` của clip tự nạp.
+   *
+   * Clip tự nạp không gán gì đã là "chỉ chạy khi bấm", nên `manual` ở đó là thừa. Clip CC0 thì
+   * ngược lại: chúng CÓ vai trò sẵn, nên phải có cách nói "đừng tự chạy nữa".
+   */
+  const builtinValid = new Set<string>([...valid, 'manual'])
+  const builtinRoles: Record<string, VrmMotionRoleName | 'manual'> = {}
+  if (o.builtinRoles && typeof o.builtinRoles === 'object') {
+    for (const [id, role] of Object.entries(o.builtinRoles as Record<string, unknown>)) {
+      if (typeof role === 'string' && builtinValid.has(role)) {
+        builtinRoles[id] = role as VrmMotionRoleName | 'manual'
+      }
+    }
+  }
+  return { dir: typeof o.dir === 'string' && o.dir.length > 0 ? o.dir : null, roles, builtinRoles }
 }
 
 /**

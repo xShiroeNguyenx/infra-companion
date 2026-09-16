@@ -16,6 +16,8 @@ không phải ước lượng.
 | Thêm/sửa mục trong bảng cài đặt | **12** |
 | Clip `.vrma` — thêm clip, đổi nguồn tải, gán vai trò | 10.3, **13** |
 | Thêm trường cấu hình / IPC mới | **9** |
+| Nhân vật ngoài desktop (app ở khay) — vòng đời cửa sổ overlay | **7.3** ← đã hỏng một lần, im lặng |
+| Trạng thái CÓ KHUNG (chưa có model, đang nạp, lỗi) | **7.6** ← khung không cuộn, phải luôn có ✕ |
 | Đo lại sau khi sửa | **8** |
 | Trước khi đưa file model/clip nào vào repo | **10** ← giấy phép |
 | "Sao cái này lại thế?" | **14** (bảng lỗi đã sửa) |
@@ -31,6 +33,7 @@ không phải ước lượng.
 | `packages/shared/src/vrmChat.ts` | Chat AI trên đầu nhân vật, nhận lệnh "mở tunnel…", câu gợi ý thao tác. |
 | `packages/shared/src/vrmOutfit.ts` | Bộ trang phục user tự lưu. |
 | `packages/shared/src/vrmFraming.ts` | Căn khung hình, biểu cảm theo sự kiện, dấu xoay theo phiên bản VRM, **hình học bố cục** (`vrmBodyRect` · `vrmSideMargin` · `vrmLeftBesideDock` — xem mục 11). |
+| `packages/shared/src/vrmActivity.ts` | **Phản ứng theo loại việc**: công cụ nào → clip + biểu cảm + câu nói (mục 13.4). |
 | `packages/shared/src/vrmMotion.ts` | Danh mục 13 clip `.vrma` CC0 tải theo yêu cầu + luật xoay vòng theo vai trò. |
 | `packages/shared/src/vrmSample.ts` | Model mẫu tải theo yêu cầu. |
 | `packages/shared/src/vrm.ts` | DTO cấu hình (`VrmSettingsDto`), clip tự nạp (`VrmFolderMotionsDto`, `pickVrmaNames`, `nextFolderClipForRole`). |
@@ -317,6 +320,33 @@ Khi app thu vào khay hoặc thu nhỏ mà có thông báo, một cửa sổ tro
 - Bong bóng thoại ở đây dùng nền **đục** (`opaque`), vì nền 20% alpha đặt trên wallpaper thì không
   đọc được — đã chụp thử và thấy.
 
+**⚠️ Vòng đời cửa sổ — chỗ đã hỏng một lần.** Vì cửa sổ được **giữ lại** giữa các đợt (chỉ ẩn/hiện,
+không dựng lại), nó có thể rơi vào trạng thái *nửa sống nửa chết*: renderer chết nhưng
+`win.isDestroyed()` vẫn `false` và cờ `ready` vẫn `true`. Khi đó `flush()` gửi IPC vào hư không rồi
+`showInactive()` một **cửa sổ trong suốt rỗng** — main báo thành công, user không thấy gì. Triệu chứng
+user báo: *"lần đầu có nhân vật, những lần sau không"*. Ba chốt hiện có:
+
+| Chốt | Ở đâu | Vì sao |
+|---|---|---|
+| `render-process-gone` + `did-fail-load` → `destroy()` | `create()` | Renderer chết thì bỏ hẳn cửa sổ, đợt sau dựng lại. `did-fail-load` **bỏ qua mã `-3` (ABORTED)** — đó là do chính ta destroy giữa chừng, không phải lỗi nạp. |
+| `if (!ready)` → dựng lại, **không** gọi `flush()` | `overlayOnEvent` | `flush()` thoát sớm khi `!ready` và **không để lại dấu vết** — thông báo nằm mãi trong `pending`. |
+| `'closed'` dọn thêm `held = false` | `create()` | `held` chỉ reset ở `pointerleave`; cửa sổ chết thì sự kiện đó không bao giờ bắn, và `armHide()` có `if (held) return` nên overlay sẽ không bao giờ tự ẩn nữa. |
+
+⚠️ **Chụp `pending` TRƯỚC `destroy()`.** Đã đo bằng Electron thật: `'closed'` chạy **đồng bộ bên
+trong** `destroy()` và nó xoá `pending` — chụp sau là mất đúng cái thông báo vừa kích hoạt việc dựng lại.
+
+✅ **Đã test GUI thật** (v0.4.5): app ở khay, nhân vật hiện lại qua **nhiều đợt** cảnh báo — không còn
+im sau lần đầu.
+
+⚠️ **Nhưng mới phủ được đường "renderer chết".** `VrmOverlayApp` vẫn **không nghe `webglcontextlost`**.
+Chromium chỉ cho ~16 context WebGL và cửa sổ chính mỗi lần đổi model lại chiếm/trả, nên context của một
+cửa sổ **ẩn hàng giờ** có thể bị thu hồi — khi đó renderer **vẫn sống**, `render-process-gone` không
+bắn, `ready` vẫn `true`, và lỗi tái diễn y hệt. Thử vài đợt trong một phiên ngắn **không tái hiện được**
+kịch bản này. **Còn treo: để app ở khay qua đêm rồi xem còn hiện không.**
+
+**Cách phân biệt nếu tái phát**: xem log main — không có dòng `[overlay] renderer gone:` hay
+`window alive but renderer not ready` nghĩa là renderer còn sống ⇒ lỗi nằm ở context WebGL.
+
 ### 7.4 Công tắc chẩn đoán
 
 Gõ trong console khi app đang chạy, không cần build lại:
@@ -354,6 +384,33 @@ khi người còn cách mép cả gang tay. Vị trí `left/top` tính theo kíc
 Kiểm bằng `apps/desktop/_harness/settings/run.cjs` (gitignore): bundle đúng component thật bằng
 esbuild, chụp 7 mức cỡ × 3 cỡ cửa sổ, đo bằng `getBoundingClientRect` / `elementFromPoint`. Hai lỗi
 22px / 62px chỉ lộ ở đây, không lộ ở test số.
+
+### 7.6 Chế độ CÓ KHUNG — luôn phải có lối thoát
+
+`chromeless` chỉ `true` khi nhân vật **đã thật sự hiện**. Mọi trạng thái còn lại là chữ (chưa chọn
+model, đang nạp lần đầu, lỗi, mất file) nên rơi vào **khung `w-80` có nền** — chữ trên nền trong
+suốt đè lên Dashboard thì không đọc nổi.
+
+Khung đó chỉ có `overflow-hidden`, **không cuộn**. Đã hỏng một lần vì hai thứ cộng lại:
+
+- `{!chromeless && controls?.()}` nối **cả bảng cài đặt** (Hiển thị / Thông báo / Thao tác / Chuyển
+  động) vào ngay dưới `StartScreen`;
+- nút `✕ Tắt trợ lý ảo` nằm cuối `footer`, tức đúng phần bị cắt khi nội dung dài hơn màn hình.
+
+Kết quả: mở trợ lý ảo lần đầu (chưa có model) là **kẹt hẳn, không có cách nào thoát**. Hai chốt hiện có:
+
+| Chốt | Vì sao |
+|---|---|
+| `controls` chỉ dựng khi **`settings && active`** | `settings` LUÔN có (file cấu hình tồn tại sẵn) nên điều kiện cũ `settings` không lọc được gì. Chưa có model thì mọi công tắc đều vô nghĩa — không có nhân vật để áp lên. |
+| Nút **✕ riêng của khung** khi `!chromeless` | Lối thoát không được phụ thuộc `controls` (nay là `null` ở trạng thái này) hay vào việc nội dung có bị cắt hay không. |
+
+⚠️ Nút ✕ là **anh em** của `boxRef`, không bọc quanh nó: `boxRef` là nơi canvas WebGL cắm vào, đổi
+cấu trúc DOM quanh thẻ đó là mất context và phải nạp lại model 40 MB.
+
+⚠️ **Vẫn chưa cho khung cuộn** (cố ý, phạm vi hẹp): trạng thái framed nào sau này có nội dung dài hơn
+màn hình thì vẫn bị cắt cụt — khác là giờ luôn còn nút ✕. Muốn chắc thì thêm
+`max-h-[80vh] overflow-y-auto` và gắn `Escape` cho cả chế độ framed (hiện `Escape` chỉ có trong
+`VrmSettingsFrame`, mà component đó không hề được dựng khi `!chromeless`).
 
 ## 8. Cách đo lại khi sửa
 
@@ -698,7 +755,7 @@ lần) chứ không lặp liên tục, và có trần 25s cho clip tự chạy.
 
 Mục này tồn tại vì **một** hiểu nhầm đã gây ra bốn lỗi riêng biệt mà user phải chụp màn hình báo.
 
-### 12.1 Thẻ nhân vật rộng gấp 2,2 lần người
+### 11.1 Thẻ nhân vật rộng gấp 2,2 lần người
 
 `vrmStage` đặt `aspect = measureDrawn × VRM_WIDTH_MARGIN ÷ frameH`, nên thẻ DOM của nhân vật
 **rộng gấp `VRM_WIDTH_MARGIN` (2,2) lần thân người nhìn thấy**. Phần dư là **lề trong suốt** chừa
@@ -722,7 +779,7 @@ cho clip giang tay khỏi bị cắt (clip "máy bay" dang tay rộng 3,55× th�
 | Lề phải mặc định "hở ra quá nhiều" | `CHROMELESS_RIGHT_GAP` đo từ mép thẻ |
 | Kéo nhân vật "đụng tường" khi còn cách mép cả gang tay | hook kéo kẹp theo mép thẻ |
 
-### 12.2 Ba hàm phải dùng, đừng tự tính lại
+### 11.2 Ba hàm phải dùng, đừng tự tính lại
 
 Ở `packages/shared/src/vrmFraming.ts` (hàm thuần → **test được**; để inline trong JSX thì vitest
 không quét, đó đúng là lý do bốn lỗi trên không có test nào chặn):
@@ -738,7 +795,7 @@ cột bất kể đang đứng đâu; đóng dock thì về chỗ user đã kéo
 `pointer-events-none` lúc dock mở). Bản đầu dùng `Math.min` nên nhân vật đứng giữa màn hình không
 lấn dock thì đứng nguyên đó — user chụp lại "vẫn chưa sát".
 
-### 12.3 `CHROMELESS_RIGHT_GAP` = 86, đo từ THÂN NGƯỜI
+### 11.3 `CHROMELESS_RIGHT_GAP` = 86, đo từ THÂN NGƯỜI
 
 Lề phải ở vị trí mặc định. **Không** phải lề thẩm mỹ — nó là chỗ chừa cho hai thứ:
 
@@ -748,7 +805,7 @@ Lề phải ở vị trí mặc định. **Không** phải lề thẩm mỹ — 
 86 bao trọn cả hai. Nơi dùng phải **trừ `vrmSideMargin`** vì `right` đặt mép thẻ; số âm là đúng và
 an toàn (phần thò ra ngoài cửa sổ chỉ là lề trong suốt).
 
-### 12.4 Hai cột `VrmSidePanel`
+### 11.4 Hai cột `VrmSidePanel`
 
 - `W = 112px` — từng là 96px hồi mỗi mục còn là dòng chữ trần; nay mỗi mục là thẻ có viền +
   padding nên 96px chỉ còn ~76px cho chữ và "Bước thể dục" xuống ba dòng.
@@ -769,7 +826,7 @@ an toàn (phần thò ra ngoài cửa sổ chỉ là lề trong suốt).
 Style mượn từ project `desktop-companion` (`app/settings.html` + `app/media/companion.css`), giữ
 màu theo `--c-accent` của theme user đang chọn.
 
-### 13.1 Ba component dùng chung
+### 12.1 Ba component dùng chung
 
 Ở `VrmSettingsFrame.tsx` — **không** tách file riêng, vì file đó cố ý chỉ phụ thuộc `react` +
 `@infra/shared` để harness bundle được bằng esbuild:
@@ -780,7 +837,7 @@ màu theo `--c-accent` của theme user đang chọn.
 | `SettingsToggle` | Hàng công tắc có khung; cả hàng là `<label>` nên bấm chữ cũng tick. |
 | `SettingsField` | Trường có nhãn nhỏ phía trên (dropdown, thanh trượt). |
 
-### 13.2 `only` — một component, bốn lần gọi
+### 12.2 `only` — một component, bốn lần gọi
 
 `VrmControls` nhận `only: 'left' | 'right' | 'footer' | undefined`:
 
@@ -800,7 +857,7 @@ nơi gọi `VrmSettingsFrame`; đừng đổi tên chúng theo vị trí, lần 
 ⚠️ **Mở rộng union `only` thì phải rà lại MỌI phép `!==` trên nó.** Thêm `'footer'` mà quên
 `only !== 'right'` ở chỗ render `ModelInfo` → URL giấy phép trải ngang cả màn hình.
 
-### 13.3 Cân hai cột
+### 12.3 Cân hai cột
 
 Cột trái gần như đứng yên, cột **phải** mới phình theo nội dung (số clip user nạp). Thêm khối mới
 thì đo lại bằng harness `cols.cjs`; lệch dưới ~15% là chấp nhận được.
@@ -813,13 +870,13 @@ query kể hết mọi quyền) và nó đẩy cả cột rộng ra.
 
 ## 13. Clip `.vrma` — hai nguồn, một cơ chế
 
-### 14.1 Nguồn 1: danh mục CC0 (`vrmMotion.ts`)
+### 13.1 Nguồn 1: danh mục CC0 (`vrmMotion.ts`)
 
 13 clip, tải theo yêu cầu vào `userData/vrm-motions/`. Mỗi clip có `id`, `role`, `durationSec` đo
 sẵn, `sha256` ghim. Tải từ **Release của chính repo** (tag `vrm-motions-v1`), mirror là nguồn cũ —
 xem mục 10.3.
 
-### 14.2 Nguồn 2: thư mục user tự nạp
+### 13.2 Nguồn 2: thư mục user tự nạp
 
 User trỏ vào thư mục `.vrma` của họ; app **chỉ đọc, không chép**. Lý do là giấy phép — xem 10.3.
 
@@ -832,7 +889,52 @@ User trỏ vào thư mục `.vrma` của họ; app **chỉ đọc, không chép*
 - `cleanFolderMotions()` **bỏ** vai trò lạ. Giữ nguyên thì clip đó im lặng không bao giờ chạy và
   user không có cách nào biết vì sao.
 
-### 14.3 Hai nguồn đi CHUNG luật ưu tiên
+### 13.3 Gán ĐÈ vai trò cho clip CC0
+
+Vai trò trong `VRM_MOTIONS` là **mặc định**, không phải cố định. User đổi được ngay trong bảng
+cài đặt — trước đây chỉ clip tự nạp mới gán được, cùng một việc mà hai luật.
+
+- Lưu ở `vrm-folder-motions.json` → `builtinRoles`, khoá là **`id`** (`idle-01`, `pose-motion`…)
+  chứ không phải tên file: danh mục định danh bằng id, và id không đổi kể cả khi đổi nơi tải.
+- Nhận thêm giá trị **`manual`** — khác `roles` của clip tự nạp. Clip tự nạp không gán gì đã là
+  "chỉ chạy khi bấm"; clip CC0 thì CÓ vai trò sẵn nên phải có cách nói "đừng tự chạy nữa".
+- ⚠️ **Chỉ ghi khoá cho clip user thật sự đổi.** Ghi cả 13 khoá "cho đủ" là đóng băng mọi người ở
+  giá trị hôm nay — lần sau sửa vai trò mặc định trong code sẽ không tới được ai.
+
+**Một chỗ duy nhất** quyết định vai trò hiệu lực: `effectiveRole(clip, overrides)`. `motionsForRole`
+và UI đều gọi vào đó; để hai nơi tự đọc `overrides` là chờ chúng lệch nhau, mà lệch ở đây nghĩa là
+dropdown hiện một đằng còn clip chạy một nẻo.
+
+⚠️ `run()` trong `useVrmMotion` phải ghi `effectiveRole(...)` vào `current.current`, **không phải
+`clip.role`**: gán "Khi có cảnh báo" cho một clip vốn là `idle` mà `PRIORITY` vẫn tính là idle thì
+nó bị mọi thứ khác cắt ngang ngay. Bảng override đọc qua `overridesRef` (ref, không phải deps) —
+thêm `folder` vào deps của `run` là hàm mới mỗi lần state panel đổi.
+
+### 13.4 Phản ứng theo LOẠI VIỆC (`vrmActivity.ts`)
+
+Mở công cụ nào thì nhân vật làm ba việc: chạy clip, đổi biểu cảm, nói một câu.
+
+- `TOOL_ACTIVITY` ánh xạ **id công cụ** (trong `toolCatalog.ts`) → một trong **6 loại việc**:
+  `bulk` · `transfer` · `logs` · `security` · `monitor` · `inspect`.
+- Gộp theo loại chứ không phải từng công cụ: 45 vai trò là dropdown không ai đọc hết, mà mở "Xem
+  log" hay "Tail log" thì phản ứng cũng như nhau.
+- **Công cụ ngoài bảng thì im** — cố ý. Diễn một màn cho mỗi cú bấm (kể cả mở Cài đặt) là nhiễu.
+- Kích hoạt bằng cách nghe cờ `modal` của store, KHÔNG móc vào từng nút: mỗi công cụ mở được từ
+  sidebar, lưới công cụ, bảng lệnh và vòng công cụ của nhân vật — móc từng chỗ là bốn chỗ để quên.
+
+⚠️ **Ba bảng phải khớp nhau**, có test chốt cả ba:
+1. `ACTIVITY_LABELS` (nhãn loại việc) ↔ `VRM_ROLE_LABELS` (dropdown gán clip) — lệch nhau thì user
+   gán "Khi xem log" rồi mở công cụ log mà clip không chạy, không gì chỉ ra vì sao.
+2. Id trong `TOOL_ACTIVITY` phải là id **có thật** — gõ nhầm `log_tail` thì `activityForTool` trả
+   `null` và im lặng, không lỗi nào báo.
+3. `ACTIVITY_EXPRESSION` phải kết thúc bằng `'neutral'` — model VRM khai biểu cảm rất khác nhau,
+   thiếu một cái chắc chắn tồn tại ở cuối thì model không có `happy` sẽ không đổi biểu cảm gì cả.
+
+Thêm loại việc mới thì sửa **năm** chỗ: `VrmActivity`, `ACTIVITY_LABELS`, `ACTIVITY_EXPRESSION`,
+`ACTIVITY_LINES`, và `VrmMotionRole` + `VrmMotionRoleName` + `VRM_ROLE_LABELS` + `PRIORITY`.
+Test sẽ đỏ nếu thiếu chỗ nào.
+
+### 13.5 Hai nguồn đi CHUNG luật ưu tiên
 
 `useVrmMotion.play(role)` theo đúng thứ tự:
 
@@ -884,3 +986,5 @@ trả quyền về lớp tự sinh và nhân vật đứng nguyên tư thế cu�
 | Tên clip xuống 2–3 dòng trong cột | Emoji 🚶 rộng gần 2 ký tự và không ngắt dòng chung với chữ; cột chỉ 112px |
 | Clip user tự nạp đứng nguyên tư thế cuối mãi mãi | `playAnimation` trả `void` nên không có `durationSec` để hẹn giờ trả quyền về lớp tự sinh |
 | Thư mục `.vrma` báo "không có file nào" dù nhìn rõ là có | So đuôi trần, không `.toLowerCase()` — bộ tải trên Windows hay ra `.VRMA` |
+| Nhân vật ngoài desktop chỉ hiện **lần đầu**, sau đó im | Renderer overlay chết nhưng `win.isDestroyed()` vẫn `false` và `ready` vẫn `true` → `flush()` gửi IPC vào hư không rồi hiện một **cửa sổ trong suốt rỗng**, main báo thành công (§7.3) |
+| Mở trợ lý ảo lần đầu (chưa có model) là **kẹt, không thoát được** | Khung `w-80` không cuộn + `controls` đổ cả bảng cài đặt vào dưới `StartScreen` ⇒ nút `✕ Tắt trợ lý ảo` ở cuối `footer` bị cắt khỏi màn hình (§7.6) |

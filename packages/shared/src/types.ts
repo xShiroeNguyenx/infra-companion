@@ -457,7 +457,7 @@ export type ReplTableDiffStatus =
   | 'missing-on-master'
   | 'engine-differs'
   | 'collation-differs'
-  | 'rows-differ'
+  | 'rows-suspect'
   | 'same'
 
 export interface ReplTableDiffDto {
@@ -578,6 +578,21 @@ export interface ReplSettingsDto {
   perPair: Record<string, Partial<ReplThresholdsDto>>
   webhookUrl: string
   osNotify: boolean
+  /**
+   * Bảng **cố ý không đồng bộ** — so lệch bỏ qua, mỗi cụm một danh sách.
+   *
+   * Dạng `schema.table`, hỗ trợ `%`/`_` như MySQL (`app.tmp_%`, `logs.%`); gõ mỗi tên database
+   * là hiểu "cả database đó".
+   *
+   * Cần riêng, không dựa vào `Replicate_Ignore_Table` đọc từ slave: rất nhiều người sync tay một
+   * số bảng mà **không** khai filter trong MySQL, nên không có gì để đọc — và họ chính là người
+   * thấy tool báo lệch những bảng họ biết thừa là sẽ lệch.
+   *
+   * Để ở đây (file settings ngoài vault) chứ không phải cột mới trong `repl_pairs`: đây là cấu
+   * hình hiển thị, không phải bí mật, và migration vault là append-only nên thêm cột là tốn kém
+   * hơn giá trị nhận lại.
+   */
+  skipTables: Record<string, string[]>
 }
 
 export interface ReplAlertDto {
