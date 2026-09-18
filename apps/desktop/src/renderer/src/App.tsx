@@ -74,6 +74,7 @@ import { useToastsStore } from './stores/toasts'
 import { useUiStore } from './stores/ui'
 import { usePluginStore } from './stores/plugins'
 import { useMonitorStore } from './stores/monitor'
+import { useTunnelFavoritesStore } from './stores/favorites'
 import { useTrayStore } from './stores/tray'
 import { useLocaldevStore } from './stores/localdev'
 import { useFontsStore } from './stores/fonts'
@@ -92,6 +93,12 @@ function formatAlertToast(a: import('@infra/shared').MonitorAlertDto): string {
   const lang = useSettingsStore.getState().language
   if (a.metric === 'offline') {
     return translate(lang, a.kind === 'breach' ? 'monitor.alertOffline' : 'monitor.alertOnline', { host: a.label })
+  }
+  if (a.metric === 'service') {
+    return translate(lang, a.kind === 'breach' ? 'monitor.alertServiceDown' : 'monitor.alertServiceUp', {
+      host: a.label,
+      service: a.service ?? ''
+    })
   }
   const names: Record<string, string> = {
     load: 'Load',
@@ -132,6 +139,8 @@ export default function App() {
   const language = useSettingsStore((s) => s.language)
   // F53: đóng cửa sổ có thu vào khay không — main cần biết, gửi sang mỗi khi đổi
   const closeToTray = useTrayStore((s) => s.closeToTray)
+  // Tunnel đã ghim ⭐ — menu khay lọc theo danh sách này (xem effect gửi trayPrefs bên dưới)
+  const pinnedTunnelIds = useTunnelFavoritesStore((s) => s.ids)
   // Workbench: cờ này = "panel phụ đang đóng" (activity bar vẫn còn)
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed)
   const bottomOpen = useUiStore((s) => s.workbenchBottomOpen)
@@ -269,10 +278,11 @@ export default function App() {
     }
   }, [])
 
-  // F53: main giữ tuỳ chọn khay (đóng-về-khay + ngôn ngữ menu khay) — gửi lúc khởi động và mỗi khi đổi
+  // F53: main giữ tuỳ chọn khay (đóng-về-khay + ngôn ngữ menu khay, tunnel đã ghim) — gửi lúc
+  // khởi động và mỗi khi đổi. Ghim nằm ở localStorage của renderer nên main chỉ biết qua đường này.
   useEffect(() => {
-    window.infra.app.setTrayPrefs({ closeToTray, language })
-  }, [closeToTray, language])
+    window.infra.app.setTrayPrefs({ closeToTray, language, pinnedTunnelIds })
+  }, [closeToTray, language, pinnedTunnelIds])
 
   // Workbench: Monitoring bật lên là vào panel đáy (thay cho dock nổi góc phải ở hai theme kia).
   // Chỉ chạy khi cờ ĐỔI — user đóng panel trong lúc đang theo dõi thì không bị mở lại.

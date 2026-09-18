@@ -15,6 +15,11 @@ const STRINGS = {
     noTunnels: 'Chưa có tunnel nào',
     locked: 'Vault đang khoá — mở app để mở khoá',
     quit: 'Thoát',
+    allTunnels: 'Tất cả tunnel',
+    stopAll: (n: number) => `Dừng tất cả tunnel (${n})`,
+    pinHint: 'Ghim ⭐ tunnel để hiện ở đây',
+    summary: (n: number, total: number) => `${n}/${total} đang chạy`,
+    unlock: 'Vault đang khoá — bấm để mở khoá',
     running: (n: number, total: number) => `${n}/${total} tunnel đang chạy`,
     idle: 'Không có tunnel đang chạy',
     hiddenTitle: 'Infra Companion vẫn đang chạy',
@@ -26,6 +31,11 @@ const STRINGS = {
     noTunnels: 'No tunnels yet',
     locked: 'Vault is locked — open the app to unlock',
     quit: 'Quit',
+    allTunnels: 'All tunnels',
+    stopAll: (n: number) => `Stop all tunnels (${n})`,
+    pinHint: 'Star ⭐ a tunnel to show it here',
+    summary: (n: number, total: number) => `${n}/${total} running`,
+    unlock: 'Vault is locked — click to unlock',
     running: (n: number, total: number) => `${n}/${total} tunnels running`,
     idle: 'No tunnel running',
     hiddenTitle: 'Infra Companion is still running',
@@ -37,6 +47,11 @@ const STRINGS = {
     noTunnels: 'トンネルはありません',
     locked: 'Vault はロック中 — アプリを開いて解除',
     quit: '終了',
+    allTunnels: 'すべてのトンネル',
+    stopAll: (n: number) => `すべてのトンネルを停止 (${n})`,
+    pinHint: '⭐ を付けるとここに表示されます',
+    summary: (n: number, total: number) => `${n}/${total} 稼働中`,
+    unlock: 'Vault はロック中 — クリックで解除',
     running: (n: number, total: number) => `${n}/${total} トンネル稼働中`,
     idle: '稼働中のトンネルはありません',
     hiddenTitle: 'Infra Companion は動作中です',
@@ -75,36 +90,76 @@ export type TrayMenuItem =
   /** Một rule: checkbox = đang chạy; bấm = bật/tắt. `detail` (lỗi) đưa vào nhãn để khay nói được vì sao đỏ. */
   | { kind: 'tunnel'; label: string; ruleId: string; checked: boolean; status: TunnelStatus }
   | { kind: 'note'; label: string }
+  /** Vault khoá: dòng BẤM ĐƯỢC — hiện cửa sổ và nhảy vào ô nhập master password. */
+  | { kind: 'unlock'; label: string }
+  /** Dừng mọi tunnel đang chạy. Chỉ xuất hiện khi có cái để dừng (`count > 0`). */
+  | { kind: 'stop-all'; label: string; count: number }
+  /** Submenu "Tất cả tunnel ▸" — chứa các rule KHÔNG ghim, để menu chính gọn mà vẫn với tới được. */
+  | { kind: 'submenu'; label: string; items: TrayMenuItem[] }
   | { kind: 'quit'; label: string }
+
+/** Nhãn một rule trên khay: ⚠ + lý do khi lỗi, ` …` khi đang nối, `:port` khi rule không tên. */
+function tunnelItem(rule: TunnelRuleDto, st: TunnelStateDto | undefined): TrayMenuItem {
+  const status = st?.status ?? 'stopped'
+  const name = rule.label || `:${rule.bindPort}`
+  const mark = status === 'error' ? '⚠ ' : ''
+  const suffix = status === 'error' && st?.detail ? ` — ${st.detail}` : status === 'starting' ? ' …' : ''
+  return { kind: 'tunnel', label: `${mark}${name}${suffix}`, ruleId: rule.id, checked: isTunnelUp(status), status }
+}
 
 /**
  * Mô hình menu khay. `rules === null` nghĩa là vault đang KHOÁ (không đọc được danh sách) → chỉ
- * có dòng ghi chú; bật/tắt tunnel cần vault mở vì `prepareConnection` phải đọc credential.
+ * có dòng mở khoá; bật/tắt tunnel cần vault mở vì `prepareConnection` phải đọc credential.
  * Thứ tự rule giữ nguyên như đầu vào (main đã xếp theo tên/ghim như UI).
+ *
+ * `pinnedIds` = các tunnel user đã ghim ⭐ ở renderer (localStorage, gửi sang main qua
+ * `TrayPrefsDto`). Có ghim thì menu CHÍNH chỉ hiện đúng những cái đó, phần còn lại lùi vào
+ * submenu "Tất cả tunnel ▸" — người dùng cả chục tunnel DB mỗi ngày không phải cuộn một danh
+ * sách dài quá màn hình chỉ để tắt một cái.
+ *
+ * Chưa ghim gì thì menu chính hiện các tunnel ĐANG CHẠY (thứ đáng tắt nhất) kèm một dòng gợi ý
+ * ghim — cố ý KHÔNG để trống, vì khay trống trơn sau khi cập nhật trông như tính năng đã hỏng.
  */
 export function trayMenuModel(
   rules: readonly TunnelRuleDto[] | null,
   states: readonly TunnelStateDto[],
-  lang: UiLanguage
+  lang: UiLanguage,
+  pinnedIds: readonly string[] = []
 ): TrayMenuItem[] {
   const s = trayStrings(lang)
   const byId = new Map(states.map((st) => [st.ruleId, st]))
   const items: TrayMenuItem[] = [{ kind: 'open', label: s.open }, { kind: 'separator' }]
+
   if (rules === null) {
-    items.push({ kind: 'note', label: s.locked })
-  } else if (rules.length === 0) {
-    items.push({ kind: 'note', label: s.noTunnels })
-  } else {
-    items.push({ kind: 'tunnels-header', label: s.tunnels })
-    for (const rule of rules) {
-      const st = byId.get(rule.id)
-      const status = st?.status ?? 'stopped'
-      const name = rule.label || `:${rule.bindPort}`
-      const mark = status === 'error' ? '⚠ ' : ''
-      const suffix = status === 'error' && st?.detail ? ` — ${st.detail}` : status === 'starting' ? ' …' : ''
-      items.push({ kind: 'tunnel', label: `${mark}${name}${suffix}`, ruleId: rule.id, checked: isTunnelUp(status), status })
-    }
+    items.push({ kind: 'unlock', label: s.unlock })
+    items.push({ kind: 'separator' }, { kind: 'quit', label: s.quit })
+    return items
   }
+  if (rules.length === 0) {
+    items.push({ kind: 'note', label: s.noTunnels })
+    items.push({ kind: 'separator' }, { kind: 'quit', label: s.quit })
+    return items
+  }
+
+  const runningCount = rules.filter((r) => isTunnelUp(byId.get(r.id)?.status)).length
+  items.push({ kind: 'tunnels-header', label: s.tunnels })
+  items.push({ kind: 'note', label: s.summary(runningCount, rules.length) })
+
+  const pinned = new Set(pinnedIds)
+  // Chưa ghim gì → lấy tạm các tunnel đang chạy làm "đáng hiện". Ghim rồi thì ghim là nguồn duy nhất,
+  // kể cả khi tunnel đã ghim đang tắt (user ghim chính là để bật nó từ khay).
+  const hasPins = rules.some((r) => pinned.has(r.id))
+  const primary = hasPins ? rules.filter((r) => pinned.has(r.id)) : rules.filter((r) => isTunnelUp(byId.get(r.id)?.status))
+  const primaryIds = new Set(primary.map((r) => r.id))
+  const rest = rules.filter((r) => !primaryIds.has(r.id))
+
+  for (const rule of primary) items.push(tunnelItem(rule, byId.get(rule.id)))
+  if (!hasPins) items.push({ kind: 'note', label: s.pinHint })
+  if (rest.length > 0) {
+    items.push({ kind: 'submenu', label: s.allTunnels, items: rest.map((r) => tunnelItem(r, byId.get(r.id))) })
+  }
+  if (runningCount > 0) items.push({ kind: 'stop-all', label: s.stopAll(runningCount), count: runningCount })
+
   items.push({ kind: 'separator' }, { kind: 'quit', label: s.quit })
   return items
 }

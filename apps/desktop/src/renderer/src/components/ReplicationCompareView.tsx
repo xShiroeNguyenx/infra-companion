@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReplChecksumRowDto, ReplCompareResultDto } from '@infra/shared'
 import { errorMessage, useToastsStore } from '../stores/toasts'
 import { Button } from './ui'
@@ -13,8 +13,11 @@ const MAX_PICK = 50
  *
  * Hai bước cố ý tách rời:
  *  1. "Quét nhanh" đọc information_schema — vài giây, nhưng số dòng chỉ là ƯỚC LƯỢNG.
+ *     Bước này TỰ CHẠY khi mở tab: nó chỉ đọc information_schema (vài giây, không quét dữ liệu),
+ *     mà để màn hình trống thì hai nút so chính xác — vốn chỉ hiện sau khi có kết quả — không bao
+ *     giờ lộ ra. Tính năng có sẵn mà người dùng không thấy thì coi như không có.
  *  2. Tick bảng đáng ngờ rồi mới đếm chính xác / checksum — mỗi bảng quét toàn bộ ở CẢ HAI
- *     server nên phải là hành động có chủ đích, không bao giờ chạy tự động.
+ *     server nên phải là hành động có chủ đích, KHÔNG BAO GIỜ chạy tự động.
  *
  * Mỗi lần chạy được main TỰ LƯU vào lịch sử (tab Lịch sử) — xem `saveRun` ở main/ipc/replication.
  */
@@ -55,6 +58,23 @@ export function ReplicationCompareView({ pairId, replicaId }: { pairId: string; 
     }
   }
 
+  /**
+   * Tự quét nhanh khi mở tab — và quét lại khi đổi cặp / đổi slave.
+   *
+   * Đọc `scan` qua ref: nó là hàm mới mỗi lần render nên để trong deps là quét lại liên tục
+   * (mỗi kết quả trả về lại `setState` → render → quét tiếp). Khoá theo `pairId|replicaId` để
+   * biết đã quét cho tổ hợp nào rồi, tránh cả trường hợp effect chạy hai lần ở StrictMode.
+   */
+  const scanRef = useRef(scan)
+  scanRef.current = scan
+  const autoScannedFor = useRef<string | null>(null)
+  useEffect(() => {
+    const key = `${pairId}|${replicaId ?? ''}`
+    if (autoScannedFor.current === key) return
+    autoScannedFor.current = key
+    void scanRef.current()
+  }, [pairId, replicaId])
+
   const toggle = (key: string): void =>
     setPicked((prev) => {
       const next = new Set(prev)
@@ -77,9 +97,11 @@ export function ReplicationCompareView({ pairId, replicaId }: { pairId: string; 
             <span className="text-subtle text-[10px]">
               {t('repl.cmp.picked', { n: picked.size, max: MAX_PICK })}
             </span>
+            {/* Nút mờ khi chưa tick bảng nào — `title` nói vì sao, không để user đoán */}
             <Button
               className="!px-2 !py-1 !text-xs"
               disabled={deepBusy || picked.size === 0}
+              title={picked.size === 0 ? t('repl.cmp.needPick') : t('repl.cmp.countTip')}
               onClick={() => void runDeep('count')}
             >
               {deepBusy ? '…' : t('repl.cmp.count')}
@@ -87,6 +109,7 @@ export function ReplicationCompareView({ pairId, replicaId }: { pairId: string; 
             <Button
               className="!px-2 !py-1 !text-xs"
               disabled={deepBusy || picked.size === 0}
+              title={picked.size === 0 ? t('repl.cmp.needPick') : t('repl.cmp.checksumTip')}
               onClick={() => void runDeep('checksum')}
             >
               {deepBusy ? '…' : t('repl.cmp.checksum')}
@@ -99,11 +122,15 @@ export function ReplicationCompareView({ pairId, replicaId }: { pairId: string; 
         )}
       </div>
 
-      {!result && !scanning && <p className="text-subtle px-2 py-8 text-center text-xs">{t('repl.cmp.hint')}</p>}
+      {/* Quét nhanh tự chạy lúc mở tab, nên trạng thái "chưa có kết quả" gần như chỉ là lúc đang chạy */}
+      {!result && <p className="text-subtle px-2 py-8 text-center text-xs">{t('repl.cmp.hint')}</p>}
       {result && !result.ok && <p className="text-danger px-2 py-4 text-xs">{result.error}</p>}
 
       {result?.ok && (
         <>
+          {/* Nói rõ bước 2 TỒN TẠI: hai nút kia chỉ hiện sau khi quét xong, mà trước đây không có
+              câu nào nhắc tới chúng — tính năng có sẵn mà người dùng không thấy thì như không có. */}
+          <p className="text-subtle mb-2 text-[10px]">{t('repl.cmp.step2')}</p>
           {result.hasFilters && <p className="text-subtle mb-2 text-[10px]">{t('repl.cmp.filterNote')}</p>}
 
           <Section title={t('repl.cmp.tables')} count={tables.length}>

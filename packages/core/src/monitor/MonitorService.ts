@@ -53,6 +53,11 @@ export interface MonitorTarget {
   chain: ChainEndpoint[]
   /** Host vào bằng login-script (ssh/su/sudo…) → đo metric xuyên qua máy đích bên trong. */
   loginSteps?: LoginStepLike[]
+  /**
+   * F71 — tên tiến trình user tự thêm ở Settings, ghép vào bộ lọc của lệnh đo. Thiếu thì chỉ
+   * đọc danh sách dựng sẵn. Lệnh dựng một lần lúc start, nên đổi danh sách cần start lại host.
+   */
+  extraProcNames?: readonly string[]
 }
 
 export interface MonitorServiceEvents {
@@ -63,7 +68,8 @@ export interface MonitorServiceEvents {
 // CHỈ dùng double-quote (giữ nesting qua shq của login-script đơn giản); lệnh nào thiếu
 // trên distro lạ thì 2>/dev/null cho section rỗng — parser tự bỏ qua metric đó.
 // Đếm TCP bằng grep " 01 "/" 06 " (cột st của /proc/net/tcp có space 2 bên) thay vì awk.
-const METRIC_CMD = [
+function buildMetricCmd(extraProcNames: readonly string[] = []): string {
+  return [
   'cat /proc/loadavg 2>/dev/null',
   'echo "==STAT=="',
   'grep -E "^cpu |^procs_running" /proc/stat 2>/dev/null',
@@ -87,8 +93,53 @@ const METRIC_CMD = [
   // Uptime service quen thuộc (etimes giây + tên) — parser lấy tiến trình lâu đời nhất mỗi tên.
   // KHÔNG dùng $(...)/awk: login-script bọc lệnh qua nhiều lớp quote, $ sẽ nổ ở sai hop.
   'echo "==SVC=="',
-  'ps -eo etimes=,comm= 2>/dev/null | grep -E " (httpd|apache2|nginx|java|node|php-fpm|mysqld|mariadbd|postgres|redis-server)$" | head -40'
-].join('; ')
+  svcCommand(extraProcNames)
+  ].join('; ')
+}
+
+/** Danh sách dựng sẵn — khớp `SERVICE_CATALOG` ở @infra/shared. */
+const BUILTIN_PROC_NAMES = [
+  'httpd',
+  'apache2',
+  'nginx',
+  'java',
+  'node',
+  'php-fpm',
+  'mysqld',
+  'mariadbd',
+  'postgres',
+  'redis-server'
+] as const
+
+/**
+ * Tên tiến trình user nhập đi THẲNG vào regex trong lệnh shell → phải chặn ký tự có nghĩa.
+ * Chỉ giữ [A-Za-z0-9_.-]: đủ cho mọi tên comm hợp lệ của Linux, và loại sạch dấu gạch đứng,
+ * ngoặc, dollar, backtick, nháy… nên không thể chèn lệnh hay phá regex. Rỗng sau lọc thì bỏ.
+ */
+function sanitizeProcName(raw: string): string {
+  return raw.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 15)
+}
+
+/**
+ * Phần đọc service của lệnh đo. Bộ lọc tên GHÉP THÊM tên user tự nhập ở Settings — để cứng danh
+ * sách dựng sẵn thì ô "tự thêm" không bao giờ khớp: lệnh không hỏi server về tên đó, parser
+ * không thấy nó chạy, cảnh báo im lặng mãi mãi (đúng kiểu "xanh nhưng không hoạt động").
+ *
+ * KHÔNG bỏ hẳn bộ lọc: máy web bận vài trăm tiến trình, poll 3s sẽ thành hàng trăm MB/ngày/host.
+ *
+ * ⚠ KHÔNG cắt dòng bằng `head -N`. `ps` xuất theo thứ tự PID, nên trên máy có httpd/php-fpm
+ * prefork vài chục worker, chúng chiếm trọn N dòng đầu và mọi service khác (java/tomcat…) bị
+ * cắt mất TRƯỚC khi parser kịp gộp theo tên — im lặng, không lỗi, và vì thứ tự PID ổn định nên
+ * lần poll nào cũng cắt đúng chỗ đó: service biến mất VĨNH VIỄN. Cắt phải làm SAU khi gộp.
+ */
+export function svcCommand(extraProcNames: readonly string[]): string {
+  const extra = extraProcNames.map(sanitizeProcName).filter((n) => n.length > 0)
+  const names = [...new Set([...BUILTIN_PROC_NAMES, ...extra])]
+  return 'ps -eo etimes=,comm= 2>/dev/null | grep -E " (' + names.join('|') + ')$"'
+}
+
+/** Lệnh mặc định (không có tên tự thêm) — dùng khi caller không truyền gì. */
+const METRIC_CMD = buildMetricCmd()
 
 const POLL_INTERVAL_MS = 3_000
 /** Quá hạn này mà exec chưa close → coi như treo, reset polling để không "chết im lặng". */
@@ -130,7 +181,10 @@ export class MonitorService extends EventEmitter<MonitorServiceEvents> {
     const monitor: ActiveMonitor = {
       hostId: target.hostId,
       // Host vào bằng login-script → bọc lệnh đo để chạy trên máy đích bên trong
-      metricCmd: (target.loginSteps?.length ? deriveExecFromLoginSteps(target.loginSteps, METRIC_CMD) : null) ?? METRIC_CMD,
+      metricCmd: (() => {
+        const cmd = target.extraProcNames?.length ? buildMetricCmd(target.extraProcNames) : METRIC_CMD
+        return (target.loginSteps?.length ? deriveExecFromLoginSteps(target.loginSteps, cmd) : null) ?? cmd
+      })(),
       client: null,
       closeChain: null,
       pollTimer: null,
@@ -429,7 +483,12 @@ function splitSections(raw: string): Sections {
   return { load, stat, mem, disk, inode, net, tcp, top, up, cpuCount, svc }
 }
 
-/** "  1234 httpd" mỗi dòng → uptime tiến trình LÂU ĐỜI nhất theo tên, sort giảm dần, tối đa 4. */
+/**
+ * "  1234 httpd" mỗi dòng → uptime tiến trình LÂU ĐỜI nhất theo tên (master của prefork pool),
+ * sort giảm dần. Gộp theo tên XONG mới cắt — cắt trước khi gộp là làm biến mất cả một service
+ * (xem `svcCommand`). Cắt ở 8 cho đủ mọi máy thực tế mà không tràn màn hình; tên là chốt phụ
+ * khi bằng điểm để thứ tự không nhảy lung tung giữa các lần poll.
+ */
 function parseServices(text: string): { name: string; uptimeSec: number }[] | null {
   const best = new Map<string, number>()
   for (const line of text.split('\n')) {
@@ -443,8 +502,8 @@ function parseServices(text: string): { name: string; uptimeSec: number }[] | nu
   if (best.size === 0) return null
   return [...best.entries()]
     .map(([name, uptimeSec]) => ({ name, uptimeSec }))
-    .sort((a, b) => b.uptimeSec - a.uptimeSec)
-    .slice(0, 4)
+    .sort((x, y) => y.uptimeSec - x.uptimeSec || x.name.localeCompare(y.name))
+    .slice(0, 8)
 }
 
 /** df -P output → { pct, mount } của mount thật có % cao nhất (bỏ fs ảo + header). */

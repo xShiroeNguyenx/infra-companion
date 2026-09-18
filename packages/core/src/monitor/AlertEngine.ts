@@ -1,4 +1,12 @@
 import {
+  emptyServiceWatch,
+  nextSeenServices,
+  resolveWatchedServices,
+  serviceProbes,
+  type ServiceWatchConfig,
+  type WatchedService
+} from '@infra/shared'
+import {
   HysteresisStates,
   binaryZone,
   feedHysteresis,
@@ -34,19 +42,23 @@ export interface AlertRules {
   defaults: AlertThresholds
   /** Override từng host — thiếu field nào dùng defaults. */
   perHost: Record<string, Partial<AlertThresholds>>
+  /** F71 — service bắt buộc phải chạy. Dùng CHUNG mọi host (không override từng host). */
+  serviceWatch?: ServiceWatchConfig
 }
 
-export type AlertMetric = 'load' | 'mem' | 'disk' | 'steal' | 'conn' | 'offline'
+export type AlertMetric = 'load' | 'mem' | 'disk' | 'steal' | 'conn' | 'offline' | 'service'
 
 export interface AlertEvent {
   hostId: string
   metric: AlertMetric
   kind: 'breach' | 'recover'
-  /** Giá trị đo được lúc chốt (null với offline). */
+  /** Giá trị đo được lúc chốt (null với offline/service). */
   value: number | null
-  /** Ngưỡng hiệu lực (null với offline). */
+  /** Ngưỡng hiệu lực (null với offline/service). */
   threshold: number | null
   ts: number
+  /** Chỉ với metric 'service': tên service (để phân biệt nhiều cảnh báo trên cùng host). */
+  service?: string
 }
 
 export interface AlertEngineOptions {
@@ -60,12 +72,23 @@ export interface AlertEngineOptions {
   offlineBreachSamples?: number
   /** Số sample ok liên tiếp mới coi là hồi (2 là đủ: 1 reconnect thật + 1 poll sạch). */
   offlineRecoverSamples?: number
+  /**
+   * F71 — số sample LIÊN TIẾP thấy service tắt mới báo chết (mặc định 3 ≈ 9s).
+   * Không để 1: `graceful restart` của Apache/Tomcat có khoảnh khắc không tiến trình nào khớp,
+   * báo ngay thì mỗi lần deploy là một cảnh báo giả.
+   */
+  serviceBreachSamples?: number
+  /** Số sample liên tiếp thấy service chạy lại mới báo hồi phục. */
+  serviceRecoverSamples?: number
   /** Đang breach kéo dài thì nhắc lại sau mỗi khoảng này. */
   realertCooldownMs?: number
 }
 
-type NumericMetric = Exclude<AlertMetric, 'offline'>
+type NumericMetric = Exclude<AlertMetric, 'offline' | 'service'>
 const METRICS: NumericMetric[] = ['load', 'mem', 'disk', 'steal', 'conn']
+
+/** Khoá state của một service trên một host. Tiền tố `:service:` cho `deleteByPrefix` gom được. */
+const serviceStateKey = (hostId: string, svcKey: string): string => `${hostId}:service:${svcKey}`
 const THRESHOLD_KEY: Record<NumericMetric, keyof Omit<AlertThresholds, 'offline'>> = {
   load: 'loadPct',
   mem: 'memPct',
@@ -79,6 +102,14 @@ export class AlertEngine {
   private readonly opts: Required<AlertEngineOptions>
   /** key = `${hostId}:${metric}` */
   private readonly states = new HysteresisStates()
+  /**
+   * F71 — service đã TỪNG thấy chạy trên từng host (hostId → tập key service).
+   *
+   * Sống trong RAM, cố ý không lưu đĩa: sau khi khởi động lại app, một service đang chết sẽ
+   * không bị coi là "từng có" nên im lặng cho tới khi nó chạy lại lần đầu. Đánh đổi có chủ ý —
+   * thà bỏ sót lúc mới mở app còn hơn kêu oan trên host vốn không chạy service đó.
+   */
+  private readonly seenServices = new Map<string, string[]>()
 
   constructor(rules: AlertRules, opts: AlertEngineOptions = {}) {
     this.rules = rules
@@ -88,11 +119,19 @@ export class AlertEngine {
       recoverMarginPts: opts.recoverMarginPts ?? 5,
       offlineBreachSamples: opts.offlineBreachSamples ?? 3,
       offlineRecoverSamples: opts.offlineRecoverSamples ?? 2,
+      serviceBreachSamples: opts.serviceBreachSamples ?? 3,
+      serviceRecoverSamples: opts.serviceRecoverSamples ?? 2,
       realertCooldownMs: opts.realertCooldownMs ?? 900_000
     }
   }
 
-  /** Đổi ngưỡng → reset TOÀN BỘ máy trạng thái (state cũ vô nghĩa với ngưỡng mới), không emit gì. */
+  /**
+   * Đổi ngưỡng → reset TOÀN BỘ máy trạng thái (state cũ vô nghĩa với ngưỡng mới), không emit gì.
+   *
+   * `seenServices` GIỮ NGUYÊN: nó ghi sự thật quan sát được ("host này từng chạy httpd"), không
+   * phụ thuộc ngưỡng. Xoá đi thì mỗi lần user chỉnh settings là mọi service đang chết lại được
+   * tha, đúng lúc người ta vừa bật tính năng lên để bắt chúng.
+   */
   setRules(rules: AlertRules): void {
     this.rules = rules
     this.states.clear()
@@ -101,10 +140,13 @@ export class AlertEngine {
   /** Host dừng theo dõi — xoá state, KHÔNG emit recover (dừng ≠ hồi phục). */
   removeHost(hostId: string): void {
     for (const metric of [...METRICS, 'offline']) this.states.delete(`${hostId}:${metric}`)
+    for (const svc of this.watchedServices()) this.states.delete(serviceStateKey(hostId, svc.key))
+    this.seenServices.delete(hostId)
   }
 
   clear(): void {
     this.states.clear()
+    this.seenServices.clear()
   }
 
   onSample(sample: MetricSample): AlertEvent[] {
@@ -116,6 +158,8 @@ export class AlertEngine {
     // Metric số: CHỈ khi sample.ok — sample lỗi đóng băng counter (không tăng, không reset)
     // để blip mất kết nối 10s không xoá tiến trình breach đang tích luỹ
     if (!sample.ok) return events
+
+    this.evalServices(sample, events)
     for (const metric of METRICS) {
       const threshold = t[THRESHOLD_KEY[metric]]
       if (threshold === null) {
@@ -147,6 +191,60 @@ export class AlertEngine {
     )
     if (outcome) {
       events.push({ hostId: sample.hostId, metric: 'offline', kind: outcome, value: null, threshold: null, ts: sample.ts })
+    }
+  }
+
+  /** Danh sách mục đang dõi, suy từ rules (rỗng = tính năng tắt). */
+  private watchedServices(): WatchedService[] {
+    return resolveWatchedServices(this.rules.serviceWatch ?? emptyServiceWatch())
+  }
+
+  /**
+   * F71 — service chết. Nhị phân như offline, nhưng MỖI service một máy trạng thái riêng để
+   * httpd chết không nuốt mất cảnh báo của java trên cùng host.
+   *
+   * `sample.services === null` = KHÔNG ĐO ĐƯỢC (ps hỏng, distro lạ, lệnh bị cắt) — khác hẳn
+   * "đo được và không có gì chạy". Phải thoát sớm, không thì một lần parser trả null sẽ báo chết
+   * TOÀN BỘ service của host. Đóng băng counter y như cách sample lỗi được xử lý ở trên.
+   */
+  private evalServices(sample: MetricSample, events: AlertEvent[]): void {
+    const watched = this.watchedServices()
+    if (watched.length === 0) {
+      // Tắt tính năng → dọn state của host này để bật lại không kêu ngay bằng counter cũ
+      this.states.deleteByPrefix(`${sample.hostId}:service:`)
+      return
+    }
+    if (sample.services === null) return
+
+    const running = sample.services
+    const prevSeen = this.seenServices.get(sample.hostId) ?? []
+    // Cập nhật "đã từng thấy" TRƯỚC khi chấm: service vừa xuất hiện lần đầu ở chính lần poll này
+    // là đang chạy, không sinh cảnh báo; nhưng lần sau nó tắt thì đã có dấu vết để bắt.
+    const seen = nextSeenServices(prevSeen, watched, running)
+    this.seenServices.set(sample.hostId, seen)
+
+    for (const probe of serviceProbes(watched, running, seen)) {
+      const outcome = feedHysteresis(
+        this.states.get(serviceStateKey(sample.hostId, probe.key)),
+        binaryZone(!probe.running),
+        sample.ts,
+        {
+          breachSamples: this.opts.serviceBreachSamples,
+          recoverSamples: this.opts.serviceRecoverSamples,
+          realertCooldownMs: this.opts.realertCooldownMs
+        }
+      )
+      if (outcome) {
+        events.push({
+          hostId: sample.hostId,
+          metric: 'service',
+          kind: outcome,
+          value: null,
+          threshold: null,
+          ts: sample.ts,
+          service: probe.label
+        })
+      }
     }
   }
 

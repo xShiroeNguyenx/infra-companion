@@ -1,3 +1,5 @@
+import type { ServiceWatchConfig } from './serviceWatch'
+
 export type ShellIcon = 'powershell' | 'cmd' | 'bash' | 'wsl' | 'zsh' | 'fish' | 'shell'
 
 /** Một loại shell local phát hiện được trên máy (PowerShell, cmd, Git Bash, WSL…). */
@@ -911,7 +913,7 @@ export interface MetricSampleDto {
   error?: string
 }
 
-export type MonitorAlertMetric = 'load' | 'mem' | 'disk' | 'steal' | 'conn' | 'offline'
+export type MonitorAlertMetric = 'load' | 'mem' | 'disk' | 'steal' | 'conn' | 'offline' | 'service'
 
 /** Ngưỡng cảnh báo — null = tắt metric đó. loadPct chuẩn hoá theo core: load1/cpuCount*100
  *  (KHÔNG chặn 100 — server bận thường trực 300-400%+). connCount là số tuyệt đối. */
@@ -935,6 +937,11 @@ export interface MonitorSettingsDto {
   webhookUrl: string
   /** Thông báo hệ điều hành (Windows toast) khi breach. */
   osNotify: boolean
+  /**
+   * F71 — service bắt buộc phải chạy, dùng CHUNG cho mọi host đang theo dõi.
+   * Thiếu field (settings cũ) = chưa bật gì cả.
+   */
+  serviceWatch?: ServiceWatchConfig
 }
 
 export interface MonitorAlertDto {
@@ -942,11 +949,13 @@ export interface MonitorAlertDto {
   label: string
   metric: MonitorAlertMetric
   kind: 'breach' | 'recover'
-  /** Giá trị đo được lúc chốt cảnh báo (%; null với offline). */
+  /** Giá trị đo được lúc chốt cảnh báo (%; null với offline/service). */
   value: number | null
-  /** Ngưỡng hiệu lực (null với offline). */
+  /** Ngưỡng hiệu lực (null với offline/service). */
   threshold: number | null
   ts: number
+  /** Chỉ với metric 'service' — tên service (nhiều service cùng host là nhiều cảnh báo riêng). */
+  service?: string
 }
 
 /** 1 host có dữ liệu lịch sử metrics (từng được monitor, còn trong hạn giữ 30 ngày). */
@@ -2058,6 +2067,11 @@ export interface TrayPrefsDto {
   /** Bấm ✕ cửa sổ chính = ẩn vào khay (tunnel/monitoring/watcher vẫn chạy); false = thoát như cũ. */
   closeToTray: boolean
   language: UiLanguage
+  /**
+   * Tunnel user đã ghim ⭐ (localStorage `infra.tunnelFavorites` ở renderer). Menu khay chỉ
+   * liệt kê những cái này ở mức đầu; rỗng = chưa ghim gì, khay tự hiện tunnel đang chạy.
+   */
+  pinnedTunnelIds: string[]
 }
 
 export interface InfraApi {
@@ -2072,6 +2086,8 @@ export interface InfraApi {
   app: {
     /** F53 — báo main tuỳ chọn khay hệ thống (đóng-về-khay, ngôn ngữ menu khay). */
     setTrayPrefs(prefs: TrayPrefsDto): void
+    /** User bấm "Vault đang khoá — bấm để mở khoá" trên menu khay. Trả về hàm unsubscribe. */
+    onUnlockRequested(cb: () => void): () => void
     /**
      * User vừa bấm Ctrl+R / F5. Phím đã bị chặn ở main; renderer hỏi lại rồi quyết định.
      *

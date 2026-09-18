@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { MonitorSettingsDto, MonitorThresholdsDto } from '@infra/shared'
+import {
+  SERVICE_CATALOG,
+  emptyServiceWatch,
+  type MonitorSettingsDto,
+  type MonitorThresholdsDto
+} from '@infra/shared'
 import { useDataStore } from '../stores/data'
 import { useMonitorStore } from '../stores/monitor'
 import { useTabsStore } from '../stores/tabs'
@@ -60,6 +65,9 @@ export function MonitorModal({ onClose }: { onClose: () => void }) {
   }
   const [settings, setSettings] = useState<MonitorSettingsDto | null>(null)
   const [showPerHost, setShowPerHost] = useState(false)
+  const [showServices, setShowServices] = useState(false)
+  /** Ô "tự thêm" — giữ ở state riêng, chỉ vào settings khi bấm Thêm (gõ dở không thành cấu hình). */
+  const [customName, setCustomName] = useState('')
   const [testing, setTesting] = useState(false)
 
   useEffect(() => {
@@ -77,6 +85,43 @@ export function MonitorModal({ onClose }: { onClose: () => void }) {
 
   const setDefault = (key: keyof MonitorThresholdsDto, value: number | null | boolean): void => {
     setSettings((s) => (s ? { ...s, defaults: { ...s.defaults, [key]: value } } : s))
+  }
+
+  /** Số mục đang dõi — hiện cạnh nhãn để biết tính năng có đang bật mà không cần mở khối ra. */
+  const serviceWatchCount =
+    (settings?.serviceWatch?.enabledIds.length ?? 0) + (settings?.serviceWatch?.customNames.length ?? 0)
+
+  /** Bật/tắt một mục trong danh sách dựng sẵn. */
+  const toggleServiceId = (id: string): void => {
+    setSettings((s) => {
+      if (!s) return s
+      const w = s.serviceWatch ?? emptyServiceWatch()
+      const enabledIds = w.enabledIds.includes(id)
+        ? w.enabledIds.filter((x) => x !== id)
+        : [...w.enabledIds, id]
+      return { ...s, serviceWatch: { ...w, enabledIds } }
+    })
+  }
+
+  /** Thêm tên tiến trình tự nhập. Trùng (kể cả khác hoa thường phần đuôi) thì bỏ qua im lặng. */
+  const addCustomService = (): void => {
+    const name = customName.trim()
+    if (!name) return
+    setSettings((s) => {
+      if (!s) return s
+      const w = s.serviceWatch ?? emptyServiceWatch()
+      if (w.customNames.includes(name)) return s
+      return { ...s, serviceWatch: { ...w, customNames: [...w.customNames, name] } }
+    })
+    setCustomName('')
+  }
+
+  const removeCustomService = (name: string): void => {
+    setSettings((s) => {
+      if (!s) return s
+      const w = s.serviceWatch ?? emptyServiceWatch()
+      return { ...s, serviceWatch: { ...w, customNames: w.customNames.filter((x) => x !== name) } }
+    })
   }
 
   /** Override per-host: input trống = kế thừa defaults (xoá key), số = override. */
@@ -240,6 +285,68 @@ export function MonitorModal({ onClose }: { onClose: () => void }) {
                 )}
               </div>
             )}
+
+            {/* F71 — service bắt buộc phải chạy. Dùng chung mọi host: máy nào chưa từng chạy
+                service đó thì tự động im lặng, nên không cần cấu hình riêng từng host. */}
+            <div className="mt-2">
+              <button
+                className="text-accent text-[11px] hover:underline"
+                onClick={() => setShowServices((v) => !v)}
+              >
+                {showServices ? '▾' : '▸'} {t('monitor.serviceWatch')}
+                {serviceWatchCount > 0 && ` (${serviceWatchCount})`}
+              </button>
+              {showServices && (
+                <div className="mt-1.5">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-content">
+                    {SERVICE_CATALOG.map((item) => (
+                      <label key={item.id} className="flex cursor-pointer items-center gap-1.5 select-none">
+                        <input
+                          type="checkbox"
+                          checked={settings.serviceWatch?.enabledIds.includes(item.id) ?? false}
+                          onChange={() => toggleServiceId(item.id)}
+                        />
+                        {item.label}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <input
+                      className={`${INPUT_CLS} !w-36`}
+                      placeholder={t('monitor.serviceCustomPlaceholder')}
+                      value={customName}
+                      maxLength={15}
+                      onChange={(e) => setCustomName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          addCustomService()
+                        }
+                      }}
+                    />
+                    <Button className="!px-2 !py-1 !text-xs" disabled={!customName.trim()} onClick={addCustomService}>
+                      {t('monitor.serviceAdd')}
+                    </Button>
+                    {(settings.serviceWatch?.customNames ?? []).map((name) => (
+                      <span
+                        key={name}
+                        className="border-edge text-content flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px]"
+                      >
+                        {name}
+                        <button
+                          className="text-subtle hover:text-danger"
+                          title={t('monitor.serviceRemove')}
+                          onClick={() => removeCustomService(name)}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-subtle mt-1.5 text-[10px]">{t('monitor.serviceWatchHint')}</p>
+                </div>
+              )}
+            </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <input

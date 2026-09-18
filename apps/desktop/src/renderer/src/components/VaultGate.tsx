@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useVaultStore } from '../stores/vault'
 import { useT } from '../i18n'
 import { Button, Field, TextInput } from './ui'
@@ -12,6 +12,12 @@ export function VaultGate() {
   const [confirm, setConfirm] = useState('')
   const [remember, setRemember] = useState(true)
   const [localError, setLocalError] = useState<string | null>(null)
+  const passwordRef = useRef<HTMLInputElement>(null)
+
+  // Bấm "mở khoá" trên menu khay: main đã hiện cửa sổ, nhưng nếu cửa sổ VỐN đang mở (chỉ bị che)
+  // thì `autoFocus` đã chạy từ lâu và con trỏ đang ở đâu không biết — focus lại tường minh,
+  // không thì user bấm xong vẫn phải tự đi tìm ô nhập.
+  useEffect(() => window.infra.app.onUnlockRequested(() => passwordRef.current?.focus()), [])
 
   const submit = (): void => {
     setLocalError(null)
@@ -41,6 +47,7 @@ export function VaultGate() {
         >
           <Field label={t('vault.masterPassword')}>
             <TextInput
+              ref={passwordRef}
               type="password"
               autoFocus
               value={password}

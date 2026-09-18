@@ -99,7 +99,7 @@
 - **Local** (L), **Remote** (R), **Dynamic / SOCKS5** (D) port forwarding
 - Managed tunnel dashboard — toggle on/off, **edit** rules, persistent across restarts, **sorted by name** (natural order: `db2` before `db10`)
 - **Pin it where you need it**: ⊞ **open in a tab** (so the popup stops blocking the app) or ⧉ **detach into an always-on-top window** — watch and toggle tunnels while your DB client covers the app
-- **Always-on tunnels** — click ⚡ on a tunnel row (or tick *Start automatically when the app opens* in its editor) and it comes up right after the vault unlocks; **closing the window keeps the app in the system tray** (tunnels, monitoring and the uptime watcher keep running), and the tray menu starts or stops any tunnel without opening the app. Settings → Application turns close-to-tray off
+- **Always-on tunnels** — click ⚡ on a tunnel row (or tick *Start automatically when the app opens* in its editor) and it comes up right after the vault unlocks; **closing the window keeps the app in the system tray** (tunnels, monitoring and the uptime watcher keep running), and the tray menu starts or stops tunnels without opening the app — the ones you starred ⭐ at the top level, the rest in a submenu, plus *Stop all tunnels* for the moment before you close the laptop. Settings → Application turns close-to-tray off
 - **Tunnel through a login-script gate** — a Local forward whose via-host is reached by a login script (nested `ssh` in a shell) tunnels by running `nc` on the innermost hop, so you can reach e.g. a database only pingable from the deepest machine straight from `127.0.0.1` (needs `nc` on the far end)
 
 ### Fleet awareness
@@ -151,6 +151,7 @@
 - **Diagnoses *why* a server is slow**: CPU split into user / system / **iowait** (disk bottleneck) / **steal** (oversold VPS — highlighted red at ≥10%), run queue, swap, fullest mount + inode%, network in/out rate, **TCP connection count** (scraper radar), top CPU process
 - **No agent required** — one SSH command reading `/proc` + `df` every 3 seconds; auto-reconnects; works through login-script hosts
 - **Alert thresholds** — Load (uncapped, %/CPU) / RAM / Disk / CPU steal / connections / offline, global defaults + per-host overrides, hysteresis + 15-min re-alert; delivered as in-app toast, **Windows notification**, and optional **webhook** (Google Chat / Slack / Discord / Telegram auto-detected, with a test button); alerts keep firing even while the vault is locked
+- **Alerts when a service dies** — a stopped Apache or Tomcat leaves the host up and the load average looking *better*, so thresholds never catch it. Tick the services that must be running (Apache, Nginx, Tomcat/JVM, PHP-FPM, MySQL/MariaDB, PostgreSQL, Redis, Node, or any process name you type); one list covers the whole fleet because a host only raises an alarm for a service **it has actually been running**
 - **Metrics history** — samples downsampled into a local `metrics.db` (minute buckets kept 48 h, 10-minute kept 30 days); 📈 on any card opens 1 h / 24 h charts for Load, CPU, steal, RAM, disk and connections
 
 ### MySQL / MariaDB replication — is the slave behind, and what do I type now?

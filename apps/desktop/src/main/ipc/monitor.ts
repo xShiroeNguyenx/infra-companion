@@ -9,7 +9,7 @@ import { postWebhook, readMonitorSettings, registerMonitorSettingsIpc } from './
 
 /** AlertRules cho engine = settings bỏ phần webhook/osNotify. */
 function toRules(s: MonitorSettingsDto): AlertRules {
-  return { defaults: s.defaults, perHost: s.perHost }
+  return { defaults: s.defaults, perHost: s.perHost, serviceWatch: s.serviceWatch }
 }
 
 /**
@@ -47,7 +47,10 @@ export function registerMonitorIpc(): () => void {
     recordEvent({
       kind: dto.kind === 'breach' ? 'alert' : 'recover',
       source: 'monitor',
-      severity: dto.kind === 'breach' ? (dto.metric === 'offline' ? 'critical' : 'warning') : 'info',
+      // Service chết nặng ngang mất kết nối: máy vẫn sống nhưng đã ngừng phục vụ — nặng hơn
+      // hẳn một ngưỡng tài nguyên bị vượt (cái đó còn đang chạy, chỉ là chạy chậm).
+      severity:
+        dto.kind === 'breach' ? (dto.metric === 'offline' || dto.metric === 'service' ? 'critical' : 'warning') : 'info',
       hostId: dto.hostId,
       title: formatAlertText(dto),
       ts: dto.ts
@@ -95,7 +98,17 @@ export function registerMonitorIpc(): () => void {
       labels.set(host.id, host.label)
       try {
         const prepared = await prepareConnection(event.sender, host.id)
-        await service.start({ hostId: host.id, chain: prepared.chain, loginSteps: prepared.loginSteps }, verify)
+        await service.start(
+          {
+            hostId: host.id,
+            chain: prepared.chain,
+            loginSteps: prepared.loginSteps,
+            // F71: tên tự thêm phải vào bộ lọc của lệnh đo, không thì server không bao giờ
+            // báo về tiến trình đó và cảnh báo "service chết" sẽ im lặng vĩnh viễn.
+            extraProcNames: settings.serviceWatch?.customNames
+          },
+          verify
+        )
       } catch (error) {
         event.sender.send(IPC.MONITOR_SAMPLE, {
           hostId: host.id,
@@ -161,6 +174,9 @@ export function registerMonitorIpc(): () => void {
   registerMonitorSettingsIpc((s) => {
     settings = s
     engine.setRules(toRules(s))
+    // Lưu ý: bộ lọc tên tiến trình nằm trong lệnh SSH dựng lúc start, nên tên TỰ THÊM mới chỉ
+    // có hiệu lực sau khi host được theo dõi lại. Ngưỡng/bật-tắt mục dựng sẵn thì ăn ngay.
+    // UI nói rõ điều này ở `monitor.serviceWatchHint` — đừng để user tưởng đã áp dụng.
   })
 
   return () => {

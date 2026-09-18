@@ -154,11 +154,19 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
     })()
   }, [])
 
-  const motion = useVrmMotion(stageReady, settings?.reactToEvents !== false, {
-    files: folderClips?.files ?? [],
-    roles: folderRoles,
-    builtinRoles
-  })
+  /**
+   * Gói tham số clip phải GIỮ NGUYÊN THAM CHIẾU giữa các lần render.
+   *
+   * Truyền thẳng object literal vào đây là dựng một vòng lặp tự nuôi: literal mới mỗi render →
+   * `runFolder` mới → `play` mới → effect "mở công cụ thì nhân vật nói một câu" (deps có
+   * `motionPlay`) chạy lại → `speak()` → `setBubble` → render → lặp lại từ đầu. Triệu chứng là
+   * bong bóng thoại nhấp nháy qua lại liên tục khi mở một công cụ, dù user không bấm gì thêm.
+   */
+  const folderInput = useMemo(
+    () => ({ files: folderClips?.files ?? [], roles: folderRoles, builtinRoles }),
+    [folderClips?.files, folderRoles, builtinRoles]
+  )
+  const motion = useVrmMotion(stageReady, settings?.reactToEvents !== false, folderInput)
   /**
    * Đọc `motion` từ ref trong effect nghe sự kiện.
    *
@@ -956,9 +964,13 @@ function VrmStageShell({
    * từ dock AI): ba lời gọi rải rác là ba chỗ để quên khi thêm lối vào thứ tư.
    */
   const motionPlay = motion.play
+  // Chỉ chạy khi cờ ĐỔI: để `motionPlay` trong deps là clip diễn lại mỗi lần hàm đổi tham chiếu
+  // (theo `installed`/`folder`) dù khung chat vẫn đang mở như cũ.
+  const playRef = useRef(motionPlay)
+  playRef.current = motionPlay
   useEffect(() => {
-    if (chatOpen) motionPlay('chat')
-  }, [chatOpen, motionPlay])
+    if (chatOpen) playRef.current('chat')
+  }, [chatOpen])
 
   /**
    * **Mở công cụ nào thì nhân vật phản ứng theo LOẠI VIỆC đó** — clip + biểu cảm + một câu nói.
@@ -977,17 +989,31 @@ function VrmStageShell({
    * `onSpeak` là hàm mới mỗi lần cha render, `stage` đổi khi nạp model — để chúng trong deps là
    * nhân vật diễn lại cả màn mỗi lần state panel nhúc nhích, dù user không mở công cụ nào.
    */
-  const reactRef = useRef({ speak: onSpeak, stage })
-  reactRef.current = { speak: onSpeak, stage }
+  const reactRef = useRef({ speak: onSpeak, stage, play: motionPlay })
+  reactRef.current = { speak: onSpeak, stage, play: motionPlay }
+  /**
+   * Công cụ đã diễn rồi — chốt chặn để một lần mở chỉ có MỘT màn.
+   *
+   * `motionPlay` từng nằm trong deps và nó đổi tham chiếu theo `folder`/`installed`, nên effect
+   * chạy lại giữa chừng và nhân vật nói lại câu cũ. `folderInput` đã được memo hoá nên vòng lặp
+   * đã đứt, nhưng deps chỉ còn `openModal` + cờ này thì về sau có thêm phụ thuộc mới cũng không
+   * tái hiện lỗi — thứ quyết định "đã diễn chưa" là CÔNG CỤ ĐANG MỞ, không phải danh tính hàm.
+   */
+  const reactedFor = useRef<string | null>(null)
   useEffect(() => {
-    if (!openModal) return
+    if (!openModal) {
+      reactedFor.current = null // đóng công cụ → lần mở sau được diễn lại
+      return
+    }
+    if (reactedFor.current === openModal) return
     const activity = activityForTool(openModal)
     if (!activity) return
-    motionPlay(activity)
+    reactedFor.current = openModal
+    reactRef.current.play(activity)
     // Biểu cảm: thử lần lượt, model có cái nào thì `playExpression` dùng cái đó
     reactRef.current.stage?.playExpression(ACTIVITY_EXPRESSION[activity])
     reactRef.current.speak(activityLine(activity))
-  }, [openModal, motionPlay])
+  }, [openModal])
   /** Đọc `motion` trong hẹn giờ mà không phải đặt lại lịch mỗi lần state của hook đổi. */
   const motionRef2 = useRef(motion)
   motionRef2.current = motion

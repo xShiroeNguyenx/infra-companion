@@ -7,6 +7,8 @@ import type { AlertEvent, AlertMetric } from './AlertEngine'
 
 export interface AlertInfo extends Pick<AlertEvent, 'metric' | 'kind' | 'value' | 'threshold'> {
   label: string
+  /** Chỉ với metric 'service' — tên service đã chết/đã sống lại. */
+  service?: string
 }
 
 const METRIC_LABEL: Record<AlertMetric, string> = {
@@ -15,13 +17,20 @@ const METRIC_LABEL: Record<AlertMetric, string> = {
   disk: 'Disk',
   steal: 'CPU steal',
   conn: 'Kết nối TCP',
-  offline: 'kết nối'
+  offline: 'kết nối',
+  service: 'service'
 }
 
 /** Text ngắn gọn dùng chung cho OS notification + webhook. conn là số tuyệt đối (không %). */
 export function formatAlertText(a: AlertInfo): string {
   if (a.metric === 'offline') {
     return a.kind === 'breach' ? `🔴 [${a.label}] mất kết nối` : `✅ [${a.label}] đã kết nối lại`
+  }
+  if (a.metric === 'service') {
+    // Tên service là phần quan trọng nhất của câu — người đọc cần biết PHẢI vào sửa cái gì,
+    // chứ "[web-01] service đã dừng" thì vẫn phải mở app ra mới biết service nào.
+    const svc = a.service ?? 'service'
+    return a.kind === 'breach' ? `🔴 [${a.label}] ${svc} đã DỪNG` : `✅ [${a.label}] ${svc} đã chạy lại`
   }
   const name = METRIC_LABEL[a.metric]
   const unit = a.metric === 'conn' ? '' : '%'
@@ -83,6 +92,8 @@ export function buildWebhookRequest(webhookUrl: string, alert: AlertEvent & { la
     kind: alert.kind,
     value: alert.value,
     threshold: alert.threshold,
-    ts: alert.ts
+    ts: alert.ts,
+    // Chỉ gắn khi có — payload generic của cảnh báo ngưỡng không cần trường rỗng
+    ...(alert.service ? { service: alert.service } : {})
   })
 }

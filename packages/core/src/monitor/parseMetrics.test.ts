@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyCounterDeltas, parseMetrics, type RawCounters } from './MonitorService'
+import { applyCounterDeltas, parseMetrics, svcCommand, type RawCounters } from './MonitorService'
 
 /** Output giả lập của METRIC_CMD trên 1 server thật (đủ mọi section). */
 const RAW = `31.40 26.86 30.89 3/320 512212
@@ -40,6 +40,68 @@ Inter-|   Receive                                                |  Transmit
  864000 httpd
 1036800 java
     120 node`
+
+describe('parseMetrics — service không bị tiến trình prefork nuốt mất', () => {
+  /**
+   * Regression: lệnh cũ có `head -40` phía shell. `ps` xuất theo thứ tự PID nên httpd
+   * prefork (vài chục worker, PID thấp) chiếm trọn 40 dòng đầu và java/tomcat bị cắt TRƯỚC
+   * khi parser gộp theo tên → biến mất khỏi biểu đồ, im lặng, và lặp lại y hệt mỗi lần poll.
+   */
+  const heavyFleet = (): string => {
+    const lines: string[] = []
+    for (let i = 0; i < 90; i++) lines.push(`${86400 - i} httpd`)
+    for (let i = 0; i < 60; i++) lines.push(`${81900 - i} php-fpm`)
+    lines.push('70080 java')
+    return lines.join('\n')
+  }
+
+  it('máy có 150 tiến trình web vẫn thấy ĐỦ httpd + php-fpm + java', () => {
+    const raw = `0 0 0
+==STAT==
+==MEM==
+==DISK==
+==INODE==
+==NET==
+==TCP==
+0
+0
+==TOP==
+==UP==
+1 1
+==CPU==
+1
+==SVC==
+${heavyFleet()}`
+    const { sample } = parseMetrics('h1', raw)
+    expect(sample.services?.map((s) => s.name).sort()).toEqual(['httpd', 'java', 'php-fpm'])
+    // lấy tiến trình GIÀ nhất mỗi tên (master), không phải worker trẻ
+    expect(sample.services?.find((s) => s.name === 'httpd')?.uptimeSec).toBe(86400)
+    expect(sample.services?.find((s) => s.name === 'java')?.uptimeSec).toBe(70080)
+  })
+
+  it('bằng điểm uptime thì sắp theo tên — thứ tự không nhảy giữa các lần poll', () => {
+    const raw = `0 0 0
+==STAT==
+==MEM==
+==DISK==
+==INODE==
+==NET==
+==TCP==
+0
+0
+==TOP==
+==UP==
+1 1
+==CPU==
+1
+==SVC==
+100 nginx
+100 java
+100 httpd`
+    const { sample } = parseMetrics('h1', raw)
+    expect(sample.services?.map((s) => s.name)).toEqual(['httpd', 'java', 'nginx'])
+  })
+})
 
 describe('parseMetrics — format mở rộng', () => {
   it('parse đủ mọi metric tức thời', () => {
@@ -135,5 +197,53 @@ MemAvailable: 500000 kB
   it('output rác → sample lỗi', () => {
     const { sample } = parseMetrics('h1', 'command not found')
     expect(sample.ok).toBe(false)
+  })
+})
+
+describe('svcCommand — bộ lọc tên tiến trình', () => {
+  /**
+   * Regression: bộ lọc từng hardcode danh sách dựng sẵn, nên tên user tự thêm ở Settings không
+   * bao giờ khớp — lệnh không hỏi server về tên đó, parser không thấy nó chạy, cảnh báo im lặng
+   * mãi mãi mà UI vẫn xanh.
+   */
+  it('tên tự thêm ĐƯỢC ghép vào bộ lọc', () => {
+    const cmd = svcCommand(['gunicorn', 'pm2'])
+    expect(cmd).toContain('gunicorn')
+    expect(cmd).toContain('pm2')
+    // vẫn giữ nguyên danh sách dựng sẵn
+    expect(cmd).toContain('httpd')
+    expect(cmd).toContain('java')
+  })
+
+  it('không truyền gì → đúng bộ dựng sẵn, không có dấu | thừa', () => {
+    const cmd = svcCommand([])
+    expect(cmd).toBe('ps -eo etimes=,comm= 2>/dev/null | grep -E " (httpd|apache2|nginx|java|node|php-fpm|mysqld|mariadbd|postgres|redis-server)$"')
+  })
+
+  it('KHÔNG cắt bằng head — cắt trước khi gộp là mất hẳn service', () => {
+    expect(svcCommand(['x'])).not.toContain('head')
+  })
+
+  it('chặn chèn lệnh/phá regex: ký tự có nghĩa bị loại sạch', () => {
+    const cmd = svcCommand(['foo; rm -rf /', 'a|b', 'x$(whoami)', 'y`id`', "z'q"])
+    // Chỉ xét PHẦN TÊN bên trong nhóm (…) — phần khung lệnh có `$"` là anchor regex hợp lệ
+    const names = /grep -E " \(([^)]*)\)\$"$/.exec(cmd)?.[1] ?? ''
+    expect(names).not.toBe('')
+    for (const bad of [';', '$', '`', "'", ' ', '/', '(', ')']) {
+      expect(names).not.toContain(bad)
+    }
+    // `a|b` không được tách thành 2 tên: dấu | bị xoá nên thành MỘT tên "ab"
+    expect(names.split('|')).toContain('ab')
+    // phần hợp lệ vẫn giữ lại để user không mất trắng thứ mình gõ
+    expect(names).toContain('foorm-rf')
+  })
+
+  it('trùng với tên dựng sẵn thì không nhân đôi', () => {
+    const cmd = svcCommand(['httpd'])
+    expect(cmd.match(/httpd/g)).toHaveLength(1)
+  })
+
+  it('tên rỗng sau khi lọc bị bỏ, không tạo nhóm rỗng trong regex', () => {
+    expect(svcCommand(['!!!', '   '])).toBe(svcCommand([]))
   })
 })

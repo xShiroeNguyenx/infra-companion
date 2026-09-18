@@ -391,6 +391,8 @@ export const IPC = {
   // ── F53: khay hệ thống + chạy nền ────────────────────────────────────────
   /** Renderer báo main tuỳ chọn khay (đóng cửa sổ có thu vào khay không, ngôn ngữ menu khay). */
   APP_TRAY_PREFS: 'app:tray-prefs',
+  /** Main báo renderer: user bấm "mở khoá" trên menu khay → hiện màn nhập master password. */
+  APP_UNLOCK_REQUESTED: 'app:unlock-requested',
 
   // ── Trung tâm thông báo + đánh dấu sự kiện ───────────────────────────────
   EVENTS_LIST: 'events:list',

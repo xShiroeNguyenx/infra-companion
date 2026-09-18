@@ -1,7 +1,14 @@
 import { app, ipcMain, net } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { IPC, type MonitorSettingsDto, type MonitorThresholdsDto } from '@infra/shared'
+import {
+  IPC,
+  SERVICE_CATALOG,
+  emptyServiceWatch,
+  type MonitorSettingsDto,
+  type MonitorThresholdsDto,
+  type ServiceWatchConfig
+} from '@infra/shared'
 import { buildWebhookRequest, type AlertEvent } from '@infra/core'
 
 /**
@@ -19,7 +26,10 @@ export const DEFAULT_MONITOR_SETTINGS: MonitorSettingsDto = {
   defaults: { loadPct: null, memPct: 90, diskPct: 90, stealPct: 20, connCount: null, offline: true },
   perHost: {},
   webhookUrl: '',
-  osNotify: true
+  osNotify: true,
+  // Không tick sẵn mục nào: "service nào bắt buộc phải chạy" là quyết định của người vận hành,
+  // đoán hộ thì máy không chạy service đó sẽ kêu oan ngay lần đầu mở app.
+  serviceWatch: emptyServiceWatch()
 }
 
 function settingsPath(): string {
@@ -68,6 +78,30 @@ function saneOverride(raw: unknown): Partial<MonitorThresholdsDto> | null {
   return Object.keys(clean).length > 0 ? clean : null
 }
 
+/**
+ * F71 — làm sạch cấu hình dõi service. Nguồn là file JSON trên đĩa + payload renderer, nên phải
+ * chặn mảng rác. Tên tự thêm: cắt khoảng trắng, bỏ rỗng, chặn độ dài (tên tiến trình `comm` của
+ * Linux tối đa 15 ký tự — dài hơn chắc chắn không bao giờ khớp) và giới hạn số lượng.
+ */
+function saneServiceWatch(raw: unknown): ServiceWatchConfig {
+  const v = (raw ?? {}) as Partial<ServiceWatchConfig>
+  const ids = Array.isArray(v.enabledIds) ? v.enabledIds : []
+  const names = Array.isArray(v.customNames) ? v.customNames : []
+  return {
+    enabledIds: [...new Set(ids.filter((x): x is string => typeof x === 'string'))]
+      .filter((id) => SERVICE_CATALOG.some((c) => c.id === id))
+      .slice(0, 50),
+    customNames: [
+      ...new Set(
+        names
+          .filter((x): x is string => typeof x === 'string')
+          .map((x) => x.trim())
+          .filter((x) => x.length > 0 && x.length <= 15)
+      )
+    ].slice(0, 50)
+  }
+}
+
 /** Validate + điền field thiếu bằng defaults — dùng cho cả đọc file lẫn payload từ renderer. */
 function sanitize(raw: unknown): MonitorSettingsDto {
   const s = (raw ?? {}) as Partial<MonitorSettingsDto>
@@ -82,7 +116,8 @@ function sanitize(raw: unknown): MonitorSettingsDto {
     defaults: saneThresholds(s.defaults, DEFAULT_MONITOR_SETTINGS.defaults),
     perHost,
     webhookUrl: typeof s.webhookUrl === 'string' ? s.webhookUrl.trim() : '',
-    osNotify: typeof s.osNotify === 'boolean' ? s.osNotify : true
+    osNotify: typeof s.osNotify === 'boolean' ? s.osNotify : true,
+    serviceWatch: saneServiceWatch(s.serviceWatch)
   }
 }
 

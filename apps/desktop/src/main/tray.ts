@@ -5,6 +5,7 @@ import {
   trayMenuModel,
   trayStrings,
   trayTooltip,
+  type TrayMenuItem,
   type TrayPrefsDto,
   type TunnelRuleDto
 } from '@infra/shared'
@@ -32,7 +33,7 @@ interface TrayDeps {
 
 let tray: Tray | null = null
 let deps: TrayDeps | null = null
-let prefs: TrayPrefsDto = { closeToTray: true, language: 'vi' }
+let prefs: TrayPrefsDto = { closeToTray: true, language: 'vi', pinnedTunnelIds: [] }
 let hiddenNoticeShown = false
 
 const isDev = !app.isPackaged
@@ -73,29 +74,45 @@ function toggleTunnel(ruleId: string, running: boolean): void {
   })
 }
 
+/** Một mục model → một mục Electron. Tách ra vì submenu phải dựng bằng chính nó (đệ quy). */
+function toTemplate(item: TrayMenuItem): MenuItemConstructorOptions {
+  switch (item.kind) {
+    case 'open':
+      return { label: item.label, click: () => deps?.showWindow() }
+    case 'separator':
+      return { type: 'separator' }
+    case 'tunnels-header':
+    case 'note':
+      return { label: item.label, enabled: false }
+    case 'tunnel':
+      return {
+        label: item.label,
+        type: 'checkbox',
+        checked: item.checked,
+        click: () => toggleTunnel(item.ruleId, item.checked)
+      }
+    case 'submenu':
+      return { label: item.label, submenu: item.items.map(toTemplate) }
+    case 'stop-all':
+      // Dừng KHÔNG cần vault mở (không đọc credential) → luôn bấm được, kể cả khi menu đang khoá.
+      return { label: item.label, click: () => getTunnelService().stopAll() }
+    case 'unlock':
+      return { label: item.label, click: () => requestUnlock() }
+    case 'quit':
+      return { label: item.label, click: () => deps?.quit() }
+  }
+}
+
+/** Hiện cửa sổ rồi bảo renderer mở màn nhập master password (main không tự mở khoá được). */
+function requestUnlock(): void {
+  deps?.showWindow()
+  const win = deps?.getWindow()
+  if (win && !win.isDestroyed()) win.webContents.send(IPC.APP_UNLOCK_REQUESTED)
+}
+
 function buildMenu(): Menu {
-  const model = trayMenuModel(rulesOrNull(), getTunnelService().states(), prefs.language)
-  const template: MenuItemConstructorOptions[] = model.map((item) => {
-    switch (item.kind) {
-      case 'open':
-        return { label: item.label, click: () => deps?.showWindow() }
-      case 'separator':
-        return { type: 'separator' }
-      case 'tunnels-header':
-      case 'note':
-        return { label: item.label, enabled: false }
-      case 'tunnel':
-        return {
-          label: item.label,
-          type: 'checkbox',
-          checked: item.checked,
-          click: () => toggleTunnel(item.ruleId, item.checked)
-        }
-      case 'quit':
-        return { label: item.label, click: () => deps?.quit() }
-    }
-  })
-  return Menu.buildFromTemplate(template)
+  const model = trayMenuModel(rulesOrNull(), getTunnelService().states(), prefs.language, prefs.pinnedTunnelIds)
+  return Menu.buildFromTemplate(model.map(toTemplate))
 }
 
 /** Dựng lại tooltip + menu (Linux: gán menu tĩnh vì AppIndicator không phát sự kiện click). */
@@ -129,7 +146,10 @@ export function createTray(d: TrayDeps): void {
   ipcMain.on(IPC.APP_TRAY_PREFS, (_event, next: TrayPrefsDto) => {
     prefs = {
       closeToTray: typeof next?.closeToTray === 'boolean' ? next.closeToTray : prefs.closeToTray,
-      language: next?.language === 'en' || next?.language === 'ja' || next?.language === 'vi' ? next.language : prefs.language
+      language: next?.language === 'en' || next?.language === 'ja' || next?.language === 'vi' ? next.language : prefs.language,
+      pinnedTunnelIds: Array.isArray(next?.pinnedTunnelIds)
+        ? next.pinnedTunnelIds.filter((x): x is string => typeof x === 'string')
+        : prefs.pinnedTunnelIds
     }
     refresh()
   })

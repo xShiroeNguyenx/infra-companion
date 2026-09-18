@@ -89,6 +89,7 @@ const api: InfraApi = {
   },
   app: {
     setTrayPrefs: (prefs) => ipcRenderer.send(IPC.APP_TRAY_PREFS, prefs),
+    onUnlockRequested: (cb) => subscribe<void>(IPC.APP_UNLOCK_REQUESTED, cb),
     onReloadRequested: (cb) => subscribe<void>(IPC.RELOAD_REQUESTED, cb),
     confirmReload: () => ipcRenderer.send(IPC.RELOAD_CONFIRMED),
     setTerminalFocus: (focused) => ipcRenderer.send(IPC.TERMINAL_FOCUS, focused)

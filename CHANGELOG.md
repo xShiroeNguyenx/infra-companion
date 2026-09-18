@@ -5,6 +5,28 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.4.6] — 2026-09-17
+
+### Fixed
+
+- **The assistant no longer repeats itself when you open a tool.** Opening Monitoring — or any tool the character reacts to — made its speech bubble flicker between two lines over and over, as if something had broken. It had: saying a line set the bubble state, that re-rendered the panel, which rebuilt the function used to play a motion clip, which re-triggered the very effect that speaks the line. Each lap fed the next, so the loop ran for as long as the tool stayed open. The clip settings are now kept stable across renders, and the reaction is tied to the tool being opened rather than to the identity of a function, so one tool opening produces exactly one line. Closing and reopening still greets you again.
+- **Monitoring no longer loses track of Apache, Tomcat and other services on busy servers.** The service line under each host showed only some of what was running — on a server with a large Apache or PHP-FPM pool, `httpd` or `java` would simply never appear, from the very first reading onward, with no error to explain it. The command asked the server for its processes and kept only the first 40 lines; since processes come back in start order, a prefork pool of 40+ workers filled that budget by itself and every other service was cut off before the app could group the list by name. The order is stable, so each reading cut at exactly the same place and the missing service never came back. The list is now grouped by service first and trimmed afterwards, and it holds up to eight services instead of four. Services with identical uptimes are ordered by name so the line stops reshuffling between readings.
+
+### Changed
+
+- **Comparing replication data now shows you the exact comparison exists.** The panel opened on an empty screen with a single "Quick scan" button, and the two buttons that compare tables *precisely* — an exact `COUNT(*)`, or `CHECKSUM TABLE` for the content itself — only appeared once a scan had finished. Nothing on that first screen mentioned them, so the precise comparison was effectively invisible unless you already knew it was there. The quick scan now runs by itself when the panel opens, since it only reads `information_schema` and takes a couple of seconds, and the results are followed by a line explaining the second step: tick the tables you care about, then choose counting or checksumming. Both buttons also explain, on hover, what they run and why they are slower — and, while nothing is ticked, say that a table has to be selected first. The heavy comparison is still never automatic: it reads every row on both servers, so it stays a deliberate choice.
+- **The tray menu no longer lists every tunnel you own.** With a dozen or more saved, right-clicking the tray icon produced a list taller than the screen — the one tunnel you wanted was somewhere in the middle of it. The menu now shows only the tunnels you have starred ⭐, and moves the rest into an *All tunnels* submenu, so everything is still reachable without opening the app. Stars are the ones you already set in the tunnels list; nothing new to configure. If you have not starred anything yet, the menu falls back to showing the tunnels that are currently running — the ones worth switching off — with a hint about starring, rather than going blank.
+
+### Added
+
+- **Monitoring can now tell you when Apache, Tomcat or another service dies.** Until now a host had to become unreachable before anything was raised; a web server that stopped while the machine stayed up produced no alert at all, and the load average even looked *better* afterwards. Monitoring settings now carry a list of services that must be running — Apache, Nginx, Tomcat/JVM, PHP-FPM, MySQL/MariaDB, PostgreSQL, Redis and Node — with nothing ticked until you choose, plus a box for any other process name. Apache is matched as `httpd` or `apache2` and MySQL as `mysqld` or `mariadbd`, so a fleet running both families of distribution does not report false failures. An alert fires after roughly nine seconds of continuous absence, which keeps restarts and deploys quiet, and it names the service so you know what to fix without opening the app. It reaches the same four places as any other alert: the toast, the notification centre (at the same severity as an unreachable host), the system notification and the webhook.
+- **A service is only reported as dead on machines that actually run it.** The list is shared by every monitored host, which would normally mean a database server complaining forever about the Tomcat it was never meant to have. Instead each host remembers the services it has been seen running, and only a change from running to absent raises anything — so one list can safely cover the whole fleet. The trade-off is deliberate: a service already dead before the app started is not counted as missing, and monitoring stays silent until it comes back at least once.
+- **Stop all tunnels, from the tray.** A single item, showing how many are running, for the moment before you close the laptop or change networks. It only appears when there is something to stop, and works whether or not the vault is unlocked.
+- **A one-line summary at the top of the tunnel list.** "2/14 running", visible the moment the menu opens — the tooltip said this already, but only if you knew to hover and wait.
+- **The tray can send you straight to the unlock prompt.** When the vault is locked the menu used to state the fact and leave you to find your own way in; that line is now clickable, and it brings the window up with the master password field focused.
+
+---
+
 ## [0.4.5] — 2026-09-15
 
 ### Fixed

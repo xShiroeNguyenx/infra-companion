@@ -140,7 +140,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   )
 }
 
-export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+export function TextInput(props: React.ComponentPropsWithRef<'input'>) {
   return (
     <input
       {...props}
