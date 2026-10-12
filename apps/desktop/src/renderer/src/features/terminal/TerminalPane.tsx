@@ -758,7 +758,7 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: Term
       {/* Guard lệnh nhạy cảm: Enter đã bị hoãn, chờ user xác nhận. Nút Huỷ autoFocus →
           bấm Enter theo phản xạ sẽ HUỶ (an toàn), muốn chạy phải chủ động chọn "Vẫn chạy". */}
       {guardPrompt && (
-        <Modal title={t('guard.title')} danger onClose={cancelGuard} closeOnBackdrop={false}>
+        <Modal title={t('guard.title')} danger onClose={cancelGuard} closeOnBackdrop={false} inline>
           <p className="text-muted mb-2 max-w-96 text-xs leading-relaxed">{t('guard.desc')}</p>
           <div className="border-danger/50 bg-input text-content mb-2 max-w-96 rounded border px-3 py-2 font-mono text-xs break-all">
             {guardPrompt.command}

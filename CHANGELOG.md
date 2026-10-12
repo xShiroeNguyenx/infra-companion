@@ -5,6 +5,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.4.8] — 2026-10-12
+
+### Fixed
+
+- **Editing a host in the Workbench layout works again.** Opening *Edit host* from the host list on the left drew the dialog squashed into that narrow column, with its left half cut off, so the form could not be used at all. Dialogs position themselves against the nearest container that sets its own position. In Workbench, the side panel does exactly that so its edge can be dragged to resize it, and every dialog opened from inside the panel was trapped in a column about 300 px wide. The panel also disables text selection. The other two layouts never showed the problem only because nothing around their host list happens to set a position. Dialogs are now drawn on a layer at the root of the window, so they cover the whole app wherever they are opened from. This applies to adding, duplicating and editing hosts and groups, notes, and every confirmation box. Notifications still appear above dialogs, and the vault lock screen above everything. One dialog keeps its old behaviour on purpose: the warning before a risky command stays inside the terminal pane it belongs to, so with split panes or broadcast you can see which pane is asking, and it hides with its tab instead of floating over another one.
+
+---
+
 ## [0.4.7] — 2026-10-12
 
 ### Fixed

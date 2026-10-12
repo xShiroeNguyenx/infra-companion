@@ -1,5 +1,20 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useT } from '../i18n'
+
+/**
+ * Lớp chứa mọi `Modal`, đặt ở gốc App (xem `App.tsx`). `display: contents` nên bản thân nó
+ * không chiếm chỗ — modal `absolute inset-0` bên trong bám vào gốc App (`relative isolate`).
+ *
+ * Vì sao phải portal: `absolute` bám vào tổ tiên GẦN NHẤT có `position`. Modal mở từ Sidebar
+ * nằm trong `SidePanel` của theme Workbench — mà panel đó `relative` (cho tay kéo đổi bề rộng)
+ * và `select-none` — nên hộp "Sửa host" bị nhốt trong cột ~300px, form tối thiểu 420px bị cắt
+ * mất nửa trái, không sửa được gì. Theme Infra không lộ lỗi chỉ vì Sidebar ở đó không có
+ * tổ tiên `relative` nào. Portal thì modal luôn phủ cả app, bất kể ai mở nó từ đâu.
+ *
+ * Lớp nằm TRƯỚC màn khoá vault (z-100) và toast trong DOM: toast vẫn nổi trên backdrop như cũ.
+ */
+export const MODAL_LAYER_ID = 'modal-layer'
 
 export function Modal({
   title,
@@ -7,7 +22,8 @@ export function Modal({
   onClose,
   danger = false,
   closeOnBackdrop = true,
-  headerExtra
+  headerExtra,
+  inline = false
 }: {
   title: string
   children: ReactNode
@@ -17,6 +33,12 @@ export function Modal({
   closeOnBackdrop?: boolean
   /** Nút phụ neo bên phải header (vd nút thu nhỏ). */
   headerExtra?: ReactNode
+  /**
+   * true = chỉ phủ khung chứa gần nhất thay vì cả app (không portal). Dành cho hộp thoại GẮN
+   * VỚI MỘT VÙNG — vd guard lệnh nhạy cảm của một pane terminal: chia pane/broadcast thì phải
+   * thấy nó thuộc pane nào, và đổi tab thì nó ẩn theo tab chứ không nằm đè lên tab khác.
+   */
+  inline?: boolean
 }) {
   useEffect(() => {
     if (!onClose) return
@@ -30,8 +52,12 @@ export function Modal({
   }, [onClose])
 
   const closeLabel = useT()('common.close')
+  // Không có lớp (cửa sổ tách rời #tunnels/#monitor không dựng App) → vẽ tại chỗ như trước.
+  // Chốt MỘT LẦN lúc mount: đổi qua lại giữa tại-chỗ và portal là React remount nội dung → mất
+  // những gì đang gõ (modal mở ngay lần render đầu, khi lớp chưa vào DOM, sẽ cứ ở tại chỗ).
+  const [layer] = useState(() => (inline ? null : document.getElementById(MODAL_LAYER_ID)))
 
-  return (
+  const node = (
     <div
       className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       onMouseDown={closeOnBackdrop ? onClose : undefined}
@@ -69,6 +95,7 @@ export function Modal({
       </div>
     </div>
   )
+  return layer ? createPortal(node, layer) : node
 }
 
 /**

@@ -8,6 +8,7 @@ import { StatusBar } from './components/StatusBar'
 import { TabsBar } from './components/TabsBar'
 import { PromptsHost } from './components/PromptsHost'
 import { VaultGate } from './components/VaultGate'
+import { MODAL_LAYER_ID } from './components/ui'
 import { CommandPalette, type Command } from './components/CommandPalette'
 import { CommandHistoryPalette } from './components/CommandHistoryPalette'
 import { SnippetsModal } from './components/SnippetsModal'
@@ -735,6 +736,10 @@ export default function App() {
       {vrmPanelOpen && <VrmPanel onClose={() => useUiStore.getState().setVrmPanelOpen(false)} />}
       <AiDiagnosePill />{/* pill khi cửa sổ AI chẩn đoán thu nhỏ; tự return null nếu không thu nhỏ */}
       <ReloadGuardModal />{/* hỏi lại khi bấm Ctrl+R / F5; tự return null khi chưa bấm */}
+
+      {/* Mọi <Modal> portal vào đây, kể cả modal mở từ trong SidePanel (`relative`) của Workbench —
+          xem MODAL_LAYER_ID. Đặt TRƯỚC màn khoá + toast để thứ tự lớp giữ nguyên như cũ. */}
+      <div id={MODAL_LAYER_ID} className="contents" />
 
       {locked && (
         <div className="absolute inset-0 z-[100]">
