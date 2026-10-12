@@ -5,6 +5,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.4.7] — 2026-10-12
+
+### Fixed
+
+- **"What is filling the disk" no longer loses whole disks mounted below the folder you are looking at.** The scan deliberately stays on one filesystem (`du -x`); without that it would wander into `/proc`, `/sys` and network mounts. The side effect was that a 500 GB volume mounted at `/mnt/…` showed up as `/mnt` — **4 KB**. The list of filesystems above it said 99%, but nothing in the folder view led there, and opening `/mnt` only reported "no subdirectories left". Filesystems mounted below the current folder now get their own box, fullest first, and each one opens with a click. The folder row that contains them carries a tag such as *+1 filesystem · 495 GB*, shown in red when one of them is nearly full. When the filesystem you are on still has room but one mounted below it does not, the verdict says so and offers to go straight there. Real filesystems in the top strip can also be clicked to scan them directly. Things that would only add noise are left out: `tmpfs`, Docker's `overlay` mounts (they share the root disk), snap's loop devices (always 100%) and bind mounts of the disk you are already on.
+
+### Added
+
+- **Space that is used but nowhere to be found.** At the root of a filesystem, the app now compares what `df` reports as used with what `du` can actually count. When the gap is large (at least 1 GB *and* 10% of the used space, which rules out the journal and other metadata), the verdict names the likely causes. The most common one is files that were deleted while a process still holds them open, such as a log removed by hand while mysqld or java is still writing to it. That space only comes back when the process closes the file or restarts, so no amount of digging through folders will find it. The other causes are data hidden underneath a mount point, and an SSH user that cannot read everything. The verdict comes with a read-only `lsof +L1` command for that filesystem and a button to copy it. The app does not run the command itself: it needs `sudo`, and what to restart is the on-call person's decision. This check used to land on "this branch is tiny, go up a level", which is meaningless at the root of a disk.
+- **Out of inodes, not out of space.** The scan now also reads `df -i`, in the same SSH round-trip. A disk that is out of inodes rejects new files with "No space left on device" while `df -h` still shows room, and `du` measures bytes, so it can never explain this. Inode usage at or above 75% now appears next to the filesystem's size. At 90% the verdict switches to the inode problem ahead of everything else, and offers a command that counts files per directory (`du --inodes`) so you can find the folder full of sessions or cache. Filesystems with no fixed inode table, such as btrfs or vfat, are left alone instead of being reported as 0%.
+- **The largest files under the current folder.** When the verdict says "the space is in files sitting directly in this folder", there was nothing to do next except open a terminal. A *Find largest files* button now lists the 20 biggest files of 50 MB or more, searching the whole subtree but staying on the same filesystem. Each file shows when it was last modified, because a large file that changed a few minutes ago is usually the one still growing. Click a row to copy its full path. The search runs only when you press the button, because `find` over a large disk can take a while, and the list is cleared when you move to another folder. On BusyBox systems, whose `find` lacks `-printf`, the result is empty and the screen says that this may be the reason.
+
+---
+
 ## [0.4.6] — 2026-09-17
 
 ### Fixed

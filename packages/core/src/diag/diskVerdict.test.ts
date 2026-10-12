@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'vitest'
-import { diskVerdict, findFilesystem, type DiskUsageDto, type FilesystemDto } from '@infra/shared'
+import {
+  deletedOpenCommand,
+  diskVerdict,
+  findFilesystem,
+  inodeCountCommand,
+  isRealFilesystem,
+  mountsAtOrBelow,
+  mountsBelow,
+  type DiskUsageDto, type FilesystemDto } from '@infra/shared'
 
 const fs = (mountedOn: string, usedKb: number, usePercent: number, availKb = 1_000_000): FilesystemDto => ({
   filesystem: `/dev/mapper${mountedOn}`,
@@ -113,5 +121,157 @@ describe('diskVerdict — việc nên làm', () => {
   test('tính đúng tỉ lệ so với phần ĐÃ DÙNG của phân vùng, không phải tổng phân vùng', () => {
     const v = diskVerdict(usage('/var', 25_000, [['log', 24_000]]), [fs('/', 50_000, 78, 50_000)])
     expect(v.shareOfUsedPercent).toBe(50)
+  })
+})
+
+describe('phân vùng gắn bên dưới — phần `du -x` không thấy', () => {
+  const dev = (filesystem: string, mountedOn: string, usedKb: number, usePercent: number, availKb = 1_000_000): FilesystemDto => ({
+    filesystem,
+    mountedOn,
+    sizeKb: usedKb + availKb,
+    usedKb,
+    availKb,
+    usePercent
+  })
+  // Ca thật: `/` mới 13%, còn một ổ 500 GB gắn ở /mnt đã 99% — `du -x /` báo /mnt chỉ 4 KB
+  const df = [
+    dev('devtmpfs', '/dev', 0, 0),
+    dev('tmpfs', '/run', 190_000, 4),
+    dev('/dev/sda1', '/', 27_000_000, 13, 190_000_000),
+    dev('/dev/sda14', '/boot/efi', 7_000, 12),
+    dev('/dev/sdb', '/mnt/data', 495_000_000, 99, 5_500_000),
+    dev('overlay', '/var/lib/docker/overlay2/abc/merged', 27_000_000, 13),
+    dev('/dev/loop3', '/snap/core20/1234', 64_000, 100)
+  ]
+
+  test('liệt kê ổ thật gắn bên dưới, đầy trước; bỏ tmpfs/overlay/loop', () => {
+    expect(mountsBelow('/', df).map((f) => f.mountedOn)).toEqual(['/mnt/data', '/boot/efi'])
+  })
+
+  test('snap squashfs luôn 100% không được tính là ổ thật — để lại là báo động giả mãi mãi', () => {
+    expect(isRealFilesystem(dev('/dev/loop3', '/snap/x', 1, 100))).toBe(false)
+    expect(isRealFilesystem(dev('/dev/sdb', '/mnt/data', 1, 1))).toBe(true)
+  })
+
+  test('đứng ở / mà ổ bên dưới 99% → khuyên đi thẳng vào ổ đó, không phải "rải rác"', () => {
+    const v = diskVerdict(usage('/', 27_000_000, [['usr', 9_000_000], ['var', 8_000_000], ['mnt', 4]]), df)
+    expect(v.level).toBe('ok')
+    expect(v.advice).toBe('otherMount')
+    expect(v.fullMountBelow!.mountedOn).toBe('/mnt/data')
+  })
+
+  test('đứng ở /mnt: du -x thấy rỗng, nhưng không được kết luận là "leaf"', () => {
+    expect(diskVerdict(usage('/mnt', 4, []), df).advice).toBe('otherMount')
+  })
+
+  test('đứng TRONG chính ổ đầy thì không trỏ lại vào chính nó', () => {
+    expect(mountsBelow('/mnt/data', df)).toEqual([])
+    const v = diskVerdict(usage('/mnt/data', 495_000_000, [['backup', 480_000_000]]), df)
+    expect(v.level).toBe('critical')
+    expect(v.advice).toBe('drillDown')
+  })
+
+  test('mục con tìm ra mount nằm tại hoặc dưới nó, khớp theo biên đường dẫn', () => {
+    const below = mountsBelow('/', df)
+    expect(mountsAtOrBelow('/mnt', below).map((f) => f.mountedOn)).toEqual(['/mnt/data'])
+    expect(mountsAtOrBelow('/mn', below)).toEqual([])
+    expect(mountsAtOrBelow('/boot', below).map((f) => f.mountedOn)).toEqual(['/boot/efi'])
+  })
+
+  test('lời khuyên này không kèm lệnh — bước tiếp theo là một cú bấm trong app', () => {
+    expect(diskVerdict(usage('/mnt', 4, []), df).command).toBeNull()
+  })
+
+  test('bind mount cùng thiết bị với phân vùng đang xem không bị đếm hai lần', () => {
+    const withBind = [...df, dev('/dev/sda1', '/srv/bind', 27_000_000, 13)]
+    expect(mountsBelow('/', withBind).map((f) => f.mountedOn)).not.toContain('/srv/bind')
+  })
+})
+
+describe('phần df báo dùng mà du không đếm ra — file đã xoá còn bị giữ mở', () => {
+  const GB = 1024 * 1024
+  const data = (usedKb: number, usePercent = 99): FilesystemDto => ({
+    filesystem: '/dev/sdb',
+    mountedOn: '/mnt/data',
+    sizeKb: 500 * GB,
+    usedKb,
+    availKb: 500 * GB - usedKb,
+    usePercent
+  })
+
+  test('ở gốc phân vùng, df 495 GB mà du chỉ 120 GB → nói thẳng, kèm lệnh lsof cho đúng mount', () => {
+    const v = diskVerdict(usage('/mnt/data', 120 * GB, [['mysql', 118 * GB]]), [data(495 * GB)])
+    expect(v.advice).toBe('hiddenUsage')
+    expect(v.hiddenKb).toBe(375 * GB)
+    expect(v.command).toBe(deletedOpenCommand('/mnt/data'))
+    expect(v.command).toContain('+L1')
+  })
+
+  test('đứng trước "đào nhầm nhánh": ở gốc thì "lên cấp trên" là lời khuyên vô nghĩa', () => {
+    // du chỉ 5% phần đã dùng → trước đây ra wrongBranch kèm nút ↑
+    expect(diskVerdict(usage('/mnt/data', 20 * GB, [['a', 19 * GB]]), [data(400 * GB, 80)]).advice).toBe('hiddenUsage')
+  })
+
+  test('chênh lệch nhỏ (journal/metadata ~1 GB) KHÔNG báo — đó là bình thường', () => {
+    const v = diskVerdict(usage('/mnt/data', 494 * GB, [['mysql', 490 * GB]]), [data(495 * GB)])
+    expect(v.advice).not.toBe('hiddenUsage')
+    expect(v.command).toBeNull()
+  })
+
+  test('chênh lớn về GB nhưng dưới 10% phần đã dùng → không báo', () => {
+    expect(diskVerdict(usage('/mnt/data', 460 * GB, [['mysql', 455 * GB]]), [data(495 * GB)]).advice).toBe('drillDown')
+  })
+
+  test('ở thư mục CON thì không so — chênh lệch khi đó chỉ là các nhánh khác', () => {
+    const v = diskVerdict(usage('/mnt/data/mysql', 10 * GB, [['db', 9 * GB]]), [data(495 * GB)])
+    expect(v.hiddenKb).toBe(0)
+    expect(v.advice).not.toBe('hiddenUsage')
+  })
+})
+
+describe('hết inode — đầy mà dung lượng còn trống', () => {
+  const root = (inodeUsePercent: number | null | undefined): FilesystemDto => ({
+    filesystem: '/dev/sda1',
+    mountedOn: '/',
+    sizeKb: 100_000_000,
+    usedKb: 40_000_000,
+    availKb: 60_000_000,
+    usePercent: 40,
+    inodeUsePercent
+  })
+
+  test('inode ≥ 90% → mức critical dù dung lượng mới 40%, kèm lệnh đếm file theo thư mục', () => {
+    const v = diskVerdict(usage('/var', 30_000_000, [['lib', 29_000_000]]), [root(97)])
+    expect(v.level).toBe('critical')
+    expect(v.advice).toBe('inodesFull')
+    expect(v.command).toBe(inodeCountCommand('/var'))
+    expect(v.command).toContain('--inodes')
+  })
+
+  test('đứng trước mọi lời khuyên khác — số byte đúng nhưng không giải thích được sự cố', () => {
+    const below: FilesystemDto = { ...root(1), filesystem: '/dev/sdb', mountedOn: '/var/data', usePercent: 99 }
+    expect(diskVerdict(usage('/var', 30_000_000, []), [root(95), below]).advice).toBe('inodesFull')
+  })
+
+  test('inode 75–89% chỉ nâng mức lên warn, chưa đổi lời khuyên', () => {
+    const v = diskVerdict(usage('/var', 30_000_000, [['lib', 29_000_000]]), [root(80)])
+    expect(v.level).toBe('warn')
+    expect(v.advice).toBe('drillDown')
+  })
+
+  test('không có số inode (null/thiếu) thì không bịa ra báo động', () => {
+    for (const i of [null, undefined]) {
+      const v = diskVerdict(usage('/var', 30_000_000, [['lib', 29_000_000]]), [root(i)])
+      expect(v.level).toBe('ok')
+      expect(v.advice).toBe('drillDown')
+    }
+  })
+
+  test('lệnh bọc nháy đơn đường dẫn, không dùng $(…) hay backtick', () => {
+    for (const cmd of [inodeCountCommand("/srv/it's"), deletedOpenCommand('/mnt/data')]) {
+      expect(cmd).not.toContain('$(')
+      expect(cmd).not.toContain('`')
+    }
+    expect(inodeCountCommand("/srv/it's")).toContain(`'\\''`)
   })
 })

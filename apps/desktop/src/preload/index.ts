@@ -241,6 +241,7 @@ const api: InfraApi = {
   },
   diag: {
     disk: (hostId, path) => ipcRenderer.invoke(IPC.DIAG_DISK, hostId, path),
+    diskFiles: (hostId, path) => ipcRenderer.invoke(IPC.DIAG_DISK_FILES, hostId, path),
     updates: (hostId) => ipcRenderer.invoke(IPC.DIAG_UPDATES, hostId),
     cronRead: (hostId, scope) => ipcRenderer.invoke(IPC.CRON_READ, hostId, scope),
     cronWrite: (hostId, content, scope) => ipcRenderer.invoke(IPC.CRON_WRITE, hostId, content, scope)

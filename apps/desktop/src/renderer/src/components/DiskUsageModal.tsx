@@ -1,8 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
-import { diskVerdict, type DiskUsageDto, type DiskUsageResultDto, type FilesystemDto, type HostDto } from '@infra/shared'
+import {
+  diskVerdict,
+  isRealFilesystem,
+  mountsAtOrBelow,
+  mountsBelow,
+  type DiskFilesResultDto,
+  type DiskUsageDto,
+  type DiskUsageResultDto,
+  type FilesystemDto,
+  type HostDto
+} from '@infra/shared'
 import { Button, ModalOrPanel, Select } from './ui'
 import { OpenInTabButton } from './OpenInTabButton'
 import { useDataStore } from '../stores/data'
+import { useToastsStore } from '../stores/toasts'
 import { useT, type I18nKey } from '../i18n'
 
 /** KB → chuỗi đọc được. Bản nhỏ viết lại ở renderer vì không import được `@infra/core` (§5). */
@@ -31,8 +42,38 @@ const ADVICE_KEY = {
   filesHere: 'disk.adviceFilesHere',
   spread: 'disk.adviceSpread',
   wrongBranch: 'disk.adviceWrongBranch',
-  leaf: 'disk.adviceLeaf'
+  leaf: 'disk.adviceLeaf',
+  otherMount: 'disk.adviceOtherMount',
+  hiddenUsage: 'disk.adviceHiddenUsage',
+  inodesFull: 'disk.adviceInodesFull'
 } as const satisfies Record<string, I18nKey>
+
+/** Thời điểm sửa file → "5 phút trước". File vừa sửa = còn đang lớn lên, đáng để ý trước. */
+function ago(ms: number, t: (key: I18nKey, params?: Record<string, string | number>) => string): string {
+  const min = Math.max(0, Math.round((Date.now() - ms) / 60_000))
+  if (min < 60) return t('disk.agoMin', { n: min })
+  const h = Math.round(min / 60)
+  return h < 48 ? t('disk.agoHour', { n: h }) : t('disk.agoDay', { n: Math.round(h / 24) })
+}
+
+/** Lệnh chỉ-đọc kèm nút chép. App không tự chạy: cần sudo, và là quyết định của người trực. */
+function CommandBox({ command, t }: { readonly command: string; readonly t: (key: I18nKey) => string }) {
+  const push = useToastsStore((s) => s.push)
+  return (
+    <div className="border-edge bg-input mt-1.5 flex items-center gap-2 rounded border px-2 py-1">
+      <code className="text-content min-w-0 flex-1 overflow-x-auto font-mono text-[11px] whitespace-nowrap">
+        {command}
+      </code>
+      <Button
+        type="button"
+        className="!px-2 !py-0.5 !text-[11px]"
+        onClick={() => void navigator.clipboard.writeText(command).then(() => push(t('disk.copied'), 'info'))}
+      >
+        {t('disk.copy')}
+      </Button>
+    </div>
+  )
+}
 
 /**
  * Khối kết luận đặt trên danh sách: *phân vùng còn bao nhiêu*, *thư mục này chiếm bao nhiêu
@@ -47,6 +88,7 @@ function Verdict({
   t,
   onGo,
   onUp,
+  onFiles,
   busy
 }: {
   readonly usage: DiskUsageDto
@@ -54,6 +96,7 @@ function Verdict({
   readonly t: (key: I18nKey, params?: Record<string, string | number>) => string
   readonly onGo: (path: string) => void
   readonly onUp: () => void
+  readonly onFiles: () => void
   readonly busy: boolean
 }) {
   const v = diskVerdict(usage, filesystems)
@@ -74,6 +117,12 @@ function Verdict({
               free: formatKb(v.filesystem.availKb)
             })
           : t('disk.verdictNoFs', { size: formatKb(usage.totalKb) })}
+        {v.filesystem?.inodeUsePercent != null && v.filesystem.inodeUsePercent >= 75 && (
+          <span className={v.filesystem.inodeUsePercent >= 90 ? 'text-danger' : 'text-warning'}>
+            {' · '}
+            {t('disk.inodeShort', { percent: v.filesystem.inodeUsePercent })}
+          </span>
+        )}
         {v.shareOfUsedPercent !== null && (
           <span className="text-muted font-normal">
             {' · '}
@@ -89,13 +138,33 @@ function Verdict({
             name: v.top?.name ?? '',
             percent: v.top?.percent ?? 0,
             size: formatKb(v.looseKb),
-            loose: v.loosePercent
+            loose: v.loosePercent,
+            mount: v.fullMountBelow?.mountedOn ?? '',
+            mountPercent: v.fullMountBelow?.usePercent ?? 0,
+            free: formatKb(v.fullMountBelow?.availKb ?? 0),
+            hidden: formatKb(v.hiddenKb),
+            inodePercent: v.filesystem?.inodeUsePercent ?? 0
           })}
         </span>
+        {v.advice === 'filesHere' && (
+          <Button type="button" className="!px-2 !py-1 !text-xs" disabled={busy} onClick={onFiles}>
+            {t('disk.findFiles')}
+          </Button>
+        )}
         {/* Gợi ý mà bấm được luôn: đọc xong không phải tự tìm lại dòng đó trong danh sách */}
         {v.advice === 'drillDown' && v.top && (
           <Button type="button" className="!px-2 !py-1 !text-xs" disabled={busy} onClick={() => onGo(v.top!.path)}>
             {t('disk.goInto', { name: v.top.name })}
+          </Button>
+        )}
+        {v.advice === 'otherMount' && v.fullMountBelow && (
+          <Button
+            type="button"
+            className="!px-2 !py-1 !text-xs"
+            disabled={busy}
+            onClick={() => onGo(v.fullMountBelow!.mountedOn)}
+          >
+            {t('disk.goInto', { name: v.fullMountBelow.mountedOn })}
           </Button>
         )}
         {v.advice === 'wrongBranch' && (
@@ -104,6 +173,7 @@ function Verdict({
           </Button>
         )}
       </div>
+      {v.command && <CommandBox command={v.command} t={t} />}
     </div>
   )
 }
@@ -132,6 +202,22 @@ export function DiskUsageModal({
   const [result, setResult] = useState<DiskUsageResultDto | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** File lớn nhất của thư mục đang xem. Chỉ quét khi user bấm — `find` cả cây có thể lâu. */
+  const [files, setFiles] = useState<(DiskFilesResultDto & { path: string }) | null>(null)
+  const [filesBusy, setFilesBusy] = useState(false)
+  const push = useToastsStore((s) => s.push)
+
+  const findFiles = async (target: string): Promise<void> => {
+    if (!hostId) return
+    setFilesBusy(true)
+    try {
+      setFiles({ ...(await window.infra.diag.diskFiles(hostId, target)), path: target })
+    } catch (err) {
+      setFiles({ ok: false, files: [], minKb: 0, path: target, error: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setFilesBusy(false)
+    }
+  }
 
   /**
    * ⚠️ KHÔNG đưa `t` vào dependency: `useT()` trả hàm MỚI mỗi render, nên `scan` sẽ đổi
@@ -148,6 +234,8 @@ export function DiskUsageModal({
         if (res.ok) {
           setResult(res)
           setPath(res.usage?.path ?? targetPath)
+          // Danh sách file thuộc thư mục cũ — giữ lại là hiện file của chỗ khác dưới tiêu đề chỗ này
+          setFiles(null)
         } else {
           setError(res.error ?? '')
         }
@@ -173,6 +261,8 @@ export function DiskUsageModal({
 
   const parent = parentOf(path)
   const usage = result?.usage ?? null
+  // `du -x` không sang phân vùng khác → lấy từ `df` những ổ gắn bên dưới để không bị "mất tích"
+  const below = usage ? mountsBelow(usage.path, result?.filesystems ?? []) : []
 
   return (
     <ModalOrPanel
@@ -207,15 +297,40 @@ export function DiskUsageModal({
               {t('disk.filesystems')}
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {result.filesystems.map((fs) => (
-                <span key={fs.mountedOn} className="text-[11px]">
-                  <span className="text-muted font-mono">{fs.mountedOn}</span>{' '}
-                  <span className={fs.usePercent >= 90 ? 'text-danger font-medium' : 'text-subtle'}>
-                    {fs.usePercent}%
-                  </span>{' '}
-                  <span className="text-subtle">({t('disk.free', { size: formatKb(fs.availKb) })})</span>
-                </span>
-              ))}
+              {result.filesystems.map((fs) => {
+                const body = (
+                  <>
+                    <span className="text-muted font-mono">{fs.mountedOn}</span>{' '}
+                    <span className={fs.usePercent >= 90 ? 'text-danger font-medium' : 'text-subtle'}>
+                      {fs.usePercent}%
+                    </span>{' '}
+                    <span className="text-subtle">({t('disk.free', { size: formatKb(fs.availKb) })})</span>
+                    {/* Chỉ hiện inode khi đáng lo — 9 phân vùng × thêm một con số là nhiễu */}
+                    {fs.inodeUsePercent != null && fs.inodeUsePercent >= 75 && (
+                      <span className={fs.inodeUsePercent >= 90 ? 'text-danger font-medium' : 'text-warning'}>
+                        {' '}
+                        {t('disk.inodeShort', { percent: fs.inodeUsePercent })}
+                      </span>
+                    )}
+                  </>
+                )
+                // Phân vùng thật bấm được để quét thẳng — tmpfs/overlay thì quét cũng vô nghĩa
+                return isRealFilesystem(fs) ? (
+                  <button
+                    key={fs.mountedOn}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void scan(fs.mountedOn)}
+                    className="hover:bg-hover rounded text-left text-[11px]"
+                  >
+                    {body}
+                  </button>
+                ) : (
+                  <span key={fs.mountedOn} className="text-[11px]">
+                    {body}
+                  </span>
+                )
+              })}
             </div>
           </div>
         )}
@@ -237,7 +352,30 @@ export function DiskUsageModal({
               busy={busy}
               onGo={(p) => void scan(p)}
               onUp={() => void scan(parent ?? '/')}
+              onFiles={() => void findFiles(usage.path)}
             />
+            {below.length > 0 && (
+              <div className="border-edge mb-2 rounded border px-3 py-2">
+                <div className="text-subtle mb-1 text-[10px] font-semibold tracking-wider uppercase">
+                  {t('disk.mountsBelow')}
+                </div>
+                {below.map((fs) => (
+                  <button
+                    key={fs.mountedOn}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void scan(fs.mountedOn)}
+                    className="hover:bg-hover flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-xs"
+                  >
+                    <span className="text-content min-w-0 flex-1 truncate font-mono">{fs.mountedOn}</span>
+                    <span className={fs.usePercent >= 90 ? 'text-danger font-medium' : 'text-subtle'}>
+                      {fs.usePercent}%
+                    </span>
+                    <span className="text-content w-20 shrink-0 text-right">{formatKb(fs.usedKb)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="text-subtle mb-1.5 text-[11px]">
               {t('disk.total', { size: formatKb(usage.totalKb) })}
             </div>
@@ -245,7 +383,12 @@ export function DiskUsageModal({
               {usage.entries.length === 0 ? (
                 <p className="text-subtle py-6 text-center text-xs">{t('disk.empty')}</p>
               ) : (
-                usage.entries.map((entry) => (
+                usage.entries.map((entry) => {
+                  // Dòng `/mnt` 4 KB mà bên dưới là ổ 495 GB: nói ra ngay trên dòng, đừng để nó trông như rỗng
+                  const inside = mountsAtOrBelow(entry.path, below)
+                  const insideKb = inside.reduce((n, fs) => n + fs.usedKb, 0)
+                  const insideFull = inside.some((fs) => fs.usePercent >= 90)
+                  return (
                   <button
                     key={entry.path}
                     type="button"
@@ -259,14 +402,70 @@ export function DiskUsageModal({
                       style={{ width: `${Math.min(100, entry.percent)}%` }}
                     />
                     <span className="text-content relative min-w-0 flex-1 truncate font-mono text-xs">{entry.name}</span>
+                    {inside.length > 0 && (
+                      <span
+                        className={`relative shrink-0 rounded border px-1.5 text-[10px] ${
+                          insideFull ? 'border-danger/50 text-danger' : 'border-edge text-subtle'
+                        }`}
+                        title={inside.map((fs) => `${fs.mountedOn} ${fs.usePercent}%`).join('\n')}
+                      >
+                        {t('disk.entryMounts', { count: inside.length, size: formatKb(insideKb) })}
+                      </span>
+                    )}
                     <span className="text-subtle relative shrink-0 text-[11px]">{entry.percent}%</span>
                     <span className="text-content relative w-20 shrink-0 text-right text-xs">
                       {formatKb(entry.sizeKb)}
                     </span>
                   </button>
-                ))
+                  )
+                })
               )}
             </div>
+
+            {/* File lớn nhất: chỗ cụt của `du -d 1` là "dung lượng nằm ở file ngay đây" */}
+            <div className="border-edge mt-2 rounded border px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="text-subtle min-w-0 flex-1 text-[10px] font-semibold tracking-wider uppercase">
+                  {t('disk.bigFiles')}
+                </span>
+                <Button
+                  type="button"
+                  className="!px-2 !py-0.5 !text-[11px]"
+                  disabled={filesBusy || busy}
+                  onClick={() => void findFiles(usage.path)}
+                >
+                  {filesBusy ? t('disk.findingFiles') : files ? t('disk.refindFiles') : t('disk.findFiles')}
+                </Button>
+              </div>
+              {files && !files.ok && (
+                <p className="text-danger mt-1 text-xs">{files.error || t('disk.failed')}</p>
+              )}
+              {files?.ok && files.files.length === 0 && (
+                <p className="text-subtle mt-1 text-[11px] leading-relaxed">
+                  {t('disk.noBigFiles', { size: formatKb(files.minKb) })}
+                </p>
+              )}
+              {files?.ok && files.files.length > 0 && (
+                <div className="mt-1 max-h-64 overflow-y-auto">
+                  {files.files.map((f) => (
+                    <button
+                      key={f.path}
+                      type="button"
+                      title={t('disk.copyPathHint')}
+                      onClick={() =>
+                        void navigator.clipboard.writeText(f.path).then(() => push(t('disk.copied'), 'info'))
+                      }
+                      className="hover:bg-hover flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-xs"
+                    >
+                      <span className="text-content min-w-0 flex-1 truncate font-mono">{f.name}</span>
+                      <span className="text-subtle shrink-0 text-[11px]">{ago(f.mtimeMs, t)}</span>
+                      <span className="text-content w-20 shrink-0 text-right">{formatKb(f.sizeKb)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <p className="text-subtle mt-2 text-[10px] leading-relaxed">{t('disk.note')}</p>
           </>
         ) : null}

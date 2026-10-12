@@ -57,6 +57,84 @@ export interface Filesystem {
   availKb: number
   usePercent: number
   mountedOn: string
+  /** % inode đã dùng (`df -i`). null = filesystem không có khái niệm inode cố định (btrfs, vfat). */
+  inodeUsePercent?: number | null
+  inodesFree?: number
+}
+
+/** Ranh giới giữa phần `df -k` và phần `df -i` trong output của `dfWithInodesCommand`. */
+const INODE_MARKER = '@@INFRA_DF_INODES@@'
+
+/**
+ * `df -k` và `df -i` trong MỘT lệnh, ngăn bằng marker.
+ *
+ * Gộp chứ không chạy song song: mỗi lệnh riêng là một kết nối SSH riêng (kể cả qua jump host
+ * + login script). Thiếu inode là ca "No space left on device" mà `df -h` vẫn còn trống —
+ * hàng triệu file session/cache nhỏ — và `du` (đo dung lượng) không bao giờ chỉ ra được.
+ */
+export function dfWithInodesCommand(): string {
+  return `${dfCommand()}; echo ${INODE_MARKER}; df -P -i 2>/dev/null`
+}
+
+/**
+ * Parse output của `dfWithInodesCommand`. Phần inode hỏng/thiếu (BusyBox cũ…) thì vẫn trả
+ * dung lượng như thường, chỉ là không có cột inode.
+ */
+export function parseDfWithInodes(stdout: string): Filesystem[] {
+  const [blocks = '', inodes = ''] = stdout.split(INODE_MARKER)
+  const rows = parseDf(blocks)
+  const byMount = new Map<string, { percent: number | null; free: number }>()
+  for (const line of inodes.trim().split('\n').slice(1)) {
+    // IUse% là "-" với filesystem không có inode cố định
+    const m = line.trim().match(/^(\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+%|-)\s+(.+)$/)
+    if (!m) continue
+    const total = Number(m[2])
+    byMount.set(m[6]!.trim(), {
+      percent: total > 0 && m[5] !== '-' ? Number(m[5]!.slice(0, -1)) : null,
+      free: Number(m[4])
+    })
+  }
+  return rows.map((r) => {
+    const i = byMount.get(r.mountedOn)
+    return i ? { ...r, inodeUsePercent: i.percent, inodesFree: i.free } : r
+  })
+}
+
+/** Ngưỡng "file lớn" khi liệt kê — dưới mức này thì không phải thứ làm đầy đĩa. */
+export const BIG_FILE_MIN_KB = 50 * 1024
+
+/**
+ * Liệt kê các file lớn nhất dưới `path` (cả cây, không chỉ một cấp) — trả lời câu "dung lượng
+ * nằm ở FILE ngay trong thư mục này" mà `du -d 1` để lại cho người dùng tự đi tìm.
+ *
+ * `-xdev` cùng lý do với `du -x`. `-size +Nk` lọc ngay ở `find` để `sort` không phải xếp hàng
+ * triệu dòng. `%T@` (mtime) để thấy file nào còn đang lớn lên. `-printf` là của GNU find —
+ * BusyBox không có, khi đó output rỗng và UI nói rõ khả năng đó.
+ */
+export function bigFilesCommand(path: string, limit = 20): string {
+  return `find ${shq(path)} -xdev -type f -size +${BIG_FILE_MIN_KB}k -printf '%k %T@ %p\\n' 2>/dev/null | sort -rn | head -n ${limit}`
+}
+
+export interface BigFile {
+  path: string
+  /** Đường dẫn tính từ thư mục đang xem, để đọc nhanh. */
+  name: string
+  sizeKb: number
+  mtimeMs: number
+}
+
+/** Parse `bigFilesCommand`. Path có khoảng trắng vẫn giữ nguyên (lấy hết phần còn lại). */
+export function parseBigFiles(stdout: string, path: string): BigFile[] {
+  const self = path.replace(/\/+$/, '') || '/'
+  const out: BigFile[] = []
+  for (const line of stdout.split('\n')) {
+    const m = line.match(/^(\d+)\s+(\d+(?:\.\d+)?)\s+(.+)$/)
+    if (!m) continue
+    const p = m[3]!
+    const name = self === '/' ? p.slice(1) : p.startsWith(`${self}/`) ? p.slice(self.length + 1) : p
+    out.push({ path: p, name, sizeKb: Number(m[1]), mtimeMs: Math.round(Number(m[2]) * 1000) })
+  }
+  return out.sort((a, b) => b.sizeKb - a.sizeKb)
 }
 
 /**

@@ -263,6 +263,7 @@ export const IPC = {
   LOG_TAIL_EVENT: 'log-tail:event',
   /** F36/F37 — chẩn đoán chỉ-đọc trên host: đĩa đầy ở đâu, máy nào cần vá gì. */
   DIAG_DISK: 'diag:disk',
+  DIAG_DISK_FILES: 'diag:diskFiles',
   DIAG_UPDATES: 'diag:updates',
   /** F35 — đọc/ghi crontab. GHI là ghi vào production: renderer phải xác nhận trước. */
   CRON_READ: 'cron:read',

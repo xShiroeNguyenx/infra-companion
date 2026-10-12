@@ -1129,12 +1129,31 @@ export interface FilesystemDto {
   availKb: number
   usePercent: number
   mountedOn: string
+  /** % inode đã dùng. null = filesystem không có inode cố định; thiếu = `df -i` không đọc được. */
+  inodeUsePercent?: number | null
+  inodesFree?: number
 }
 
 export interface DiskUsageResultDto {
   ok: boolean
   usage: DiskUsageDto | null
   filesystems: FilesystemDto[]
+  error?: string
+}
+
+/** Một file lớn dưới thư mục đang xem (`find -size +50M`). */
+export interface DiskFileDto {
+  path: string
+  name: string
+  sizeKb: number
+  mtimeMs: number
+}
+
+export interface DiskFilesResultDto {
+  ok: boolean
+  files: DiskFileDto[]
+  /** Ngưỡng đã lọc, để UI nói "không có file nào ≥ X". */
+  minKb: number
   error?: string
 }
 
@@ -2359,6 +2378,8 @@ export interface InfraApi {
   diag: {
     /** Liệt kê MỘT cấp dưới `path` (drill-down từng bước) + dung lượng còn trống các phân vùng. */
     disk(hostId: string, path: string): Promise<DiskUsageResultDto>
+    /** Các file lớn nhất dưới `path` (cả cây, `-xdev`). Chỉ chạy khi user bấm — có thể chậm. */
+    diskFiles(hostId: string, path: string): Promise<DiskFilesResultDto>
     /** Liệt kê bản cập nhật đang chờ. CHỈ ĐỌC — không chạy `apt update`, không cài gì. */
     updates(hostId: string): Promise<HostUpdatesDto>
     /**

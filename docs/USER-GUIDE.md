@@ -837,10 +837,19 @@ Pick a host. The top strip lists every filesystem with how full it is (red past 
 
 | What the numbers say | What you get told |
 |---|---|
+| The filesystem is **out of inodes** (90%+) | Checked before anything else: new files fail with "No space left on device" while there is still room, and `du` (which counts bytes) can't explain it. You get a copyable `du --inodes` command that counts files per directory. |
+| This filesystem has room, but one **mounted below** this directory is 90%+ full | *Go straight there* — with a button. `du -x` never counts another filesystem, so that disk would otherwise look like an empty 4 KB folder. |
+| At the **root of a filesystem**, `df` reports far more used than `du` can count (≥ 1 GB and ≥ 10%) | Usually files deleted while a process still holds them open; the space only returns when that process closes them or restarts. You get a copyable `sudo lsof +L1` command for that filesystem. Data hidden under a mount point, or a user who can't read everything, cause the same gap. |
 | One subdirectory holds 60%+ | *Go into `log` — it holds 95.5% here, and everything else together is rounding error.* Plus a button that opens it. |
-| Most of the space is in **files sitting directly here** | Going deeper won't find it — `du -d 1` counts directories, so a single enormous `catalina.out` never shows up as a row. You need to look at individual files. |
+| Most of the space is in **files sitting directly here** | Going deeper won't find it — `du -d 1` counts directories, so a single enormous `catalina.out` never shows up as a row. Plus a button that lists the largest files. |
 | Nothing dominates | *The space is spread out* — said plainly, rather than implying there's a culprit to chase. |
 | This branch is tiny next to what the filesystem has used | You're digging in the wrong place; here's the way back up. |
+
+The commands are **only shown, never run** by the app: they need `sudo`, and what to restart is the decision of whoever is on call.
+
+**Filesystems mounted below.** When other disks are mounted somewhere under the current directory, they get their own box above the list, fullest first; click one to scan it. The row that contains them is tagged *+1 filesystem · 495 GB*, red when one of them is nearly full. `tmpfs`, Docker `overlay` mounts, snap loop devices (always 100%) and bind mounts of the same disk are left out. Real filesystems in the top strip can be clicked too. Inode usage appears next to a filesystem once it reaches 75%.
+
+**Largest files.** *Find largest files* lists the 20 biggest files of 50 MB or more anywhere under the current directory, on the same filesystem only (`find -xdev`). Each shows when it was last modified — a big file touched minutes ago is usually the one still growing. Click a row to copy its full path. It only runs when you press it, because `find` over a large disk can take a while. BusyBox `find` has no `-printf`, so on those systems the list comes back empty.
 
 > The filesystem is matched by **longest mount point, at a path boundary** — so `/bootstrap` isn't reported as living on `/boot`, and a directory under `/var/lib/docker` is measured against that mount instead of `/`. If `df` gave nothing back, the verdict says only what it actually knows rather than inventing an urgency level.
 

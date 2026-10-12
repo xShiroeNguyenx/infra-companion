@@ -1324,7 +1324,7 @@ export const vi = {
   'disk.empty': 'Không có thư mục con nào đọc được',
   'disk.failed': 'Không quét được',
   'disk.note':
-    'Đi từng cấp một (`du -d 1`), không vượt sang phân vùng khác. Thư mục không đủ quyền bị bỏ qua — nên tổng của cấp cha có thể lớn hơn tổng các dòng ở đây.',
+    'Đi từng cấp một (`du -d 1`), không vượt sang phân vùng khác — phân vùng gắn bên dưới được liệt kê riêng ở trên. Thư mục không đủ quyền bị bỏ qua — nên tổng của cấp cha có thể lớn hơn tổng các dòng ở đây.',
   'disk.verdictFs': 'Phân vùng {mount} đã dùng {percent}%, còn {free}',
   'disk.verdictNoFs': 'Thư mục này: {size}',
   'disk.verdictShare': 'thư mục này {size}, tức {percent}% phần đã dùng',
@@ -1336,6 +1336,27 @@ export const vi = {
   'disk.adviceLeaf': 'Không còn thư mục con nào ở đây.',
   'disk.goInto': 'Vào {name} →',
   'disk.goUp': '↑ Lên cấp trên',
+  'disk.adviceOtherMount':
+    'Phân vùng này còn trống, nhưng {mount} gắn bên dưới đã dùng {mountPercent}% (còn {free}) — `du` không tính dung lượng của phân vùng khác, nên đi thẳng vào đó.',
+  'disk.mountsBelow': 'Phân vùng gắn bên dưới — `du` ở đây không tính',
+  'disk.entryMounts': '+{count} phân vùng · {size}',
+  'disk.adviceHiddenUsage':
+    'Phân vùng báo đã dùng nhiều hơn tổng `du` đếm được tới {hidden}. Hay gặp nhất: file đã xoá (`rm`) nhưng tiến trình vẫn đang giữ mở (log của mysqld/java…) — dung lượng chỉ được trả lại khi tiến trình đóng file hoặc restart. Cũng có thể là dữ liệu bị một mount point che, hoặc user SSH không đủ quyền đọc hết. Kiểm bằng:',
+  'disk.adviceInodesFull':
+    'Hết INODE ({inodePercent}%) chứ không phải hết dung lượng — ghi file mới sẽ báo "No space left on device" dù còn trống. Thường do hàng triệu file nhỏ (session, cache, hàng đợi mail); `du` đo byte nên không chỉ ra được. Đếm số file theo thư mục:',
+  'disk.inodeShort': 'inode {percent}%',
+  'disk.copy': 'Chép',
+  'disk.copied': 'Đã chép vào clipboard',
+  'disk.bigFiles': 'File lớn nhất ở đây (cả các thư mục con)',
+  'disk.findFiles': '📄 Tìm file lớn nhất',
+  'disk.refindFiles': '↻ Tìm lại',
+  'disk.findingFiles': 'Đang tìm…',
+  'disk.noBigFiles':
+    'Không có file nào từ {size} trở lên. (Máy dùng BusyBox thì `find` không có `-printf` và cũng ra kết quả rỗng.)',
+  'disk.copyPathHint': 'Bấm để chép đường dẫn đầy đủ',
+  'disk.agoMin': 'sửa {n} phút trước',
+  'disk.agoHour': 'sửa {n} giờ trước',
+  'disk.agoDay': 'sửa {n} ngày trước',
   'pkg.title': 'Máy nào cần vá gì',
   'pkg.desc':
     'Đọc danh sách gói chờ cập nhật trên các máy bạn chọn. CHỈ ĐỌC và KHÔNG đi mạng — chỉ đọc cache có sẵn trên máy đó (`apt list --upgradable`, `dnf -C check-update`), không làm mới metadata vì việc đó cần root và ghi vào máy. Nên kết quả cũ đúng bằng lần refresh cache gần nhất của chính máy đó, và cố ý không có nút vá.',
@@ -3519,7 +3540,7 @@ export const en: Partial<Record<I18nKey, string>> = {
   'disk.empty': 'No readable subdirectories',
   'disk.failed': 'Scan failed',
   'disk.note':
-    'One level at a time (`du -d 1`), never crossing into another filesystem. Directories you cannot read are skipped — so the parent total can exceed the rows listed here.',
+    'One level at a time (`du -d 1`), never crossing into another filesystem — filesystems mounted below are listed separately above. Directories you cannot read are skipped — so the parent total can exceed the rows listed here.',
   'disk.verdictFs': 'Filesystem {mount} is {percent}% used, {free} left',
   'disk.verdictNoFs': 'This directory: {size}',
   'disk.verdictShare': 'this directory is {size}, {percent}% of what is used',
@@ -3531,6 +3552,27 @@ export const en: Partial<Record<I18nKey, string>> = {
   'disk.adviceLeaf': 'No subdirectories left here.',
   'disk.goInto': 'Open {name} →',
   'disk.goUp': '↑ Go up',
+  'disk.adviceOtherMount':
+    'This filesystem has room, but {mount} mounted below it is {mountPercent}% used ({free} left) — `du` never counts another filesystem, so go straight there.',
+  'disk.mountsBelow': 'Filesystems mounted below — not counted by `du` here',
+  'disk.entryMounts': '+{count} filesystem(s) · {size}',
+  'disk.adviceHiddenUsage':
+    'The filesystem reports {hidden} more in use than `du` can count. Most often: files that were deleted (`rm`) but are still held open by a process (mysqld or java logs…) — the space only comes back when the process closes the file or restarts. It can also be data hidden under a mount point, or an SSH user that cannot read everything. Check with:',
+  'disk.adviceInodesFull':
+    'Out of INODES ({inodePercent}%), not out of space — creating a file fails with "No space left on device" even though there is room. Usually millions of tiny files (sessions, cache, a mail queue); `du` measures bytes, so it cannot point at them. Count files per directory:',
+  'disk.inodeShort': 'inodes {percent}%',
+  'disk.copy': 'Copy',
+  'disk.copied': 'Copied to clipboard',
+  'disk.bigFiles': 'Largest files here (including subdirectories)',
+  'disk.findFiles': '📄 Find largest files',
+  'disk.refindFiles': '↻ Search again',
+  'disk.findingFiles': 'Searching…',
+  'disk.noBigFiles':
+    'No files of {size} or more. (On BusyBox systems `find` has no `-printf`, which also gives an empty result.)',
+  'disk.copyPathHint': 'Click to copy the full path',
+  'disk.agoMin': 'modified {n} min ago',
+  'disk.agoHour': 'modified {n} h ago',
+  'disk.agoDay': 'modified {n} days ago',
   'pkg.title': 'What needs patching',
   'pkg.desc':
     'Reads the pending package updates on the machines you pick. READ-ONLY and OFFLINE — it only reads the cache already on the machine (`apt list --upgradable`, `dnf -C check-update`) and never refreshes metadata, since that needs root and writes to the machine. Results are therefore only as fresh as each machine’s own last cache refresh, and there is deliberately no button to patch.',
@@ -5690,7 +5732,7 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'disk.empty': '読み取れるサブディレクトリがありません',
   'disk.failed': 'スキャンできませんでした',
   'disk.note':
-    '1 階層ずつ（`du -d 1`）、他のファイルシステムには入りません。権限のないディレクトリはスキップされるため、親の合計がここの行の合計を上回ることがあります。',
+    '1 階層ずつ（`du -d 1`）、他のファイルシステムには入りません（配下のマウントは上に別途表示）。権限のないディレクトリはスキップされるため、親の合計がここの行の合計を上回ることがあります。',
   'disk.verdictFs': 'ファイルシステム {mount} は {percent}% 使用、残り {free}',
   'disk.verdictNoFs': 'このディレクトリ: {size}',
   'disk.verdictShare': 'このディレクトリは {size}、使用済み容量の {percent}%',
@@ -5702,6 +5744,26 @@ export const ja: Partial<Record<I18nKey, string>> = {
   'disk.adviceLeaf': 'ここにサブディレクトリはありません。',
   'disk.goInto': '{name} を開く →',
   'disk.goUp': '↑ 上の階層へ',
+  'disk.adviceOtherMount':
+    'このファイルシステムには空きがありますが、配下にマウントされた {mount} は {mountPercent}% 使用（残り {free}）です — `du` は他のファイルシステムを数えないので、直接そちらへ進んでください。',
+  'disk.mountsBelow': '配下のマウント — ここの `du` には含まれません',
+  'disk.entryMounts': '+{count} 個のファイルシステム · {size}',
+  'disk.adviceHiddenUsage':
+    'ファイルシステムの使用量が `du` で数えた合計より {hidden} 多くなっています。最も多い原因は、削除（`rm`）されたのにプロセスがまだ開いているファイル（mysqld や java のログなど）です — プロセスがファイルを閉じるか再起動するまで容量は戻りません。マウントポイントの下に隠れたデータや、SSH ユーザーの読み取り権限不足の可能性もあります。確認コマンド:',
+  'disk.adviceInodesFull':
+    '容量ではなく INODE が枯渇しています（{inodePercent}%）— 空きがあってもファイル作成は "No space left on device" で失敗します。通常は大量の小さなファイル（セッション、キャッシュ、メールキュー）が原因で、バイト数を測る `du` では特定できません。ディレクトリごとのファイル数:',
+  'disk.inodeShort': 'inode {percent}%',
+  'disk.copy': 'コピー',
+  'disk.copied': 'クリップボードにコピーしました',
+  'disk.bigFiles': 'ここで最も大きいファイル（サブディレクトリを含む）',
+  'disk.findFiles': '📄 大きいファイルを探す',
+  'disk.refindFiles': '↻ 再検索',
+  'disk.findingFiles': '検索中…',
+  'disk.noBigFiles': '{size} 以上のファイルはありません。（BusyBox の `find` には `-printf` がないため、その場合も空になります。）',
+  'disk.copyPathHint': 'クリックでフルパスをコピー',
+  'disk.agoMin': '{n} 分前に更新',
+  'disk.agoHour': '{n} 時間前に更新',
+  'disk.agoDay': '{n} 日前に更新',
   'pkg.title': '更新が必要なマシン',
   'pkg.desc':
     '選んだマシンの保留中パッケージ更新を読み取ります。読み取り専用かつネットワーク不使用 — マシン上の既存キャッシュのみを読み（`apt list --upgradable`、`dnf -C check-update`）、メタデータの更新は行いません（root が必要で書き込みになるため）。結果は各マシン自身の最終キャッシュ更新時点のものです。適用ボタンは意図的にありません。',

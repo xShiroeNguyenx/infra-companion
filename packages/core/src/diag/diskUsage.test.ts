@@ -1,5 +1,17 @@
 import { describe, expect, test } from 'vitest'
-import { dfCommand, duCommand, formatKb, parentPath, parseDf, parseDu } from './diskUsage'
+import {
+  BIG_FILE_MIN_KB,
+  bigFilesCommand,
+  dfCommand,
+  dfWithInodesCommand,
+  duCommand,
+  formatKb,
+  parentPath,
+  parseBigFiles,
+  parseDf,
+  parseDfWithInodes,
+  parseDu
+} from './diskUsage'
 
 describe('duCommand', () => {
   test('có -x (không vượt filesystem), -k (ép KB), -d 1 (một cấp)', () => {
@@ -20,7 +32,7 @@ describe('duCommand', () => {
   })
 
   test('KHÔNG dùng $(…) hay backtick — mỗi hop login-script bóc mất một lớp quote', () => {
-    for (const cmd of [duCommand('/var'), dfCommand()]) {
+    for (const cmd of [duCommand('/var'), dfCommand(), dfWithInodesCommand(), bigFilesCommand('/var')]) {
       expect(cmd).not.toContain('$(')
       expect(cmd).not.toContain('`')
     }
@@ -98,6 +110,72 @@ tmpfs              2048000         0   2048000       0% /dev/shm
 
   test('output rỗng → mảng rỗng', () => {
     expect(parseDf('')).toEqual([])
+  })
+})
+
+describe('parseDfWithInodes', () => {
+  const blocks = `Filesystem     1024-blocks      Used Available Capacity Mounted on
+/dev/sda1         41152000  20000000  21152000      49% /
+/dev/sdb1        104857600  20971520  83886080      20% /mnt/my data
+/dev/sdc1           524288     10000    514288       2% /boot/efi
+`
+  const inodes = `Filesystem      Inodes   IUsed   IFree IUse% Mounted on
+/dev/sda1      2621440 2595000   26440   99% /
+/dev/sdb1      6553600   12000 6541600    1% /mnt/my data
+/dev/sdc1            0       0       0     - /boot/efi
+`
+  const marker = dfWithInodesCommand().match(/echo (\S+)/)![1]!
+
+  test('ghép % inode vào đúng phân vùng theo điểm gắn (kể cả điểm gắn có khoảng trắng)', () => {
+    const rows = parseDfWithInodes(`${blocks}${marker}\n${inodes}`)
+    expect(rows).toHaveLength(3)
+    // Ca kinh điển: dung lượng mới 49% mà inode đã 99%
+    expect(rows[0]).toMatchObject({ mountedOn: '/', usePercent: 49, inodeUsePercent: 99, inodesFree: 26_440 })
+    expect(rows[1]).toMatchObject({ mountedOn: '/mnt/my data', inodeUsePercent: 1 })
+  })
+
+  test('filesystem không có inode cố định (vfat/btrfs, IUse% = "-") → null, không phải 0%', () => {
+    expect(parseDfWithInodes(`${blocks}${marker}\n${inodes}`)[2]!.inodeUsePercent).toBeNull()
+  })
+
+  test('phần inode hỏng/thiếu vẫn giữ nguyên dung lượng — không mất cả màn vì thiếu một cột', () => {
+    const rows = parseDfWithInodes(`${blocks}${marker}\n`)
+    expect(rows).toHaveLength(3)
+    expect(rows[0]!.inodeUsePercent).toBeUndefined()
+    expect(parseDfWithInodes(blocks)).toHaveLength(3)
+  })
+
+  test('dòng inode KHÔNG bị đọc nhầm thành phân vùng thứ hai', () => {
+    // Không có marker thì regex của parseDf khớp cả dòng `df -i` → mỗi phân vùng ra 2 lần
+    expect(parseDfWithInodes(`${blocks}${marker}\n${inodes}`).filter((r) => r.mountedOn === '/')).toHaveLength(1)
+  })
+})
+
+describe('bigFilesCommand / parseBigFiles', () => {
+  test('-xdev (như du -x), lọc ngưỡng ngay ở find, giới hạn số dòng', () => {
+    const cmd = bigFilesCommand('/var/log')
+    expect(cmd).toContain('-xdev')
+    expect(cmd).toContain(`-size +${BIG_FILE_MIN_KB}k`)
+    expect(cmd).toContain('head -n 20')
+    expect(cmd).toContain("'/var/log'")
+  })
+
+  test('đọc size + mtime + path, path có khoảng trắng giữ nguyên, tên tính từ thư mục đang xem', () => {
+    const files = parseBigFiles(
+      '204800 1760000000.5 /var/log/app/old dump.sql\n9437184 1760001000.0 /var/log/catalina.out\n',
+      '/var/log'
+    )
+    expect(files[0]).toMatchObject({ name: 'catalina.out', sizeKb: 9_437_184, mtimeMs: 1_760_001_000_000 })
+    expect(files[1]!.name).toBe('app/old dump.sql')
+    expect(files[1]!.path).toBe('/var/log/app/old dump.sql')
+  })
+
+  test('ở gốc / thì tên bỏ dấu / đầu', () => {
+    expect(parseBigFiles('60000 1 /swapfile\n', '/')[0]!.name).toBe('swapfile')
+  })
+
+  test('output rỗng (không có file nào vượt ngưỡng) → mảng rỗng, không lỗi', () => {
+    expect(parseBigFiles('', '/var')).toEqual([])
   })
 })
 

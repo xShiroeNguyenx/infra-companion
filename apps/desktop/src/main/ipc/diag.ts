@@ -2,12 +2,15 @@ import { ipcMain, type IpcMainInvokeEvent } from 'electron'
 import {
   applySecurityNames,
   detectManagerCommand,
-  dfCommand,
+  BIG_FILE_MIN_KB,
+  bigFilesCommand,
+  dfWithInodesCommand,
   duCommand,
   execOnce,
+  parseBigFiles,
+  parseDfWithInodes,
   parseSecurityNames,
   securityListCommand,
-  parseDf,
   parseDu,
   parseManager,
   parseUpdates,
@@ -18,7 +21,14 @@ import {
   writeSucceeded,
   type CronScope
 } from '@infra/core'
-import { IPC, type CronReadResult, type CronWriteResult, type DiskUsageResultDto, type HostUpdatesDto } from '@infra/shared'
+import {
+  IPC,
+  type CronReadResult,
+  type CronWriteResult,
+  type DiskFilesResultDto,
+  type DiskUsageResultDto,
+  type HostUpdatesDto
+} from '@infra/shared'
 import { makeHostKeyVerifier, prepareConnection } from './connection'
 import { touchActivity } from './vault'
 
@@ -64,7 +74,7 @@ export function registerDiagIpc(): void {
     try {
       const [du, df] = await Promise.all([
         run(event, hostId, duCommand(path), DU_TIMEOUT_MS),
-        run(event, hostId, dfCommand(), DU_TIMEOUT_MS)
+        run(event, hostId, dfWithInodesCommand(), DU_TIMEOUT_MS)
       ])
       if (!du.ok) {
         return { ok: false, usage: null, filesystems: [], error: du.error ?? `Không đọc được ${path}` }
@@ -72,10 +82,30 @@ export function registerDiagIpc(): void {
       return {
         ok: true,
         usage: parseDu(du.stdout, path),
-        filesystems: df.ok ? parseDf(df.stdout) : []
+        filesystems: df.ok ? parseDfWithInodes(df.stdout) : []
       }
     } catch (error) {
       return { ok: false, usage: null, filesystems: [], error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle(IPC.DIAG_DISK_FILES, async (event, hostId: string, path: string): Promise<DiskFilesResultDto> => {
+    touchActivity()
+    try {
+      const res = await run(event, hostId, bigFilesCommand(path), DU_TIMEOUT_MS)
+      // stdout rỗng là HỢP LỆ (không có file nào vượt ngưỡng) — chỉ hỏng khi kênh exec hỏng.
+      // `run` coi rỗng là !ok nên phải tự phân biệt ở đây.
+      if (!res.ok && res.error) {
+        return { ok: false, files: [], minKb: BIG_FILE_MIN_KB, error: res.error }
+      }
+      return { ok: true, files: parseBigFiles(res.stdout, path), minKb: BIG_FILE_MIN_KB }
+    } catch (error) {
+      return {
+        ok: false,
+        files: [],
+        minKb: BIG_FILE_MIN_KB,
+        error: error instanceof Error ? error.message : String(error)
+      }
     }
   })
 

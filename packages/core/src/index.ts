@@ -524,8 +524,20 @@ export {
 } from './keys/authorizedKeys'
 export type { CopyIdOutcome } from './keys/authorizedKeys'
 // F36 / F37 — chẩn đoán đọc-thuần trên host: đĩa đầy ở đâu, máy nào cần vá gì.
-export { dfCommand, duCommand, formatKb, parentPath, parseDf, parseDu } from './diag/diskUsage'
-export type { DiskEntry, DiskUsage, Filesystem } from './diag/diskUsage'
+export {
+  BIG_FILE_MIN_KB,
+  bigFilesCommand,
+  dfCommand,
+  dfWithInodesCommand,
+  duCommand,
+  formatKb,
+  parentPath,
+  parseBigFiles,
+  parseDf,
+  parseDfWithInodes,
+  parseDu
+} from './diag/diskUsage'
+export type { BigFile, DiskEntry, DiskUsage, Filesystem } from './diag/diskUsage'
 export {
   detectManagerCommand,
   parseManager,
