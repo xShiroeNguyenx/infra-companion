@@ -19,6 +19,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Motions blend into each other instead of snapping.** Every switch between a motion clip and the character’s own idle movement used to jump from one pose to the next in a single frame. The most visible case was the end of every reaction clip, and stopping after a walk. Each switch now blends over 0.3 seconds.
 - **Walking costs almost nothing extra.** The character walks in place while its frame slides sideways. The 3D scene draws the same number of pixels as when it stands still, and the sliding is done by the compositor without recalculating the page layout.
 
+### Security
+
+- **Electron 42.4.0 → 42.11.14.** Electron is the runtime the app ships with, so its fixes reach every install. This update closes six advisories. Among them, popups and frames opened from sandboxed content could lose that sandbox, and protocol responses could reuse the wrong session cache. It stays on the same major version, so the terminal’s native module keeps working without a rebuild.
+- **js-yaml 4.2.0 → 4.3.2**, used by the auto-updater to read the release manifest. The fixes stop crafted YAML from tying up the CPU.
+- `pnpm audit --prod`, which covers everything that goes into the installer, now reports **no known vulnerabilities**. The alerts GitHub still lists come from build and test tools such as the packager, the bundler and the test runner, which never ship to users.
+
 ---
 
 ## [0.4.8] — 2026-10-12

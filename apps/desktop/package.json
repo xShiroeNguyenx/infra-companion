@@ -47,7 +47,7 @@
     "@types/three": "^0.185.4",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^5.0.0",
-    "electron": "42.4.0",
+    "electron": "42.11.14",
     "electron-builder": "^26.15.0",
     "electron-vite": "^5.0.0",
     "tailwindcss": "^4.3.0",
