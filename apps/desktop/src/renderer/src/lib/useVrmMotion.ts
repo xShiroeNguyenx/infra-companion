@@ -61,6 +61,17 @@ export interface VrmMotionApi {
   stop: () => void
   /** Clip đang chạy (id), `null` = đang dùng chuyển động tự sinh. */
   playing: string | null
+  /**
+   * Bật/tắt clip `walk` cho đi dạo (`useVrmStroll`): lặp, **neo tại chỗ** (khung trượt thay).
+   *
+   * Bật trả về tốc độ đi đo từ clip (m/s), `0` nếu không bật được (chưa tải, đang có clip khác).
+   * Tắt chỉ có tác dụng khi clip đang chạy CHÍNH LÀ lượt đi bộ này — clip khác đã chen vào thì để yên.
+   */
+  walk: (on: boolean, pace?: number, clipId?: string) => Promise<number>
+  /** Vai trò của clip đang chạy và còn hạn; `null` = không có clip nào. Đọc đồng bộ. */
+  currentRole: () => VrmMotionRole | null
+  /** Lượt đi bộ còn đang giữ nhân vật không — `false` ngay khi clip khác chen ngang. Đọc đồng bộ. */
+  isWalking: () => boolean
 }
 
 /**
@@ -101,6 +112,12 @@ export function useVrmMotion(
   const lastFolderByRole = useRef(new Map<VrmMotionRoleName, string>())
   const stopTimer = useRef<number | null>(null)
   /**
+   * Clip đang chạy là lượt đi bộ của `walk()`. Ref chứ không state: vòng rAF của đi dạo đọc nó
+   * MỖI FRAME để biết có ai chen ngang chưa, mà state thì trễ một lượt render — đủ để khung trượt
+   * thêm vài frame trong lúc nhân vật đã đứng lại cúi đầu xin lỗi.
+   */
+  const walking = useRef(false)
+  /**
    * Bảng gán đè, giữ trong ref để `run()` đọc được mà không phải nằm trong deps của nó.
    *
    * `run` đã `useCallback([stage])`; thêm `folder` vào deps là hàm mới mỗi lần user gõ một ký tự
@@ -119,6 +136,7 @@ export function useVrmMotion(
       stopTimer.current = null
     }
     current.current = null
+    walking.current = false
     setPlaying(null)
     void stage?.playAnimation(null)
   }, [stage])
@@ -135,6 +153,7 @@ export function useVrmMotion(
          * user chọn chúng CHÍNH VÌ muốn thấy nhân vật đi, neo lại là làm hỏng điều họ muốn xem.
          */
         void stage?.playAnimation(bytes, { once: !loop, anchor: !(loop && clip.locomotion) })
+        walking.current = false
         setPlaying(clip.id)
         // Vai trò HIỆU LỰC, không phải `clip.role`: user gán đè thì luật ưu tiên phải theo cái họ
         // gán — gán "Khi có cảnh báo" cho một clip vốn là `idle` mà `PRIORITY` vẫn tính là idle
@@ -184,6 +203,7 @@ export function useVrmMotion(
       const file = folder.files.find((f) => f.name === name)
       if (!file) return false
       lastFolderByRole.current.set(role, name)
+      walking.current = false
       // `anchor: true` như mọi clip TỰ CHẠY: nhiều clip dời cả người đi, mà khung ôm sát thân nên
       // nhân vật đi thẳng ra ngoài rồi vài giây sau mới quay lại
       void stage.playAnimation(file.bytes, { once: true, anchor: true }).then((durationSec) => {
@@ -242,6 +262,50 @@ export function useVrmMotion(
     [stage, installed, run]
   )
 
+  const walk = useCallback(
+    async (on: boolean, pace = 1, clipId = 'walk'): Promise<number> => {
+      if (!stage) return 0
+      if (!on) {
+        if (walking.current) stop()
+        return 0
+      }
+      const free = (): boolean => {
+        const cur = current.current
+        return walking.current || !cur || performance.now() >= cur.until
+      }
+      if (!enabled || !installed.includes(clipId) || !free()) return 0
+      let bytes = cache.current.get(clipId)
+      if (!bytes) {
+        const r = await window.infra.vrm.readMotion(clipId)
+        if (!r.ok) return 0
+        bytes = r.bytes
+        cache.current.set(clipId, bytes)
+      }
+      // Kiểm lại SAU lượt đọc file: trong lúc chờ, một cảnh báo có thể đã chiếm nhân vật
+      if (!free()) return 0
+      if (stopTimer.current !== null) {
+        clearTimeout(stopTimer.current)
+        stopTimer.current = null
+      }
+      walking.current = true
+      /**
+       * Vai `idle`, hạn VÔ CÙNG: mọi phản ứng (chạm, chat, cảnh báo) đều ưu tiên hơn idle nên vẫn
+       * chen ngang được; còn lịch clip idle định kỳ thì gặp `idle >= idle` và tự nhường — không
+       * thay dáng đi bằng dáng uống nước giữa đường.
+       */
+      current.current = { role: 'idle', until: Infinity }
+      setPlaying(clipId)
+      await stage.playAnimation(bytes, { anchor: true, measureGait: true, timeScale: pace })
+      return walking.current ? stage.gaitSpeed() : 0
+    },
+    [stage, enabled, installed, stop]
+  )
+  const isWalking = useCallback(() => walking.current, [])
+  const currentRole = useCallback((): VrmMotionRole | null => {
+    const cur = current.current
+    return cur && performance.now() < cur.until ? cur.role : null
+  }, [])
+
   const download = useCallback(async () => {
     setDownloading(true)
     try {
@@ -261,5 +325,5 @@ export function useVrmMotion(
     []
   )
 
-  return { installed, clips: VRM_MOTIONS, downloading, download, play, playById, stop, playing }
+  return { installed, clips: VRM_MOTIONS, downloading, download, play, playById, stop, playing, walk, isWalking, currentRole }
 }

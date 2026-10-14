@@ -8,6 +8,7 @@
  */
 
 import type { VrmMeta, VrmSpec } from './vrmTypes'
+import { STROLL_PACE } from './vrmStroll'
 
 /** Trần dung lượng một model. Model VRM thật thường 15–60 MB; hơn 200 MB là bất thường. */
 export const VRM_MAX_BYTES = 200 * 1024 * 1024
@@ -249,6 +250,15 @@ export interface VrmSettingsDto {
    * `reactToEvents` cũng bật.
    */
   desktopOverlay: boolean
+  /**
+   * Lúc rảnh thì đi dạo qua lại dọc đáy cửa sổ (clip `walk`, xem `vrmStroll.ts`).
+   *
+   * Mặc định tắt: một thứ chuyển động ở rìa mắt là chuyện user phải tự chọn, và nó cần bộ clip
+   * đã tải về.
+   */
+  stroll: boolean
+  /** Nhịp đi dạo — một trong `STROLL_PACES`; clip và khung cùng chậm theo tỉ lệ này. */
+  strollPace: number
 }
 
 export const DEFAULT_VRM_SETTINGS: VrmSettingsDto = {
@@ -262,7 +272,9 @@ export const DEFAULT_VRM_SETTINGS: VrmSettingsDto = {
   rotationY: 0,
   posX: null,
   posY: null,
-  desktopOverlay: true
+  desktopOverlay: true,
+  stroll: false,
+  strollPace: STROLL_PACE
 }
 
 /** Đọc một toạ độ tỉ lệ đã lưu: phải là số trong [0,1], ngoài ra coi như chưa có. */

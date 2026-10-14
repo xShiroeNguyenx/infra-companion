@@ -20,6 +20,8 @@ import {
   FINGER_CURL_RIGHT_SCALE,
   FINGER_JOINTS,
   frameDistance,
+  gaitGroundSpeed,
+  type GaitSample,
   elbowDrift,
   elbowDriftReach,
   lookArmOffset,
@@ -248,7 +250,23 @@ export interface VrmStage {
    * tự nạp từ thư mục thì không — mà `useVrmMotion` cần con số đó để hẹn giờ trả quyền về lớp tự
    * sinh. Đọc từ chính file là nguồn duy nhất đúng, và stage vốn đã có nó trong tay.
    */
-  playAnimation(bytes: Uint8Array | null, opts?: { once?: boolean; anchor?: boolean }): Promise<number>
+  playAnimation(
+    bytes: Uint8Array | null,
+    opts?: { once?: boolean; anchor?: boolean; measureGait?: boolean; timeScale?: number }
+  ): Promise<number>
+  /**
+   * Tốc độ đi (m/s) đo từ bàn chân của clip nạp gần nhất với `measureGait`; `0` = chưa đo/không đo được.
+   *
+   * Dùng cho đi dạo (`vrmStroll.ts`): khung trượt ngang phải khớp đúng tốc độ này, lệch là chân trượt.
+   */
+  gaitSpeed(): number
+  /**
+   * Bao nhiêu pixel CSS trên màn hình ứng với 1 mét ở mặt phẳng nhân vật đứng.
+   *
+   * Tính từ camera thật (khoảng cách + FOV + chiều cao canvas), nên đúng ở mọi mức zoom và với cả
+   * hai ràng buộc căn khung (dọc hoặc ngang).
+   */
+  pxPerMeter(): number
   /** Dừng vòng lặp render và giải phóng toàn bộ tài nguyên GPU. */
   dispose(): void
 }
@@ -557,6 +575,88 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
    * ở frame cuối. Phải **gỡ hẳn** mixer mới trả được quyền cho lớp idle.
    */
   let clipEndsAt = 0
+  /**
+   * ==== CHUYỂN MƯỢT giữa clip và chuyển động tự sinh ====
+   *
+   * Clip `.vrma` và lớp tự sinh đều GHI ĐÈ xương mỗi frame, nên đổi nguồn là xương nhảy thẳng từ
+   * tư thế này sang tư thế kia trong một frame — user thấy rõ nhất lúc nhân vật đi dạo dừng lại,
+   * và ở cuối mọi clip phản ứng. Cách chữa: lúc đổi nguồn chụp lại tư thế ĐANG HIỆN, rồi trong
+   * `BLEND_MS` kế tiếp trộn từ ảnh chụp đó sang thứ nguồn mới ghi ra (slerp từng xương).
+   *
+   * Trộn SAU khi nguồn đã ghi xong và TRƯỚC `vrm.update`: hai nguồn không cần biết gì về nhau,
+   * và cả hai chiều (clip → tự sinh, tự sinh → clip, clip → clip) đi chung một đường.
+   */
+  const BLEND_MS = 300
+  const blendBones: Obj3D[] = (
+    [
+      'hips', 'spine', 'chest', 'upperChest', 'neck', 'head',
+      'leftShoulder', 'leftUpperArm', 'leftLowerArm', 'leftHand',
+      'rightShoulder', 'rightUpperArm', 'rightLowerArm', 'rightHand',
+      'leftUpperLeg', 'leftLowerLeg', 'leftFoot', 'leftToes',
+      'rightUpperLeg', 'rightLowerLeg', 'rightFoot', 'rightToes'
+    ] as BoneName[]
+  )
+    .map((b) => bone(b))
+    .filter((n): n is Obj3D => n !== null)
+  const blendQ = blendBones.map(() => new THREE.Quaternion())
+  const blendHips = new THREE.Vector3()
+  const blendTmp = new THREE.Quaternion()
+  const blendHipsTmp = new THREE.Vector3()
+  const blendHipsNode = bone('hips')
+  let blendT0 = 0
+  /** Chụp tư thế đang hiện làm điểm xuất phát của một lượt trộn. */
+  function snapshotPose(): void {
+    blendBones.forEach((n, i) => blendQ[i]!.copy(n.quaternion))
+    if (blendHipsNode) blendHips.copy(blendHipsNode.position)
+    blendT0 = performance.now()
+  }
+  /** Trộn từ ảnh chụp sang tư thế nguồn vừa ghi — gọi mỗi frame, tự hết sau `BLEND_MS`. */
+  function applyBlend(now: number): void {
+    if (!blendT0) return
+    const k = smoothStep(Math.min(1, (now - blendT0) / BLEND_MS))
+    if (k >= 1) {
+      blendT0 = 0
+      return
+    }
+    blendBones.forEach((n, i) => {
+      blendTmp.copy(n.quaternion)
+      n.quaternion.copy(blendQ[i]!).slerp(blendTmp, k)
+    })
+    if (blendHipsNode) {
+      blendHipsTmp.copy(blendHipsNode.position)
+      blendHipsNode.position.lerpVectors(blendHips, blendHipsTmp, k)
+    }
+  }
+  /** Tốc độ đi đo từ clip gần nhất — xem `gaitSpeed()`. */
+  let gait = 0
+  /**
+   * Lấy mẫu vị trí hai bàn chân so với hông suốt một vòng clip rồi suy ra tốc độ đi.
+   *
+   * Chạy mixer tới từng mốc bằng `setTime` rồi trả về 0: frame kế tiếp `tick` gọi `mixer.update`
+   * nên tư thế tạm này không bao giờ được vẽ ra. Đo trong `modelFrame` nên góc xoay của nhân vật
+   * (đang quay mặt sang trái hay phải) không ảnh hưởng con số.
+   */
+  function sampleGait(m: import('three').AnimationMixer, duration: number): number {
+    const hipsN = bone('hips')
+    const lf = bone('leftFoot')
+    const rf = bone('rightFoot')
+    if (!hipsN || !lf || !rf || !(duration > 0)) return 0
+    const N = 60
+    const h = new THREE.Vector3()
+    const a = new THREE.Vector3()
+    const b = new THREE.Vector3()
+    const samples: GaitSample[] = []
+    for (let i = 0; i <= N; i++) {
+      const t = (duration * i) / N
+      m.setTime(t)
+      toModel(hipsN, h)
+      toModel(lf, a).sub(h)
+      toModel(rf, b).sub(h)
+      samples.push({ t, left: { x: a.x, y: a.y, z: a.z }, right: { x: b.x, y: b.y, z: b.z } })
+    }
+    m.setTime(0)
+    return gaitGroundSpeed(samples)
+  }
   /** Giữ nhân vật tại chỗ trong lúc clip chạy — xem chú thích ở `tick`. */
   let anchorHips = false
   /**
@@ -1578,6 +1678,7 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
     rotPrev = rotY
     // Clip chạy-một-lần đã hết → GỠ mixer, trả xương lại cho lớp tự sinh ngay frame này
     if (mixer && clipEndsAt > 0 && now >= clipEndsAt) {
+      snapshotPose()
       mixer.stopAllAction()
       mixer = null
       clipEndsAt = 0
@@ -1654,6 +1755,7 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
         })
       }
     }
+    applyBlend(now)
     // Góc user + vòng tự xoay, ghi MỖI frame (không chỉ lúc `setRotationY`) vì offset đổi liên tục
     vrm.scene.rotation.y = baseRotationY + rotY
     faceTick(now)
@@ -1714,6 +1816,15 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
     },
     setFpsCap(cap) {
       frameMs = 1000 / cap
+    },
+    gaitSpeed() {
+      return gait
+    },
+    pxPerMeter() {
+      const h = renderer.domElement.clientHeight
+      // Chiều cao nhìn thấy ở mặt phẳng z = 0 (chỗ nhân vật đứng) — camera luôn nằm trên trục z
+      const visible = 2 * camera.position.z * Math.tan((camera.fov * Math.PI) / 360)
+      return visible > 0 ? h / visible : 0
     },
     setSpringBones(on) {
       springOn = on
@@ -1833,11 +1944,13 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
     },
     async playAnimation(bytes, opts) {
       // Bỏ clip đang chạy trước, kể cả khi lượt mới lỗi — thà về idle còn hơn kẹt nửa vời
+      if (mixer) snapshotPose()
       mixer?.stopAllAction()
       mixer = null
       clipEndsAt = 0
       anchorHips = opts?.anchor === true
       if (!bytes) return 0
+      if (opts?.measureGait) gait = 0
 
       const vrmaMod = await import('@pixiv/three-vrm-animation')
       const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js')
@@ -1849,6 +1962,9 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
         const g = await l.loadAsync(url)
         const anim = (g.userData.vrmAnimations as unknown[] | undefined)?.[0]
         if (!anim) throw new Error('File không chứa animation VRM (.vrma)')
+        // Chụp TRƯỚC khi đo bước chân: `sampleGait` tua mixer mới qua các tư thế, xương lúc đó
+        // không còn là thứ đang hiện trên màn hình
+        snapshotPose()
         const clip = vrmaMod.createVRMAnimationClip(anim as never, vrm)
         const m = new THREE.AnimationMixer(vrm.scene)
         const action = m.clipAction(clip)
@@ -1865,6 +1981,9 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
           clipEndsAt = performance.now() + clip.duration * 1000
         }
         action.play()
+        if (opts?.measureGait) gait = sampleGait(m, clip.duration)
+        // Đặt SAU khi đo: `gaitSpeed()` là tốc độ ở nhịp GỐC, nơi gọi tự nhân với cùng tỉ lệ này
+        if (opts?.timeScale && opts.timeScale > 0) action.timeScale = opts.timeScale
         mixer = m
         return clip.duration
       } finally {

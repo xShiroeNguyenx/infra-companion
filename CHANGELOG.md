@@ -5,6 +5,22 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.4.9] — 2026-10-14
+
+### Added
+
+- **The character takes a walk when you are not using the app.** Turn on *Đi dạo lúc rảnh* in the character settings, and after 30 seconds without a key press or mouse movement it turns sideways and walks along the bottom of the window. It covers two to four stretches, stopping between them to turn and face you, then rests for one to three minutes before going again. The last stretch always ends exactly where you placed it. Touching the keyboard or mouse stops it on the spot. Opening the settings or the AI dock sends it straight back to its place. It does not walk while the window is minimised or in the tray. It needs the motion pack from the 🎬 menu, and it is off by default.
+- **The steps match the ground.** The walking speed is not a guessed number. It is measured from the clip itself, from how fast the foot on the ground moves backwards relative to the hips, and converted to pixels through the real camera, so it stays right at every zoom level. A fixed speed would make the character either slide like it is on ice or drift behind its own steps.
+- **Choose the pace: slow, normal or fast.** The clip slows down by the same ratio as the movement, so the feet keep matching the ground at any pace.
+- **After an alert, the character runs back to its place.** If an alert arrives while the character is away from its usual spot, it plays its reaction where it stands, then runs back once the reaction is over. The next time you look for it, it is where you left it.
+
+### Changed
+
+- **Motions blend into each other instead of snapping.** Every switch between a motion clip and the character’s own idle movement used to jump from one pose to the next in a single frame. The most visible case was the end of every reaction clip, and stopping after a walk. Each switch now blends over 0.3 seconds.
+- **Walking costs almost nothing extra.** The character walks in place while its frame slides sideways. The 3D scene draws the same number of pixels as when it stands still, and the sliding is done by the compositor without recalculating the page layout.
+
+---
+
 ## [0.4.8] — 2026-10-12
 
 ### Fixed

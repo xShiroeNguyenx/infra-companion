@@ -9,6 +9,7 @@ import { VRM_PROBE_BYTES, probeVrm } from '@infra/core'
 import {
   cleanFolderMotions,
   cleanPos,
+  cleanStrollPace,
   DEFAULT_VRM_FOLDER_MOTIONS,
   DEFAULT_VRM_SETTINGS,
   IPC,
@@ -162,7 +163,9 @@ export async function readSettings(): Promise<VrmSettingsDto> {
       rotationY: Number.isFinite(raw.rotationY) ? Number(raw.rotationY) : 0,
       posX: cleanPos(raw.posX),
       posY: cleanPos(raw.posY),
-      desktopOverlay: raw.desktopOverlay !== false
+      desktopOverlay: raw.desktopOverlay !== false,
+      stroll: raw.stroll === true,
+      strollPace: cleanStrollPace(raw.strollPace)
     }
   } catch {
     return { ...DEFAULT_VRM_SETTINGS }
@@ -722,7 +725,9 @@ export function registerVrmIpc(): () => void {
       rotationY: Number.isFinite(next.rotationY) ? Math.atan2(Math.sin(next.rotationY), Math.cos(next.rotationY)) : 0,
       posX: cleanPos(next.posX),
       posY: cleanPos(next.posY),
-      desktopOverlay: next.desktopOverlay !== false
+      desktopOverlay: next.desktopOverlay !== false,
+      stroll: next.stroll === true,
+      strollPace: cleanStrollPace(next.strollPace)
     }
     await mkdir(app.getPath('userData'), { recursive: true })
     await writeFile(settingsPath(), JSON.stringify(clean, null, 2), 'utf8')

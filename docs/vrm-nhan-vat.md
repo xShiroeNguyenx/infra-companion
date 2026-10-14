@@ -36,8 +36,10 @@ không phải ước lượng.
 | `packages/shared/src/vrmActivity.ts` | **Phản ứng theo loại việc**: công cụ nào → clip + biểu cảm + câu nói (mục 13.4). |
 | `packages/shared/src/vrmMotion.ts` | Danh mục 13 clip `.vrma` CC0 tải theo yêu cầu + luật xoay vòng theo vai trò. |
 | `packages/shared/src/vrmSample.ts` | Model mẫu tải theo yêu cầu. |
+| `packages/shared/src/vrmStroll.ts` | **Đi dạo lúc rảnh**: đo tốc độ bước từ clip, khoảng được đi, chọn điểm đến, nhịp (mục 15). |
 | `packages/shared/src/vrm.ts` | DTO cấu hình (`VrmSettingsDto`), clip tự nạp (`VrmFolderMotionsDto`, `pickVrmaNames`, `nextFolderClipForRole`). |
 | `apps/desktop/src/renderer/src/lib/vrmStage.ts` | **Sân khấu 3D**. Không phụ thuộc React. Nơi duy nhất chạm vào xương. |
+| `apps/desktop/src/renderer/src/lib/useVrmStroll.ts` | Vòng đi dạo: canh rảnh, trượt khung bằng CSS `translate`, chạy về sau cảnh báo (mục 15). |
 | `apps/desktop/src/renderer/src/lib/useVrmMotion.ts` | Chạy clip theo vai trò — **hai nguồn** (danh mục CC0 + clip user tự nạp) đi chung một luật ưu tiên. |
 | `apps/desktop/src/renderer/src/components/VrmPanel.tsx` | Khung React, chuột/phím, menu tròn, nội dung bảng cài đặt. |
 | `apps/desktop/src/renderer/src/components/VrmSettingsFrame.tsx` | **Khung** bảng cài đặt hai cột + `SettingsGroup`/`SettingsToggle`/`SettingsField`. Cố ý chỉ phụ thuộc `react` + `@infra/shared` để harness bundle được. |
@@ -988,3 +990,62 @@ trả quyền về lớp tự sinh và nhân vật đứng nguyên tư thế cu�
 | Thư mục `.vrma` báo "không có file nào" dù nhìn rõ là có | So đuôi trần, không `.toLowerCase()` — bộ tải trên Windows hay ra `.VRMA` |
 | Nhân vật ngoài desktop chỉ hiện **lần đầu**, sau đó im | Renderer overlay chết nhưng `win.isDestroyed()` vẫn `false` và `ready` vẫn `true` → `flush()` gửi IPC vào hư không rồi hiện một **cửa sổ trong suốt rỗng**, main báo thành công (§7.3) |
 | Mở trợ lý ảo lần đầu (chưa có model) là **kẹt, không thoát được** | Khung `w-80` không cuộn + `controls` đổ cả bảng cài đặt vào dưới `StartScreen` ⇒ nút `✕ Tắt trợ lý ảo` ở cuối `footer` bị cắt khỏi màn hình (§7.6) |
+| Dừng clip là nhân vật **giật** sang tư thế khác trong một frame | Clip và lớp tự sinh đều ghi đè xương — đổi nguồn mà không trộn. Đã thêm `snapshotPose`/`applyBlend` (mục 15.3) |
+
+---
+
+## 15. Đi dạo lúc rảnh (v0.4.9)
+
+### 15.1 Cách làm — "cách A"
+
+Clip `walk` chạy **tại chỗ** (`anchor: true`), còn cả khung trượt ngang bằng thuộc tính CSS
+**`translate`**, ghi thẳng vào DOM mỗi frame trong `useVrmStroll`.
+
+- **`translate`, KHÔNG `transform`:** React ghi `transform: scale()` ở chế độ cài đặt; ghi đè
+  `transform` là lượt render kế tiếp xoá mất độ dời. React không bao giờ đụng `translate`, và
+  hai thuộc tính cộng dồn với nhau.
+- **Không mở canvas rộng:** số pixel phải vẽ giữ nguyên như lúc đứng. Trượt là việc của
+  compositor, không tính lại layout.
+- `getBoundingClientRect()` tính cả `translate` → bong bóng, menu, hit-test vẫn bám đúng người.
+- **Ctrl+kéo** đo vị trí từ rect (đã gồm độ dời) → `useLayoutEffect` theo `pos` xoá độ dời trước
+  khi vẽ, nếu không nó bị cộng hai lần.
+
+### 15.2 Tốc độ phải khớp bước chân
+
+`gaitGroundSpeed` đo từ chính clip: bàn chân **đang chạm đất** đứng yên so với mặt đất, nên so
+với hông nó lùi đúng bằng tốc độ tiến. `sampleGait` trong stage tua mixer qua 60 mốc bằng
+`setTime`, đo trong `modelFrame` (không phụ thuộc góc xoay). Đổi ra pixel bằng `pxPerMeter()`
+(từ camera thật, đúng ở mọi zoom).
+
+- Lấy **trung vị**, không trung bình: mẫu lúc đổi chân vọt lên.
+- Đọc track vị trí hông KHÔNG được: clip "đi tại chỗ" có hông đứng yên → ra 0.
+- **Nhịp chậm lại phải giảm CẢ HAI**: `action.timeScale = pace` và tốc độ trượt × `pace`. Chỉ giảm
+  trượt là chân bước nhanh mà người tiến chậm — lại trượt chân, ngược chiều.
+- `timeScale` đặt **SAU** `sampleGait`: số đo là ở nhịp gốc, nơi gọi tự nhân.
+
+### 15.3 Chuyển mượt (áp cho MỌI clip)
+
+`snapshotPose()` chụp quaternion các xương chính + vị trí hông lúc đổi nguồn (clip hết, gỡ
+clip, nạp clip mới); `applyBlend()` trộn 300 ms, chạy SAU khi nguồn ghi xương và TRƯỚC
+`vrm.update`. Chụp **trước** `sampleGait` — hàm đó tua xương qua các tư thế không hiện ra.
+
+### 15.4 Phối hợp với clip khác
+
+Lượt đi giữ vai `idle` với hạn **vô cùng** trong `useVrmMotion`: mọi phản ứng (chạm, chat, cảnh
+báo) vẫn cắt ngang, còn lịch clip idle định kỳ tự nhường (`idle >= idle`). Vòng rAF đọc
+`isWalking()` (ref, đồng bộ) mỗi frame — clip khác chen vào là đứng lại ngay, không trượt thêm.
+`walk(false)` chỉ dừng khi clip đang chạy **vẫn là** lượt đi bộ, không giết clip cảnh báo.
+
+### 15.5 Luật hành vi
+
+| Tình huống | Hành vi |
+|---|---|
+| 30 s không phím/chuột, cửa sổ không ẩn, không có gì mở | Đi 2–4 chặng, nghỉ 3–9 s giữa chặng, rồi nghỉ 1–3 phút |
+| Chặng cuối của lượt | **Luôn về chỗ gốc** (`nextStrollTarget`) |
+| User thao tác giữa chặng | Đứng lại tại chỗ; lượt sau kết thúc ở gốc |
+| Cảnh báo lúc đang lệch gốc | Diễn phản ứng tại chỗ, hết clip + hết bận thì **chạy** về (`run-slow`, không có thì đi) — không dừng vì user thao tác |
+| Mở cài đặt / dock, tắt setting | Về gốc ngay (không đi) |
+| Cửa sổ ẩn / ở khay | Không bắt đầu; đang đi thì rAF đứng, mở lại đi tiếp |
+
+Thêm setting `stroll` + `strollPace` theo đủ 3 chỗ của mục 9.
+

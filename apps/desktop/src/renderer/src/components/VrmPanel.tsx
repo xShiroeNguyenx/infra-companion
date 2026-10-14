@@ -15,6 +15,8 @@ import {
   pickHint,
   sampleErrorMessage,
   statusForEvent,
+  STROLL_PACE,
+  STROLL_PACES,
   vrmBodyRect,
   vrmLeftBesideDock,
   vrmSideMargin,
@@ -35,6 +37,7 @@ import {
 import { createVrmStage, type VrmPart, type VrmStage } from '../lib/vrmStage'
 import { useDraggablePanel } from '../lib/useDraggablePanel'
 import { useVrmMotion, type VrmMotionApi } from '../lib/useVrmMotion'
+import { useVrmStroll } from '../lib/useVrmStroll'
 import {
   VrmChatBubble,
   VrmMiniPanel,
@@ -633,6 +636,9 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
       stageAspect={stageAspect}
       stage={stageRef.current}
       motion={motion}
+      stroll={settings?.stroll === true && load.kind === 'ready'}
+      strollPace={settings?.strollPace ?? STROLL_PACE}
+      restRotationRef={rotationRef}
       bubble={bubble}
       onSpeak={speak}
       savedPos={
@@ -842,6 +848,9 @@ function VrmStageShell({
   stageAspect,
   stage,
   motion,
+  stroll,
+  strollPace,
+  restRotationRef,
   bubble,
   onSpeak,
   savedPos,
@@ -870,6 +879,11 @@ function VrmStageShell({
   readonly stage: VrmStage | null
   /** Thư viện chuyển động — shell dùng cho "chạm vào người" và "mở chat", menu 🎬 dùng phần còn lại. */
   readonly motion: VrmMotionApi
+  /** Setting "đi dạo lúc rảnh" đang bật và model đã nạp xong — xem `useVrmStroll`. */
+  readonly stroll: boolean
+  readonly strollPace: number
+  /** Góc xoay user chọn — đi dạo xong thì quay mặt về đây. */
+  readonly restRotationRef: React.MutableRefObject<number>
   /** Thông báo đang hiện trên đầu nhân vật; `null` = không có. */
   readonly bubble: { id: number; text: string; severity: AppEventSeverity } | null
   readonly zoom: number
@@ -1031,7 +1045,8 @@ function VrmStageShell({
     if (!chromeless) return
     let timer = 0
     const fire = (): void => {
-      if (!hintBusyRef.current) motionRef2.current?.play('idle')
+      // Đang đi dạo thì nhường: `play` cũng tự nhường (lượt đi giữ vai idle), đây chỉ là chốt sớm
+      if (!hintBusyRef.current && !strollingRef.current) motionRef2.current?.play('idle')
       timer = window.setTimeout(fire, motionIdleDelayMs(Math.random))
     }
     timer = window.setTimeout(fire, motionIdleDelayMs(Math.random))
@@ -1210,6 +1225,21 @@ function VrmStageShell({
    */
   /** Lề trong suốt mỗi bên của thẻ — xem `vrmSideMargin`. */
   const sideMargin = vrmSideMargin(width)
+  /**
+   * Đi dạo lúc rảnh — chỉ ở chế độ không khung, và tắt khi cài đặt/dock mở: cả hai đặt nhân vật ở
+   * chỗ khác (khe giữa khung cài đặt, sát cột dock), trượt thêm là lệch khỏi chỗ đó.
+   */
+  const strollingRef = useVrmStroll({
+    stage,
+    motion,
+    panelRef,
+    enabled: stroll && chromeless && !showSettings && !dockOpen,
+    busyRef: hintBusyRef,
+    restRotationRef,
+    sideMargin,
+    pos,
+    pace: strollPace
+  })
   const settingsBox = settingsFrameBox(window.innerWidth, window.innerHeight, width)
   const settingsSlot = characterSlotInSettings(settingsBox, width, H)
   // Hai thứ trên đọc cỡ màn hình lúc render: đổi cỡ cửa sổ khi bảng đang mở thì phải render lại,
@@ -1853,6 +1883,25 @@ function VrmControls({
           checked={settings.lookAtCursor}
           onChange={(v) => onPatch({ lookAtCursor: v })}
         />
+        <SettingsToggle
+          label="Đi dạo lúc rảnh"
+          checked={settings.stroll}
+          title="Không đụng phím/chuột 30 giây thì đi qua lại dọc đáy cửa sổ. Cần bộ chuyển động đã tải (menu 🎬)"
+          onChange={(v) => onPatch({ stroll: v })}
+        />
+        {settings.stroll && (
+          <SettingsField label="Nhịp đi">
+            <select
+              className="bg-elevated border-edge rounded border px-2 py-1 text-xs"
+              value={settings.strollPace}
+              onChange={(e) => onPatch({ strollPace: Number(e.target.value) })}
+            >
+              <option value={STROLL_PACES[0]}>Chậm</option>
+              <option value={STROLL_PACES[1]}>Vừa</option>
+              <option value={STROLL_PACES[2]}>Nhanh</option>
+            </select>
+          </SettingsField>
+        )}
         <SettingsToggle
           label="Hiện lúc mở app"
           checked={settings.autoShow}
