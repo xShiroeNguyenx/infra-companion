@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   cleanStrollPace,
+  cleanWalkStyle,
+  DEFAULT_WALK_STYLE,
+  smoothFactor,
+  WALK_LEG_BONES,
+  WALK_STYLES,
   gaitGroundSpeed,
   nextStrollTarget,
   pickStrollTarget,
@@ -144,5 +149,56 @@ describe('đi dạo — nhịp đi đã lưu', () => {
 
   it('nhịp mặc định là một trong các nhịp cho chọn — dropdown không bao giờ trống', () => {
     expect(STROLL_PACES).toContain(STROLL_PACE)
+  })
+})
+
+describe('dáng đi', () => {
+  it('dáng gốc không chỉnh gì; dáng mềm mại có cấu hình', () => {
+    expect(WALK_STYLES.natural).toBeNull()
+    expect(WALK_STYLES.graceful).not.toBeNull()
+  })
+
+  it('mềm mại = tay vung hẹp lại, đầu giữ yên, hông lắc rõ hơn, bớt nảy', () => {
+    const g = WALK_STYLES.graceful!
+    for (const b of ['leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm', 'head', 'neck']) {
+      expect(g.amplitude[b]).toBeGreaterThan(0)
+      expect(g.amplitude[b]).toBeLessThan(1)
+    }
+    // Hai tay đối xứng — lệch nhau là một bên vung khác bên kia
+    expect(g.amplitude.leftUpperArm).toBe(g.amplitude.rightUpperArm)
+    expect(g.amplitude.leftLowerArm).toBe(g.amplitude.rightLowerArm)
+    expect(g.amplitude.hips).toBeGreaterThan(1)
+    expect(g.bob).toBeLessThan(1)
+  })
+
+  it('bước ngắn lại vừa phải và hai chân đối xứng — co quá là đi lết', () => {
+    const g = WALK_STYLES.graceful!
+    for (const k of WALK_LEG_BONES) {
+      expect(g.amplitude[k]).toBeGreaterThanOrEqual(0.8)
+      expect(g.amplitude[k]).toBeLessThanOrEqual(1)
+      expect(g.amplitude[k]).toBe(g.amplitude[k.replace(/^left|^right/, (m) => (m === 'left' ? 'right' : 'left'))])
+    }
+  })
+
+  it('khuỷu DUỖI ra (clip gốc đã gập ~43°) nhưng không duỗi thẳng tưng', () => {
+    const g = WALK_STYLES.graceful!
+    expect(g.elbowDeg).toBeLessThan(0)
+    expect(g.elbowMinDeg).toBeGreaterThan(0)
+  })
+
+  it('giá trị đã lưu lạ thì về mặc định', () => {
+    expect(cleanWalkStyle('natural')).toBe('natural')
+    expect(cleanWalkStyle('graceful')).toBe('graceful')
+    expect(cleanWalkStyle('sexy')).toBe(DEFAULT_WALK_STYLE)
+    expect(cleanWalkStyle(undefined)).toBe(DEFAULT_WALK_STYLE)
+  })
+
+  it('hệ số lọc thấp: 0 ms là không lọc, frame càng dài càng theo kịp', () => {
+    expect(smoothFactor(1 / 30, 0)).toBe(1)
+    const a = smoothFactor(1 / 60, 70)
+    const b = smoothFactor(1 / 30, 70)
+    expect(a).toBeGreaterThan(0)
+    expect(b).toBeGreaterThan(a)
+    expect(b).toBeLessThan(1)
   })
 })

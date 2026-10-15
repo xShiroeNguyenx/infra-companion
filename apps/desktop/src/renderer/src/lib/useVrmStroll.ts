@@ -3,6 +3,8 @@ import {
   nextStrollTarget,
   stepToward,
   STROLL_HOME_CLIP,
+  WALK_STYLES,
+  type WalkStyle,
   STROLL_IDLE_AFTER_MS,
   strollFacing,
   strollLegs,
@@ -41,6 +43,8 @@ export function useVrmStroll(opts: {
   pos: { x: number; y: number } | null
   /** Nhịp đi user chọn (`STROLL_PACES`). */
   pace: number
+  /** Dáng đi user chọn — áp cả lúc đi dạo lẫn lúc chạy về. */
+  walkStyle: WalkStyle
 }): MutableRefObject<boolean> {
   const { stage, panelRef, enabled, busyRef, restRotationRef, pos } = opts
   /** Đang trong một chặng đi — cho nơi khác (lịch clip idle) biết mà nhường. */
@@ -54,6 +58,8 @@ export function useVrmStroll(opts: {
   // Ref: đổi nhịp trong cài đặt áp vào chặng KẾ TIẾP, không dựng lại cả vòng đi dạo
   const paceRef = useRef(opts.pace)
   paceRef.current = opts.pace
+  const styleRef = useRef(opts.walkStyle)
+  styleRef.current = opts.walkStyle
   const hasWalk = opts.motion.installed.includes('walk')
 
   useEffect(() => {
@@ -151,7 +157,9 @@ export function useVrmStroll(opts: {
       // Chạy về: nhịp gốc của clip chạy; máy chưa có clip chạy thì đi về theo nhịp thường
       const run = home && motionRef.current.installed.includes(STROLL_HOME_CLIP)
       const pace = run ? 1 : paceRef.current
-      const measured = await motionRef.current.walk(true, pace, run ? STROLL_HOME_CLIP : 'walk')
+      const measured = await motionRef.current.walk(true, pace, run ? STROLL_HOME_CLIP : 'walk',
+        WALK_STYLES[styleRef.current]
+      )
       if (!alive) return
       if (!motionRef.current.isWalking()) {
         // Không bật được (clip khác đang chạy, file lỗi) — thử lại sau, đừng trượt khung khi chân đứng im

@@ -17,6 +17,9 @@ import {
   statusForEvent,
   STROLL_PACE,
   STROLL_PACES,
+  cleanWalkStyle,
+  DEFAULT_WALK_STYLE,
+  type WalkStyle,
   vrmBodyRect,
   vrmLeftBesideDock,
   vrmSideMargin,
@@ -638,6 +641,7 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
       motion={motion}
       stroll={settings?.stroll === true && load.kind === 'ready'}
       strollPace={settings?.strollPace ?? STROLL_PACE}
+      walkStyle={settings?.walkStyle ?? DEFAULT_WALK_STYLE}
       restRotationRef={rotationRef}
       bubble={bubble}
       onSpeak={speak}
@@ -850,6 +854,7 @@ function VrmStageShell({
   motion,
   stroll,
   strollPace,
+  walkStyle,
   restRotationRef,
   bubble,
   onSpeak,
@@ -882,6 +887,7 @@ function VrmStageShell({
   /** Setting "đi dạo lúc rảnh" đang bật và model đã nạp xong — xem `useVrmStroll`. */
   readonly stroll: boolean
   readonly strollPace: number
+  readonly walkStyle: WalkStyle
   /** Góc xoay user chọn — đi dạo xong thì quay mặt về đây. */
   readonly restRotationRef: React.MutableRefObject<number>
   /** Thông báo đang hiện trên đầu nhân vật; `null` = không có. */
@@ -1238,7 +1244,8 @@ function VrmStageShell({
     restRotationRef,
     sideMargin,
     pos,
-    pace: strollPace
+    pace: strollPace,
+    walkStyle
   })
   const settingsBox = settingsFrameBox(window.innerWidth, window.innerHeight, width)
   const settingsSlot = characterSlotInSettings(settingsBox, width, H)
@@ -1899,6 +1906,19 @@ function VrmControls({
               <option value={STROLL_PACES[0]}>Chậm</option>
               <option value={STROLL_PACES[1]}>Vừa</option>
               <option value={STROLL_PACES[2]}>Nhanh</option>
+            </select>
+          </SettingsField>
+        )}
+        {settings.stroll && (
+          <SettingsField label="Dáng đi">
+            <select
+              className="bg-elevated border-edge rounded border px-2 py-1 text-xs"
+              value={settings.walkStyle}
+              title="Mềm mại: tay vung hẹp và thả lỏng, hông lắc nhẹ, đầu giữ yên — hợp nhân vật nữ"
+              onChange={(e) => onPatch({ walkStyle: cleanWalkStyle(e.target.value) })}
+            >
+              <option value="graceful">Mềm mại</option>
+              <option value="natural">Mạnh mẽ (gốc)</option>
             </select>
           </SettingsField>
         )}

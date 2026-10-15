@@ -202,3 +202,105 @@ export function strollRestMs(rng: () => number): number {
 export function strollLegs(rng: () => number): number {
   return STROLL_LEGS_MIN + Math.floor(rng() * (STROLL_LEGS_MAX - STROLL_LEGS_MIN + 1))
 }
+
+/**
+ * Dáng đi: chỉnh clip `walk` LÚC CHẠY, không tạo file clip mới.
+ *
+ * Clip CC0 duy nhất có dáng đi là dáng sải bước dứt khoát — hợp nhân vật nam, nhưng với nhân vật
+ * nữ thì thô: tay vung rộng và cứng, đầu nảy theo từng bước. Sửa ở lúc chạy thay vì xuất file mới
+ * vì chỉnh được ngay bằng một con số, áp cho mọi model, và không phải lo giấy phép phát hành lại.
+ *
+ * VRM không khai giới tính nhân vật, nên đây là lựa chọn của user chứ không tự đoán.
+ */
+export type WalkStyle = 'natural' | 'graceful'
+export const WALK_STYLES_LIST: readonly WalkStyle[] = ['natural', 'graceful']
+export const DEFAULT_WALK_STYLE: WalkStyle = 'graceful'
+
+export interface WalkStyleSpec {
+  /**
+   * Hệ số biên độ của từng xương **quanh tư thế trung bình của cả vòng bước**: `< 1` là dịu lại,
+   * `> 1` là rõ hơn. Tính quanh trung bình (không quanh 0) nên tư thế nền của clip giữ nguyên,
+   * chỉ độ vung đổi — tay vẫn buông xuôi, chỉ vung hẹp hơn.
+   */
+  amplitude: Readonly<Record<string, number>>
+  /** Hệ số độ nảy lên xuống của hông mỗi bước. */
+  bob: number
+  /** Khép cánh tay vào sát thân (độ, quanh trục trước-sau). */
+  armInDeg: number
+  /**
+   * Đổi độ gập khuỷu (độ, cộng vào góc của clip): âm = DUỖI ra.
+   *
+   * Clip gốc gập khuỷu sẵn ~43° (dáng sải bước thể thao) — đo được. Bản đầu cộng thêm 14° vì
+   * tưởng tay "duỗi thẳng tưng", kết quả tay gập lên ngang hông, trông gồng chứ không thả lỏng.
+   * Tay thả lỏng khi đi là gần duỗi, khuỷu chỉ chùng nhẹ.
+   */
+  elbowDeg: number
+  /** Khuỷu không duỗi quá góc này (độ) — duỗi thẳng 0° là khoá khớp, cũng cứng. */
+  elbowMinDeg: number
+  /**
+   * Làm mượt phần thân trên theo thời gian (ms, hằng số thời gian lọc thấp). Không lọc chân: chân
+   * trễ nhịp là bàn chân trượt khỏi chỗ chạm đất.
+   */
+  smoothMs: number
+}
+
+/**
+ * Xương CHÂN được co biên độ: bước ngắn lại. Không lọc theo thời gian (xem `smoothMs`), và tốc độ
+ * trượt phải đo lại SAU khi co — sải ngắn hơn mà khung vẫn trượt theo sải cũ là chân trượt.
+ */
+export const WALK_LEG_BONES: readonly string[] = [
+  'leftUpperLeg', 'leftLowerLeg', 'leftFoot',
+  'rightUpperLeg', 'rightLowerLeg', 'rightFoot'
+]
+
+/**
+ * `natural` = clip gốc, không chỉnh. `graceful` = mềm mại, thướt tha:
+ * - tay vung vừa (~55%), khuỷu duỗi ra còn chùng nhẹ, cánh tay khép vào thân → tay thả lỏng;
+ * - bước ngắn lại (chân 0,85×), hông lắc rõ hơn (1,2×) → dáng uyển chuyển;
+ * - cổ/đầu giữ yên (0,35–0,45×), hông bớt nảy (0,65×) → bước êm, không nhún nhảy.
+ *
+ * Số đã chỉnh theo ảnh chụp + số đo trên model thật (harness), không phải đoán.
+ */
+export const WALK_STYLES: Readonly<Record<WalkStyle, WalkStyleSpec | null>> = {
+  natural: null,
+  graceful: {
+    amplitude: {
+      hips: 1.2,
+      spine: 0.8,
+      chest: 0.7,
+      upperChest: 0.7,
+      neck: 0.45,
+      head: 0.35,
+      leftShoulder: 0.6,
+      rightShoulder: 0.6,
+      leftUpperArm: 0.55,
+      rightUpperArm: 0.55,
+      leftLowerArm: 0.6,
+      rightLowerArm: 0.6,
+      leftHand: 0.6,
+      rightHand: 0.6,
+      leftUpperLeg: 0.85,
+      rightUpperLeg: 0.85,
+      leftLowerLeg: 0.85,
+      rightLowerLeg: 0.85,
+      leftFoot: 0.9,
+      rightFoot: 0.9
+    },
+    bob: 0.65,
+    armInDeg: 5,
+    elbowDeg: -18,
+    elbowMinDeg: 12,
+    smoothMs: 70
+  }
+}
+
+/** Đọc dáng đi đã lưu; giá trị lạ về mặc định. */
+export function cleanWalkStyle(v: unknown): WalkStyle {
+  return WALK_STYLES_LIST.find((s) => s === v) ?? DEFAULT_WALK_STYLE
+}
+
+/** Hệ số lọc thấp cho một frame dài `dtSec` với hằng số thời gian `tauMs` (0 = không lọc). */
+export function smoothFactor(dtSec: number, tauMs: number): number {
+  if (!(tauMs > 0)) return 1
+  return 1 - Math.exp(-(dtSec * 1000) / tauMs)
+}

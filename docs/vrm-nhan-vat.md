@@ -1047,5 +1047,28 @@ báo) vẫn cắt ngang, còn lịch clip idle định kỳ tự nhường (`idl
 | Mở cài đặt / dock, tắt setting | Về gốc ngay (không đi) |
 | Cửa sổ ẩn / ở khay | Không bắt đầu; đang đi thì rAF đứng, mở lại đi tiếp |
 
-Thêm setting `stroll` + `strollPace` theo đủ 3 chỗ của mục 9.
+Thêm setting `stroll` + `strollPace` + `walkStyle` theo đủ 3 chỗ của mục 9.
+
+### 15.6 Dáng đi (v0.4.10) — chỉnh clip lúc chạy, không tạo file mới
+
+Clip `walk` CC0 là dáng sải bước thể thao, đo trên model thật: khuỷu gập **43°**, tay vung
+**34 cm**, sải **66 cm**. Dáng `graceful` (`WALK_STYLES` trong `vrmStroll.ts`) chỉnh lúc chạy trong
+`applyWalkStyle` (stage), SAU `mixer.update`:
+
+1. **Co/giãn biên độ quanh tư thế TRUNG BÌNH của vòng bước** (`scaleAmplitude`): slerp từ trung
+   bình tới tư thế clip với hệ số k. Không giả định trục xương → đúng cả 0.x lẫn 1.0. Trung bình
+   quaternion phải **đồng bán cầu** (q và −q là một phép xoay, cộng ngược dấu là triệt tiêu).
+2. **Lọc thấp thân trên** (`smoothMs`). **Không lọc chân**: chân trễ nhịp là trượt.
+3. **Khép tay** (trục = cánh tay × hướng vào thân) và **đổi độ gập khuỷu trong mặt phẳng khuỷu**
+   (trục = cánh tay × cẳng tay, kẹp `elbowMinDeg`).
+
+⚠️ Bản đầu **cộng** 14° vào khuỷu vì tưởng tay duỗi thẳng → tay gập lên ngang hông, trông gồng.
+Chỉ số đo + ảnh chụp mới lộ ra (clip đã gập sẵn 43°). Trục gập cố định "cẳng tay × phía trước"
+cũng bỏ: mặt phẳng khuỷu thì không bao giờ gập ngược.
+
+⚠️ **Co chân thì phải đo lại tốc độ SAU khi co**: `sampleGait` chạy 2 lượt — lượt 1 lấy trung
+bình, lượt 2 đo bàn chân với `scaleAmplitude` đã áp. Sải −16% → tốc độ −15%, khớp.
+
+Kiểm: harness `apps/desktop/_harness/walkstyle.cjs` (gitignore) đo khuỷu/vung tay/sải/nảy đầu và
+chụp 4 pha nghiêng cho cả hai dáng.
 

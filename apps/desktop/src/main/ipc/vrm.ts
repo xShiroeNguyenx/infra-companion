@@ -10,6 +10,7 @@ import {
   cleanFolderMotions,
   cleanPos,
   cleanStrollPace,
+  cleanWalkStyle,
   DEFAULT_VRM_FOLDER_MOTIONS,
   DEFAULT_VRM_SETTINGS,
   IPC,
@@ -165,7 +166,8 @@ export async function readSettings(): Promise<VrmSettingsDto> {
       posY: cleanPos(raw.posY),
       desktopOverlay: raw.desktopOverlay !== false,
       stroll: raw.stroll === true,
-      strollPace: cleanStrollPace(raw.strollPace)
+      strollPace: cleanStrollPace(raw.strollPace),
+      walkStyle: cleanWalkStyle(raw.walkStyle)
     }
   } catch {
     return { ...DEFAULT_VRM_SETTINGS }
@@ -727,7 +729,8 @@ export function registerVrmIpc(): () => void {
       posY: cleanPos(next.posY),
       desktopOverlay: next.desktopOverlay !== false,
       stroll: next.stroll === true,
-      strollPace: cleanStrollPace(next.strollPace)
+      strollPace: cleanStrollPace(next.strollPace),
+      walkStyle: cleanWalkStyle(next.walkStyle)
     }
     await mkdir(app.getPath('userData'), { recursive: true })
     await writeFile(settingsPath(), JSON.stringify(clean, null, 2), 'utf8')

@@ -5,7 +5,21 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.4.9] — 2026-10-14
+## [0.4.10] — 2026-10-15
+
+### Added
+
+- **A softer way of walking for the character.** The only freely licensed walk clip is a brisk, athletic stride. It suits a male character, but on a female one it looked rough: arms swinging wide with elbows bent, the head bouncing at every step. A new *Dáng đi* setting next to the walking pace offers **Mềm mại** (graceful, the default) and **Mạnh mẽ** (the original clip). Measured on a real model, the graceful style changes the walk like this:
+  - Arms swing about half as far (34 → 18 cm), hang closer to the body, and the elbows relax from 43° to a gentle 25°.
+  - Steps are about 16% shorter, and the hips sway a little more.
+  - The head bobs a third less and stays steadier.
+- **The feet still match the ground in the new style.** Shorter steps move the character forward more slowly. The walking speed is measured again *after* the style is applied, so the frame slides exactly as far as the feet step.
+
+### Changed
+
+- **The style is applied while the clip plays; no new motion file is created.** It works with every model, VRM 0.x and 1.0 alike, because it never assumes which way a bone's axes point. Each bone's swing is scaled around its average position over the step cycle, and the arm adjustments use directions measured from the bones themselves. The legs are not time-smoothed, because a foot that lags behind the beat slides on the ground.
+
+ — 2026-10-14
 
 ### Added
 

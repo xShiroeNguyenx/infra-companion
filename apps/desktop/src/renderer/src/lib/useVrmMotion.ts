@@ -6,7 +6,8 @@ import {
   VRM_MOTIONS,
   type VrmMotionClip,
   type VrmMotionRole,
-  type VrmMotionRoleName
+  type VrmMotionRoleName,
+  type WalkStyleSpec
 } from '@infra/shared'
 import type { VrmStage } from './vrmStage'
 
@@ -67,7 +68,7 @@ export interface VrmMotionApi {
    * Bật trả về tốc độ đi đo từ clip (m/s), `0` nếu không bật được (chưa tải, đang có clip khác).
    * Tắt chỉ có tác dụng khi clip đang chạy CHÍNH LÀ lượt đi bộ này — clip khác đã chen vào thì để yên.
    */
-  walk: (on: boolean, pace?: number, clipId?: string) => Promise<number>
+  walk: (on: boolean, pace?: number, clipId?: string, style?: WalkStyleSpec | null) => Promise<number>
   /** Vai trò của clip đang chạy và còn hạn; `null` = không có clip nào. Đọc đồng bộ. */
   currentRole: () => VrmMotionRole | null
   /** Lượt đi bộ còn đang giữ nhân vật không — `false` ngay khi clip khác chen ngang. Đọc đồng bộ. */
@@ -263,7 +264,7 @@ export function useVrmMotion(
   )
 
   const walk = useCallback(
-    async (on: boolean, pace = 1, clipId = 'walk'): Promise<number> => {
+    async (on: boolean, pace = 1, clipId = 'walk', style: WalkStyleSpec | null = null): Promise<number> => {
       if (!stage) return 0
       if (!on) {
         if (walking.current) stop()
@@ -295,7 +296,7 @@ export function useVrmMotion(
        */
       current.current = { role: 'idle', until: Infinity }
       setPlaying(clipId)
-      await stage.playAnimation(bytes, { anchor: true, measureGait: true, timeScale: pace })
+      await stage.playAnimation(bytes, { anchor: true, measureGait: true, timeScale: pace, style })
       return walking.current ? stage.gaitSpeed() : 0
     },
     [stage, enabled, installed, stop]

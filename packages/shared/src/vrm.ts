@@ -8,7 +8,7 @@
  */
 
 import type { VrmMeta, VrmSpec } from './vrmTypes'
-import { STROLL_PACE } from './vrmStroll'
+import { DEFAULT_WALK_STYLE, STROLL_PACE, type WalkStyle } from './vrmStroll'
 
 /** Trần dung lượng một model. Model VRM thật thường 15–60 MB; hơn 200 MB là bất thường. */
 export const VRM_MAX_BYTES = 200 * 1024 * 1024
@@ -259,6 +259,8 @@ export interface VrmSettingsDto {
   stroll: boolean
   /** Nhịp đi dạo — một trong `STROLL_PACES`; clip và khung cùng chậm theo tỉ lệ này. */
   strollPace: number
+  /** Dáng đi — `graceful` mềm mại (hợp nhân vật nữ), `natural` là clip gốc. Xem `WALK_STYLES`. */
+  walkStyle: WalkStyle
 }
 
 export const DEFAULT_VRM_SETTINGS: VrmSettingsDto = {
@@ -274,7 +276,8 @@ export const DEFAULT_VRM_SETTINGS: VrmSettingsDto = {
   posY: null,
   desktopOverlay: true,
   stroll: false,
-  strollPace: STROLL_PACE
+  strollPace: STROLL_PACE,
+  walkStyle: DEFAULT_WALK_STYLE
 }
 
 /** Đọc một toạ độ tỉ lệ đã lưu: phải là số trong [0,1], ngoài ra coi như chưa có. */

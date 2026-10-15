@@ -21,7 +21,10 @@ import {
   FINGER_JOINTS,
   frameDistance,
   gaitGroundSpeed,
+  smoothFactor,
   type GaitSample,
+  type WalkStyleSpec,
+  WALK_LEG_BONES,
   elbowDrift,
   elbowDriftReach,
   lookArmOffset,
@@ -252,7 +255,7 @@ export interface VrmStage {
    */
   playAnimation(
     bytes: Uint8Array | null,
-    opts?: { once?: boolean; anchor?: boolean; measureGait?: boolean; timeScale?: number }
+    opts?: { once?: boolean; anchor?: boolean; measureGait?: boolean; timeScale?: number; style?: WalkStyleSpec | null }
   ): Promise<number>
   /**
    * Tốc độ đi (m/s) đo từ bàn chân của clip nạp gần nhất với `measureGait`; `0` = chưa đo/không đo được.
@@ -636,12 +639,39 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
    * nên tư thế tạm này không bao giờ được vẽ ra. Đo trong `modelFrame` nên góc xoay của nhân vật
    * (đang quay mặt sang trái hay phải) không ảnh hưởng con số.
    */
-  function sampleGait(m: import('three').AnimationMixer, duration: number): number {
+  function sampleGait(m: import('three').AnimationMixer, duration: number, style: WalkStyleSpec | null): number {
     const hipsN = bone('hips')
     const lf = bone('leftFoot')
     const rf = bone('rightFoot')
     if (!hipsN || !lf || !rf || !(duration > 0)) return 0
     const N = 60
+    /**
+     * Lượt 1: tư thế TRUNG BÌNH của cả vòng bước — tâm để `applyWalkStyle` co/giãn độ vung.
+     * Lượt 2: đo bàn chân, SAU khi đã co biên độ theo dáng đi — dáng mềm mại bước ngắn hơn, đo
+     * theo sải gốc thì khung trượt nhanh hơn bước chân.
+     */
+    const sum = styleBones.map(() => new THREE.Vector4())
+    let ySum = 0
+    for (let i = 0; i <= N; i++) {
+      m.setTime((duration * i) / N)
+      styleBones.forEach((sb, k) => {
+        const q = sb.node.quaternion
+        const acc = sum[k]!
+        // Cùng bán cầu với tổng đang có: q và −q là một phép xoay, cộng ngược dấu là triệt tiêu nhau
+        const sgn = i > 0 && acc.x * q.x + acc.y * q.y + acc.z * q.z + acc.w * q.w < 0 ? -1 : 1
+        acc.x += sgn * q.x
+        acc.y += sgn * q.y
+        acc.z += sgn * q.z
+        acc.w += sgn * q.w
+      })
+      ySum += hipsN.position.y
+    }
+    styleBones.forEach((sb, k) => {
+      const acc = sum[k]!
+      sb.mean.set(acc.x, acc.y, acc.z, acc.w).normalize()
+    })
+    gaitMeanHipsY = ySum / (N + 1)
+
     const h = new THREE.Vector3()
     const a = new THREE.Vector3()
     const b = new THREE.Vector3()
@@ -649,6 +679,7 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
     for (let i = 0; i <= N; i++) {
       const t = (duration * i) / N
       m.setTime(t)
+      if (style) scaleAmplitude(style)
       toModel(hipsN, h)
       toModel(lf, a).sub(h)
       toModel(rf, b).sub(h)
@@ -659,6 +690,111 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
   }
   /** Giữ nhân vật tại chỗ trong lúc clip chạy — xem chú thích ở `tick`. */
   let anchorHips = false
+
+  /**
+   * ==== DÁNG ĐI — chỉnh clip đi bộ lúc chạy (`WALK_STYLES` ở `vrmStroll.ts`) ====
+   *
+   * Chạy SAU `mixer.update`, ghi đè lên xương clip vừa đặt. Ba bước, theo thứ tự:
+   * 1. **Co/giãn độ vung quanh tư thế trung bình** của vòng bước (đo trong `sampleGait`) — không
+   *    giả định trục cục bộ nào của xương, nên đúng cả rig 0.x lẫn 1.0.
+   * 2. **Lọc thấp theo thời gian** phần thân trên — keyframe của clip gắt, lọc nhẹ cho tay đầu mềm.
+   * 3. **Khép tay, gập khuỷu** trong KHUNG MODEL, trục suy từ chính hướng xương lúc đó (tích có
+   *    hướng), không phải từ dấu ±: bản euler cũ của tay đã sai dấu trên 0.x đúng vì giả định.
+   */
+  let walkStyle: WalkStyleSpec | null = null
+  let gaitMeanHipsY = 0
+  /** Tư thế trung bình đã đo chưa — chưa thì bước 1 không có tâm, bỏ qua cả lớp. */
+  let gaitMeanReady = false
+  /** Xương thân trên được lọc thấp — chân KHÔNG lọc, trễ nhịp là bàn chân trượt. */
+  const SMOOTH_BONES = new Set<string>([
+    'spine', 'chest', 'upperChest', 'neck', 'head',
+    'leftShoulder', 'leftUpperArm', 'leftLowerArm', 'leftHand',
+    'rightShoulder', 'rightUpperArm', 'rightLowerArm', 'rightHand'
+  ])
+  const styleBones = (
+    [
+      'hips', 'spine', 'chest', 'upperChest', 'neck', 'head',
+      'leftShoulder', 'leftUpperArm', 'leftLowerArm', 'leftHand',
+      'rightShoulder', 'rightUpperArm', 'rightLowerArm', 'rightHand',
+      ...WALK_LEG_BONES
+    ] as BoneName[]
+  )
+    .map((name) => ({ name: name as string, node: bone(name) }))
+    .filter((b): b is { name: string; node: Obj3D } => b.node !== null)
+    .map((b) => ({ ...b, mean: new THREE.Quaternion(), prev: new THREE.Quaternion(), hasPrev: false }))
+  const wsQ = new THREE.Quaternion()
+  const wsQm = new THREE.Quaternion()
+  const wsQp = new THREE.Quaternion()
+  const wsA = new THREE.Vector3()
+  const wsB = new THREE.Vector3()
+  const wsAxis = new THREE.Vector3()
+  const wsInward = new THREE.Vector3()
+
+  /** Xoay xương `b` một góc quanh trục `axisModel` (khung model), giữ nguyên mọi thứ khác. */
+  function rotateInModel(b: Obj3D, axisModel: Vec3, angle: number): void {
+    // Phép xoay khung model đổi ra thế giới: qM · R · qM⁻¹, đặt TRƯỚC hướng thế giới hiện tại
+    modelFrame.getWorldQuaternion(wsQm)
+    wsAxis.copy(axisModel).applyQuaternion(wsQm)
+    wsQ.setFromAxisAngle(wsAxis, angle)
+    b.getWorldQuaternion(wsQp)
+    wsQ.multiply(wsQp)
+    b.parent!.getWorldQuaternion(wsQp)
+    b.quaternion.copy(wsQp.invert().multiply(wsQ))
+    b.updateWorldMatrix(false, true)
+  }
+
+  /** Bước 1: co/giãn độ vung quanh tư thế trung bình. Dùng chung cho lúc chạy và lúc đo bước chân. */
+  function scaleAmplitude(st: WalkStyleSpec): void {
+    for (const sb of styleBones) {
+      const k = st.amplitude[sb.name] ?? 1
+      // Từ trung bình đi tới tư thế clip, dừng ở k phần (k > 1 là vượt quá — slerp ngoại suy được)
+      if (k === 1) continue
+      wsQ.copy(sb.node.quaternion)
+      sb.node.quaternion.copy(sb.mean).slerp(wsQ, k)
+    }
+  }
+
+  function applyWalkStyle(dt: number): void {
+    const st = walkStyle
+    if (!st || !gaitMeanReady) return
+    const hipsN = bone('hips')
+    scaleAmplitude(st)
+    for (const sb of styleBones) {
+      if (SMOOTH_BONES.has(sb.name)) {
+        if (sb.hasPrev) sb.node.quaternion.copy(sb.prev.slerp(sb.node.quaternion, smoothFactor(dt, st.smoothMs)))
+        sb.prev.copy(sb.node.quaternion)
+        sb.hasPrev = true
+      }
+    }
+    if (hipsN) hipsN.position.y = gaitMeanHipsY + (hipsN.position.y - gaitMeanHipsY) * st.bob
+    hipsN?.updateWorldMatrix(false, true)
+
+    for (const side of ['left', 'right'] as const) {
+      const rig = arms[side]
+      if (!rig) continue
+      // Khép tay: trục = hướng cánh tay × hướng vào thân → xoay đưa khuỷu về phía thân, dù rig nào
+      wsInward.set(-rig.sideX, 0, 0)
+      toModel(rig.lower, wsB).sub(toModel(rig.upper, wsA))
+      wsAxis.crossVectors(wsB, wsInward)
+      if (wsAxis.lengthSq() > 1e-8 && st.armInDeg) {
+        rotateInModel(rig.upper, wsAxis.normalize(), (st.armInDeg * Math.PI) / 180)
+      }
+      /**
+       * Đổi độ gập khuỷu TRONG MẶT PHẲNG KHUỶU (trục = cánh tay × cẳng tay): xoay dương là gập
+       * thêm, âm là duỗi ra, và không thể gập ngược khớp như khi lấy trục cố định. Kẹp ở
+       * `elbowMinDeg` để không duỗi thẳng tưng.
+       */
+      toModel(rig.lower, wsB).sub(toModel(rig.upper, wsA))
+      const up = wsA.copy(wsB)
+      toModel(rig.hand, wsB).sub(toModel(rig.lower, wsInward))
+      const flex = up.angleTo(wsB)
+      const want = Math.max((st.elbowMinDeg * Math.PI) / 180, flex + (st.elbowDeg * Math.PI) / 180)
+      wsAxis.crossVectors(up, wsB)
+      if (wsAxis.lengthSq() > 1e-8 && Math.abs(want - flex) > 1e-4) {
+        rotateInModel(rig.lower, wsAxis.normalize(), want - flex)
+      }
+    }
+  }
   /**
    * ==== "Chuột có đang trên người không" — KHÔNG dùng raycast ====
    *
@@ -1701,6 +1837,7 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
         hips.position.x = hipsRest.x
         hips.position.z = hipsRest.z
       }
+      if (walkStyle) applyWalkStyle(dt)
     } else {
       /**
        * Một lượt cộng dồn: xoá tư thế → từng tầng CỘNG vào → ghi xuống xương MỘT lần.
@@ -1951,6 +2088,10 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
       anchorHips = opts?.anchor === true
       if (!bytes) return 0
       if (opts?.measureGait) gait = 0
+      // Dáng đi chỉ áp cho đúng lượt có `style` — clip khác (cảnh báo, chạm) chạy nguyên bản
+      walkStyle = null
+      gaitMeanReady = false
+      for (const sb of styleBones) sb.hasPrev = false
 
       const vrmaMod = await import('@pixiv/three-vrm-animation')
       const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js')
@@ -1981,7 +2122,11 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
           clipEndsAt = performance.now() + clip.duration * 1000
         }
         action.play()
-        if (opts?.measureGait) gait = sampleGait(m, clip.duration)
+        if (opts?.measureGait) {
+          gait = sampleGait(m, clip.duration, opts.style ?? null)
+          gaitMeanReady = true
+        }
+        walkStyle = opts?.style ?? null
         // Đặt SAU khi đo: `gaitSpeed()` là tốc độ ở nhịp GỐC, nơi gọi tự nhân với cùng tỉ lệ này
         if (opts?.timeScale && opts.timeScale > 0) action.timeScale = opts.timeScale
         mixer = m
