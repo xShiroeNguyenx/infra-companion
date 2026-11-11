@@ -5,6 +5,7 @@ import { useUiStore } from '../../stores/ui'
 import { WORKBENCH_BOTTOM_TABS_META } from '../../features/workbench/workbench'
 import { LogTailModal } from '../LogTailModal'
 import { MonitorCard } from '../MonitorDock'
+import { MonitorAutoStartButton } from '../MonitorAutoStartButton'
 import { TunnelsModal } from '../TunnelsModal'
 import { useT } from '../../i18n'
 
@@ -91,6 +92,9 @@ export function BottomPanel() {
           )
         })}
         <div className="flex-1" />
+        {tab === 'monitor' && monitorActive && (
+          <MonitorAutoStartButton className="mr-1 px-2 py-0.5 text-[11px]" />
+        )}
         {tab === 'monitor' && monitorActive && (
           <button
             type="button"

@@ -24,6 +24,12 @@ import type { VrmStage } from './vrmStage'
  * cộng dồn với `transform: scale()` của chế độ cài đặt thay vì đè lên. `getBoundingClientRect()`
  * tính cả `translate`, nên bong bóng thoại, menu và hit-test vẫn bám đúng chỗ người đang đứng.
  *
+ * ⚠️ `translate` (như `transform`) biến khung thành **khối chứa của mọi con `position: fixed`**.
+ * Lớp nổi nào nằm TRONG khung sẽ bị dời thêm đúng vị trí khung — tính hai lần — và văng ra ngoài
+ * màn hình. Độ dời lại ở lại sau khi dừng, nên lỗi kéo dài tới lượt đi kế tiếp: đã dính thật
+ * ("đi dạo xong chuột phải không mở menu"). Vì vậy `VrmPanel` render mọi lớp nổi làm ANH EM của
+ * khung, đừng đưa chúng vào lại bên trong.
+ *
  * Chỉ dời khung, không đụng `left`/`right`: không đổi kích thước → `ResizeObserver` không gọi
  * `stage.resize()`, camera không căn lại, và compositor tự làm mà không tính lại layout.
  */

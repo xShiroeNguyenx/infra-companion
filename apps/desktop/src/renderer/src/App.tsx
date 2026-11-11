@@ -75,6 +75,7 @@ import { useToastsStore } from './stores/toasts'
 import { useUiStore } from './stores/ui'
 import { usePluginStore } from './stores/plugins'
 import { useMonitorStore } from './stores/monitor'
+import { startMonitorAutoStart } from './stores/monitorAutoStart'
 import { useTunnelFavoritesStore } from './stores/favorites'
 import { useTrayStore } from './stores/tray'
 import { useLocaldevStore } from './stores/localdev'
@@ -165,6 +166,11 @@ export default function App() {
   const allHosts = useDataStore((s) => s.hosts)
   const booted = useRef(false)
   const openedInitialTab = useRef(false)
+  /** Đã thử bật monitoring ⚡ tự bật trong vòng đời cửa sổ này — xem effect mở vault. */
+  const monitorAutoStartTried = useRef(false)
+  /** `t` mới nhất cho callback chạy sau khi danh bạ nạp — đổi ngôn ngữ không làm chạy lại effect. */
+  const tRef = useRef(t)
+  tRef.current = t
 
   // F39: đồng bộ danh sách host cần watch sang main mỗi khi bật/tắt hoặc hosts đổi.
   // serial loại (hostname = COM port, không phải TCP); tắt thì store đã gọi watcher.stop().
@@ -293,11 +299,38 @@ export default function App() {
 
   useEffect(() => {
     if (vaultState !== 'unlocked') return
-    void useDataStore.getState().refreshAll()
+    const refreshed = useDataStore.getState().refreshAll()
     void usePluginStore.getState().refresh()
     // F15: bật các tunnel có cờ "tự bật" — main tự chặn lần gọi thứ hai trong cùng tiến trình
     // (khoá rồi mở lại vault không làm bật lại tunnel user đã chủ ý dừng)
     void window.infra.tunnels.autoStart()
+    /**
+     * Monitoring ⚡ tự bật — cùng nhịp với tunnel ở trên, nhưng phải ĐỢI danh bạ nạp xong: cần nhãn
+     * host để dựng card, và cần biết host nào đã bị xoá. Chỉ một lần mỗi cửa sổ: khoá rồi mở lại
+     * vault không được bật lại monitoring user đã chủ ý bấm Dừng.
+     */
+    if (!monitorAutoStartTried.current) {
+      monitorAutoStartTried.current = true
+      void refreshed
+        .then(() => {
+          // Danh bạ nạp hỏng (refreshAll đã tự báo lỗi): chưa tính là đã thử — lần mở vault sau thử lại
+          if (!useDataStore.getState().loaded) {
+            monitorAutoStartTried.current = false
+            return null
+          }
+          return startMonitorAutoStart()
+        })
+        .then((res) => {
+          if (!res) return
+          const push = useToastsStore.getState().push
+          if (res.started > 0) push(tRef.current('monitor.autoStarted', { n: res.started }), 'info')
+          // Nói ra phần không bật được — im lặng thì user chỉ thấy thiếu card mà không biết vì sao
+          if (res.missing > 0) push(tRef.current('monitor.autoStartMissing', { n: res.missing }), 'error')
+        })
+        .catch((e: unknown) => {
+          useToastsStore.getState().push(tRef.current('monitor.autoStartFailed', { error: String(e) }), 'error')
+        })
+    }
     if (!openedInitialTab.current) {
       openedInitialTab.current = true
       // Mặc định khởi động vào Dashboard (activeId=null = home, không cần mở gì);

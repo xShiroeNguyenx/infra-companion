@@ -261,6 +261,13 @@ export interface VrmSettingsDto {
   strollPace: number
   /** Dáng đi — `graceful` mềm mại (hợp nhân vật nữ), `natural` là clip gốc. Xem `WALK_STYLES`. */
   walkStyle: WalkStyle
+  /**
+   * Click xuyên qua: bấm/cuộn/kéo trên người nhân vật rơi xuống app phía sau, rê chuột vào thì
+   * nhân vật mờ đi; Ctrl + chuột phải lên người vẫn mở menu. Xem `vrmClickThrough.ts`.
+   *
+   * Mặc định tắt: bật lên là mọi thao tác chạm/níu/nhấn giữ đều ngừng — user phải tự chọn đánh đổi.
+   */
+  clickThrough: boolean
 }
 
 export const DEFAULT_VRM_SETTINGS: VrmSettingsDto = {
@@ -277,7 +284,8 @@ export const DEFAULT_VRM_SETTINGS: VrmSettingsDto = {
   desktopOverlay: true,
   stroll: false,
   strollPace: STROLL_PACE,
-  walkStyle: DEFAULT_WALK_STYLE
+  walkStyle: DEFAULT_WALK_STYLE,
+  clickThrough: false
 }
 
 /** Đọc một toạ độ tỉ lệ đã lưu: phải là số trong [0,1], ngoài ra coi như chưa có. */

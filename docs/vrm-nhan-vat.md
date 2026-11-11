@@ -37,6 +37,7 @@ không phải ước lượng.
 | `packages/shared/src/vrmMotion.ts` | Danh mục 13 clip `.vrma` CC0 tải theo yêu cầu + luật xoay vòng theo vai trò. |
 | `packages/shared/src/vrmSample.ts` | Model mẫu tải theo yêu cầu. |
 | `packages/shared/src/vrmStroll.ts` | **Đi dạo lúc rảnh**: đo tốc độ bước từ clip, khoảng được đi, chọn điểm đến, nhịp (mục 15). |
+| `packages/shared/src/vrmClickThrough.ts` | **Click xuyên qua**: khi nào áp, khi nào mờ, cú chuột phải nào là của nhân vật (mục 16). |
 | `packages/shared/src/vrm.ts` | DTO cấu hình (`VrmSettingsDto`), clip tự nạp (`VrmFolderMotionsDto`, `pickVrmaNames`, `nextFolderClipForRole`). |
 | `apps/desktop/src/renderer/src/lib/vrmStage.ts` | **Sân khấu 3D**. Không phụ thuộc React. Nơi duy nhất chạm vào xương. |
 | `apps/desktop/src/renderer/src/lib/useVrmStroll.ts` | Vòng đi dạo: canh rảnh, trượt khung bằng CSS `translate`, chạy về sau cảnh báo (mục 15). |
@@ -1007,6 +1008,12 @@ Clip `walk` chạy **tại chỗ** (`anchor: true`), còn cả khung trượt ng
 - **Không mở canvas rộng:** số pixel phải vẽ giữ nguyên như lúc đứng. Trượt là việc của
   compositor, không tính lại layout.
 - `getBoundingClientRect()` tính cả `translate` → bong bóng, menu, hit-test vẫn bám đúng người.
+- ⚠️ **Nhưng `translate` cũng biến khung thành khối chứa của con `position: fixed`** (giống
+  `transform`). Bản v0.4.9–v0.4.10 để menu tròn, bong bóng, chat, bảng hai bên làm CON của khung:
+  `fixed inset-0` co lại bằng khung, toạ độ màn hình bị cộng thêm vị trí khung → menu vẽ ra ngoài
+  cửa sổ (đo trên Electron 42: nút ở (900, 600) ra (1599, 926) với cửa sổ rộng 1184px). Độ dời ở
+  lại sau khi dừng nên lỗi kéo dài: user thấy "đi dạo xong chuột phải không mở menu". Từ v0.4.11
+  mọi lớp nổi là **anh em** của khung, bọc trong một lớp `z-40` để giữ đúng tầng cũ.
 - **Ctrl+kéo** đo vị trí từ rect (đã gồm độ dời) → `useLayoutEffect` theo `pos` xoá độ dời trước
   khi vẽ, nếu không nó bị cộng hai lần.
 
@@ -1072,3 +1079,50 @@ bình, lượt 2 đo bàn chân với `scaleAmplitude` đã áp. Sải −16% �
 Kiểm: harness `apps/desktop/_harness/walkstyle.cjs` (gitignore) đo khuỷu/vung tay/sải/nảy đầu và
 chụp 4 pha nghiêng cho cả hai dáng.
 
+
+---
+
+## 16. Click xuyên qua (v0.4.11)
+
+Bật ở Cài đặt → nhóm **🖱 Thao tác** → *Click xuyên qua* (`clickThrough`, mặc định tắt). Bấm, cuộn,
+kéo trên người nhân vật đều rơi xuống app phía sau; rê chuột vào thì nhân vật mờ còn 15%; giữ
+**Ctrl + chuột phải** lên người để mở menu. Ý lấy từ `desktop-companion`.
+
+### 16.1 Vì sao gọn hơn bản `desktop-companion`
+
+Bên đó pet là **một cửa sổ riêng**: bỏ qua chuột là cả cửa sổ mù chuột, nên phải có hook chuột toàn
+cục của hệ điều hành để biết con trỏ ở đâu, để bắt Ctrl + chuột phải, và phải tạm tắt click-through
+mỗi lần mở menu (menu nằm trong chính cửa sổ đang mù chuột). Ở đây nhân vật nằm **trong trang**:
+
+- Chỉ khung nhân vật (`boxRef`) mang `pointer-events-none`. `pointermove`/`contextmenu` của cả cửa
+  sổ vẫn tới — không cần hook nào.
+- Menu tròn và các bảng là **anh em** của khung (mục 15.1, v0.4.11) nên luôn bấm được — không phải
+  tạm tắt rồi bật lại.
+
+### 16.2 Cách làm (`VrmStageShell`)
+
+- "Con trỏ có trên người không" = `pointInBoxNdc` (ngoài khung → `null`) rồi `stage.hitTest` — **cùng
+  đường** với cú click khi tắt tính năng, nên vùng làm mờ trùng vùng bấm được.
+- Rời người chờ `SEE_THROUGH_LEAVE_MS` (250ms) mới hiện lại: hộp xương có khe giữa tay và thân,
+  không chờ thì lướt ngang qua là nháy.
+- Kiểm lại mỗi 400ms **khi đang mờ**: nhân vật tự đi dạo khỏi chỗ con trỏ đang đứng yên thì không
+  có `pointermove` nào báo.
+- Ctrl + chuột phải: nghe ở pha **capture của `window`** và nuốt **cả chuỗi** `pointerdown` ·
+  `mousedown` · `pointerup` · `mouseup` · `auxclick` · `contextmenu` — xterm phản ứng ngay từ
+  `mousedown`, chặn mỗi `contextmenu` là terminal vẫn nhận nửa đầu.
+- Không áp khi: có khung, đang mở cài đặt, dock AI mở (`clickThroughActive`). Không mờ khi menu/bảng
+  của nhân vật đang mở (`seeThroughFaded`) — menu mở ngay trên người.
+- Câu gợi ý thao tác im hẳn khi đang bật (mọi câu đều dạy chạm/kéo/chuột phải trần). Bật/tắt thì
+  nhân vật nói một câu chỉ đường Ctrl + chuột phải.
+
+### 16.3 Đã kiểm thế nào
+
+Bằng **sự kiện chuột thật** (`webContents.sendInputEvent`) trên Electron 42, bố cục dựng lại: một
+phần tử phủ dưới có listener `mousedown/mouseup/click/contextmenu/auxclick/wheel` + một listener
+`contextmenu` ở thẻ gốc (như React), khung `pointer-events:none` đè lên. Kết quả: click trái, lăn,
+chuột phải trần trên người → xuống phần tử dưới; Ctrl + chuột phải trên người → mở menu, phần tử dưới
+**không nhận sự kiện nào**; Ctrl + chuột phải ngoài người → xuống phần tử dưới; `pointermove` ở
+`window` vẫn thấy con trỏ trên người.
+
+**Chưa làm:** nhân vật ngoài desktop (`VrmOverlayApp`, lúc app ở khay) không theo setting này — cửa
+sổ đó chỉ hiện vài giây khi có cảnh báo, và click vào nó là đường mở lại app.

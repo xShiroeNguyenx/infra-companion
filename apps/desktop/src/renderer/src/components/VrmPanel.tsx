@@ -9,6 +9,13 @@ import {
   motionPackBytes,
   ACTIVITY_EXPRESSION,
   activityForTool,
+  CLICK_THROUGH_OFF_LINE,
+  CLICK_THROUGH_ON_LINE,
+  clickThroughActive,
+  ctrlMenuWanted,
+  pointInBoxNdc,
+  SEE_THROUGH_LEAVE_MS,
+  seeThroughFaded,
   activityLine,
   openedLine,
   settingsFrameBox,
@@ -443,6 +450,22 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
     })
   }, [settings?.reactToEvents])
 
+  /**
+   * Bật/tắt click xuyên qua → nhân vật nói một câu.
+   *
+   * Bật mà im thì user mất luôn đường vào menu: chuột phải trần giờ rơi xuống app phía sau, và
+   * cách duy nhất còn lại (Ctrl + chuột phải) là thao tác vô hình. Lần đọc cấu hình ĐẦU (mở panel,
+   * mở app) không phải là "vừa đổi" nên không nói gì.
+   */
+  const prevClickThrough = useRef<boolean | null>(null)
+  useEffect(() => {
+    if (!settings) return
+    const prev = prevClickThrough.current
+    prevClickThrough.current = settings.clickThrough
+    if (prev === null || prev === settings.clickThrough) return
+    speak(settings.clickThrough ? CLICK_THROUGH_ON_LINE : CLICK_THROUGH_OFF_LINE)
+  }, [settings, speak])
+
   // Tự tắt sau 6 giây. Hẹn giờ đặt theo `bubble.id` nên thông báo mới luôn gia hạn lại từ đầu
   // thay vì bị cái cũ tắt sớm.
   useEffect(() => {
@@ -642,6 +665,7 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
       stroll={settings?.stroll === true && load.kind === 'ready'}
       strollPace={settings?.strollPace ?? STROLL_PACE}
       walkStyle={settings?.walkStyle ?? DEFAULT_WALK_STYLE}
+      clickThrough={settings?.clickThrough === true}
       restRotationRef={rotationRef}
       bubble={bubble}
       onSpeak={speak}
@@ -855,6 +879,7 @@ function VrmStageShell({
   stroll,
   strollPace,
   walkStyle,
+  clickThrough,
   restRotationRef,
   bubble,
   onSpeak,
@@ -888,6 +913,8 @@ function VrmStageShell({
   readonly stroll: boolean
   readonly strollPace: number
   readonly walkStyle: WalkStyle
+  /** Setting "click xuyên qua" user đã bật — còn áp hay không thì xem `clickThroughActive`. */
+  readonly clickThrough: boolean
   /** Góc xoay user chọn — đi dạo xong thì quay mặt về đây. */
   readonly restRotationRef: React.MutableRefObject<number>
   /** Thông báo đang hiện trên đầu nhân vật; `null` = không có. */
@@ -1094,6 +1121,108 @@ function VrmStageShell({
   const markHintDone = useVrmHintsStore((s) => s.markDone)
   const hintBusyRef = useRef(false)
   hintBusyRef.current = !!menu || !!toolRing || !!side || showSettings || chatOpen || dockOpen || !!bubble
+
+  /**
+   * ==== CLICK XUYÊN QUA ==== (`vrmClickThrough.ts`)
+   *
+   * Khung nhân vật thôi nhận chuột (`pointer-events-none`), nên bấm/cuộn/kéo trên người đều rơi
+   * xuống app phía sau. Vì khung không còn sự kiện nào, "con trỏ có trên người không" phải hỏi từ
+   * `pointermove` của CẢ CỬA SỔ — rồi đi đúng đường hit-test của cú click (`hitTest`, hộp quanh
+   * xương), nên vùng làm mờ trùng với vùng bấm vào được khi tắt tính năng.
+   *
+   * Không cần tạm tắt click-through khi mở menu như `desktop-companion`: bên đó cả cửa sổ pet mù
+   * chuột, ở đây menu và các bảng là phần tử riêng ngoài khung, luôn bấm được.
+   */
+  const ctActive = clickThroughActive({ setting: clickThrough, chromeless, settingsOpen: showSettings, dockOpen })
+  const ctActiveRef = useRef(ctActive)
+  ctActiveRef.current = ctActive
+  /** Con trỏ đang trên người (đã trễ `SEE_THROUGH_LEAVE_MS` lúc rời) — chỉ đổi khi vào/ra, không mỗi lần di chuột. */
+  const [ctHover, setCtHover] = useState(false)
+  const ctFaded = seeThroughFaded({ active: ctActive, over: ctHover, uiOpen: !!menu || !!toolRing || !!side || chatOpen })
+  useEffect(() => {
+    if (!ctActive || !stage) return
+    let leave = 0
+    let hovering = false
+    let last: { x: number; y: number } | null = null
+    const over = (x: number, y: number): boolean => {
+      const box = boxRef.current
+      if (!box) return false
+      const p = pointInBoxNdc(x, y, box.getBoundingClientRect())
+      return p !== null && stage.hitTest(p.nx, p.ny)
+    }
+    const setHover = (v: boolean): void => {
+      if (v) {
+        clearTimeout(leave)
+        leave = 0
+        if (!hovering) {
+          hovering = true
+          setCtHover(true)
+        }
+        return
+      }
+      if (!hovering || leave) return
+      leave = window.setTimeout(() => {
+        leave = 0
+        hovering = false
+        setCtHover(false)
+      }, SEE_THROUGH_LEAVE_MS)
+    }
+    const onMove = (e: PointerEvent): void => {
+      last = { x: e.clientX, y: e.clientY }
+      setHover(over(e.clientX, e.clientY))
+    }
+    /**
+     * Nhân vật tự đi khỏi chỗ con trỏ đang ĐỨNG YÊN (đi dạo bắt đầu đúng lúc user không đụng
+     * chuột): không có `pointermove` nào báo, thiếu bước này thì nó đi dạo trong trạng thái mờ 15%.
+     * Chỉ làm việc khi đang mờ.
+     */
+    const recheck = window.setInterval(() => {
+      if (hovering && last) setHover(over(last.x, last.y))
+    }, 400)
+    // Con trỏ ra khỏi cửa sổ (sang app khác): từ đó không còn `pointermove` nào → coi như đã rời người
+    const onOut = (e: MouseEvent): void => {
+      if (e.relatedTarget !== null) return
+      last = null
+      setHover(false)
+    }
+    const inOverlay = (e: Event): boolean =>
+      e.target instanceof Element && e.target.closest('[data-vrm-overlay]') !== null
+    const wanted = (e: MouseEvent): boolean =>
+      !inOverlay(e) && ctrlMenuWanted({ active: true, over: over(e.clientX, e.clientY), ctrlKey: e.ctrlKey })
+    /**
+     * Nuốt CẢ CHUỖI sự kiện của cú Ctrl + chuột phải đó, không chỉ `contextmenu`: terminal (xterm)
+     * phản ứng ngay từ `mousedown` (lấy focus, chọn từ) — chặn mỗi bước cuối là app phía sau vẫn
+     * nhận nửa đầu. Nghe ở pha CAPTURE của `window` để chạy trước mọi listener của app, kể cả
+     * listener gốc của React. Cú nào không dành cho nhân vật thì để nguyên, không đụng tới.
+     */
+    const swallow = (e: MouseEvent): void => {
+      if (e.button !== 2 || !wanted(e)) return
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    const onContext = (e: MouseEvent): void => {
+      if (!wanted(e)) return
+      e.preventDefault()
+      e.stopPropagation()
+      setMenu({ x: e.clientX, y: e.clientY })
+      markHintDone('menu')
+    }
+    const SWALLOW = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'auxclick'] as const
+    window.addEventListener('pointermove', onMove, { capture: true, passive: true })
+    window.addEventListener('mouseout', onOut, true)
+    for (const t of SWALLOW) window.addEventListener(t, swallow, true)
+    window.addEventListener('contextmenu', onContext, true)
+    return () => {
+      clearTimeout(leave)
+      clearInterval(recheck)
+      window.removeEventListener('pointermove', onMove, { capture: true })
+      window.removeEventListener('mouseout', onOut, true)
+      for (const t of SWALLOW) window.removeEventListener(t, swallow, true)
+      window.removeEventListener('contextmenu', onContext, true)
+      setCtHover(false)
+    }
+  }, [ctActive, stage, boxRef, markHintDone])
+
   const hintsDoneRef = useRef(hintsDone)
   hintsDoneRef.current = hintsDone
   const lastHintRef = useRef<string | null>(null)
@@ -1101,7 +1230,9 @@ function VrmStageShell({
     if (!chromeless) return
     let timer = 0
     const fire = (): void => {
-      if (hintBusyRef.current) {
+      // Đang click xuyên qua thì im: mọi gợi ý đều dạy chạm/kéo/nhấn giữ/chuột phải trần — đúng
+      // những thứ lúc này rơi xuống app phía sau. Gợi ý sai còn tệ hơn không gợi ý.
+      if (hintBusyRef.current || ctActiveRef.current) {
         timer = window.setTimeout(fire, HINT_RETRY_MS)
         return
       }
@@ -1397,9 +1528,27 @@ function VrmStageShell({
         <div
           ref={boxRef}
           style={chromeless ? { height: H, width } : undefined}
-          className={`relative shrink-0 transition-opacity duration-200 ${
-            chromeless ? 'pointer-events-auto cursor-grab active:cursor-grabbing' : 'h-[380px] w-full overflow-hidden'
-          } ${dockOpen ? 'pointer-events-none opacity-40' : showSettings && chromeless ? 'opacity-55' : ''}`}
+          /**
+           * Click xuyên qua: `pointer-events-none` + mờ còn 15% khi con trỏ trên người. Mờ nhanh
+           * (200ms) để chữ phía sau đọc được ngay, hiện lại chậm hơn (400ms) cho dịu mắt — cùng nhịp
+           * với `desktop-companion`. Duration theo TRẠNG THÁI ĐÍCH: lúc đang mờ là 200, lúc không
+           * mờ là 400, nên chiều vào và chiều ra mỗi chiều một tốc độ.
+           */
+          className={`relative shrink-0 transition-opacity ${ctActive && !ctFaded ? 'duration-400' : 'duration-200'} ${
+            chromeless
+              ? ctActive
+                ? 'pointer-events-none'
+                : 'pointer-events-auto cursor-grab active:cursor-grabbing'
+              : 'h-[380px] w-full overflow-hidden'
+          } ${
+            dockOpen
+              ? 'pointer-events-none opacity-40'
+              : showSettings && chromeless
+                ? 'opacity-55'
+                : ctFaded
+                  ? 'opacity-15'
+                  : ''
+          }`}
           /**
            * Tooltip NGẮN. Bản trước liệt kê cả 5 thao tác nên Windows vẽ ra một dải chữ chạy ngang
            * gần hết màn hình, che mất chính nhân vật — mà tooltip thì tự hiện khi rê chuột, user
@@ -1483,6 +1632,9 @@ function VrmStageShell({
              * bao giờ nhận được `click`** (cùng họ với bẫy `setPointerCapture` đã làm ô checkbox
              * không tích được). `onClick` đã có bước chặn này, nhưng thiếu ở `pointerdown` thì hỏng
              * ngay từ đầu chuỗi sự kiện.
+             *
+             * Từ v0.4.11 các bảng nổi đã ra ngoài khung (xem chỗ render, lý do `translate`), nên sự
+             * kiện của chúng không còn nổi lên tới đây — chốt này giữ lại làm lớp phòng hờ.
              */
             if ((e.target as HTMLElement).closest('[data-vrm-overlay]')) return
 
@@ -1576,181 +1728,6 @@ function VrmStageShell({
           {/* `z-10`: canvas do stage chèn thẳng vào DOM nên đứng sau các nút của React trong
               thứ tự anh em — thiếu z-index thì lời báo lỗi/tiến độ bị canvas che mất. */}
           {overlay && <div className="absolute inset-0 z-10 flex items-center justify-center">{overlay}</div>}
-
-          {menu && (
-            <VrmRadialMenu
-              x={menu.x}
-              y={menu.y}
-              onDismiss={() => setMenu(null)}
-              /**
-               * THỨ TỰ CÓ CHỦ Ý — vòng chia đều từ 12 giờ thuận chiều kim đồng hồ, nên với 8 nút:
-               * index 0 = đỉnh, index 4 = đáy.
-               *
-               * User yêu cầu: **chat ở trên cùng, cài đặt ở dưới cùng**. Hai thứ này neo hai
-               * đầu trục dọc nên dễ nhắm nhất — chat là việc dùng nhiều nhất, cài đặt là việc
-               * ít nhưng phải tìm thấy ngay. Các mục còn lại xếp theo cụm: ngoại hình bên phải
-               * (biểu cảm → trang phục → chuyển động), đổi model và reset bên trái.
-               */
-              actions={[
-                {
-                  id: 'chat',
-                  icon: '💬',
-                  label: 'Hỏi trợ lý AI',
-                  // Bỏ thu nhỏ: chọn "hỏi" mà ra bong bóng chỉ đọc được thì user phải bấm thêm
-                  // một lần nữa mới gõ được — trạng thái mini là của lần trước, không phải ý bây giờ
-                  onSelect: () => {
-                    useVrmChatStore.getState().setMini(false)
-                    setChatOpen(true)
-                  }
-                },
-                {
-                  id: 'expr',
-                  icon: '😊',
-                  label: `Biểu cảm (${expressions.length})`,
-                  onSelect: () => setSide('expr')
-                },
-                {
-                  id: 'parts',
-                  icon: '👗',
-                  label: 'Trang phục',
-                  onSelect: () => {
-                    setSide('parts')
-                    markHintDone('outfit')
-                  }
-                },
-                { id: 'motion', icon: '🎬', label: 'Chuyển động', onSelect: () => setSide('motion') },
-                { id: 'settings', icon: '⚙', label: 'Cài đặt', onSelect: () => setShowSettings(true) },
-                {
-                  id: 'reset',
-                  icon: '↺',
-                  label: 'Về cỡ & góc mặc định',
-                  onSelect: () => onResetView()
-                },
-                { id: 'models', icon: '🧑‍🎤', label: 'Đổi trợ lý ảo', onSelect: () => setSide('models') },
-                {
-                  id: 'tools',
-                  icon: '🧰',
-                  label: 'Công cụ',
-                  onSelect: () => setToolRing({ x: menu.x, y: menu.y })
-                }
-              ]}
-            />
-          )}
-
-          {/* Bong bóng thoại khi có thông báo — chỉ ở chế độ không khung, vì lúc có khung thì
-              panel đã là một hộp có chữ, thêm bong bóng nữa là hai lớp chữ chồng nhau.
-              Đang mở chat thì nhường chỗ: hai bong bóng cùng nằm trên đầu là chồng lên nhau. */}
-          {bubble && chromeless && !chatOpen && (
-            <VrmSpeechBubble text={bubble.text} severity={bubble.severity} anchor={anchorRect()} />
-          )}
-
-          {chatOpen && (
-            <VrmChatBubble
-              anchor={anchorRect()}
-              onClose={() => setChatOpen(false)}
-              onOpenFull={() => {
-                setChatOpen(false)
-                // Mở qua `openTool` như mọi lối vào khác — nó là nơi DUY NHẤT biết Trợ lý AI mở
-                // dạng dock hay tab, và lượt dùng cũng được đếm đúng
-                const ai = TOOLS.find((x) => x.id === 'ai')
-                if (ai) openTool(ai)
-              }}
-            />
-          )}
-
-          {/* Vòng con: công cụ đã ghim trên Dashboard + nút "Tất cả" + đường quay lại vòng chính */}
-          {toolRing && (
-            <VrmRadialMenu
-              x={toolRing.x}
-              y={toolRing.y}
-              onDismiss={() => setToolRing(null)}
-              /**
-               * Đường quay lại nằm ở TÂM, không phải một nút trên vành.
-               *
-               * Vành là chỗ của các lựa chọn cùng cấp; "lùi một bước" khác loại nên lẫn vào đó
-               * thì vừa chiếm một ô vừa phải đi tìm. Tâm thì luôn nằm ngay dưới con trỏ lúc vòng
-               * vừa mở.
-               */
-              center={{
-                label: 'Menu',
-                onSelect: () => {
-                  setMenu({ x: toolRing.x, y: toolRing.y })
-                  setToolRing(null)
-                }
-              }}
-              actions={pinnedToolActions}
-            />
-          )}
-
-          {/* Bảng hai bên: giữa để trống cho nhân vật nên vừa chọn vừa thấy kết quả */}
-          {side === 'expr' && (
-            <VrmSidePanel
-              title="Biểu cảm"
-              items={expressions.map((e) => ({ id: e, label: e }))}
-              onPick={(id) => stage?.playExpression([id])}
-              anchor={anchorRect()}
-              onClose={() => setSide(null)}
-            />
-          )}
-          {side === 'parts' && (
-            <VrmOutfitPanel
-              modelId={activeModelId}
-              parts={parts}
-              onTogglePart={onTogglePart}
-              onApplyOutfit={onApplyOutfit}
-              anchor={anchorRect()}
-              onClose={() => setSide(null)}
-            />
-          )}
-          {side === 'motion' &&
-            /**
-             * Chưa tải clip thì hộp nhỏ (chỉ một nút); tải rồi thì **hai cột hai bên nhân vật** như
-             * bảng biểu cảm — user yêu cầu rõ: đừng đè lên người.
-             */
-            (motion.installed.length === 0 ? (
-              <VrmMotionPanel motion={motion} anchor={anchorRect()} onClose={() => setSide(null)} onSpeak={onSpeak} />
-            ) : (
-              <VrmSidePanel
-                title="Chuyển động"
-                items={[
-                  // Dừng đứng đầu để lúc đang chạy clip thì nó ở ngay tầm mắt
-                  ...(motion.playing ? [{ id: '__stop', label: '■ Dừng' }] : []),
-                  /**
-                   * Clip di chuyển đánh dấu bằng `›` chứ không phải 🚶.
-                   *
-                   * Cột chỉ rộng 112px và mỗi mục nay là một thẻ có viền, nên emoji (rộng gần
-                   * bằng hai ký tự, và không ngắt dòng chung với chữ) đẩy "Bước thể dục" xuống
-                   * hai dòng — nhìn thấy trên ảnh harness. Dấu một ký tự giữ nguyên ý "clip này
-                   * làm nhân vật đi khỏi chỗ", tooltip nói đủ phần còn lại.
-                   */
-                  ...motion.clips.map((c) => ({
-                    id: c.id,
-                    label: `${c.label}${c.locomotion ? ' ›' : ''}`,
-                    hint: c.locomotion ? `${c.label} — trợ lý ảo sẽ đi khỏi chỗ đứng` : c.label,
-                    active: motion.playing === c.id
-                  }))
-                ]}
-                activeId={motion.playing}
-                onPick={(id) => (id === '__stop' ? motion.stop() : motion.playById(id))}
-                anchor={anchorRect()}
-                onClose={() => setSide(null)}
-              />
-            ))}
-          {side === 'models' && (
-            <VrmSidePanel
-              title="Trợ lý ảo"
-              items={models.map((m) => ({ id: m.id, label: m.label + (m.missing ? ' (mất file)' : '') }))}
-              activeId={activeModelId}
-              onPick={(id) => {
-                onPickModel(id)
-                setSide(null)
-              }}
-              // Bảng vẫn mở sau khi xoá: dọn danh sách thường là xoá vài cái liền một lúc
-              onRemove={onRemoveModel}
-              anchor={anchorRect()}
-              onClose={() => setSide(null)}
-            />
-          )}
         </div>
 
         {/* Có khung thì controls hiện THẲNG, không giấu sau menu: trong đó có tác giả + giấy phép
@@ -1758,6 +1735,199 @@ function VrmStageShell({
             biết mình đang dùng model tác giả cấm dùng thương mại. Không khung thì đành phải giấu
             (chữ trên nền trong suốt không đọc nổi), đó là cái giá của việc bỏ khung. */}
         {!chromeless && controls?.()}
+      </div>
+
+      {/**
+       * Lớp nổi của nhân vật (menu tròn, bong bóng, chat, bảng hai bên) là **ANH EM** của thẻ nhân
+       * vật, cố ý không đặt bên trong — cùng lý do với khung cài đặt ngay dưới.
+       *
+       * Thẻ nhân vật có lúc mang `translate` (đi dạo, `useVrmStroll` — và độ dời Ở LẠI sau khi
+       * dừng) hoặc `transform: scale()` (cài đặt). Cả hai biến thẻ thành **khối chứa của con
+       * `fixed`**: `fixed inset-0` co lại đúng bằng thẻ, và toạ độ màn hình (clientX của cú chuột
+       * phải) bị cộng thêm vị trí thẻ. Đo trên Electron 42: thẻ dời −150px, nút đặt ở (900, 600)
+       * bị vẽ ra (1599, 926), ngoài cửa sổ rộng 1184px. User thấy "đi dạo xong thì chuột phải
+       * không mở menu nữa" — menu CÓ mở, chỉ là nằm ngoài màn hình, và không một lỗi nào báo ra.
+       *
+       * Lớp bọc `z-40` giữ đúng tầng cũ: các bảng tự khai `z-50`, nhưng trước đây số đó chỉ có
+       * nghĩa BÊN TRONG thẻ nhân vật `z-40`. Thả thẳng ra gốc App là đổi thứ tự lớp với mọi thứ
+       * khác trong App. Đứng sau thẻ trong DOM nên vẫn nằm trên người như cũ. `pointer-events-none`
+       * vì lớp bọc phủ cả cửa sổ — từng bảng tự bật `pointer-events-auto` cho phần bấm được.
+       */}
+      <div className="pointer-events-none absolute inset-0 z-40">
+        {menu && (
+          <VrmRadialMenu
+            x={menu.x}
+            y={menu.y}
+            onDismiss={() => setMenu(null)}
+            /**
+             * THỨ TỰ CÓ CHỦ Ý — vòng chia đều từ 12 giờ thuận chiều kim đồng hồ, nên với 8 nút:
+             * index 0 = đỉnh, index 4 = đáy.
+             *
+             * User yêu cầu: **chat ở trên cùng, cài đặt ở dưới cùng**. Hai thứ này neo hai
+             * đầu trục dọc nên dễ nhắm nhất — chat là việc dùng nhiều nhất, cài đặt là việc
+             * ít nhưng phải tìm thấy ngay. Các mục còn lại xếp theo cụm: ngoại hình bên phải
+             * (biểu cảm → trang phục → chuyển động), đổi model và reset bên trái.
+             */
+            actions={[
+              {
+                id: 'chat',
+                icon: '💬',
+                label: 'Hỏi trợ lý AI',
+                // Bỏ thu nhỏ: chọn "hỏi" mà ra bong bóng chỉ đọc được thì user phải bấm thêm
+                // một lần nữa mới gõ được — trạng thái mini là của lần trước, không phải ý bây giờ
+                onSelect: () => {
+                  useVrmChatStore.getState().setMini(false)
+                  setChatOpen(true)
+                }
+              },
+              {
+                id: 'expr',
+                icon: '😊',
+                label: `Biểu cảm (${expressions.length})`,
+                onSelect: () => setSide('expr')
+              },
+              {
+                id: 'parts',
+                icon: '👗',
+                label: 'Trang phục',
+                onSelect: () => {
+                  setSide('parts')
+                  markHintDone('outfit')
+                }
+              },
+              { id: 'motion', icon: '🎬', label: 'Chuyển động', onSelect: () => setSide('motion') },
+              { id: 'settings', icon: '⚙', label: 'Cài đặt', onSelect: () => setShowSettings(true) },
+              {
+                id: 'reset',
+                icon: '↺',
+                label: 'Về cỡ & góc mặc định',
+                onSelect: () => onResetView()
+              },
+              { id: 'models', icon: '🧑‍🎤', label: 'Đổi trợ lý ảo', onSelect: () => setSide('models') },
+              {
+                id: 'tools',
+                icon: '🧰',
+                label: 'Công cụ',
+                onSelect: () => setToolRing({ x: menu.x, y: menu.y })
+              }
+            ]}
+          />
+        )}
+
+        {/* Bong bóng thoại khi có thông báo — chỉ ở chế độ không khung, vì lúc có khung thì
+            panel đã là một hộp có chữ, thêm bong bóng nữa là hai lớp chữ chồng nhau.
+            Đang mở chat thì nhường chỗ: hai bong bóng cùng nằm trên đầu là chồng lên nhau. */}
+        {bubble && chromeless && !chatOpen && (
+          <VrmSpeechBubble text={bubble.text} severity={bubble.severity} anchor={anchorRect()} />
+        )}
+
+        {chatOpen && (
+          <VrmChatBubble
+            anchor={anchorRect()}
+            onClose={() => setChatOpen(false)}
+            onOpenFull={() => {
+              setChatOpen(false)
+              // Mở qua `openTool` như mọi lối vào khác — nó là nơi DUY NHẤT biết Trợ lý AI mở
+              // dạng dock hay tab, và lượt dùng cũng được đếm đúng
+              const ai = TOOLS.find((x) => x.id === 'ai')
+              if (ai) openTool(ai)
+            }}
+          />
+        )}
+
+        {/* Vòng con: công cụ đã ghim trên Dashboard + nút "Tất cả" + đường quay lại vòng chính */}
+        {toolRing && (
+          <VrmRadialMenu
+            x={toolRing.x}
+            y={toolRing.y}
+            onDismiss={() => setToolRing(null)}
+            /**
+             * Đường quay lại nằm ở TÂM, không phải một nút trên vành.
+             *
+             * Vành là chỗ của các lựa chọn cùng cấp; "lùi một bước" khác loại nên lẫn vào đó
+             * thì vừa chiếm một ô vừa phải đi tìm. Tâm thì luôn nằm ngay dưới con trỏ lúc vòng
+             * vừa mở.
+             */
+            center={{
+              label: 'Menu',
+              onSelect: () => {
+                setMenu({ x: toolRing.x, y: toolRing.y })
+                setToolRing(null)
+              }
+            }}
+            actions={pinnedToolActions}
+          />
+        )}
+
+        {/* Bảng hai bên: giữa để trống cho nhân vật nên vừa chọn vừa thấy kết quả */}
+        {side === 'expr' && (
+          <VrmSidePanel
+            title="Biểu cảm"
+            items={expressions.map((e) => ({ id: e, label: e }))}
+            onPick={(id) => stage?.playExpression([id])}
+            anchor={anchorRect()}
+            onClose={() => setSide(null)}
+          />
+        )}
+        {side === 'parts' && (
+          <VrmOutfitPanel
+            modelId={activeModelId}
+            parts={parts}
+            onTogglePart={onTogglePart}
+            onApplyOutfit={onApplyOutfit}
+            anchor={anchorRect()}
+            onClose={() => setSide(null)}
+          />
+        )}
+        {side === 'motion' &&
+          /**
+           * Chưa tải clip thì hộp nhỏ (chỉ một nút); tải rồi thì **hai cột hai bên nhân vật** như
+           * bảng biểu cảm — user yêu cầu rõ: đừng đè lên người.
+           */
+          (motion.installed.length === 0 ? (
+            <VrmMotionPanel motion={motion} anchor={anchorRect()} onClose={() => setSide(null)} onSpeak={onSpeak} />
+          ) : (
+            <VrmSidePanel
+              title="Chuyển động"
+              items={[
+                // Dừng đứng đầu để lúc đang chạy clip thì nó ở ngay tầm mắt
+                ...(motion.playing ? [{ id: '__stop', label: '■ Dừng' }] : []),
+                /**
+                 * Clip di chuyển đánh dấu bằng `›` chứ không phải 🚶.
+                 *
+                 * Cột chỉ rộng 112px và mỗi mục nay là một thẻ có viền, nên emoji (rộng gần
+                 * bằng hai ký tự, và không ngắt dòng chung với chữ) đẩy "Bước thể dục" xuống
+                 * hai dòng — nhìn thấy trên ảnh harness. Dấu một ký tự giữ nguyên ý "clip này
+                 * làm nhân vật đi khỏi chỗ", tooltip nói đủ phần còn lại.
+                 */
+                ...motion.clips.map((c) => ({
+                  id: c.id,
+                  label: `${c.label}${c.locomotion ? ' ›' : ''}`,
+                  hint: c.locomotion ? `${c.label} — trợ lý ảo sẽ đi khỏi chỗ đứng` : c.label,
+                  active: motion.playing === c.id
+                }))
+              ]}
+              activeId={motion.playing}
+              onPick={(id) => (id === '__stop' ? motion.stop() : motion.playById(id))}
+              anchor={anchorRect()}
+              onClose={() => setSide(null)}
+            />
+          ))}
+        {side === 'models' && (
+          <VrmSidePanel
+            title="Trợ lý ảo"
+            items={models.map((m) => ({ id: m.id, label: m.label + (m.missing ? ' (mất file)' : '') }))}
+            activeId={activeModelId}
+            onPick={(id) => {
+              onPickModel(id)
+              setSide(null)
+            }}
+            // Bảng vẫn mở sau khi xoá: dọn danh sách thường là xoá vài cái liền một lúc
+            onRemove={onRemoveModel}
+            anchor={anchorRect()}
+            onClose={() => setSide(null)}
+          />
+        )}
       </div>
 
       {/**
@@ -1989,16 +2159,31 @@ function VrmControls({
        * dải chữ chạy gần hết màn hình, tự hiện mỗi lần rê chuột và che mất chính nhân vật.
        */}
       <SettingsGroup title="🖱 Thao tác">
+        <SettingsToggle
+          label="Click xuyên qua"
+          checked={settings.clickThrough}
+          title="Bấm, cuộn, kéo trên người trợ lý ảo đều xuống app phía sau; rê chuột vào thì trợ lý ảo mờ đi để đọc được chữ bên dưới. Giữ Ctrl + chuột phải lên người để mở menu"
+          onChange={(v) => onPatch({ clickThrough: v })}
+        />
         <div className="text-subtle space-y-1 text-[11px]">
-          {[
-            ['Click', 'trợ lý ảo phản ứng'],
-            ['Nhấn giữ', 'mở khung chat'],
-            ['Kéo', 'níu — thả ra bật về'],
-            ['Ctrl + kéo', 'di chuyển'],
-            ['Shift + kéo', 'xoay người'],
-            ['Ctrl + lăn', 'to / nhỏ'],
-            ['Chuột phải', 'mở menu']
-          ].map(([k, v]) => (
+          {/* Đang bật thì chỉ liệt kê thứ CÒN dùng được — để nguyên bảy dòng cũ là bảng tra nói dối:
+              click, kéo, nhấn giữ lúc này đều rơi xuống app phía sau */}
+          {(settings.clickThrough
+            ? [
+                ['Rê chuột vào', 'mờ đi, đọc được chữ phía sau'],
+                ['Click, cuộn, kéo', 'xuống app phía sau'],
+                ['Ctrl + chuột phải', 'mở menu']
+              ]
+            : [
+                ['Click', 'trợ lý ảo phản ứng'],
+                ['Nhấn giữ', 'mở khung chat'],
+                ['Kéo', 'níu — thả ra bật về'],
+                ['Ctrl + kéo', 'di chuyển'],
+                ['Shift + kéo', 'xoay người'],
+                ['Ctrl + lăn', 'to / nhỏ'],
+                ['Chuột phải', 'mở menu']
+              ]
+          ).map(([k, v]) => (
             <div key={k} className="flex gap-2">
               <span className="text-content w-20 shrink-0 font-medium">{k}</span>
               <span className="min-w-0 flex-1">{v}</span>

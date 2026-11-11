@@ -171,9 +171,11 @@ export function TabsBar() {
         <div className="flex items-center">
           <button
             aria-selected={activeId === null}
+            // Cùng kiểu "đang mở" với tab bên cạnh — bản `bg-app` cũ cũng chìm mất khi bật ảnh nền
             className={`flex h-7 items-center rounded px-2 ${
-              activeId === null ? 'bg-app text-content' : 'text-muted hover:bg-hover hover:text-content'
+              activeId === null ? 'bg-accent-soft text-content' : 'text-muted hover:bg-hover hover:text-content'
             }`}
+            style={activeId === null ? { boxShadow: 'inset 0 -2px 0 var(--c-accent)' } : undefined}
             title={t('tabs.openDashboard')}
             onClick={() => goToSection('dashboard')}
           >
@@ -200,25 +202,42 @@ export function TabsBar() {
         }}
       >
         {tabs.map((tab) => {
+          const active = tab.id === activeId
+          const title = tabTitle(tab)
           const color = tabColor(tab, hosts, groups)
           const marker =
             dropAt?.id === tab.id
               ? `inset ${dropAt.side === 'before' ? '2px' : '-2px'} 0 0 var(--c-accent)`
               : null
-          // Sọc màu group trên đầu tab (nhận diện production/staging) + vạch chỉ chỗ sắp thả.
-          // Cả hai dùng inset shadow chứ KHÔNG dùng border: border làm tab rộng thêm 2px nên
-          // cả thanh giật mỗi lần vạch nhảy sang tab khác.
-          const shadow = [color ? `inset 0 2px 0 ${color}` : null, marker].filter(Boolean).join(', ')
+          // Sọc màu group trên đầu tab (nhận diện production/staging) + vạch accent dưới tab đang
+          // mở + vạch chỉ chỗ sắp thả. Cả ba dùng inset shadow chứ KHÔNG dùng border: border làm
+          // tab rộng/cao thêm 2px nên cả thanh giật mỗi lần vạch nhảy sang tab khác.
+          // Vạch đang-mở ở mép DƯỚI vì mép trên đã là chỗ của màu group — cùng ngôn ngữ với thanh
+          // tab đáy của Workbench (`BottomPanel`).
+          const shadow = [
+            color ? `inset 0 2px 0 ${color}` : null,
+            active ? 'inset 0 -2px 0 var(--c-accent)' : null,
+            marker
+          ]
+            .filter(Boolean)
+            .join(', ')
           return (
           <div
             key={tab.id}
             role="tab"
-            aria-selected={tab.id === activeId}
+            aria-selected={active}
             draggable
+            /**
+             * Tab đang mở phải nổi ở MỌI nền, kể cả khi bật ảnh nền.
+             *
+             * Bản trước chỉ đổi nền sang `bg-app` (#0b0e14) trên thanh `bg-panel` — bật ảnh nền thì
+             * thanh thành `rgba(14,18,27,.62)`, hai màu gần như cùng một màu đen, và cái khác duy
+             * nhất còn lại là chữ sáng hơn một bậc. User chụp được: bốn tab trông như nhau, "không
+             * biết mình có đang mở đúng tab không". Nay ĐỦ BỐN dấu hiệu độc lập với ảnh nền: nền
+             * tô accent, vạch accent dưới, chữ đậm, nút ✕ luôn hiện.
+             */
             className={`group flex max-w-52 min-w-28 cursor-pointer items-center gap-2 rounded-t px-3 text-xs ${
-              tab.id === activeId
-                ? 'bg-app text-content'
-                : 'text-muted hover:bg-hover hover:text-content'
+              active ? 'bg-accent-soft text-content' : 'text-muted hover:bg-hover hover:text-content'
             } ${dragId === tab.id ? 'opacity-40' : ''}`}
             style={shadow ? { boxShadow: shadow } : undefined}
             onClick={() => setActive(tab.id)}
@@ -248,16 +267,29 @@ export function TabsBar() {
             // Thả ra ngoài thanh tab / bấm Esc giữa chừng: dragend LUÔN chạy, nếu không dọn ở đây
             // thì tab kéo dở kẹt mờ và vạch chỉ chỗ nằm lại trên màn hình
             onDragEnd={endDrag}
-            title={tabSubtitle(tab) ?? tabTitle(tab)}
+            title={tabSubtitle(tab) ?? title}
           >
             <span className={`size-1.5 shrink-0 rounded-full ${statusDotClass(tab, ldDot)}`} />
             {tab.kind === 'sftp' && <span className="text-subtle shrink-0">📁</span>}
             {tab.kind === 'vnc' && <span className="text-subtle shrink-0">🖥️</span>}
             {toolMeta(tab.kind) && <span className="text-subtle shrink-0">{toolMeta(tab.kind)!.icon}</span>}
             {tab.broadcast && <span className="text-warning shrink-0" title="Broadcast ON">📡</span>}
-            <span className="truncate">{tabTitle(tab)}</span>
+            {/**
+             * Chữ đậm cho tab đang mở, nhưng GIỮ CHỖ trước bằng một bản đậm vô hình chồng cùng ô
+             * lưới: chữ đậm rộng hơn vài px, đổi `font-weight` trần thì mỗi lần chuyển tab bề rộng
+             * hai tab đổi theo và cả dãy tab phía sau xê dịch.
+             */}
+            <span className="grid min-w-0">
+              <span aria-hidden className="invisible col-start-1 row-start-1 truncate font-semibold">
+                {title}
+              </span>
+              <span className={`col-start-1 row-start-1 truncate ${active ? 'font-semibold' : ''}`}>{title}</span>
+            </span>
             <button
-              className="text-subtle hover:bg-edge-strong hover:text-content ml-auto rounded p-0.5 opacity-0 group-hover:opacity-100"
+              // Tab đang mở luôn hiện ✕ (như trình duyệt) — thêm một dấu hiệu "đây là tab đang mở"
+              className={`text-subtle hover:bg-edge-strong hover:text-content ml-auto rounded p-0.5 ${
+                active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+              }`}
               title={t('tabs.close')}
               onClick={(e) => {
                 e.stopPropagation()

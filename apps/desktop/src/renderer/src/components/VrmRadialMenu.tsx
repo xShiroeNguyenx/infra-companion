@@ -109,6 +109,9 @@ export function VrmRadialMenu({
    * Khung ôm sát người nên có model chỉ rộng ~146px, mà vòng tròn bán kính 86 thì cần ~210px —
    * đặt trong khung là nửa vòng bị `overflow-hidden` cắt mất. Toạ độ nhận vào là toạ độ màn
    * hình (clientX/clientY), kẹp lại để vòng không tràn ra ngoài cửa sổ.
+   *
+   * ⚠️ `fixed` chỉ phủ cửa sổ khi KHÔNG tổ tiên nào có `transform`/`translate`. Khung nhân vật có
+   * cả hai (đi dạo, cài đặt), nên nơi gọi phải render menu NGOÀI khung — xem `VrmPanel`.
    */
   const radius = radiusFor(actions.length)
   const reach = radius + ITEM / 2 + 8

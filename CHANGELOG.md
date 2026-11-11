@@ -5,6 +5,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.4.11] — 2026-11-11
+
+### Added
+
+- **👻 Click through the character.** Turn on *Click xuyên qua* in the character settings (🖱 Thao tác). Clicks, scrolling and dragging on the character now reach the terminal or page behind it, so it never gets in the way of your work. Hover over the character and it fades almost away, so you can read what is underneath. Move the mouse off and it comes back. It is off by default.
+- **Ctrl + right-click still opens the character's menu while click-through is on.** Only that one gesture on the character is caught; the app behind does not see it at all, not even the button press. A plain right-click, or a Ctrl + right-click anywhere else, still goes to the app behind. The menu and every panel opened from it stay clickable as usual, and clicking elsewhere closes the menu like any popup.
+- The character tells you how to reach its menu when you turn click-through on. While it is on, the character stops offering tips about touching, dragging and right-clicking, since those now go to the app behind. The list of gestures in the settings shows only the ones that still work.
+
+- **⚡ Monitoring can start by itself when the app opens.** While hosts are being watched, press **⚡ Start when the app opens** next to **■ Stop**, in the floating dock, the Monitoring tab or the Workbench bottom panel. The hosts you are watching are remembered. Every time the app opens, they are watched again as soon as the vault unlocks, including when it unlocks itself with "remember on this computer". It is the same ⚡ as a tunnel's *start automatically*.
+  - The button has three looks. Grey means off. Orange with a filled ⚡ means these exact hosts will start; press it to turn this off. Dashed orange *Update auto-start* means a different set is saved, because you started again with other hosts; press it to save the hosts on screen instead.
+  - **■ Stop** only ends the current session; the saved hosts stay. Locking and unlocking the vault never restarts monitoring you stopped.
+  - If a saved host has been deleted or is no longer SSH, the app tells you when it opens and removes it from the list, instead of quietly showing one card fewer every time.
+  - The choice belongs to this computer, like host favorites. It saves only which hosts to watch, never a password or key.
+
+### Changed
+
+- **The open tab stands out at a glance.** It used to differ from the other tabs only by a slightly darker background, which disappeared completely with a background image turned on, so every tab looked the same. The open tab now has an accent-coloured background, an accent line along its bottom edge, bold text, and its ✕ button always showing. The bottom line matches the tabs of the Workbench bottom panel. The group colour stripe (red for production and so on) stays on the top edge. Switching tabs does not shift the other tabs, even though the bold text is wider. The 🏠 button is highlighted the same way when the Dashboard is open.
+
+### Fixed
+
+- **Right-clicking the character opens its menu again after it has been walking.** When the character stops after a walk, it stays where it stopped. From then on its menu opened outside the window, so right-clicking seemed to do nothing until the character happened to walk back to its usual spot. The same shift also pushed the speech bubble, the chat bubble and the side panels (expressions, outfits, motions, characters) away from the character, often off-screen. All of them now appear next to the character wherever it stands, including while the settings panel shrinks the character to fit.
+- **Speech bubbles no longer fade with the character.** While the AI dock or the settings panel is open, the character is dimmed. Its speech bubble used to dim with it, which made alerts hard to read. The bubble is now always fully visible.
+
 ## [0.4.10] — 2026-10-15
 
 ### Added
@@ -19,7 +42,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **The style is applied while the clip plays; no new motion file is created.** It works with every model, VRM 0.x and 1.0 alike, because it never assumes which way a bone's axes point. Each bone's swing is scaled around its average position over the step cycle, and the arm adjustments use directions measured from the bones themselves. The legs are not time-smoothed, because a foot that lags behind the beat slides on the ground.
 
- — 2026-10-14
+## [0.4.9] — 2026-10-14
 
 ### Added
 

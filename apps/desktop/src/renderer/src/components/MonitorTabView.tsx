@@ -2,6 +2,7 @@ import { useMonitorStore } from '../stores/monitor'
 import { useTabsStore, type AppTab } from '../stores/tabs'
 import { useUiStore } from '../stores/ui'
 import { MonitorCard } from './MonitorDock'
+import { MonitorAutoStartButton } from './MonitorAutoStartButton'
 import { useT } from '../i18n'
 
 /**
@@ -40,6 +41,7 @@ export function MonitorTabView({ tab, active }: { tab: AppTab; active: boolean }
         >
           {t('monitor.tabConfig')}
         </button>
+        <MonitorAutoStartButton className="px-2 py-1 text-xs" />
         {monitors.length > 0 && (
           <button
             className="border-edge-strong text-muted hover:bg-hover rounded border px-2 py-1 text-xs font-medium"

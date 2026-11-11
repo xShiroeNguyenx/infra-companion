@@ -167,7 +167,8 @@ export async function readSettings(): Promise<VrmSettingsDto> {
       desktopOverlay: raw.desktopOverlay !== false,
       stroll: raw.stroll === true,
       strollPace: cleanStrollPace(raw.strollPace),
-      walkStyle: cleanWalkStyle(raw.walkStyle)
+      walkStyle: cleanWalkStyle(raw.walkStyle),
+      clickThrough: raw.clickThrough === true
     }
   } catch {
     return { ...DEFAULT_VRM_SETTINGS }
@@ -730,7 +731,8 @@ export function registerVrmIpc(): () => void {
       desktopOverlay: next.desktopOverlay !== false,
       stroll: next.stroll === true,
       strollPace: cleanStrollPace(next.strollPace),
-      walkStyle: cleanWalkStyle(next.walkStyle)
+      walkStyle: cleanWalkStyle(next.walkStyle),
+      clickThrough: next.clickThrough === true
     }
     await mkdir(app.getPath('userData'), { recursive: true })
     await writeFile(settingsPath(), JSON.stringify(clean, null, 2), 'utf8')

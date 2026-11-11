@@ -6,6 +6,7 @@ import { useTabsStore } from '../stores/tabs'
 import { useT } from '../i18n'
 import { useDraggablePanel } from '../lib/useDraggablePanel'
 import { MetricChart } from './MetricsHistoryModal'
+import { MonitorAutoStartButton } from './MonitorAutoStartButton'
 
 /** Dashboard monitoring neo góc phải — mờ khi không rê chuột, KHÔNG backdrop nên
  *  vẫn thao tác terminal bình thường. Chỉ biến mất khi user bấm Dừng.
@@ -88,6 +89,8 @@ export function MonitorDock() {
           >
             –
           </button>
+          {/* Chỉ icon: header dock rộng 320px đã kín chữ "Đang theo dõi…" + 4 nút */}
+          <MonitorAutoStartButton compact className="px-1.5 py-1" />
           <button
             className="border-edge-strong text-muted hover:bg-hover rounded border px-2 py-0.5 text-xs font-medium"
             onClick={stop}
