@@ -16,9 +16,19 @@ import { useTabsStore, type Pane } from '../../stores/tabs'
 import { useAiExplainStore } from '../../stores/aiExplain'
 import { useDataStore } from '../../stores/data'
 import { useSettingsStore, type CommandAlias } from '../../stores/settings'
+import { useTermHighlightStore } from '../../stores/termHighlight'
+import { fireTermTrigger, forgetTermTriggers } from '../../lib/termTrigger'
 import { useT } from '../../i18n'
 import { Button, Modal, TextInput } from '../../components/ui'
-import { terminalTheme } from './theme'
+import { darkTerminalTheme, lightTerminalTheme, terminalTheme } from './theme'
+import { attachHighlighter, type Highlighter } from './termHighlighter'
+import { createPromptNav, type PromptNav } from './promptNav'
+
+/** Nền nháy trên dòng prompt vừa nhảy tới — dùng đúng màu vùng chọn của theme cho quen mắt. */
+function promptFlashColor(): string {
+  const color = useSettingsStore.getState().theme === 'light' ? lightTerminalTheme.selectionBackground : darkTerminalTheme.selectionBackground
+  return color ?? '#2d3f76'
+}
 
 /**
  * Đọc lệnh đang gõ tại con trỏ, nối cả các dòng bị wrap (lệnh dài tràn nhiều dòng hiển thị).
@@ -122,6 +132,13 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: Term
    * trống, đọc buffer trả ''.
    */
   const pendingCommandRef = useRef<string | null>(null)
+  /** F25 — tô màu/báo động theo mẫu; pane báo dòng user tự gõ lúc bấm Enter. */
+  const highlighterRef = useRef<Highlighter | null>(null)
+  /** Ctrl+↑/↓ — mốc prompt từ OSC 133;A. */
+  const promptNavRef = useRef<PromptNav | null>(null)
+  /** Đã nhắc "chưa có mốc prompt" trong pane này chưa — nhắc một lần là đủ. */
+  const promptHintShownRef = useRef(false)
+  const [promptHint, setPromptHint] = useState(false)
   const fitRef = useRef<FitAddon | null>(null)
   const searchRef = useRef<SearchAddon | null>(null)
   const webglRef = useRef<WebglAddon | null>(null)
@@ -239,6 +256,24 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: Term
         if (selection) void useAiExplainStore.getState().explain(selection)
         return false
       }
+      // Ctrl+↑/↓ — nhảy giữa các prompt. Chỉ chặn phím khi THẬT SỰ có mốc để nhảy: chưa bật
+      // shell integration thì phím đi xuống terminal như trước (ai đã gán nó trong zsh/fish vẫn
+      // dùng được), kèm một lời nhắc một lần để biết vì sao không nhảy.
+      const jumpDir = matchesCombo(event, sc.prevPrompt) ? 'prev' : matchesCombo(event, sc.nextPrompt) ? 'next' : null
+      if (jumpDir && term.buffer.active.type === 'normal') {
+        const nav = promptNavRef.current
+        if (nav?.hasPrompts()) {
+          event.preventDefault()
+          const running = (useShellMarksStore.getState().panes[pane.sessionId]?.runningSince ?? null) !== null
+          nav.jump(jumpDir, running, promptFlashColor())
+          return false
+        }
+        if (!promptHintShownRef.current) {
+          promptHintShownRef.current = true
+          setPromptHint(true)
+          setTimeout(() => setPromptHint(false), 6000)
+        }
+      }
       return true
     })
 
@@ -261,10 +296,45 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: Term
     fit.fit()
     window.infra.terminal.resize(pane.sessionId, term.cols, term.rows)
 
+    // F25 — tô màu + báo động theo mẫu. Gắn TRƯỚC khi ghi lại buffer cũ để buffer đó cũng được tô.
+    const highlighter = attachHighlighter(term, {
+      getRules: () => {
+        const s = useTermHighlightStore.getState()
+        return { enabled: s.enabled, compiled: s.compiled }
+      },
+      getTheme: () => (useSettingsStore.getState().theme === 'light' ? 'light' : 'dark'),
+      onTrigger: (rule, lineText) =>
+        fireTermTrigger({
+          sessionId: pane.sessionId,
+          paneTitle: pane.subtitle ?? pane.title,
+          hostId: pane.origin?.kind === 'host' ? pane.origin.hostId : null,
+          rule,
+          lineText
+        })
+    })
+    highlighterRef.current = highlighter
+    // Đổi mẫu (Cài đặt) hoặc đổi theme sáng/tối → gỡ màu cũ, tô lại phần gần đây
+    const offHighlightRules = useTermHighlightStore.subscribe((s, prev) => {
+      if (s.compiled !== prev.compiled || s.enabled !== prev.enabled) highlighter.rescan()
+    })
+    const offHighlightTheme = useSettingsStore.subscribe((s, prev) => {
+      if (s.theme !== prev.theme) highlighter.rescan()
+    })
+    const promptNav = createPromptNav(term)
+    promptNavRef.current = promptNav
+
     // Pane bị remount khi gộp/tách tab → ghi lại buffer đã chụp TRƯỚC khi subscribe
     // (data mới đến trong lúc unmount nằm ở hàng đợi pending, flush sau snapshot là đúng thứ tự)
     const snapshot = takeTermSnapshot(pane.sessionId)
-    if (snapshot) term.write(snapshot)
+    if (snapshot) {
+      // Buffer cũ là output ĐÃ thấy: tô lại cho đúng, nhưng không được báo động lần nữa. Tắt báo
+      // động tới khi ghi xong, rồi quét nó một lượt im lặng để mốc "đã quét" vượt qua nó.
+      highlighter.setNotify(false)
+      term.write(snapshot, () => {
+        highlighter.catchUp()
+        highlighter.setNotify(true)
+      })
+    }
 
     // F23 — Shell integration: đọc OSC 133 (A/B/C/D) do shell trên remote gửi để biết ranh giới
     // từng lệnh + exit code. `registerOscHandler` trả true = đã xử lý, xterm không in ra màn hình.
@@ -279,6 +349,8 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: Term
         // (mặc định gần như mọi distro) sẽ để lại cột dài hơn prompt mới sau một `cd /`, và
         // `stripPrompt` cắt mất đầu lệnh — `echo rm -rf /` thành `-rf /`.
         promptColRef.current = null
+        // Mốc cho Ctrl+↑/↓
+        promptNav.onPromptStart()
       } else if (mark.kind === 'prompt-end') {
         // Cột con trỏ tại mốc B = độ dài prompt VỪA in. Dùng để cắt prompt ra khỏi dòng lệnh
         // lúc user bấm Enter (F24 chèn lệnh này ngược ra terminal nên phải sạch prompt).
@@ -306,6 +378,8 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: Term
     const dataDisposable = term.onData((data) => {
       // Theo dõi dòng đang gõ để biết TÊN lệnh vừa chạy (marker OSC 133 không gửi kèm lệnh)
       if (useSettingsStore.getState().shellMarksEnabled) useShellMarksStore.getState().onInput(pane.sessionId, data)
+      // Gõ phím = quay về chỗ đang làm; lần Ctrl+↑ sau tính lại từ đáy
+      promptNav.resetCursor()
       handleInput(data)
     })
     const resizeDisposable = term.onResize(({ cols, rows }) =>
@@ -464,6 +538,12 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: Term
       unsubscribeData()
       dataDisposable.dispose()
       oscDisposable.dispose()
+      offHighlightRules()
+      offHighlightTheme()
+      highlighter.dispose()
+      promptNav.dispose()
+      highlighterRef.current = null
+      promptNavRef.current = null
       resizeDisposable.dispose()
       selectionDisposable.dispose()
       cursorMoveDisposable.dispose()
@@ -484,6 +564,9 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: Term
       // pane đã đóng thì clearTermSession dọn rồi — chụp lại sẽ rò bộ nhớ
       const liveSessionId = currentSessionIdOf(pane.id)
       if (liveSessionId) saveTermSnapshot(liveSessionId, serialize.serialize())
+      // Phiên này kết thúc hẳn (đóng pane, hoặc reconnect sang phiên mới) → bỏ trạng thái hạ
+      // nhiệt báo động của nó. Gộp/tách tab thì phiên vẫn sống, giữ nguyên.
+      if (liveSessionId !== pane.sessionId) forgetTermTriggers(pane.sessionId)
       term.dispose() // dispose cả WebglAddon đã nạp
       termRef.current = null
       fitRef.current = null
@@ -551,6 +634,9 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: Term
     if (data === '\r') {
       const { commandGuardEnabled, commandGuardPatterns } = useSettingsStore.getState()
       const term = termRef.current
+      // F25 — dòng tại con trỏ là dòng user TỰ GÕ: `grep -i error app.log` không được tự kích
+      // hoạt mẫu `error`. Phải đánh dấu lúc này, cùng thời điểm F24 chốt lệnh (xem ngay dưới).
+      highlighterRef.current?.markInputLine()
       // F24 — chốt dòng lệnh NGAY ĐÂY, không đợi mốc OSC 133;C.
       //
       // Đây là thời điểm DUY NHẤT con trỏ còn nằm trên dòng lệnh: bấm Enter thì tty echo CR+LF
@@ -721,6 +807,14 @@ export function TerminalPane({ tabId, pane, paneActive, tabVisible, slot }: Term
       {/* F23 — dải nhỏ góc trên phải: lệnh đang chạy (kèm đồng hồ) hoặc kết quả lệnh vừa xong.
           Chỉ hiện khi shell trên remote thật sự gửi OSC 133 — không có thì im lặng, không quảng cáo. */}
       <ShellMarkBadge sessionId={pane.sessionId} />
+
+      {/* Ctrl+↑/↓ mà chưa có mốc prompt nào: nói vì sao không nhảy, một lần mỗi pane. Phím vẫn
+          đi xuống terminal như trước, nên lời nhắc là cách duy nhất để biết tính năng có tồn tại. */}
+      {promptHint && (
+        <div className="border-edge-strong bg-elevated/95 text-muted pointer-events-none absolute bottom-3 left-1/2 z-30 max-w-[90%] -translate-x-1/2 rounded border px-3 py-1.5 text-[11px] leading-relaxed shadow-lg">
+          {t('terminal.promptJumpHint')}
+        </div>
+      )}
 
       {/* Auto-complete dropdown: portal ra body + fixed để không bị overflow-hidden của pane cắt.
           Xổ lên (above) khi con trỏ ở nửa dưới màn hình. */}

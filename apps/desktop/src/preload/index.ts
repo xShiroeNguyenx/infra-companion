@@ -101,6 +101,7 @@ const api: InfraApi = {
     ackAll: () => ipcRenderer.invoke(IPC.EVENTS_ACK_ALL),
     remove: (id) => ipcRenderer.invoke(IPC.EVENTS_DELETE, id),
     addMarker: (input) => ipcRenderer.invoke(IPC.EVENTS_ADD_MARKER, input),
+    addTrigger: (input) => ipcRenderer.invoke(IPC.EVENTS_ADD_TRIGGER, input),
     timeline: (hostId, fromTs, toTs) => ipcRenderer.invoke(IPC.EVENTS_TIMELINE, hostId, fromTs, toTs),
     onNew: (cb) => subscribe<AppEventDto>(IPC.EVENTS_NEW, cb),
     onChanged: (cb) => subscribe<number>(IPC.EVENTS_CHANGED, cb)

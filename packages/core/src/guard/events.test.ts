@@ -70,9 +70,10 @@ describe('countUnread / defaultSeverity', () => {
     expect(defaultSeverity('marker')).toBe('info')
   })
 
-  test('bộ nguồn đủ 7 và có user (marker tay)', () => {
-    expect(EVENT_SOURCES).toHaveLength(7)
+  test('bộ nguồn đủ 8, có user (marker tay) và terminal (F25 báo động theo mẫu)', () => {
+    expect(EVENT_SOURCES).toHaveLength(8)
     expect(EVENT_SOURCES).toContain('user')
+    expect(EVENT_SOURCES).toContain('terminal')
   })
 })
 

@@ -246,6 +246,8 @@ For a host reached via the login script `ssh deploy@web-01`, SFTP **enters web-0
 | **Reorder tabs** | **Drag a tab** along the bar and drop it where you want. An accent line shows where it will land — left half of a tab means *before it*, right half means *after it*, and the empty space past the last tab means *to the end*. Dragging near either edge scrolls the bar, so a target that's off-screen is still reachable. Dropping does **not** switch tabs, and nothing is reconnected — the sessions keep running exactly as they were |
 | **Close tab/pane** | `Ctrl+Shift+W`, or `✕` on the tab/pane, or middle-click the tab |
 | **Find in terminal** | `Ctrl+F` |
+| **Jump between prompts** | `Ctrl+↑` / `Ctrl+↓` — scroll straight to where each command started instead of hunting through its output. The first `Ctrl+↑` lands on the command you just ran, or on the start of the one still running. The prompt flashes so you can see where you are even when it is already on screen. Needs shell integration (§15P); without it the keys reach the terminal as before and a one-time hint says why nothing jumped. Rebind in **Settings → ⌨ Keyboard shortcuts** |
+| **Colour errors and warnings** | Automatic — see §5E |
 | **Copy / Paste** | `Ctrl+Shift+C` / `Ctrl+Shift+V` — **rebind in Settings → ⌨ Keyboard shortcuts**. Pasting goes through the bound combo or right-click only; plain `Ctrl+V` no longer auto-pastes (standard terminal behavior) |
 | **Copy with the mouse** | Select text → **left-click inside the highlight** = copy (a *"Copied"* toast confirms) |
 | **Paste with the mouse** | **Right-click** anywhere in the terminal = paste the clipboard at the cursor (respects Broadcast) |
@@ -331,6 +333,44 @@ Settings opens as a **full-screen page** with a category rail on the left — **
 - It matches by text, not by parsing the shell, so it errs toward asking (e.g. `grep reboot` triggers the `reboot` rule) — a false prompt is safer than a missed `rm -rf`. Trim the list if a pattern is too eager.
 
 **Test**: type `rm -rf /tmp/nothing-here` → press Enter → the confirmation popup appears. Press **↑** to recall it and Enter again → it's still caught. Open `vim` and type `rm -rf` on a line → Enter does **not** trigger it.
+
+---
+
+## 5E. Highlight & alerts — `⋯` → Settings → 🖍 Highlight & alerts
+
+**What it is**: the terminal colours the words that matter as output arrives. Out of the box, `error`, `fatal`, `failed`, `exception`… are red, and `warn`, `deprecated` are yellow. Any pattern can also **alert** you, which is meant for a log you `tail -F` in one tab while you work in another.
+
+**Patterns**:
+- Plain text is case-insensitive: `Out of memory`. Wrap a pattern in `/…/` for a regex: `/\bOOM\b/` is case-sensitive, and `/\bOOM\b/i` is not.
+- **Colour**: red, yellow, green, blue or purple. The swatches show the real colours for your current light/dark theme.
+- **Matched text only** colours just the match, with its own background and text colour. **Whole line** gives the line a soft background and keeps its original text colours.
+- **Order matters**: where two patterns overlap, the higher one wins. Use ▲ ▼ to reorder.
+- A pattern that could freeze the terminal (nested repetition such as `(a+)+`) is refused with an explanation. So is one that matches an empty string, which would match everywhere.
+- **Try it**: paste a real log line into the box at the bottom. You see exactly how it will be coloured and whether it would raise an alert.
+- **Restore default patterns** brings back the starter set.
+
+**Alerts**: tick **Alert** on a pattern. When a **new** line matches while that pane is out of sight (another tab is active, or the app window is not focused):
+- a notification pops up with the line;
+- it is recorded in the **notification center** under the **🖍 Terminal** filter;
+- the character reacts, as it does to a monitoring alert. When the app is in the tray, this includes the desktop character.
+
+**Rules that keep alerts useful**:
+- **At most one alert per minute, per pattern, per pane.** The next one says how many matching lines were folded in, so a burst of 500 identical errors is one alert.
+- While you are looking at the pane, there is no alert. The colour is enough.
+- Output that was already there is coloured but never alerts. This covers reopening a pane after merging or splitting tabs.
+- **The notification center keeps the pane name and the pattern, not the log line.** A log line can contain a token or a password, and the notification store on disk is not encrypted. The full line is in the pop-up and in the terminal.
+
+**What is never coloured**:
+- Lines you typed yourself. `grep -i error app.log` does not colour, or alert on, your own command.
+- Full-screen programs (vim, less, htop).
+- In a single huge burst (`cat` of a 200,000-line file), only the last 3,000 lines are scanned.
+
+The colours follow the text when the screen is redrawn. After `clear` or `Ctrl+L`, old colours do not stick to new text. When a multi-line progress display (`docker pull`, `apt`) rewrites a line in place, the colour follows the new content.
+
+**Test**:
+1. Open an SSH tab. Run `echo "2026 [error] upstream timed out"` → `error` turns red, while the `echo` line you typed stays plain.
+2. Add a pattern `OOM` and tick **Alert**.
+3. In that tab run `sleep 5; echo OOM`, then switch to another tab within 5 seconds. A notification appears, and the bell's **🖍 Terminal** filter has the entry. Run the same command and stay on the tab: the line turns red, but there is no notification.
 
 ---
 
@@ -1248,6 +1288,7 @@ pixiv's VRoid Project gives away a [seven-animation pack](https://vroid.booth.pm
 | `Ctrl+J` | Bottom panel — Monitoring / Log / Tunnels (Workbench theme only) |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Switch tabs |
 | `Ctrl+F` | Find in terminal |
+| `Ctrl+↑` / `Ctrl+↓` | Jump to the previous / next prompt (needs shell integration; customizable) |
 | `Ctrl+Shift+E` | AI-explain the selected terminal output |
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | Copy / Paste (customizable in **Settings → ⌨ Keyboard shortcuts**) |
 | Left-click inside a selection | Copy the highlighted text |
@@ -1276,6 +1317,7 @@ pixiv's VRoid Project gives away a [seven-animation pack](https://vroid.booth.pm
 - **Multi-host tail** opens one SSH connection per machine; keep the list to what the gate can take.
 - **Scheduled jobs** need the app running (pair them with close-to-tray) and the vault open; a run that meets a locked vault is recorded as *skipped*. Timing is checked every 30 seconds, so a job can start up to half a minute late, and the schedule is your machine's local time — including its daylight-saving jumps.
 - **Fleet security check** is Linux-only, needs no `sudo` and therefore cannot read `/etc/shadow`, a root-only `sshd_config` include, or anything else that requires privilege — it reports what an ordinary account can see. Results are not stored, so there is no history to compare.
+- **Terminal highlighting** colours only lines that are complete, so a progress line still being rewritten is coloured when it ends. A single huge burst of output is scanned only for its last 3,000 lines. Alerts depend on the app window's timers: when it is minimised to the tray, Chromium slows them, so an alert can arrive somewhat after the line itself.
 - **Shell integration** requires the snippet in the host's `.bashrc`; bash only for now (zsh and fish are not covered), and it applies to shells started after the snippet is added. A machine you have not set up simply shows nothing extra.
 - **3D character** needs a `.vrm` file — `.vrma` animation clips can be loaded but `.glb`/`.fbx` and VRoid's own `.vroid` project files cannot. Models carry no animation of their own, so every movement is generated by the app; a model whose skeleton departs from the VRM humanoid standard may pose oddly. Rendering costs a WebGL context and a few percent of a core, which is why the frame cap defaults to 30 and hair physics can be turned off. The desktop overlay appears on the **primary** monitor only, and the first alert after minimising waits a few seconds while the model loads. Expressions come from what the model declares — a model with none shows an empty list.
 - **Folder diff** compares modified time and size, so a file edited in place with the same length and a preserved timestamp reads as identical (this is why *same time, different size* is shown as a conflict rather than resolved). Watching uploads only; deletions and renames are never mirrored to the host, and a tree over 20 000 files is truncated with a warning. On Linux, per-directory watchers are registered because recursive `fs.watch` is not available there — a directory created while watching is picked up only after you toggle Watch off and on.

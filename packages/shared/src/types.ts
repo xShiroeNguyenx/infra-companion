@@ -1475,8 +1475,11 @@ export interface WatcherStatusDto {
 
 /** `alert` = có chuyện; `recover` = hết chuyện; `info` = ghi nhận; `marker` = user tự đánh dấu (deploy…). */
 export type AppEventKind = 'alert' | 'recover' | 'info' | 'marker'
-/** Nguồn phát: từng hệ theo dõi trong app, `user` = marker tay, `app` = chính ứng dụng. */
-export type AppEventSource = 'monitor' | 'replication' | 'watcher' | 'tunnel' | 'http' | 'user' | 'app'
+/**
+ * Nguồn phát: từng hệ theo dõi trong app, `terminal` = mẫu báo động F25 khớp output,
+ * `user` = marker tay, `app` = chính ứng dụng.
+ */
+export type AppEventSource = 'monitor' | 'replication' | 'watcher' | 'tunnel' | 'http' | 'terminal' | 'user' | 'app'
 export type AppEventSeverity = 'info' | 'warning' | 'critical'
 
 export interface AppEventDto {
@@ -1518,6 +1521,18 @@ export interface MarkerInput {
   hostId?: string | null
   title: string
   ts?: number
+}
+
+/**
+ * F25 — một mẫu có bật báo động vừa khớp output của terminal. Main ghi thành `alert` nguồn
+ * `terminal` để nó vào trung tâm thông báo và nhân vật phản ứng như mọi cảnh báo khác.
+ *
+ * Chỉ có tiêu đề (pane + mẫu), KHÔNG có dòng log: `events.db` không mã hoá, mà dòng log có thể
+ * chứa token hay mật khẩu.
+ */
+export interface TriggerEventInput {
+  hostId?: string | null
+  title: string
 }
 
 // ---------------------------------------------------------------------------
@@ -2131,6 +2146,8 @@ export interface InfraApi {
     ackAll(): Promise<void>
     remove(id: number): Promise<void>
     addMarker(input: MarkerInput): Promise<AppEventDto | null>
+    /** F25 — mẫu báo động khớp output terminal → ghi một `alert` nguồn `terminal`. */
+    addTrigger(input: TriggerEventInput): Promise<AppEventDto | null>
     /** Marker (toàn fleet + của host) và alert/recover của host trong khoảng — để vẽ lên biểu đồ. */
     timeline(hostId: string | null, fromTs: number, toTs: number): Promise<AppEventDto[]>
     /** Sự kiện mới vừa được ghi (từ bất kỳ nguồn nào). */

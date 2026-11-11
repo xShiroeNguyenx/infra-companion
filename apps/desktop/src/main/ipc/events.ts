@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { EventStore } from '@infra/core'
-import { IPC, type AppEventDto, type AppEventInput, type AppEventQuery, type MarkerInput } from '@infra/shared'
+import { IPC, type AppEventDto, type AppEventInput, type AppEventQuery, type MarkerInput, type TriggerEventInput } from '@infra/shared'
 import { overlayOnEvent } from '../overlay'
 
 /**
@@ -73,6 +73,19 @@ export function registerEventsIpc(): () => void {
       hostId: input.hostId ?? null,
       title: title.slice(0, 200),
       ts: typeof input.ts === 'number' && Number.isFinite(input.ts) ? input.ts : undefined
+    })
+  })
+  // F25 — mẫu báo động khớp output terminal. Renderer đã tự hạ nhiệt (1 lần/phút/mẫu/pane);
+  // ở đây chỉ kiểm kiểu và cắt độ dài, vì đây vẫn là dữ liệu từ renderer.
+  ipcMain.handle(IPC.EVENTS_ADD_TRIGGER, (_e, input: TriggerEventInput) => {
+    const title = String(input?.title ?? '').trim()
+    if (!title) return null
+    return recordEvent({
+      kind: 'alert',
+      source: 'terminal',
+      severity: 'warning',
+      hostId: typeof input.hostId === 'string' && input.hostId !== '' ? input.hostId : null,
+      title: title.slice(0, 200)
     })
   })
   ipcMain.handle(IPC.EVENTS_TIMELINE, (_e, hostId: string | null, fromTs: number, toTs: number) =>

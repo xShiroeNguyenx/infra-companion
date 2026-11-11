@@ -4,16 +4,35 @@
  * vật lý nên không lệ thuộc layout/IME). So khớp = dựng lại chuỗi từ event rồi so bằng.
  */
 
-export type ShortcutAction = 'copy' | 'paste' | 'find' | 'explain'
+export type ShortcutAction = 'copy' | 'paste' | 'find' | 'explain' | 'prevPrompt' | 'nextPrompt'
 
-export const SHORTCUT_ACTIONS: ShortcutAction[] = ['copy', 'paste', 'find', 'explain']
+export const SHORTCUT_ACTIONS: ShortcutAction[] = ['copy', 'paste', 'find', 'explain', 'prevPrompt', 'nextPrompt']
 
-/** Giá trị mặc định — GIỮ nguyên hành vi cũ đã hardcode trong TerminalPane. */
+/**
+ * Giá trị mặc định — GIỮ nguyên hành vi cũ đã hardcode trong TerminalPane.
+ *
+ * Nhảy prompt dùng Ctrl+↑/↓ như VS Code. Bash mặc định không gán gì cho tổ hợp này (bấm vào
+ * thường chỉ in ra rác kiểu `;5A`), nên lấy nó không cướp phím của shell. Pane chỉ chặn phím khi
+ * thật sự có mốc prompt để nhảy; chưa bật shell integration thì phím đi thẳng xuống terminal.
+ */
 export const DEFAULT_SHORTCUTS: Record<ShortcutAction, string> = {
   copy: 'Ctrl+Shift+C',
   paste: 'Ctrl+Shift+V',
   find: 'Ctrl+F',
-  explain: 'Ctrl+Shift+E'
+  explain: 'Ctrl+Shift+E',
+  prevPrompt: 'Ctrl+ArrowUp',
+  nextPrompt: 'Ctrl+ArrowDown'
+}
+
+/** Nhãn để HIỂN THỊ một phím trong combo: `ArrowUp` → `↑`. Chuỗi lưu vẫn giữ tên gốc. */
+export function displayKey(key: string): string {
+  const arrows: Record<string, string> = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }
+  return arrows[key] ?? key
+}
+
+/** Combo để hiển thị: `Ctrl+ArrowUp` → `Ctrl+↑`. */
+export function displayCombo(combo: string): string {
+  return combo.split('+').map(displayKey).join('+')
 }
 
 const MODIFIER_CODES = new Set([

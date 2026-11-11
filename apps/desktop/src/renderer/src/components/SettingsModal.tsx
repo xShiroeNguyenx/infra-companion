@@ -16,8 +16,9 @@ import {
 } from '../stores/settings'
 import { useToastsStore } from '../stores/toasts'
 import { DEFAULT_GUARD_PATTERNS } from '../lib/commandGuard'
-import { SHORTCUT_ACTIONS, eventToCombo, isValidShortcut, type ShortcutAction } from '../lib/shortcuts'
+import { SHORTCUT_ACTIONS, displayCombo, eventToCombo, isValidShortcut, type ShortcutAction } from '../lib/shortcuts'
 import { CustomPaletteSection } from './CustomPaletteSection'
+import { HighlightRulesSection } from './HighlightRulesSection'
 import { LocaldevSettingsView } from '../features/localdev/LocaldevSettingsView'
 import { LayoutGlyph } from './LayoutGlyph'
 import { LayoutPreview } from './LayoutPreview'
@@ -33,6 +34,7 @@ type SettingsSection =
   | 'background'
   | 'terminal'
   | 'autocomplete'
+  | 'highlight'
   | 'shortcuts'
   | 'guard'
   | 'app'
@@ -297,6 +299,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     { id: 'background', label: t('settings.background'), icon: '🖼️' },
     { id: 'terminal', label: t('settings.terminal'), icon: '▮' },
     { id: 'autocomplete', label: t('settings.autocomplete'), icon: '⌥' },
+    // F25 — cùng họ "terminal thông minh", đứng ngay sau shell integration/auto-complete
+    { id: 'highlight', label: t('settings.highlight'), icon: '🖍' },
     { id: 'shortcuts', label: t('settings.shortcuts'), icon: '⌨' },
     { id: 'guard', label: t('settings.cmdGuard'), icon: '🛡️' },
     // Hành vi của chính app (khay hệ thống…) — không thuộc terminal hay giao diện
@@ -885,6 +889,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               </>
             )}
             {section === 'localdev' && <LocaldevSettingsView />}
+            {section === 'highlight' && <HighlightRulesSection />}
 
             {section === 'shortcuts' && (
               <>
@@ -911,7 +916,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                               : 'border-edge-strong text-content hover:bg-hover'
                           }`}
                         >
-                          {recording === action ? t('settings.scPress') : shortcuts[action]}
+                          {recording === action ? t('settings.scPress') : displayCombo(shortcuts[action])}
                         </button>
                       </div>
                     )

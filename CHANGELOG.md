@@ -5,6 +5,30 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.4.12] — 2026-11-11
+
+### Added
+
+- **🖍 The terminal colours what matters.** Lines with `error`, `fatal`, `failed`, `exception` are marked in red, and `warn` or `deprecated` in yellow, right in the terminal as they arrive. Output already on screen is coloured too. Only the matching words are coloured, so the rest of the line keeps its own colours. Change the patterns in **Settings → Highlight & alerts**.
+  - A pattern is plain text (case-insensitive) or a `/regex/`. Pick one of five colours. Colour just the matched text, or give the whole line a soft background. Where two patterns overlap, the higher one in the list wins, and you can reorder them.
+  - Lines you type yourself are never coloured, so `grep -i error app.log` does not light up your own command.
+  - Nothing is coloured inside full-screen programs such as vim, less or htop.
+  - A **Try it** box shows exactly how a pasted log line will look and whether it will raise an alert, so you can get a regex right without waiting for that line to appear on the server.
+  - A pattern that could freeze the terminal, such as `(a+)+`, is refused with an explanation. So is one that matches an empty string and would therefore match everywhere.
+- **Alerts on a pattern.** Tick *Alert* on a pattern, such as `Out of memory`. When a new line matches while you are looking elsewhere (another tab, or another window), you get a notification. The alert is also recorded in the notification center under a new **Terminal** filter, and the character reacts as it does to a monitoring alert.
+  - Each pattern alerts at most once a minute per pane. The next alert says how many matching lines were folded in, so a burst of 500 identical errors is one alert, not 500.
+  - The notification center stores only the pane name and the pattern, never the log line itself, because a log line can contain a token or a password. The line appears in the notification and stays in the terminal.
+  - Patterns ship with alerts off. You choose which logs deserve an interruption.
+- **Ctrl+↑ / Ctrl+↓ jump between prompts.** Scroll straight to where the previous command started instead of hunting through its output. The first Ctrl+↑ goes to the command you just ran. If a command is still running, it goes to where that command started. The prompt you land on flashes briefly, so you can see it even when it is already on screen. Ctrl+↓ walks forward and returns to the bottom.
+  - It needs shell integration, the same OSC 133 snippet that shows exit codes. Without it, the keys reach the terminal as before, and a one-time hint explains how to turn it on.
+  - Both keys can be changed in **Settings → Keyboard shortcuts**. The cheat sheet on the Dashboard and in Help now shows arrow keys as ↑ ↓.
+
+### Notes
+
+- Colours stay correct when the screen is redrawn. After `clear` or Ctrl+L, old colours do not stick to new text. When a multi-line progress display (`docker pull`, `apt`) rewrites a line in place, the colouring follows the new text.
+- The cost is small. In a test feeding 40,000 lines in 400 bursts, with 10,000 lines of scrollback, output took about 10% longer with highlighting on. Only the last 3,000 lines of a single huge burst, like `cat` of a big file, are scanned.
+- When the app is minimised to the tray, Chromium slows the timers of hidden windows. Alerts can therefore arrive a little later than the line itself. Terminal output was already handled this way.
+
 ## [0.4.11] — 2026-11-11
 
 ### Added

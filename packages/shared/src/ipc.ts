@@ -402,6 +402,7 @@ export const IPC = {
   EVENTS_ACK_ALL: 'events:ack-all',
   EVENTS_DELETE: 'events:delete',
   EVENTS_ADD_MARKER: 'events:add-marker',
+  EVENTS_ADD_TRIGGER: 'events:add-trigger',
   EVENTS_TIMELINE: 'events:timeline',
   /** main → renderer: một sự kiện vừa ghi. */
   EVENTS_NEW: 'events:new',

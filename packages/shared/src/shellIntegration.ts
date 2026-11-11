@@ -102,6 +102,61 @@ export function shouldNotify(input: NotifyInput): NotifyDecision {
   return { notify: true }
 }
 
+// ── Nhảy giữa các prompt (Ctrl+↑ / Ctrl+↓) ────────────────────────────────
+
+export interface PromptJumpInput {
+  /** Số dòng (trong buffer) của các mốc prompt-start; thứ tự tuỳ ý, `-1` = mốc đã bị xoá. */
+  prompts: readonly number[]
+  direction: 'prev' | 'next'
+  /** Prompt vừa nhảy tới ở lần bấm trước (null = chưa nhảy, hoặc user đã gõ phím từ đó). */
+  current: number | null
+  /** Dòng trên cùng đang hiện. */
+  viewportTop: number
+  rows: number
+  /** Giá trị `viewportTop` khi cuộn hết xuống đáy. */
+  baseY: number
+  /** Dòng con trỏ đang đứng (tuyệt đối trong buffer). */
+  cursorLine: number
+  /** Đang có lệnh chạy: ở đáy không có prompt mới, chỉ có output đang chảy. */
+  running: boolean
+}
+
+export type PromptJump = { kind: 'line'; line: number } | { kind: 'bottom' } | { kind: 'none' }
+
+/**
+ * Chọn prompt để nhảy tới.
+ *
+ * Mốc tính "trước/sau" là chỗ khó, vì `scrollToLine` đưa prompt lên dòng trên cùng **trừ khi
+ * đã gần đáy**, lúc đó viewport đứng yên. Nên không thể lấy dòng trên cùng làm mốc mọi lúc:
+ *  · vừa nhảy tới một prompt mà nó còn trên màn hình → lấy CHÍNH nó, để bấm tiếp đi tiếp
+ *    được cả khi viewport không nhúc nhích;
+ *  · đang ở đáy, đứng ở prompt mới tinh → lấy prompt đó, để lần bấm đầu tới ngay lệnh vừa chạy
+ *    (không bắt user bấm một lần "vô ích" vào chính dòng mình đang gõ);
+ *  · đang ở đáy mà lệnh đang chạy → lấy dưới con trỏ, để lần bấm đầu tới đầu lệnh đang chạy;
+ *  · user đã tự cuộn lên → lấy dòng trên cùng đang hiện.
+ */
+export function pickPromptJump(input: PromptJumpInput): PromptJump {
+  const lines = [...new Set(input.prompts.filter((l) => l >= 0))].sort((a, b) => a - b)
+  if (lines.length === 0) return { kind: 'none' }
+  const atBottom = input.viewportTop >= input.baseY
+  const visible = (l: number): boolean => l >= input.viewportTop && l < input.viewportTop + input.rows
+
+  let anchor: number
+  if (input.current !== null && visible(input.current)) anchor = input.current
+  else if (atBottom) {
+    const freshPrompt = [...lines].reverse().find((l) => l <= input.cursorLine)
+    anchor = !input.running && freshPrompt !== undefined ? freshPrompt : input.cursorLine + 1
+  } else anchor = input.viewportTop
+
+  if (input.direction === 'prev') {
+    const target = [...lines].reverse().find((l) => l < anchor)
+    return target === undefined ? { kind: 'none' } : { kind: 'line', line: target }
+  }
+  const target = lines.find((l) => l > anchor)
+  if (target !== undefined) return { kind: 'line', line: target }
+  return atBottom ? { kind: 'none' } : { kind: 'bottom' }
+}
+
 /** Thời gian chạy → chuỗi ngắn cạnh prompt: `1.2s`, `45s`, `3m20s`, `1h04m`. */
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`

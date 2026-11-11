@@ -15,6 +15,7 @@ const SOURCE_ICON: Record<AppEventSource, string> = {
   watcher: '📡',
   tunnel: '🔀',
   http: '🌐',
+  terminal: '🖍',
   user: '📌',
   app: 'ℹ️'
 }
@@ -25,6 +26,7 @@ const SOURCE_KEY: Record<AppEventSource, I18nKey> = {
   watcher: 'events.src.watcher',
   tunnel: 'events.src.tunnel',
   http: 'events.src.http',
+  terminal: 'events.src.terminal',
   user: 'events.src.user',
   app: 'events.src.app'
 }

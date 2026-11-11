@@ -6,7 +6,7 @@ import type { AppEventDto, AppEventKind, AppEventSeverity, AppEventSource } from
  * không import được core nên các phép tính hiển thị đặt ở đây.
  */
 
-export const EVENT_SOURCES: readonly AppEventSource[] = ['monitor', 'replication', 'watcher', 'tunnel', 'http', 'user', 'app']
+export const EVENT_SOURCES: readonly AppEventSource[] = ['monitor', 'replication', 'watcher', 'tunnel', 'http', 'terminal', 'user', 'app']
 
 /** Khoá ngày THEO GIỜ MÁY, dạng YYYY-MM-DD — để gom "hôm nay / hôm qua / ngày cụ thể". */
 export function dayKey(ts: number): string {

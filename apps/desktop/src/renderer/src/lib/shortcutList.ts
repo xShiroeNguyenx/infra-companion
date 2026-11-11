@@ -6,12 +6,12 @@
  * hardcode trong `App.tsx`; giờ vẫn phải giữ đồng bộ bằng tay với App.tsx (không có cách nào đọc
  * ngược từ handler ra), nhưng ít nhất chỉ còn MỘT bản chép thay vì hai.
  *
- * Riêng 4 phím terminal thì user đổi được ở Cài đặt → đọc giá trị đang lưu chứ không in cứng,
+ * Riêng các phím terminal thì user đổi được ở Cài đặt → đọc giá trị đang lưu chứ không in cứng,
  * nếu không cheat sheet sẽ nói dối ngay khi user đổi phím.
  */
 
 import type { I18nKey } from '../i18n'
-import { SHORTCUT_ACTIONS, type ShortcutAction } from './shortcuts'
+import { SHORTCUT_ACTIONS, displayKey, type ShortcutAction } from './shortcuts'
 
 export interface ShortcutEntry {
   /** Khoá i18n mô tả hành động. */
@@ -45,13 +45,15 @@ const TERM_LABEL: Record<ShortcutAction, I18nKey> = {
   copy: 'settings.sc.copy',
   paste: 'settings.sc.paste',
   find: 'settings.sc.find',
-  explain: 'settings.sc.explain'
+  explain: 'settings.sc.explain',
+  prevPrompt: 'settings.sc.prevPrompt',
+  nextPrompt: 'settings.sc.nextPrompt'
 }
 
-/** 4 phím terminal theo ĐÚNG giá trị user đang đặt (`stores/settings`.shortcuts). */
+/** Phím terminal theo ĐÚNG giá trị user đang đặt (`stores/settings`.shortcuts). */
 export function terminalShortcuts(current: Record<ShortcutAction, string>): ShortcutEntry[] {
   return SHORTCUT_ACTIONS.map((action) => ({
     key: TERM_LABEL[action],
-    combo: current[action].split('+')
+    combo: current[action].split('+').map(displayKey)
   }))
 }
