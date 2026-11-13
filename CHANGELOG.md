@@ -29,6 +29,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The cost is small. In a test feeding 40,000 lines in 400 bursts, with 10,000 lines of scrollback, output took about 10% longer with highlighting on. Only the last 3,000 lines of a single huge burst, like `cat` of a big file, are scanned.
 - When the app is minimised to the tray, Chromium slows the timers of hidden windows. Alerts can therefore arrive a little later than the line itself. Terminal output was already handled this way.
 
+### Security
+
+- **Electron 42.11.14 → 42.11.18.** Electron is the runtime the app ships with, so this update reaches every install. It closes [GHSA-jr5w-w6x2-84p9](https://github.com/advisories/GHSA-jr5w-w6x2-84p9): intermediate certificates of the eMudhra certificate authority were compromised, and until now the app would trust them on its HTTPS connections, including the one that downloads updates. The installer again ships with no known vulnerabilities. The remaining alerts GitHub shows for the repository are all in build and test tools, which never reach the installer.
+
 ## [0.4.11] — 2026-11-11
 
 ### Added
