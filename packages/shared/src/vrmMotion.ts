@@ -10,8 +10,13 @@
  * hay release công khai là đúng hành vi đó. User tự tải về rồi dùng nút "Nạp file .vrma" thì hợp
  * lệ, đó là chuyện giữa họ và pixiv.
  *
- * Toàn bộ clip dưới đây là **CC0 1.0** từ ba tác giả trên BOOTH (đã đối chiếu điều khoản ở trang
- * gốc, không chỉ tin nơi phân phối lại). CC0 không bắt ghi công; vẫn ghi vì nó là hồ sơ nguồn gốc.
+ * Clip của **người khác** dưới đây đều là **CC0 1.0** từ ba tác giả trên BOOTH (đã đối chiếu điều
+ * khoản ở trang gốc, không chỉ tin nơi phân phối lại). CC0 không bắt ghi công; vẫn ghi vì nó là hồ
+ * sơ nguồn gốc.
+ *
+ * Từ v0.5.0 có thêm clip **riêng của dự án** (`OWN`, tên `pastel-*`): tác giả repo tự làm và tự
+ * phát hành, giữ bản quyền. Chúng thay dần clip CC0 — vai nào đã có clip riêng thì clip CC0 của vai
+ * đó bị gỡ khỏi danh mục; vai chưa có thì clip CC0 ở lại cho nhân vật khỏi đứng im.
  */
 
 /** Vai trò của clip trong app — quyết định nó tự chạy lúc nào. */
@@ -92,7 +97,39 @@ const REROFUMI = { author: 'へすい / rerofumi', sourceUrl: 'https://booth.pm/
 const SASHII = { author: 'sashii', sourceUrl: 'https://booth.pm/ja/items/6412084' }
 const SASHII_RT = { author: 'sashii (retarget) · JenJell (gốc)', sourceUrl: 'https://booth.pm/ja/items/7861818' }
 
-/** Dựng một mục cho gọn — mọi clip đều CC0 và cùng nơi host. */
+/**
+ * Clip riêng của dự án: tag `vrm-motions-v2`, KHÔNG có mirror (không tồn tại bản nào ở nơi khác).
+ * `vrm-motions-v1` vẫn phải GIỮ: clip CC0 còn lại và mọi bản app ≤ 0.4.12 tải từ đó.
+ */
+const RELEASE_OWN = 'https://github.com/xShiroeNguyenx/infra-companion/releases/download/vrm-motions-v2'
+export const OWN_MOTION_AUTHOR = 'xShiroeNguyenx'
+export const OWN_MOTION_LICENSE = 'Giữ bản quyền — chỉ dùng trong Infra Companion'
+
+function ownClip(
+  id: string,
+  label: string,
+  role: VrmMotionRole,
+  durationSec: number,
+  sha256: string,
+  sizeBytes: number
+): VrmMotionClip {
+  return {
+    id,
+    label,
+    role,
+    durationSec,
+    author: OWN_MOTION_AUTHOR,
+    license: OWN_MOTION_LICENSE,
+    licenseUrl: 'https://github.com/xShiroeNguyenx/infra-companion',
+    sourceUrl: 'https://github.com/xShiroeNguyenx/infra-companion',
+    url: `${RELEASE_OWN}/${id}.vrma`,
+    sha256,
+    sizeBytes,
+    fileName: `${id}.vrma`
+  }
+}
+
+/** Dựng một mục CC0 cho gọn — cùng nơi host, cùng mirror. */
 function clip(
   id: string,
   label: string,
@@ -135,12 +172,15 @@ export const VRM_MOTIONS: readonly VrmMotionClip[] = [
    * thân người lúc đứng, vượt xa lề `WIDTH_MARGIN` (2,2×) nên hai bàn tay bị cắt cụt. Nó nằm ở
    * nhóm chọn tay. "Uống nước" (1,3×) thay chỗ: đủ hẹp, và là cử chỉ đời thường hợp lúc rảnh.
    */
-  clip('idle-01', 'Đứng thư giãn', 'idle', 7.97, '5ed6c016df035b21daaefe64751e1356387c6a33693d31366b0912ac7566ea92', 95888, SASHII),
+  // Clip riêng (thay 'idle-01' CC0). ⚠️ CHƯA đo bề ngang trên model thật — xem cảnh báo ngay trên.
+  ownClip('pastel-idle', 'Đứng thư giãn', 'idle', 15.38, 'f0af4db043c1acc2fd8b182e4efd6afd20e3cfcf44fff9e49b66088e3c4d49f5', 337304),
   clip('drink-water', 'Uống nước', 'idle', 23.73, 'ba56122fecb5014f019096dcd014c0c35f1d560dcb0f6b1d55d3d66e5d69740c', 613560, REROFUMI),
-  clip('speaking-01', 'Đang nói', 'chat', 1.97, 'ba0339d2d9755fc2e0dab06e96a0d91303d0a508c9f89f07dc17a07dc0e2535c', 37208, SASHII),
+  // Mở khung chat → gật đầu đón (clip riêng, thay 'speaking-01' CC0)
+  ownClip('pastel-agree', 'Gật đầu', 'chat', 4.04, 'abe10c2e8a55c4a3dbb3d644eb03864d64f9b48ec3507bc7418aaacd74db83f5', 109404),
   // Chạm vào người → TẠO DÁNG (user đổi từ "giật mình")
   clip('pose-motion', 'Tạo dáng', 'poke', 20.0, 'e3b06f78b21df2fe1f26d80dd1826fd47941a891d44b46a6197f8a87de05ff2c', 521156, REROFUMI),
-  clip('failed-apology', 'Cúi xin lỗi', 'alert', 7.27, 'fdc0cdeca81c8130c8fd4c257cae4392c58f48e3b016fe2db696b6d40823f504', 204992, REROFUMI),
+  // Có cảnh báo → sợ hãi (clip riêng, thay 'failed-apology' CC0)
+  ownClip('pastel-afraid', 'Sợ hãi', 'alert', 2.63, 'ef5e159356576426d67ba43291395cd32e547e41de14fdf2f27016befe9e6d67', 83432),
   clip('success-cheer', 'Ăn mừng', 'recover', 21.5, '88123be97c20633b926b911c1904aae3cdc790c5416b39788b753749ba087afb', 559496, REROFUMI),
   // Mở công cụ ngồi đọc lâu → nhân vật cũng ngồi xem điện thoại cho hợp cảnh
   clip('review-phone', 'Xem điện thoại', 'inspect', 10.43, '54a37ca48a1d4ffb60cfc539013f59fecd48d93375b2069c6c35b5e9f416b726', 281528, REROFUMI),
@@ -148,6 +188,9 @@ export const VRM_MOTIONS: readonly VrmMotionClip[] = [
   clip('reaction-startle', 'Giật mình', 'manual', 11.43, 'ad2a5118837bfa6789cb89383d4e0bd98bed7685158b692bbfb6662ee42ae6c9', 307340, REROFUMI),
   // Dang tay rộng 3,55× thân người — vượt khung nếu tự chạy, nên chỉ khi user chủ động chọn
   clip('airplane-02', 'Máy bay', 'manual', 7.5, '6a8dd04f6a0b4f071d881df1fce68e116dc4c5c1d651f5a5585a91cfa4037ccd', 235656, SASHII),
+  // Bước tại chỗ (hông không dời ngang: đo biên độ x/z = 0) nên không gắn cờ `locomotion`.
+  // Đi dạo ưu tiên clip này, 'walk' CC0 bên dưới là dự phòng — xem `STROLL_WALK_CLIPS`.
+  ownClip('pastel-walk', 'Bước tại chỗ', 'manual', 2.38, '2669f8202920de057cbb15646bf286fdf94aa3cca168db69230d6aa76e65eeb0', 51960),
   // ── Di chuyển: KHÔNG tự chạy (nhân vật rời khỏi chỗ đứng) ──────────────────
   clip('walk', 'Đi bộ', 'manual', 0.83, '51c4158488a86a6bb99b978fb4d269e1798f9749bceaf0420473bae413fc3271', 66604, SASHII_RT, true),
   clip('run-slow', 'Chạy chậm', 'manual', 0.73, '54fff21bbbbbe6364dc812f39dd849eadb61de3888b556580143d386592d17e5', 48864, SASHII_RT, true),

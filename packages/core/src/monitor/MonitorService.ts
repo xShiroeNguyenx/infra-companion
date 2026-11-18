@@ -228,11 +228,12 @@ export class MonitorService extends EventEmitter<MonitorServiceEvents> {
       this.poll(monitor)
       monitor.pollTimer = setInterval(() => this.poll(monitor), POLL_INTERVAL_MS)
     } catch (error) {
+      // Đã dừng trong lúc đang kết nối dở: KHÔNG emit. Sample lỗi này đến SAU khi main đã dọn
+      // engine/lastSamples, nên nó sẽ dựng lại state cảnh báo cho một host không còn được theo dõi.
+      if (monitor.stopped) return
       this.emit('sample', errorSample(target.hostId, error instanceof Error ? error.message : String(error)))
-      if (!monitor.stopped) {
-        this.clearTimers(monitor)
-        monitor.reconnectTimer = setTimeout(() => void this.connect(monitor, target, verifyHostKey), 5_000)
-      }
+      this.clearTimers(monitor)
+      monitor.reconnectTimer = setTimeout(() => void this.connect(monitor, target, verifyHostKey), 5_000)
     }
   }
 

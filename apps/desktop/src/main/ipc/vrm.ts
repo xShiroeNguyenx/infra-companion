@@ -9,11 +9,10 @@ import { VRM_PROBE_BYTES, probeVrm } from '@infra/core'
 import {
   cleanFolderMotions,
   cleanPos,
-  cleanStrollPace,
-  cleanWalkStyle,
   DEFAULT_VRM_FOLDER_MOTIONS,
   DEFAULT_VRM_SETTINGS,
   IPC,
+  isRetiredSamplePath,
   pickVrmaNames,
   sampleDownloadCap,
   VRM_MAX_BYTES,
@@ -127,7 +126,7 @@ async function writeOutfits(file: VrmOutfitFile): Promise<void> {
   await writeFile(outfitsPath(), JSON.stringify(file, null, 2), 'utf8')
 }
 
-async function readIndex(): Promise<VrmIndexEntry[]> {
+async function readIndexRaw(): Promise<VrmIndexEntry[]> {
   try {
     const raw = JSON.parse(await readFile(modelsPath(), 'utf8')) as unknown
     if (!Array.isArray(raw)) return []
@@ -151,6 +150,18 @@ async function writeIndex(entries: VrmIndexEntry[]): Promise<void> {
 
 /** Export cho `main/overlay.ts`: quyết định có hiện nhân vật ngoài desktop hay không cần đọc cấu hình này. */
 export async function readSettings(): Promise<VrmSettingsDto> {
+  // Thu hồi model mẫu cũ TRƯỚC khi ai đó đọc được `activeId` trỏ vào nó — xem `retireOldSamples`
+  await retireOldSamples()
+  return readSettingsRaw()
+}
+
+/** Danh bạ model, sau khi đã thu hồi model mẫu cũ. Mọi nơi ngoài `retireOldSamples` dùng hàm này. */
+async function readIndex(): Promise<VrmIndexEntry[]> {
+  await retireOldSamples()
+  return readIndexRaw()
+}
+
+async function readSettingsRaw(): Promise<VrmSettingsDto> {
   try {
     const raw = JSON.parse(await readFile(settingsPath(), 'utf8')) as Partial<VrmSettingsDto>
     return {
@@ -166,8 +177,6 @@ export async function readSettings(): Promise<VrmSettingsDto> {
       posY: cleanPos(raw.posY),
       desktopOverlay: raw.desktopOverlay !== false,
       stroll: raw.stroll === true,
-      strollPace: cleanStrollPace(raw.strollPace),
-      walkStyle: cleanWalkStyle(raw.walkStyle),
       clickThrough: raw.clickThrough === true
     }
   } catch {
@@ -216,6 +225,68 @@ async function readHead(path: string, n: number): Promise<Uint8Array> {
  */
 function samplesDir(): string {
   return join(app.getPath('userData'), 'vrm-samples')
+}
+
+/**
+ * ==== Thu hồi model mẫu cũ (v0.5.0) ====
+ *
+ * Model mẫu CC0 cũ không còn trong app: tác giả muốn mọi người dùng nhân vật riêng của dự án. Máy
+ * nào còn giữ bản cũ thì gỡ nó khỏi danh bạ, xoá file, và bỏ `activeId` nếu đang trỏ vào nó — không
+ * còn model đang dùng thì renderer hiện popup tải nhân vật mới (`StartScreen`).
+ *
+ * Chạy MỘT lần mỗi lượt mở app, trước lần đọc danh bạ / cấu hình đầu tiên (`readIndex`,
+ * `readSettings` đều chờ nó). Bên trong chỉ được gọi bản `…Raw`: gọi bản thường là tự chờ chính mình.
+ *
+ * Chỉ đụng tới `userData/vrm-samples/` và `userData/vrm-motions/` — hai thư mục app tự tạo và tự
+ * tải file vào. File `.vrm` user chọn từ chỗ khác không bao giờ bị xoá (`isRetiredSamplePath`).
+ *
+ * Lỗi ở đây KHÔNG được chặn tính năng: log rồi đi tiếp, model cũ ở lại thêm một lượt mở app.
+ */
+let retireJob: Promise<void> | null = null
+
+function retireOldSamples(): Promise<void> {
+  return (retireJob ??= (async () => {
+    try {
+      const dir = samplesDir()
+      const current = VRM_SAMPLE_MODELS.map((m) => m.fileName)
+      const entries = await readIndexRaw()
+      const retired = entries.filter((e) => isRetiredSamplePath(e.path, dir, current))
+
+      if (retired.length > 0) {
+        const gone = new Set(retired.map((e) => e.id))
+        await writeIndex(entries.filter((e) => !gone.has(e.id)))
+        const settings = await readSettingsRaw()
+        if (settings.activeId && gone.has(settings.activeId)) {
+          await writeFile(settingsPath(), JSON.stringify({ ...settings, activeId: null }, null, 2), 'utf8')
+        }
+        // Bộ trang phục gắn theo id model — model mất thì chúng thành rác không ai thấy
+        const outfitFile = await readOutfits()
+        let touched = false
+        for (const id of gone) {
+          if (outfitFile.outfits[id] || outfitFile.worn[id]) {
+            delete outfitFile.outfits[id]
+            delete outfitFile.worn[id]
+            touched = true
+          }
+        }
+        if (touched) await writeOutfits(outfitFile)
+      }
+
+      // Xoá file: cả file của mục vừa gỡ lẫn file mồ côi (mục đã bị bỏ tay từ trước, file còn lại)
+      for (const name of await readdir(dir).catch(() => [] as string[])) {
+        if (isRetiredSamplePath(join(dir, name), dir, current)) await rm(join(dir, name), { force: true }).catch(() => {})
+      }
+      // Clip đã rời danh mục (ba clip CC0 nhường vai cho clip riêng) cũng không còn ai đọc tới
+      const keep = new Set(VRM_MOTIONS.map((c) => c.fileName.toLowerCase()))
+      for (const name of await readdir(motionsDir()).catch(() => [] as string[])) {
+        if (/\.vrma$/i.test(name) && !keep.has(name.toLowerCase())) {
+          await rm(join(motionsDir(), name), { force: true }).catch(() => {})
+        }
+      }
+    } catch (e) {
+      console.error('[vrm] retiring old sample models failed:', (e as Error).message)
+    }
+  })())
 }
 
 /** Đang tải — cho phép huỷ, và chặn bấm tải hai lần cùng lúc. */
@@ -730,8 +801,6 @@ export function registerVrmIpc(): () => void {
       posY: cleanPos(next.posY),
       desktopOverlay: next.desktopOverlay !== false,
       stroll: next.stroll === true,
-      strollPace: cleanStrollPace(next.strollPace),
-      walkStyle: cleanWalkStyle(next.walkStyle),
       clickThrough: next.clickThrough === true
     }
     await mkdir(app.getPath('userData'), { recursive: true })

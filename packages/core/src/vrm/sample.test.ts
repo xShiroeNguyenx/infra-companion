@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sampleDownloadCap, sampleErrorMessage, VRM_SAMPLE_MODELS } from '@infra/shared'
+import { isRetiredSamplePath, sampleDownloadCap, sampleErrorMessage, VRM_SAMPLE_MODELS } from '@infra/shared'
 
 describe('danh sách model mẫu', () => {
   it('mỗi model có đủ thông tin để tải và kiểm', () => {
@@ -57,5 +57,39 @@ describe('câu báo lỗi', () => {
 
   it('lỗi mã kiểm tra nói rõ file đã bị BỎ — không để user tưởng đã tải xong', () => {
     expect(sampleErrorMessage('checksum')).toMatch(/bỏ|không khớp/i)
+  })
+})
+
+describe('model mẫu đã bị thu hồi', () => {
+  const dir = 'C:\\Users\\deploy\\AppData\\Roaming\\app\\vrm-samples'
+  const current = ['pink-pastel.vrm']
+
+  it('model mẫu cũ trong thư mục của app → thu hồi', () => {
+    expect(isRetiredSamplePath(dir + '\\sendagaya-shino.vrm', dir, current)).toBe(true)
+  })
+
+  it('model mẫu hiện hành → giữ', () => {
+    expect(isRetiredSamplePath(dir + '\\pink-pastel.vrm', dir, current)).toBe(false)
+  })
+
+  it('file của USER ở chỗ khác không bao giờ bị thu hồi, kể cả trùng tên model cũ', () => {
+    // Xoá nhầm ở đây là xoá file của người dùng — lỗi nặng nhất hàm này có thể gây ra
+    expect(isRetiredSamplePath('D:\\models\\sendagaya-shino.vrm', dir, current)).toBe(false)
+    expect(isRetiredSamplePath('D:\\models\\my-avatar.vrm', dir, current)).toBe(false)
+  })
+
+  it('thư mục chỉ TRÙNG TIỀN TỐ tên thì không tính là thư mục của app', () => {
+    expect(isRetiredSamplePath(dir + '-backup\\sendagaya-shino.vrm', dir, current)).toBe(false)
+  })
+
+  it('không phân biệt hoa/thường và dấu gạch chéo (Windows trả cả hai kiểu)', () => {
+    const alt = dir.replace(/\\/g, '/').toUpperCase()
+    expect(isRetiredSamplePath(alt + '/Sendagaya-Shino.VRM', dir, current)).toBe(true)
+    expect(isRetiredSamplePath(alt + '/PINK-PASTEL.VRM', dir, current)).toBe(false)
+  })
+
+  it('file nằm sâu hơn một cấp, hoặc thư mục rỗng → để yên', () => {
+    expect(isRetiredSamplePath(dir + '\\sub\\old.vrm', dir, current)).toBe(false)
+    expect(isRetiredSamplePath('sendagaya-shino.vrm', '', current)).toBe(false)
   })
 })

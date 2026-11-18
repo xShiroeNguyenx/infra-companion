@@ -118,6 +118,45 @@ thì khuỷu gập **34 độ** (đo đúng vậy trên model thật, user gọi
 **Muốn khuỷu sát eo hơn nữa**: giảm `poleOut`, tăng `poleBack`. Đừng để `poleOut` về 0, khuỷu sẽ
 ép vào sườn và xuyên qua thân ở model gầy. Test chặn ở mức 0.1.
 
+### 3.1b Bàn tay ra ngoài quần áo (`ARM_CLEARANCE`)
+
+`restTarget` đặt bàn tay theo khớp háng, đúng với model mặc đồ ôm. Model có váy xoè hay tay áo phồng
+thì chỗ đó nằm trong váy: tay bị ép vào thân, tay áo lún vào hông, vai trông sệ và lệch ra sau. Nên
+lúc nạp model, `measureArmClearance` (trong `vrmStage.ts`) đo hình thật ở dáng nghỉ, và
+`armClearanceM` đổi số đo thành phần cộng vào `lateralM` của từng tay.
+
+| Tham số | Giá trị | Ý nghĩa |
+|---|---|---|
+| `sleeveFrac` | 1 | Phần bán kính cẳng tay phải nằm ngoài mép thân: 1 là tay áo vừa chạm mép váy |
+| `maxFrac` | 0.35 | Trần của phần đưa ra, tính theo chiều dài tay |
+
+Đo gì:
+
+- **Mép thân**: phân vị 95 của khoảng cách ngang tới đường giữa, trên các đỉnh **không** thuộc tay và
+  **không** thuộc đầu, trong dải cao của cẳng tay khi buông. Đỉnh thuộc phần nào thì hỏi xương nặng
+  nhất của nó: dưới xương vai là tay, dưới xương cổ là đầu. Tóc dài rủ tới hông vì thế không bị tính
+  là thân.
+- **Bán kính cẳng tay**: phân vị 85 của khoảng cách tới trục khuỷu → cổ tay, chỉ lấy đỉnh chiếu xuống
+  **trong** đoạn đó. Bàn tay và ngón nằm quá cổ tay; tính cả vào thì tay trần cũng ra "bán kính" 10 cm.
+- Dùng phân vị chứ không dùng `max`: một dải ruy băng lạc không được quyết định mép thân ở đâu.
+
+**Đo được trên ba model** (góc vai → bàn tay so với phương ngang, trước → sau):
+
+| Model | Bán kính cẳng tay | Trái | Phải |
+|---|---|---|---|
+| Tay áo phồng, váy xoè | 8 cm | 76° → 67° | 77° → 67° |
+| Tay trần | 2,7 cm | 72° → 68° | 69° → 67° |
+| Model mẫu (Sendagaya Shino) | 2,9 cm | 81° → 77° | 78° → 76° |
+
+Các số này tính bằng đúng công thức trên file model, **chưa nhìn trong app**. Ở `sleeveFrac` 0.6 model
+tay áo phồng mới ra 71° và tay áo vẫn cắt vào váy.
+
+**Trần `maxFrac` để làm gì**: một cái đuôi hay đôi cánh gắn weight vào hông sẽ làm "mép thân" phình ra
+một bên; không có trần thì tay bên đó bị bẻ ra gần ngang.
+
+**Phép đo hỏng thì ra 0** (model không có skin, three đổi API) kèm một dòng `console.warn`: tay về
+đúng công thức cũ. Chỉ áp cho tư thế đứng do code sinh; clip `.vrma` không bị đụng.
+
 ### 3.2 Khuỷu trôi (`ELBOW_DRIFT`) — chống "đơ ở cùi chỏ"
 
 | Tham số | Giá trị | Ý nghĩa |
@@ -514,7 +553,40 @@ nghiệm cho thấy khoảng một nửa ghi rõ **cấm phân phối lại**, n
 bản quyền nhân vật. Một file ghi "cho phân phối lại" vẫn có thể vi phạm bản quyền của hãng game.
 Chỉ đưa vào repo những model mà **tác giả gốc** công bố giấy phép cho phép, tốt nhất là CC0.
 
-### 10.1 Model mẫu nên dùng
+### 10.0 Từ v0.5.0: model và clip RIÊNG của dự án
+
+Model chính của app nay là **Pink Pastel** (`pink-pastel.vrm`), do tác giả repo tự làm và tự phát
+hành, giữ bản quyền. Mục 10.1–10.3 bên dưới mô tả model/clip CC0 cũ: giữ lại làm hồ sơ, và vì
+**hai release `vrm-sample-v1` / `vrm-motions-v1` KHÔNG được xoá** — các bản app ≤ 0.4.12 và những
+clip CC0 còn trong danh mục vẫn tải từ đó.
+
+| | Tag | File |
+|---|---|---|
+| Model | `vrm-sample-v2` | `pink-pastel.vrm` (5.636.424 byte) |
+| Clip | `vrm-motions-v2` | `pastel-idle.vrma`, `pastel-agree.vrma`, `pastel-afraid.vrma`, `pastel-walk.vrma` |
+
+- **`scripts/vrm-license.cjs` báo ❌ với `pink-pastel.vrm` là đúng**: metadata cố ý ghi cấm phân phối
+  lại và cấm chỉnh sửa. Công cụ đó trả lời câu "người khác có được đăng lại không"; chủ sở hữu tự
+  đăng thì không cần phép ai.
+- **Biểu cảm**: model khai `blink`, `blinkLeft`, `blinkRight`, `happy`, `relaxed`, `surprised`, `sad`,
+  `angry`, `neutral` — đủ mọi biểu cảm app gọi tới. **Không có** khẩu hình (`aa`/`ih`/`ou`/`ee`/`oh`)
+  và không khai `lookAt`: app hiện không dùng hai thứ đó, nhưng thêm tính năng nhép miệng hay
+  liếc mắt thì model này chưa đáp ứng.
+- **Vai nào đã có clip riêng thì clip CC0 của vai đó bị gỡ khỏi danh mục** (`idle-01`,
+  `speaking-01`, `failed-apology`). Vai chưa có thì clip CC0 ở lại.
+- **Đi dạo là đi CHÉO 45°, không đi ngang** (`useVrmStroll.ts`): chặng ra tiến về phía người xem —
+  mặt quay 45°, thẻ trượt ngang đồng thời phóng to dần bằng thuộc tính CSS `scale` neo ở bàn chân
+  (`strollDepthScale`, camera giả định 4 m, trần 1,4× và không để đỉnh đầu vượt mép trên cửa sổ);
+  chặng về quay lưng 135° và nhỏ dần về cỡ 1. Mỗi lượt đúng 2 chặng. Mục 15 bên dưới mô tả bản đi
+  ngang cũ. ⚠️ `scale` chỉ kéo giãn ảnh canvas đã vẽ nên ở 1,4× hình hơi nhoè; **chưa nhìn trong app**.
+- **Đi dạo ưu tiên `pastel-walk`**, `walk` CC0 là dự phòng cho máy chưa tải clip mới
+  (`STROLL_WALK_CLIPS` trong `vrmStroll.ts`). Mặc định `walkStyle` đổi sang `natural` (không
+  chỉnh gì lên clip): user xem `pastel-walk` ở kiểu này và chốt là đẹp hơn. `graceful` vẫn chọn
+  được, nhưng số của nó chỉnh cho clip CC0.
+- Đổi nội dung một file đã đăng = đổi sha256 = mọi bản app đã phát hành từ chối file đó. Sửa file
+  thì đăng dưới tag mới (`…-v3`) rồi mới sửa danh mục.
+
+### 10.1 Model mẫu cũ (CC0, tới v0.4.12)
 
 **Sendagaya Shino (千駄ヶ谷篠)** — nhân vật nữ anime, đồng phục học sinh, tóc dài đen.
 
@@ -1054,7 +1126,8 @@ báo) vẫn cắt ngang, còn lịch clip idle định kỳ tự nhường (`idl
 | Mở cài đặt / dock, tắt setting | Về gốc ngay (không đi) |
 | Cửa sổ ẩn / ở khay | Không bắt đầu; đang đi thì rAF đứng, mở lại đi tiếp |
 
-Thêm setting `stroll` + `strollPace` + `walkStyle` theo đủ 3 chỗ của mục 9.
+Thêm setting `stroll` + `walkStyle` theo đủ 3 chỗ của mục 9. (`strollPace` — Chậm/Vừa/Nhanh — đã
+**gỡ ở v0.5.0**: clip đi bộ luôn phát đúng tốc độ gốc; khoá cũ trong file cấu hình bị bỏ qua.)
 
 ### 15.6 Dáng đi (v0.4.10) — chỉnh clip lúc chạy, không tạo file mới
 

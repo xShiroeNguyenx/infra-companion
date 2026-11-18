@@ -3,11 +3,14 @@ import {
   nextStrollTarget,
   stepToward,
   STROLL_HOME_CLIP,
-  WALK_STYLES,
-  type WalkStyle,
+  strollWalkClip,
   STROLL_IDLE_AFTER_MS,
+  STROLL_DIAGONAL_LEGS,
+  STROLL_DIAGONAL_RAD,
+  STROLL_MAX_SCALE,
+  strollDepthScale,
   strollFacing,
-  strollLegs,
+  strollMaxOffset,
   strollPauseMs,
   strollRange,
   strollRestMs,
@@ -17,7 +20,9 @@ import type { VrmMotionApi } from './useVrmMotion'
 import type { VrmStage } from './vrmStage'
 
 /**
- * Nhân vật đi dạo qua lại lúc user rảnh — "cách A": clip `walk` chạy tại chỗ, khung trượt ngang.
+ * Nhân vật đi dạo lúc user rảnh — "cách A": clip `walk` chạy tại chỗ, khung trượt ngang VÀ phóng
+ * to dần (thuộc tính CSS `scale`) để diễn đường đi chéo 45° về phía người xem; chặng về thì ngược
+ * lại. Hình học ở `strollDepthScale` / `strollMaxOffset` (`vrmStroll.ts`).
  *
  * Trượt bằng thuộc tính CSS **`translate`** (không phải `transform`): React không bao giờ ghi
  * thuộc tính này, nên ghi thẳng vào DOM mỗi frame không bị lượt render kế tiếp xoá mất, và nó
@@ -47,10 +52,6 @@ export function useVrmStroll(opts: {
   sideMargin: number
   /** Vị trí kéo tay — đổi là bỏ offset (xem effect cuối). */
   pos: { x: number; y: number } | null
-  /** Nhịp đi user chọn (`STROLL_PACES`). */
-  pace: number
-  /** Dáng đi user chọn — áp cả lúc đi dạo lẫn lúc chạy về. */
-  walkStyle: WalkStyle
 }): MutableRefObject<boolean> {
   const { stage, panelRef, enabled, busyRef, restRotationRef, pos } = opts
   /** Đang trong một chặng đi — cho nơi khác (lịch clip idle) biết mà nhường. */
@@ -61,12 +62,7 @@ export function useVrmStroll(opts: {
   motionRef.current = opts.motion
   const marginRef = useRef(opts.sideMargin)
   marginRef.current = opts.sideMargin
-  // Ref: đổi nhịp trong cài đặt áp vào chặng KẾ TIẾP, không dựng lại cả vòng đi dạo
-  const paceRef = useRef(opts.pace)
-  paceRef.current = opts.pace
-  const styleRef = useRef(opts.walkStyle)
-  styleRef.current = opts.walkStyle
-  const hasWalk = opts.motion.installed.includes('walk')
+  const hasWalk = strollWalkClip(opts.motion.installed) !== null
 
   useEffect(() => {
     const panel = panelRef.current
@@ -80,12 +76,34 @@ export function useVrmStroll(opts: {
     /** Góc đang hiển thị — để quay mượt từ đó sang góc mới thay vì giật. */
     let rot = restRotationRef.current
 
+    /** Độ phóng đang áp lên thẻ — `getBoundingClientRect()` đã gồm nó, nên phải nhớ để chia ra. */
+    let scale = 1
+    /**
+     * Trần độ phóng của LƯỢT này: không quá `STROLL_MAX_SCALE`, và không để đỉnh đầu vượt mép trên
+     * cửa sổ (thẻ neo ở bàn chân nên to ra là cao lên).
+     */
+    let maxScale = STROLL_MAX_SCALE
     const apply = (): void => {
+      scale = offset.current === 0 ? 1 : strollDepthScale(offset.current, stage.pxPerMeter(), maxScale)
       panel.style.translate = offset.current === 0 ? '' : `${offset.current}px 0`
+      // `scale` (như `translate`) là thuộc tính React không bao giờ ghi → ghi thẳng mỗi frame an toàn
+      panel.style.scale = scale === 1 ? '' : String(scale)
+      panel.style.transformOrigin = scale === 1 ? '' : 'bottom center'
+    }
+    /** Hộp của thẻ lúc ở chỗ gốc, cỡ 1 — bóc cả độ dời lẫn độ phóng (neo đáy-giữa) ra khỏi rect. */
+    const homeRect = (): { left: number; width: number; top: number; bottom: number; height: number } => {
+      const r = panel.getBoundingClientRect()
+      const width = r.width / scale
+      const height = r.height / scale
+      return { left: r.left - offset.current + (r.width - width) / 2, width, top: r.bottom - height, bottom: r.bottom, height }
     }
     const range = (): { min: number; max: number } => {
-      const r = panel.getBoundingClientRect()
-      return strollRange({ left: r.left - offset.current, width: r.width }, window.innerWidth, marginRef.current)
+      const h = homeRect()
+      // Lề rộng hơn (16 → 60px): ở cuối chặng thân người đã to ra, mép ngoài lấn thêm vài chục px
+      const edge = strollRange({ left: h.left, width: h.width }, window.innerWidth, marginRef.current, 60)
+      // Và không trượt quá chỗ độ phóng chạm trần — xem `strollMaxOffset`
+      const far = strollMaxOffset(stage.pxPerMeter(), maxScale)
+      return { min: Math.max(edge.min, -far), max: Math.min(edge.max, far) }
     }
     const clampToRange = (): void => {
       const { min, max } = range()
@@ -139,7 +157,9 @@ export function useVrmStroll(opts: {
         stage.setRotationY(rot)
         if (k >= 1) turn = null
       } else if (leg) {
-        const px = leg.speedM * stage.pxPerMeter()
+        // Đi chéo: chỉ thành phần NGANG của bước chân thành độ trượt; và 1 mét trên màn hình dài
+        // hơn đúng bằng độ phóng hiện tại
+        const px = leg.speedM * Math.cos(STROLL_DIAGONAL_RAD) * stage.pxPerMeter() * scale
         const r = stepToward(offset.current, leg.target, px, dt)
         offset.current = r.offset
         apply()
@@ -152,20 +172,28 @@ export function useVrmStroll(opts: {
     }
 
     const startLeg = async (home = false): Promise<void> => {
+      if (offset.current === 0) {
+        // Đầu lượt: chốt trần độ phóng theo chỗ trống phía trên đầu (chừa 8px)
+        const h = homeRect()
+        maxScale = Math.max(1, Math.min(STROLL_MAX_SCALE, (h.bottom - 8) / Math.max(1, h.height)))
+      }
       clampToRange()
-      const target = home ? 0 : nextStrollTarget(Math.random, offset.current, range(), legsLeft)
+      const r0 = range()
+      // Khoảng đi ngắn (zoom nhỏ) thì hạ ngưỡng "đủ xa để đáng đi" theo, không thì không bao giờ đi
+      const minDist = Math.min(160, 0.6 * Math.max(-r0.min, r0.max))
+      const target = home ? 0 : nextStrollTarget(Math.random, offset.current, r0, legsLeft, minDist)
       if (target === null) {
         legsLeft = 0
         schedule(strollRestMs(Math.random))
         return
       }
       strolling.current = true
-      // Chạy về: nhịp gốc của clip chạy; máy chưa có clip chạy thì đi về theo nhịp thường
+      // Chạy về bằng clip chạy; máy chưa có clip chạy thì đi về bằng clip đi
       const run = home && motionRef.current.installed.includes(STROLL_HOME_CLIP)
-      const pace = run ? 1 : paceRef.current
-      const measured = await motionRef.current.walk(true, pace, run ? STROLL_HOME_CLIP : 'walk',
-        WALK_STYLES[styleRef.current]
-      )
+      const walkClip = strollWalkClip(motionRef.current.installed) ?? 'walk'
+      // Luôn tốc độ GỐC của clip (tham số thứ hai = 1) — không còn cài đặt nhịp đi
+      // Không truyền dáng đi: clip phát nguyên bản, không chỉnh gì lên động tác
+      const measured = await motionRef.current.walk(true, 1, run ? STROLL_HOME_CLIP : walkClip)
       if (!alive) return
       if (!motionRef.current.isWalking()) {
         // Không bật được (clip khác đang chạy, file lỗi) — thử lại sau, đừng trượt khung khi chân đứng im
@@ -174,10 +202,12 @@ export function useVrmStroll(opts: {
         return
       }
       const dir = target > offset.current ? 1 : -1
-      // Trượt chậm ĐÚNG tỉ lệ clip đã chậm lại — xem `STROLL_PACE`
-      leg = { target, speedM: strollSpeed(measured) * pace, home }
+      // Rời chỗ gốc = tiến lại gần người xem (mặt hướng ra); về gốc = quay lưng đi vào trong
+      const approaching = Math.abs(target) > Math.abs(offset.current)
+      // Trượt đúng tốc độ bước chân đo từ clip
+      leg = { target, speedM: strollSpeed(measured), home }
       // Bước tại chỗ trong lúc quay người, rồi mới tiến — giống người thật đổi hướng
-      turn = { from: rot, to: strollFacing(dir), t0: performance.now(), ms: 350 }
+      turn = { from: rot, to: strollFacing(dir, approaching), t0: performance.now(), ms: approaching ? 350 : 600 }
       cancelAnimationFrame(raf)
       lastT = 0
       raf = requestAnimationFrame(frame)
@@ -195,7 +225,7 @@ export function useVrmStroll(opts: {
         schedule(5_000)
         return
       }
-      if (legsLeft <= 0) legsLeft = strollLegs(Math.random)
+      if (legsLeft <= 0) legsLeft = STROLL_DIAGONAL_LEGS
       void startLeg()
     }
 
@@ -249,7 +279,11 @@ export function useVrmStroll(opts: {
   useLayoutEffect(() => {
     if (offset.current === 0) return
     offset.current = 0
-    if (panelRef.current) panelRef.current.style.translate = ''
+    if (panelRef.current) {
+      panelRef.current.style.translate = ''
+      panelRef.current.style.scale = ''
+      panelRef.current.style.transformOrigin = ''
+    }
   }, [pos, panelRef])
 
   return strolling

@@ -128,7 +128,28 @@ export function useVrmMotion(
   overridesRef.current = folder?.builtinRoles
 
   useEffect(() => {
-    void window.infra.vrm.listMotions().then((r) => setInstalled(r.installed))
+    void window.infra.vrm.listMotions().then((r) => {
+      setInstalled(r.installed)
+      /**
+       * Người đã tải bộ clip mà danh mục nay có thêm clip mới → tự tải phần thiếu, MỘT lần mỗi
+       * lượt mở app.
+       *
+       * Vì sao không chờ họ bấm: bản mới gỡ ba clip cũ khỏi danh mục và giao vai của chúng cho clip
+       * riêng của dự án. Không tự tải thì sau khi cập nhật app, mở chat và có cảnh báo sẽ không
+       * còn chuyển động nào — mà họ không làm gì sai và không có gì báo cho biết. Họ đã đồng ý tải
+       * bộ clip từ trước; đây là phần bổ sung của chính bộ đó (vài trăm KB), không phải lượt tải mới.
+       *
+       * Người CHƯA tải gì (`installed` rỗng) thì không đụng: lần đầu vẫn phải do họ bấm.
+       * Hỏng (mất mạng) thì im lặng — nút "tải clip còn thiếu" trong menu 🎬 vẫn ở đó.
+       */
+      const missing = r.clips.some((c) => !r.installed.includes(c.id))
+      if (r.installed.length > 0 && missing) {
+        void window.infra.vrm
+          .downloadMotions()
+          .then((d) => setInstalled(d.installed))
+          .catch(() => {})
+      }
+    })
   }, [])
 
   const stop = useCallback(() => {

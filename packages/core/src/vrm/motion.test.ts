@@ -7,6 +7,8 @@ import {
   motionPackBytes,
   motionsForRole,
   nextMotionForRole,
+  OWN_MOTION_AUTHOR,
+  OWN_MOTION_LICENSE,
   VRM_MOTIONS,
   type VrmMotionClip
 } from '@infra/shared'
@@ -33,10 +35,11 @@ describe('thư viện chuyển động', () => {
     }
   })
 
-  it('mọi clip đều có mirror dự phòng, và mọi nguồn đều HTTPS', () => {
+  it('clip của người khác đều có mirror dự phòng, và mọi nguồn đều HTTPS', () => {
     for (const c of VRM_MOTIONS) {
-      // Một nguồn duy nhất là một điểm hỏng duy nhất — link ngoài chắc chắn chết theo thời gian
-      expect(c.mirrors?.length ?? 0, c.id).toBeGreaterThan(0)
+      // Một nguồn duy nhất là một điểm hỏng duy nhất — link ngoài chắc chắn chết theo thời gian.
+      // Clip riêng của dự án thì không có bản nào ở nơi khác để làm mirror.
+      if (c.author !== OWN_MOTION_AUTHOR) expect(c.mirrors?.length ?? 0, c.id).toBeGreaterThan(0)
       for (const u of [c.url, ...(c.mirrors ?? [])]) expect(u.startsWith('https://'), `${c.id}: ${u}`).toBe(true)
     }
   })
@@ -49,8 +52,11 @@ describe('thư viện chuyển động', () => {
   it('CHỈ chứa clip cho phân phối lại — repo này public', () => {
     // Bộ "VRMA_MotionPack" của pixiv cấm phát tán lại ở dạng trích xuất được; đây là chốt chặn
     // để không ai vô tình thêm nó vào
+    // Chỉ hai loại được phép: CC0 của người khác, hoặc clip do chính tác giả repo làm ra.
+    // Một clip "của mình" mà mang giấy phép lạ, hay clip người khác không phải CC0, đều đỏ.
     for (const c of VRM_MOTIONS) {
-      expect(c.license).toMatch(/CC0/)
+      if (c.author === OWN_MOTION_AUTHOR) expect(c.license, c.id).toBe(OWN_MOTION_LICENSE)
+      else expect(c.license, c.id).toMatch(/CC0/)
       expect(c.licenseUrl.startsWith('https://')).toBe(true)
       expect(c.sourceUrl.startsWith('https://')).toBe(true)
       expect(c.author.length).toBeGreaterThan(0)

@@ -5,6 +5,27 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.5.0] — 2026-11-18
+
+### Changed
+
+- **The app has its own character.** The sample model is now Pink Pastel, a character made for Infra Companion, replacing the third-party model. It is a 5 MB download instead of 14 MB. The earlier sample model is retired: if you had downloaded it, the app removes it on first launch and asks you to download Pink Pastel instead. A `.vrm` file you picked from your own disk is not touched.
+  - It blinks and has the five expressions the app uses (happy, relaxed, surprised, sad, angry).
+  - It is published for use inside this app only; the author keeps the rights.
+- **One download sets the character up.** Opening the character for the first time now shows a large prompt in the middle of the window with a single button that fetches the model and its motions together. The motions used to be a second download tucked in the character's menu, so a new character stood still and could not stroll. To use your own `.vrm` file, pick "Choose another model" in the character settings afterwards.
+- **Strolling uses the project's own walk, unaltered.** The character now walks with its own clip, and no longer paces sideways across the window: it walks diagonally toward you, growing larger, then turns and walks back to its spot. The clip plays exactly as it is: the "walking style" setting is gone. The walk always plays at the clip's own speed; the slow/medium/fast pace setting is gone.
+- **Three motions are now the project's own.** The idle pose, the nod when chat opens and the frightened reaction to an alert replace the third-party clips that used to play there, and a step-in-place clip joins the manual list. The other situations keep their existing clips. If you already had the motion pack, the new clips are fetched automatically the next time the character opens.
+- **The character's hands rest outside its clothes.** A standing character used to drop its hands beside the hip joints, which suits a slim outfit. On a model with puffy sleeves or a wide skirt that spot is inside the skirt, so the arms were pressed into the body and the shoulders looked slumped. The app now measures each model when it loads (how wide the body and clothes are at hand height, and how thick the forearm is with its sleeve) and moves the hands out by that much.
+  - A model in a slim outfit barely changes: its arms open by 2 to 4 degrees.
+  - Long hair hanging to the hips is not counted as body width, and a tail or wings cannot push an arm out sideways: the extra reach is capped.
+  - Only the standing pose changes. Motion clips play as before.
+
+### Fixed
+
+- **Stopping monitoring now stops every host.** Pressing Stop while hosts were still connecting left the remaining ones running out of sight: they kept their SSH connection and could still raise "lost connection" alerts until the app was restarted.
+
+---
+
 ## [0.4.12] — 2026-11-11
 
 ### Added

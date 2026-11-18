@@ -37,27 +37,57 @@ export interface VrmSampleModel {
 /**
  * Danh sách model mẫu. Hiện chỉ một — thêm nữa thì UI tự hiện thành danh sách chọn.
  *
- * ⚠️ **Chỉ thêm model có giấy phép cho PHÂN PHỐI LẠI.** Kiểm bằng `scripts/vrm-license.cjs` trước,
- * và với nhân vật game thương mại thì metadata trong file KHÔNG đủ — người chuyển đổi sang VRM tự
- * điền trường đó, họ không sở hữu bản quyền nhân vật.
+ * Từ v0.5.0 model chính là **nhân vật riêng của dự án** (Pink Pastel), thay cho model CC0 lấy từ
+ * bên ngoài. Vì là của chính tác giả repo nên nó KHÔNG cần giấy phép "cho phân phối lại": tác giả
+ * tự phát hành và giữ bản quyền. Metadata trong file vì thế vẫn ghi cấm phân phối lại / cấm chỉnh
+ * sửa, và `scripts/vrm-license.cjs` sẽ báo ❌ với nó — đúng như mong đợi, vì công cụ đó trả lời
+ * câu "NGƯỜI KHÁC có được đăng lại file này không".
+ *
+ * ⚠️ **Model của NGƯỜI KHÁC thì chỉ thêm khi giấy phép cho PHÂN PHỐI LẠI.** Kiểm bằng
+ * `scripts/vrm-license.cjs` trước, và với nhân vật game thương mại thì metadata trong file KHÔNG
+ * đủ — người chuyển đổi sang VRM tự điền trường đó, họ không sở hữu bản quyền nhân vật.
  */
 export const VRM_SAMPLE_MODELS: readonly VrmSampleModel[] = [
   {
-    id: 'sendagaya-shino',
-    label: 'Sendagaya Shino',
-    note: 'Nữ sinh tóc dài — model mẫu chính thức của dự án VRoid',
-    author: 'pixiv Inc.',
-    license: 'CC0 (miễn trừ bản quyền)',
-    licenseUrl: 'https://vroid.pixiv.help/hc/en-us/articles/360013482714-Sendagaya-Shino',
+    id: 'pink-pastel',
+    label: 'Pink Pastel',
+    note: 'Cô mèo tóc hồng, váy xoè — nhân vật riêng của Infra Companion',
+    author: 'xShiroeNguyenx',
+    license: 'Giữ bản quyền — chỉ dùng trong Infra Companion',
+    licenseUrl: 'https://vrm.dev/licenses/1.0/',
     // Release của chính repo này — xem docs/vrm-nhan-vat.md mục 10.2 để biết cách đăng lên.
-    // Tag `vrm-sample-v1` cố ý TÁCH khỏi tag phát hành app: model không đổi theo phiên bản app,
-    // và gắn vào tag app thì mỗi lần phát hành lại phải đính kèm 14 MB đó một lần nữa.
-    url: 'https://github.com/xShiroeNguyenx/infra-companion/releases/download/vrm-sample-v1/sendagaya-shino.vrm',
-    sha256: 'f11b2648e7e588ae171ad1c32e465f84e5b130b1d1789e3a3702946c0981d2a9',
-    sizeBytes: 14_870_776,
-    fileName: 'sendagaya-shino.vrm'
+    // Tag `vrm-sample-v2` cố ý TÁCH khỏi tag phát hành app: model không đổi theo phiên bản app,
+    // và gắn vào tag app thì mỗi lần phát hành lại phải đính kèm file đó một lần nữa.
+    // (`vrm-sample-v1` là model CC0 cũ — GIỮ release đó: các bản app ≤ 0.4.12 vẫn tải từ nó.)
+    url: 'https://github.com/xShiroeNguyenx/infra-companion/releases/download/vrm-sample-v2/pink-pastel.vrm',
+    sha256: '4a7657acfddf05944a164af391702eef1a27f080244f9b711bdc5e41dece6433',
+    sizeBytes: 5_636_424,
+    fileName: 'pink-pastel.vrm'
   }
 ]
+
+/**
+ * Một đường dẫn trong danh bạ có phải **model mẫu đã bị thu hồi** không.
+ *
+ * Thu hồi = file nằm trong thư mục model mẫu của app (`userData/vrm-samples/`) mà tên không còn
+ * trong `VRM_SAMPLE_MODELS`. Từ v0.5.0 model mẫu CC0 cũ bị gỡ khỏi app: máy nào còn giữ thì app xoá
+ * bản đó và mời tải nhân vật mới — tác giả muốn mọi người dùng chung một nhân vật của dự án.
+ *
+ * ⚠️ Chỉ khớp file **trong thư mục của app**. File `.vrm` user tự chọn từ chỗ khác trên máy KHÔNG
+ * BAO GIỜ bị coi là thu hồi, kể cả khi trùng tên: đó là file của họ, app không có quyền xoá.
+ *
+ * So không phân biệt hoa/thường và dấu gạch chéo: Windows trả `C:\\…` lẫn `c:/…` cho cùng một chỗ.
+ */
+export function isRetiredSamplePath(path: string, samplesDir: string, currentFileNames: readonly string[]): boolean {
+  const norm = (s: string): string => s.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+  const dir = norm(samplesDir)
+  const p = norm(path)
+  if (dir === '' || !p.startsWith(dir + '/')) return false
+  const name = p.slice(dir.length + 1)
+  // File nằm sâu hơn một cấp không phải thứ app tự tải về — để yên
+  if (name === '' || name.includes('/')) return false
+  return !currentFileNames.some((f) => f.toLowerCase() === name)
+}
 
 /**
  * Trần dung lượng khi tải: dừng sớm nếu nhận vượt xa mức dự kiến.

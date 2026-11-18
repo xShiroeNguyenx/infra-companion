@@ -102,7 +102,7 @@ describe('nextFolderClipForRole — xoay vòng trong nhóm cùng vai trò', () =
  * một việc mà hai luật. Nay cả hai gán được; clip CC0 chỉ khác ở chỗ có **mặc định** để quay về.
  */
 describe('effectiveRole / motionsForRole — gán đè vai trò clip CC0', () => {
-  const clip = VRM_MOTIONS.find((c) => c.id === 'idle-01')!
+  const clip = VRM_MOTIONS.find((c) => c.id === 'pastel-idle')!
 
   it('không gán gì → dùng vai trò mặc định của danh mục', () => {
     expect(effectiveRole(clip)).toBe(clip.role)
@@ -110,43 +110,43 @@ describe('effectiveRole / motionsForRole — gán đè vai trò clip CC0', () =>
   })
 
   it('gán đè → vai trò mới thắng', () => {
-    expect(effectiveRole(clip, { 'idle-01': 'alert' })).toBe('alert')
+    expect(effectiveRole(clip, { 'pastel-idle': 'alert' })).toBe('alert')
   })
 
   it('`manual` tắt hẳn hành vi tự chạy — clip biến khỏi mọi nhóm vai trò', () => {
     // `manual` là thứ clip TỰ NẠP không cần (không gán gì đã là "chỉ khi bấm"), nhưng clip CC0
     // thì có sẵn vai trò nên phải có cách nói "đừng tự chạy nữa"
-    const off = { 'idle-01': 'manual' } as const
-    expect(motionsForRole('idle', off).some((c) => c.id === 'idle-01')).toBe(false)
-    expect(motionsForRole('manual', off).some((c) => c.id === 'idle-01')).toBe(true)
+    const off = { 'pastel-idle': 'manual' } as const
+    expect(motionsForRole('idle', off).some((c) => c.id === 'pastel-idle')).toBe(false)
+    expect(motionsForRole('manual', off).some((c) => c.id === 'pastel-idle')).toBe(true)
   })
 
   it('clip gán đè CHUYỂN nhóm, không nằm hai nơi', () => {
-    const over = { 'idle-01': 'alert' } as const
-    expect(motionsForRole('idle', over).some((c) => c.id === 'idle-01')).toBe(false)
-    expect(motionsForRole('alert', over).some((c) => c.id === 'idle-01')).toBe(true)
+    const over = { 'pastel-idle': 'alert' } as const
+    expect(motionsForRole('idle', over).some((c) => c.id === 'pastel-idle')).toBe(false)
+    expect(motionsForRole('alert', over).some((c) => c.id === 'pastel-idle')).toBe(true)
   })
 
   it('clip KHÁC không bị ảnh hưởng', () => {
-    const over = { 'idle-01': 'alert' } as const
-    // `drink-water` cũng là idle mặc định, gán đè idle-01 không được kéo nó theo
+    const over = { 'pastel-idle': 'alert' } as const
+    // `drink-water` cũng là idle mặc định, gán đè pastel-idle không được kéo nó theo
     expect(motionsForRole('idle', over).some((c) => c.id === 'drink-water')).toBe(true)
   })
 
   it('nextMotionForRole tôn trọng gán đè', () => {
-    const over = { 'idle-01': 'alert' } as const
-    const got = nextMotionForRole('alert', null, ['idle-01', 'failed-apology'], over)
-    // `idle-01` nay thuộc nhóm alert nên lọt vào phép chọn
+    const over = { 'pastel-idle': 'alert' } as const
+    const got = nextMotionForRole('alert', null, ['pastel-idle', 'pastel-afraid'], over)
+    // `pastel-idle` nay thuộc nhóm alert nên lọt vào phép chọn
     expect(got).not.toBeNull()
-    expect(['idle-01', 'failed-apology']).toContain(got!.id)
+    expect(['pastel-idle', 'pastel-afraid']).toContain(got!.id)
   })
 
   it('cleanFolderMotions giữ `manual` cho clip CC0 nhưng BỎ ở clip tự nạp', () => {
     const got = cleanFolderMotions({
       roles: { 'a.vrma': 'manual' },
-      builtinRoles: { 'idle-01': 'manual', 'drink-water': 'bịa' }
+      builtinRoles: { 'pastel-idle': 'manual', 'drink-water': 'bịa' }
     })
     expect(got.roles).toEqual({}) // clip tự nạp không nhận `manual`
-    expect(got.builtinRoles).toEqual({ 'idle-01': 'manual' }) // clip CC0 thì có, giá trị lạ bị bỏ
+    expect(got.builtinRoles).toEqual({ 'pastel-idle': 'manual' }) // clip CC0 thì có, giá trị lạ bị bỏ
   })
 })

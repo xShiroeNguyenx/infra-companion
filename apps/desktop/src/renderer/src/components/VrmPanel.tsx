@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   expressionForEvent,
   HINT_FIRST_MS,
@@ -22,11 +23,6 @@ import {
   pickHint,
   sampleErrorMessage,
   statusForEvent,
-  STROLL_PACE,
-  STROLL_PACES,
-  cleanWalkStyle,
-  DEFAULT_WALK_STYLE,
-  type WalkStyle,
   vrmBodyRect,
   vrmLeftBesideDock,
   vrmSideMargin,
@@ -60,6 +56,7 @@ import {
 import { SettingsField, SettingsGroup, SettingsToggle, VrmSettingsFrame } from './VrmSettingsFrame'
 import { useEventsStore } from '../stores/events'
 import { useUiStore } from '../stores/ui'
+import { useToastsStore } from '../stores/toasts'
 import { useToolUsageStore } from '../stores/toolUsage'
 import { useTabsStore } from '../stores/tabs'
 import { useVrmChatStore } from '../stores/vrmChat'
@@ -190,7 +187,6 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
   const motionRef = useRef(motion)
   motionRef.current = motion
   const [load, setLoad] = useState<LoadState>({ kind: 'idle' })
-  const [picking, setPicking] = useState(false)
   /** Tỉ lệ ngang/dọc thật của model, để khung ôm sát thân người thay vì đoán bề rộng. */
   const [stageAspect, setStageAspect] = useState<number | null>(null)
   /**
@@ -502,18 +498,13 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
   }, [])
 
   const pick = useCallback(async () => {
-    setPicking(true)
-    try {
-      const res = await window.infra.vrm.pick()
-      if (res.ok) {
-        await refreshAfterAdd()
-        return
-      }
-      if (res.reason === 'canceled') return
-      setLoad({ kind: 'error', message: pickError(res.reason, res.detail) })
-    } finally {
-      setPicking(false)
+    const res = await window.infra.vrm.pick()
+    if (res.ok) {
+      await refreshAfterAdd()
+      return
     }
+    if (res.reason === 'canceled') return
+    setLoad({ kind: 'error', message: pickError(res.reason, res.detail) })
   }, [])
 
   /**
@@ -663,8 +654,6 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
       stage={stageRef.current}
       motion={motion}
       stroll={settings?.stroll === true && load.kind === 'ready'}
-      strollPace={settings?.strollPace ?? STROLL_PACE}
-      walkStyle={settings?.walkStyle ?? DEFAULT_WALK_STYLE}
       clickThrough={settings?.clickThrough === true}
       restRotationRef={rotationRef}
       bubble={bubble}
@@ -728,13 +717,13 @@ export function VrmPanel({ onClose }: { readonly onClose: () => void }) {
        * hiện vòng xoay tại chỗ.
        */
       chromeless={!!active && !active.missing && (load.kind === 'ready' || (load.kind === 'loading' && everLoaded))}
+      hideFrame={!active}
       overlay={
         !active ? (
           <StartScreen
-            onPick={() => void pick()}
             onDownloaded={() => void refreshAfterAdd()}
-            models={models}
-            picking={picking}
+            onDownloadMotions={motion.download}
+            onClose={onClose}
             error={load.kind === 'error' ? load.message : null}
           />
         ) : load.kind === 'loading' ? (
@@ -872,13 +861,12 @@ function VrmStageShell({
   boxRef,
   chromeless,
   overlay,
+  hideFrame,
   controls,
   stageAspect,
   stage,
   motion,
   stroll,
-  strollPace,
-  walkStyle,
   clickThrough,
   restRotationRef,
   bubble,
@@ -902,6 +890,11 @@ function VrmStageShell({
   readonly boxRef: React.RefObject<HTMLDivElement | null>
   readonly chromeless: boolean
   readonly overlay: React.ReactNode
+  /**
+   * Giấu hộp có khung (vẫn giữ trong DOM). Dùng khi `overlay` tự vẽ ra giữa màn hình qua portal
+   * (`StartScreen`): không giấu thì một hộp rỗng 380px nằm trơ ở góc phía sau popup.
+   */
+  readonly hideFrame?: boolean
   /** Dựng nội dung cài đặt — gọi hai lần cho hai cột, hoặc một lần không tham số cho bản xếp chồng. */
   readonly controls: ((only?: 'left' | 'right' | 'footer') => React.ReactNode) | null
   /** Tỉ lệ ngang/dọc thật của model, `null` khi chưa dựng xong. */
@@ -911,8 +904,6 @@ function VrmStageShell({
   readonly motion: VrmMotionApi
   /** Setting "đi dạo lúc rảnh" đang bật và model đã nạp xong — xem `useVrmStroll`. */
   readonly stroll: boolean
-  readonly strollPace: number
-  readonly walkStyle: WalkStyle
   /** Setting "click xuyên qua" user đã bật — còn áp hay không thì xem `clickThroughActive`. */
   readonly clickThrough: boolean
   /** Góc xoay user chọn — đi dạo xong thì quay mặt về đây. */
@@ -1374,9 +1365,7 @@ function VrmStageShell({
     busyRef: hintBusyRef,
     restRotationRef,
     sideMargin,
-    pos,
-    pace: strollPace,
-    walkStyle
+    pos
   })
   const settingsBox = settingsFrameBox(window.innerWidth, window.innerHeight, width)
   const settingsSlot = characterSlotInSettings(settingsBox, width, H)
@@ -1479,7 +1468,7 @@ function VrmStageShell({
                */
               'pointer-events-none transition-[left,right,bottom,top,transform] duration-300'
             : 'bg-elevated/95 border-edge-strong w-80 gap-2 overflow-hidden rounded-lg border p-3 opacity-95 shadow-2xl transition-opacity hover:opacity-100'
-        }`}
+        } ${hideFrame && !chromeless ? 'invisible' : ''}`}
       >
         {/* Canvas phải có kích thước THẬT từ CSS: WebGLRenderer đọc clientWidth/Height lúc dựng,
             canvas cao 0 thì scene trống mà không báo lỗi gì. Kéo bằng chính thân nhân vật —
@@ -2066,32 +2055,6 @@ function VrmControls({
           title="Không đụng phím/chuột 30 giây thì đi qua lại dọc đáy cửa sổ. Cần bộ chuyển động đã tải (menu 🎬)"
           onChange={(v) => onPatch({ stroll: v })}
         />
-        {settings.stroll && (
-          <SettingsField label="Nhịp đi">
-            <select
-              className="bg-elevated border-edge rounded border px-2 py-1 text-xs"
-              value={settings.strollPace}
-              onChange={(e) => onPatch({ strollPace: Number(e.target.value) })}
-            >
-              <option value={STROLL_PACES[0]}>Chậm</option>
-              <option value={STROLL_PACES[1]}>Vừa</option>
-              <option value={STROLL_PACES[2]}>Nhanh</option>
-            </select>
-          </SettingsField>
-        )}
-        {settings.stroll && (
-          <SettingsField label="Dáng đi">
-            <select
-              className="bg-elevated border-edge rounded border px-2 py-1 text-xs"
-              value={settings.walkStyle}
-              title="Mềm mại: tay vung hẹp và thả lỏng, hông lắc nhẹ, đầu giữ yên — hợp nhân vật nữ"
-              onChange={(e) => onPatch({ walkStyle: cleanWalkStyle(e.target.value) })}
-            >
-              <option value="graceful">Mềm mại</option>
-              <option value="natural">Mạnh mẽ (gốc)</option>
-            </select>
-          </SettingsField>
-        )}
         <SettingsToggle
           label="Hiện lúc mở app"
           checked={settings.autoShow}
@@ -2250,56 +2213,6 @@ function VrmControls({
           {/* Khung lớn thì hiện bản đầy đủ (có mô tả model); panel nhỏ mới cần bản gọn */}
           <SampleDownload onDownloaded={onDownloaded} models={models} compact={only === undefined} />
 
-          <div className="flex flex-wrap items-center gap-1">
-            <button className="border-edge hover:bg-elevated rounded border px-2 py-1 text-xs" onClick={onPickAnimation}>
-              🎞 Nạp file .vrma
-            </button>
-            <button
-              className="border-edge hover:bg-elevated rounded border px-2 py-1 text-xs"
-              title="Chọn một thư mục và nạp mọi file .vrma trong đó"
-              onClick={onPickAnimationDir}
-            >
-              📂 Nạp cả thư mục
-            </button>
-            {animationName && (
-              <>
-                <span className="text-subtle max-w-32 truncate text-xs" title={animationName}>
-                  {animationName}
-                </span>
-                <button
-                  className="border-edge hover:bg-elevated rounded border px-1.5 py-0.5 text-xs"
-                  title="Về chuyển động mặc định"
-                  onClick={() => onClearAnimation()}
-                >
-                  ✕
-                </button>
-              </>
-            )}
-          </div>
-
-          {/**
-           * Chỉ CHỈ CHỖ, không tải hộ.
-           *
-           * Bộ chuyển động chính thức của pixiv cấm *"distributing these motions or their
-           * alterations … in a way that can be rigged or extracted"* — nên app không được đặt
-           * file đó vào repo, vào release, hay tự tải về hộ user. Nhưng điều khoản **cho phép
-           * dùng** (kể cả thương mại, chỉ cần ghi credit), nên đường hợp lệ là: user tự tải, app
-           * nạp từ máy họ. Dòng này rút ngắn đúng cái khoảng cách đó.
-           */}
-          <p className="text-subtle text-[11px] leading-relaxed">
-            Chưa có clip nào?{' '}
-            <a
-              href="https://vroid.booth.pm/items/5512385"
-              target="_blank"
-              rel="noreferrer"
-              className="text-accent hover:underline"
-              title="Bộ 7 chuyển động miễn phí của VRoid Project (pixiv) trên BOOTH. App không tải hộ: giấy phép cho phép bạn dùng nhưng cấm phát tán lại file, nên bạn tải rồi app nạp từ máy bạn."
-            >
-              tải bộ 7 clip miễn phí của VRoid Project
-            </a>{' '}
-            rồi giải nén và nạp cả thư mục.
-          </p>
-
           {/**
            * 13 clip CC0 — cũng gán vai trò được, cùng một chỗ với clip tự nạp.
            *
@@ -2312,7 +2225,9 @@ function VrmControls({
            */}
           {builtinList.length > 0 && (
             <div className="border-edge flex flex-col gap-1 rounded border p-1.5">
-              <span className="text-subtle text-[11px]">🎬 {builtinList.length} clip có sẵn (CC0)</span>
+              <span className="text-subtle text-[11px]">
+                Bấm tên để xem thử · ô bên phải chọn lúc nào tự chạy
+              </span>
               <div className="flex max-h-40 flex-col gap-0.5 overflow-y-auto">
                 {builtinList.map((c) => {
                   const over = builtinRoles[c.id]
@@ -2360,58 +2275,96 @@ function VrmControls({
             </div>
           )}
 
-          {folderClips && folderClips.files.length > 0 && (
-            <div className="border-edge flex flex-col gap-1 rounded border p-1.5">
-              <div className="flex items-center gap-1">
-                <span className="text-subtle min-w-0 flex-1 truncate text-[11px]" title={folderClips.dir}>
-                  📂 {folderClips.files.length} clip · {folderClips.dir}
-                </span>
-                <button
-                  className="border-edge hover:bg-elevated rounded border px-1.5 py-0.5 text-[11px]"
-                  title="Bỏ danh sách này"
-                  onClick={onClearFolderClips}
-                >
-                  ✕
+          {/**
+           * Clip TỰ NẠP gom vào một mục thu gọn: phần lớn người dùng chỉ cần bộ có sẵn ở trên, mà
+           * hai nút nạp + một danh sách thứ hai nằm ngang hàng với nó làm cả mục trông như có hai
+           * hệ thống song song. Đã nạp thư mục rồi thì mở sẵn — che đi là giấu thứ họ đang dùng.
+           */}
+          <details className="group" open={!!folderClips && folderClips.files.length > 0}>
+            <summary className="text-subtle hover:text-content cursor-pointer text-[11px] select-none">
+              Dùng clip .vrma của riêng bạn
+            </summary>
+            <div className="mt-1.5 flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-1">
+                <button className="border-edge hover:bg-elevated rounded border px-2 py-1 text-xs" onClick={onPickAnimation}>
+                  🎞 Nạp file .vrma
                 </button>
-              </div>
-              {/* Cuộn trong khung: bộ vài chục clip sẽ đẩy mọi thứ bên dưới ra khỏi panel */}
-              <div className="flex max-h-40 flex-col gap-0.5 overflow-y-auto">
-                {folderClips.files.map((c) => (
-                  <div key={c.name} className="flex items-center gap-1">
+                <button
+                  className="border-edge hover:bg-elevated rounded border px-2 py-1 text-xs"
+                  title="Chọn một thư mục và nạp mọi file .vrma trong đó"
+                  onClick={onPickAnimationDir}
+                >
+                  📂 Nạp cả thư mục
+                </button>
+                {animationName && (
+                  <>
+                    <span className="text-subtle max-w-32 truncate text-xs" title={animationName}>
+                      {animationName}
+                    </span>
                     <button
-                      className={`hover:bg-elevated min-w-0 flex-1 truncate rounded px-1.5 py-0.5 text-left text-[11px] ${
-                        animationName === c.name ? 'bg-accent/20 text-accent' : 'text-content'
-                      }`}
-                      title={`Phát thử ${c.name}`}
-                      onClick={() => onPlayFolderClip(c)}
+                      className="border-edge hover:bg-elevated rounded border px-1.5 py-0.5 text-xs"
+                      title="Về chuyển động mặc định"
+                      onClick={() => onClearAnimation()}
                     >
-                      {c.name}
+                      ✕
                     </button>
-                    {/**
-                     * Vai trò tự chạy — **để trống = chỉ chạy khi bấm**.
-                     *
-                     * Gán ở đây thì clip này THẮNG clip CC0 mặc định của cùng vai trò; vai trò
-                     * không gán thì vẫn dùng clip mặc định như cũ, nên gán vài cái không làm mất
-                     * chuyển động nào đang có.
-                     */}
-                    <select
-                      className="bg-elevated border-edge text-subtle w-24 shrink-0 rounded border px-1 py-0.5 text-[10px]"
-                      value={folderRoles[c.name] ?? ''}
-                      title="Chạy tự động khi nào — để trống thì chỉ chạy khi bạn bấm"
-                      onChange={(e) => onSetClipRole(c.name, (e.target.value || null) as VrmMotionRoleName | null)}
-                    >
-                      <option value="">— khi bấm —</option>
-                      {VRM_ROLE_LABELS.map((r) => (
-                        <option key={r.value} value={r.value}>
-                          {r.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+                  </>
+                )}
               </div>
+              {folderClips && folderClips.files.length > 0 && (
+                <div className="border-edge flex flex-col gap-1 rounded border p-1.5">
+                  <div className="flex items-center gap-1">
+                    <span className="text-subtle min-w-0 flex-1 truncate text-[11px]" title={folderClips.dir}>
+                      📂 {folderClips.files.length} clip · {folderClips.dir}
+                    </span>
+                    <button
+                      className="border-edge hover:bg-elevated rounded border px-1.5 py-0.5 text-[11px]"
+                      title="Bỏ danh sách này"
+                      onClick={onClearFolderClips}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  {/* Cuộn trong khung: bộ vài chục clip sẽ đẩy mọi thứ bên dưới ra khỏi panel */}
+                  <div className="flex max-h-40 flex-col gap-0.5 overflow-y-auto">
+                    {folderClips.files.map((c) => (
+                      <div key={c.name} className="flex items-center gap-1">
+                        <button
+                          className={`hover:bg-elevated min-w-0 flex-1 truncate rounded px-1.5 py-0.5 text-left text-[11px] ${
+                            animationName === c.name ? 'bg-accent/20 text-accent' : 'text-content'
+                          }`}
+                          title={`Phát thử ${c.name}`}
+                          onClick={() => onPlayFolderClip(c)}
+                        >
+                          {c.name}
+                        </button>
+                        {/**
+                         * Vai trò tự chạy — **để trống = chỉ chạy khi bấm**.
+                         *
+                         * Gán ở đây thì clip này THẮNG clip CC0 mặc định của cùng vai trò; vai trò
+                         * không gán thì vẫn dùng clip mặc định như cũ, nên gán vài cái không làm mất
+                         * chuyển động nào đang có.
+                         */}
+                        <select
+                          className="bg-elevated border-edge text-subtle w-24 shrink-0 rounded border px-1 py-0.5 text-[10px]"
+                          value={folderRoles[c.name] ?? ''}
+                          title="Chạy tự động khi nào — để trống thì chỉ chạy khi bạn bấm"
+                          onChange={(e) => onSetClipRole(c.name, (e.target.value || null) as VrmMotionRoleName | null)}
+                        >
+                          <option value="">— khi bấm —</option>
+                          {VRM_ROLE_LABELS.map((r) => (
+                            <option key={r.value} value={r.value}>
+                              {r.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          </details>
         </div>
       </SettingsGroup>
     </>
@@ -2571,47 +2524,141 @@ function SampleDownload({
   )
 }
 
+/**
+ * Màn hình CÀI ĐẶT LẦN ĐẦU: một popup lớn giữa màn hình, MỘT nút tải cả nhân vật lẫn bộ chuyển động.
+ *
+ * Bản trước là một hộp nhỏ ở góc với hai lối (tải mẫu / chọn file .vrm), và bộ clip là một lượt tải
+ * RIÊNG nằm trong menu 🎬 mà không gì nhắc tới — người mới tải xong model là có một nhân vật đứng
+ * im, không đi dạo, và không biết còn thiếu một bước. Nay tải là điều kiện để dùng, và một lần bấm
+ * là đủ cả hai. Muốn dùng file .vrm riêng thì vẫn có "Chọn model khác" trong cài đặt sau đó.
+ *
+ * Vẽ qua PORTAL ra `document.body`: thẻ cha là hộp `w-80` có `overflow-hidden`, popup nằm trong
+ * đó thì bị cắt. `data-vrm-overlay` là bắt buộc — sự kiện React vẫn nổi bọt qua portal lên khung
+ * nhân vật, mà khung đó bắt chuột để kéo; dấu này bảo nó bỏ qua.
+ */
 function StartScreen({
-  onPick,
   onDownloaded,
-  models,
-  picking,
+  onDownloadMotions,
+  onClose,
   error
 }: {
-  readonly onPick: () => void
-  /** Tải xong model mẫu → cha nạp lại danh sách + cấu hình (giống sau khi `pick`). */
+  /** Tải xong → cha nạp lại danh sách + cấu hình. */
   readonly onDownloaded: () => void
-  /** Model đã có — để không mời tải lại model mẫu đã tải. */
-  readonly models: VrmModelDto[]
-  readonly picking: boolean
+  /** Tải bộ clip còn thiếu; `true` = đủ cả bộ. */
+  readonly onDownloadMotions: () => Promise<boolean>
+  readonly onClose: () => void
   readonly error: string | null
 }) {
-  return (
-    <div className="flex flex-col items-center gap-3 px-4 py-6 text-center">
-      <span className="text-4xl">🧑‍🎤</span>
+  const [sample, setSample] = useState<VrmSampleModel | null>(null)
+  const [progress, setProgress] = useState<VrmSampleProgress | null>(null)
+  /** `model` đang tải nhân vật · `motions` đang tải clip · `null` chưa bấm / đã dừng. */
+  const [step, setStep] = useState<'model' | 'motions' | null>(null)
+  const [dlError, setDlError] = useState<string | null>(null)
 
-      <SampleDownload onDownloaded={onDownloaded} models={models} disabled={picking} />
+  useEffect(() => {
+    void window.infra.vrm.listSamples().then((list) => setSample(list[0] ?? null))
+  }, [])
+  useEffect(() => window.infra.vrm.onSampleProgress(setProgress), [])
 
-      <div className="text-subtle flex w-full items-center gap-2 text-[10px]">
-        <span className="border-edge flex-1 border-t" />
-        hoặc
-        <span className="border-edge flex-1 border-t" />
+  const totalMb = (((sample?.sizeBytes ?? 0) + motionPackBytes()) / 1024 / 1024).toFixed(0)
+
+  const download = async (): Promise<void> => {
+    if (!sample) return
+    setDlError(null)
+    setStep('model')
+    setProgress({ id: sample.id, phase: 'download', receivedBytes: 0, totalBytes: null, percent: 0 })
+    const res = await window.infra.vrm.downloadSample(sample.id)
+    if (!res.ok) {
+      setStep(null)
+      setProgress(null)
+      // Huỷ là do chính user bấm — không phải lỗi, không cần câu đỏ
+      if (res.reason !== 'canceled') setDlError(sampleErrorMessage(res.reason))
+      return
+    }
+    setStep('motions')
+    /**
+     * Clip hỏng KHÔNG chặn việc dùng nhân vật: model đã về, giữ user ở màn hình này vì vài clip
+     * là phạt nhầm chỗ. Nhưng phải NÓI — im lặng thì họ có một nhân vật không đi dạo mà không biết
+     * vì sao, đúng cái lỗi màn hình này sinh ra để sửa.
+     */
+    let motionsOk = false
+    try {
+      motionsOk = await onDownloadMotions()
+    } catch {
+      motionsOk = false
+    }
+    if (!motionsOk) {
+      useToastsStore
+        .getState()
+        .push('Đã tải trợ lý ảo, nhưng một số chuyển động chưa tải được. Mở menu 🎬 của trợ lý ảo để tải lại.', 'error')
+    }
+    onDownloaded()
+  }
+
+  const busy = step !== null
+  const pct = step === 'motions' ? 100 : (progress?.percent ?? 0)
+
+  return createPortal(
+    <div data-vrm-overlay className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4">
+      <div className="bg-elevated border-edge-strong relative flex w-full max-w-lg flex-col items-center gap-5 rounded-xl border px-8 py-10 text-center shadow-2xl">
+        <button
+          className="text-subtle hover:text-content absolute right-3 top-3 rounded px-2 py-1 text-sm leading-none"
+          title="Đóng"
+          aria-label="Đóng"
+          onClick={() => {
+            if (step === 'model') window.infra.vrm.cancelSample()
+            onClose()
+          }}
+        >
+          ✕
+        </button>
+        <span className="text-6xl">🧑‍🎤</span>
+        <h2 className="text-content text-2xl font-semibold leading-snug">
+          Tải trợ lý ảo{sample ? ` (${totalMb} MB)` : ''}
+        </h2>
+        <p className="text-subtle max-w-sm text-sm leading-relaxed">
+          Trợ lý ảo cần tải về một lần mới dùng được: nhân vật {sample?.label ?? ''} và bộ chuyển động của cô ấy.
+        </p>
+
+        {busy ? (
+          <div className="w-full max-w-sm">
+            <div className="bg-input h-2 w-full overflow-hidden rounded-full">
+              <div className="bg-accent h-full transition-[width] duration-200" style={{ width: `${pct}%` }} />
+            </div>
+            <div className="text-subtle mt-2 flex items-center justify-between text-xs">
+              <span>
+                {step === 'motions'
+                  ? 'Đang tải bộ chuyển động…'
+                  : progress?.phase === 'verify'
+                    ? 'Đang kiểm tra file…'
+                    : `Đang tải nhân vật… ${((progress?.receivedBytes ?? 0) / 1024 / 1024).toFixed(1)} MB`}
+              </span>
+              {step === 'model' && (
+                <button className="hover:text-content underline" onClick={() => window.infra.vrm.cancelSample()}>
+                  Huỷ
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <button
+            className="bg-accent rounded-lg px-8 py-3 text-base font-medium text-white hover:opacity-90 disabled:opacity-50"
+            disabled={!sample}
+            onClick={() => void download()}
+          >
+            ⬇ Tải về và dùng
+          </button>
+        )}
+
+        {(dlError ?? error) && <p className="text-danger max-w-sm text-sm leading-relaxed">{dlError ?? error}</p>}
+        {sample && (
+          <p className="text-subtle text-[11px]">
+            {sample.author} · {sample.license}
+          </p>
+        )}
       </div>
-
-      <p className="text-subtle text-xs leading-relaxed">
-        Chọn một file <code className="text-content">.vrm</code> có trong máy.
-        <br />
-        App chỉ ghi nhớ đường dẫn, không giữ bản sao.
-      </p>
-      <button
-        className="border-edge hover:bg-elevated rounded border px-3 py-1.5 text-xs disabled:opacity-50"
-        disabled={picking}
-        onClick={onPick}
-      >
-        {picking ? 'Đang mở…' : '📂 Chọn file .vrm'}
-      </button>
-      {error && <p className="text-danger text-xs">{error}</p>}
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -2699,13 +2746,20 @@ function VrmMotionPanel({
 }) {
   const mb = (motionPackBytes() / 1024 / 1024).toFixed(1)
   const have = motion.installed.length > 0
+  /**
+   * Clip có trong danh mục mà chưa có trên máy. Danh mục LỚN LÊN theo phiên bản app (v0.5.0 thêm
+   * clip riêng của dự án), nên người đã tải bộ cũ cần một đường lấy phần mới — chỉ hiện nút tải khi
+   * chưa có clip nào thì họ kẹt mãi với các dòng mờ "chưa tải được", và vai nào vừa đổi sang clip
+   * mới sẽ im lặng không chạy gì.
+   */
+  const missing = motion.clips.filter((c) => !motion.installed.includes(c.id)).length
 
   return (
     <VrmMiniPanel title="Chuyển động" anchor={anchor} onClose={onClose}>
       {!have ? (
         <div className="flex flex-col gap-2">
           <p className="text-subtle text-[11px] leading-relaxed">
-            {motion.clips.length} chuyển động (CC0) — tải một lần rồi dùng mãi.
+            {motion.clips.length} chuyển động — tải một lần rồi dùng mãi.
           </p>
           <button
             className="border-edge hover:bg-elevated rounded border px-3 py-1.5 text-xs disabled:opacity-50"
@@ -2727,6 +2781,15 @@ function VrmMotionPanel({
               onClick={motion.stop}
             >
               ■ Dừng, về bình thường
+            </button>
+          )}
+          {missing > 0 && (
+            <button
+              className="border-edge hover:bg-elevated mb-1 rounded border px-2 py-1 text-xs disabled:opacity-50"
+              disabled={motion.downloading}
+              onClick={() => void motion.download()}
+            >
+              {motion.downloading ? 'Đang tải…' : `⬇ Tải ${missing} clip còn thiếu`}
             </button>
           )}
           <div className="max-h-56 space-y-0.5 overflow-y-auto">
@@ -2757,7 +2820,7 @@ function VrmMotionPanel({
             })}
           </div>
           <p className="text-subtle mt-1 text-[10px] leading-relaxed">
-            CC0 · へすい/rerofumi, sashii, JenJell
+            Rê chuột lên từng clip để xem tác giả và giấy phép
           </p>
         </div>
       )}

@@ -110,21 +110,14 @@ export function pickStrollTarget(
 }
 
 /**
- * Nhịp đi so với clip gốc: clip phát chậm lại bằng tỉ lệ này VÀ khung trượt chậm đúng tỉ lệ đó.
+ * KHÔNG có "nhịp đi": clip đi bộ luôn phát đúng tốc độ gốc, và khung trượt theo tốc độ đo từ chính
+ * clip (`gaitGroundSpeed`).
  *
- * Phải giảm cả hai cùng lúc: chỉ giảm tốc độ trượt thì chân bước nhanh mà người tiến chậm — lại
- * thành trượt chân, chỉ là ngược chiều. Clip gốc là dáng đi vội (~1 bước/0,4 giây), user muốn
- * "thong thả hơn".
+ * Tới v0.4.12 có cài đặt Chậm/Vừa/Nhanh (0,55 / 0,7 / 0,9) để hãm clip `walk` CC0 — dáng đi vội,
+ * một vòng bước 0,83 giây. Clip `pastel-walk` của dự án (2,38 giây một vòng) đã có nhịp của riêng
+ * nó; user yêu cầu bỏ hẳn cài đặt và đi đúng theo clip. Khoá `strollPace` còn sót trong file cấu
+ * hình cũ thì bị bỏ qua.
  */
-export const STROLL_PACE = 0.7
-
-/** Ba nhịp user chọn trong cài đặt. Rời rạc chứ không thanh trượt liền: khác nhau 0,05 thì mắt không phân biệt nổi. */
-export const STROLL_PACES = [0.55, 0.7, 0.9] as const
-
-/** Đọc nhịp đã lưu: chỉ nhận đúng một trong `STROLL_PACES`, còn lại về mặc định. */
-export function cleanStrollPace(v: unknown): number {
-  return STROLL_PACES.find((p) => p === v) ?? STROLL_PACE
-}
 
 /**
  * Có cảnh báo lúc đang lệch khỏi chỗ gốc → diễn phản ứng xong thì **chạy** về (clip `run-slow`).
@@ -133,6 +126,22 @@ export function cleanStrollPace(v: unknown): number {
  * sang. Chạy chứ không đi: chậm rãi đi về giữa lúc có sự cố trông như không quan tâm.
  */
 export const STROLL_HOME_CLIP = 'run-slow'
+
+/**
+ * Clip dùng khi ĐI dạo, theo thứ tự ưu tiên: clip riêng của dự án trước, clip CC0 cũ làm dự phòng.
+ *
+ * Phải có dự phòng: clip riêng thêm vào ở v0.5.0, người đã tải bộ cũ chưa có nó cho tới khi bấm
+ * "tải clip còn thiếu". Chỉ gọi cứng clip mới thì đi dạo của họ tắt im lặng sau khi cập nhật app.
+ *
+ * Tốc độ trượt trên màn hình đo từ chính clip đang phát (`measureGait`), nên đổi clip không cần
+ * chỉnh lại số nào ở đây.
+ */
+export const STROLL_WALK_CLIPS: readonly string[] = ['pastel-walk', 'walk']
+
+/** Clip đi bộ đầu tiên ĐÃ CÓ trên máy; `null` = chưa có cái nào, không đi dạo được. */
+export function strollWalkClip(installed: readonly string[]): string | null {
+  return STROLL_WALK_CLIPS.find((id) => installed.includes(id)) ?? null
+}
 
 /**
  * Điểm đến của chặng kế tiếp: chặng CUỐI của một lượt luôn là **chỗ đứng gốc** (offset 0).
@@ -172,10 +181,56 @@ export function stepToward(
  *
  * Ở góc 0 model nhìn về +Z (thẳng ra camera); xoay `+π/2` quanh trục đứng đưa +Z sang +X, tức
  * bên PHẢI màn hình.
+ *
+ * Đi CHÉO 45°, không đi ngang (từ v0.5.0, user yêu cầu): chặng đi ra thì tiến chéo VỀ PHÍA NGƯỜI
+ * XEM — mặt hướng ra, người to dần; chặng về thì quay lưng đi chéo vào trong — nhỏ dần về cỡ cũ.
+ * Đi ngang 90° chỉ cho thấy một nửa mặt và thân dẹt như tờ giấy.
+ *
+ * @param dir hướng trượt trên màn hình: 1 = sang phải, −1 = sang trái
+ * @param approaching `true` = đang tiến lại gần người xem (rời chỗ đứng gốc)
  */
-export function strollFacing(dir: 1 | -1): number {
-  return dir > 0 ? Math.PI / 2 : -Math.PI / 2
+export const STROLL_DIAGONAL_RAD = Math.PI / 4
+
+export function strollFacing(dir: 1 | -1, approaching = true): number {
+  return dir * (approaching ? STROLL_DIAGONAL_RAD : Math.PI - STROLL_DIAGONAL_RAD)
 }
+
+/**
+ * ==== Chiều sâu của đường đi chéo ====
+ *
+ * Khung nhân vật là một thẻ 2D, không có trục Z thật — "lại gần" được diễn bằng cách PHÓNG TO thẻ
+ * (thuộc tính CSS `scale`, neo ở bàn chân) cùng lúc trượt ngang. Đi chéo 45° thì quãng tiến về
+ * phía trước bằng quãng trượt ngang, và phép chiếu phối cảnh cho độ phóng `D / (D − z)` với `D` là
+ * khoảng cách camera giả định.
+ *
+ * Chỗ đứng gốc là điểm XA nhất (cỡ 1): nhân vật neo sát đáy cửa sổ, lùi ra xa hơn nữa thì bàn chân
+ * phải dâng lên giữa màn hình, còn tiến lại gần thì chỉ cần to ra tại chỗ.
+ */
+export const STROLL_CAMERA_M = 4
+/** Trần độ phóng: CSS `scale` chỉ kéo giãn ảnh canvas đã vẽ, quá mức này là thấy nhoè. */
+export const STROLL_MAX_SCALE = 1.4
+
+/** Độ phóng của thẻ khi đã trượt `offsetPx` khỏi chỗ gốc. Luôn trong `[1, maxScale]`. */
+export function strollDepthScale(offsetPx: number, pxPerMeter: number, maxScale = STROLL_MAX_SCALE): number {
+  if (!(pxPerMeter > 0) || !Number.isFinite(offsetPx)) return 1
+  const z = (Math.abs(offsetPx) / pxPerMeter) * Math.tan(STROLL_DIAGONAL_RAD)
+  if (z >= STROLL_CAMERA_M) return Math.max(1, maxScale)
+  return Math.min(Math.max(1, maxScale), Math.max(1, STROLL_CAMERA_M / (STROLL_CAMERA_M - z)))
+}
+
+/**
+ * Trượt xa nhất được bao nhiêu (px) trước khi độ phóng chạm trần.
+ *
+ * Đích phải nằm TRONG khoảng này: đi quá thì độ phóng đứng yên ở trần trong khi người vẫn trượt,
+ * tức là đoạn cuối lại thành đi ngang với cái mặt quay chéo.
+ */
+export function strollMaxOffset(pxPerMeter: number, maxScale = STROLL_MAX_SCALE): number {
+  if (!(pxPerMeter > 0) || !(maxScale > 1)) return 0
+  return (STROLL_CAMERA_M * (1 - 1 / maxScale) * pxPerMeter) / Math.tan(STROLL_DIAGONAL_RAD)
+}
+
+/** Một lượt đi chéo luôn là 2 chặng: đi ra (to dần) rồi về chỗ gốc (nhỏ dần). */
+export const STROLL_DIAGONAL_LEGS = 2
 
 /** Phải rảnh bao lâu (không gõ phím, không di chuột) mới bắt đầu đi. */
 export const STROLL_IDLE_AFTER_MS = 30_000
@@ -213,8 +268,17 @@ export function strollLegs(rng: () => number): number {
  * VRM không khai giới tính nhân vật, nên đây là lựa chọn của user chứ không tự đoán.
  */
 export type WalkStyle = 'natural' | 'graceful'
-export const WALK_STYLES_LIST: readonly WalkStyle[] = ['natural', 'graceful']
-export const DEFAULT_WALK_STYLE: WalkStyle = 'graceful'
+/**
+ * ⚠️ Từ v0.5.0 **không còn cài đặt dáng đi**: đi dạo luôn phát nguyên clip (`natural`).
+ *
+ * `graceful` sinh ra để làm dịu clip `walk` CC0 — dáng sải bước thể thao, khuỷu gập sẵn ~43°. Nay
+ * đi dạo dùng clip `pastel-walk` của chính dự án, vốn đã là dáng đi của nhân vật; user xem rồi yêu
+ * cầu bỏ hẳn lựa chọn, chỉ giữ một kiểu. Khoá `walkStyle` còn sót trong file cấu hình cũ bị bỏ qua.
+ *
+ * Bảng số `WALK_STYLES` và phần áp nó trong `vrmStage.ts` (`playAnimation({ style })`) VẪN CÒN
+ * nhưng không nơi nào gọi tới: gỡ chúng là sửa đường đo bước chân của sân khấu mà không nhìn được
+ * kết quả. Muốn dọn thì dọn cùng một lượt có thử GUI.
+ */
 
 export interface WalkStyleSpec {
   /**
@@ -294,10 +358,6 @@ export const WALK_STYLES: Readonly<Record<WalkStyle, WalkStyleSpec | null>> = {
   }
 }
 
-/** Đọc dáng đi đã lưu; giá trị lạ về mặc định. */
-export function cleanWalkStyle(v: unknown): WalkStyle {
-  return WALK_STYLES_LIST.find((s) => s === v) ?? DEFAULT_WALK_STYLE
-}
 
 /** Hệ số lọc thấp cho một frame dài `dtSec` với hằng số thời gian `tauMs` (0 = không lọc). */
 export function smoothFactor(dtSec: number, tauMs: number): number {

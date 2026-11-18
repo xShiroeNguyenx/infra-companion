@@ -31,6 +31,8 @@ import {
   LOOK_ARM,
   MICRO_ARM,
   NATURAL_REST,
+  armClearanceM,
+  percentile,
   newArmSwing,
   newTug,
   restTarget,
@@ -494,6 +496,114 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
     }
   }
   const arms = { left: captureArm('left'), right: captureArm('right') }
+
+  /**
+   * ==== BÀN TAY RA NGOÀI QUẦN ÁO ====
+   *
+   * Đo MỘT lần lúc nạp, khi rig còn ở dáng nghỉ: mỗi bên, thân + quần áo rộng tới đâu ở tầm bàn
+   * tay buông, và cẳng tay (kể cả tay áo) dày bao nhiêu. `armClearanceM` đổi hai số đó thành phần
+   * cộng vào `lateralM` của tay bên ấy. Model mặc đồ ôm ra 0 nên tư thế cũ không đổi.
+   *
+   * Đỉnh thuộc phần nào thì hỏi xương nặng nhất của nó: dưới xương vai là tay, dưới xương cổ là
+   * đầu + tóc (tóc dài rủ xuống tầm hông KHÔNG phải thân), còn lại là thân. Vị trí lấy qua skin
+   * (`getVertexPosition`) chứ không đọc thẳng attribute: lưới của nhiều model nằm trong hệ khác.
+   *
+   * Hỏng ở đâu (model không có skin, three đổi API) thì cả phép đo ra 0 kèm một dòng cảnh báo —
+   * tay về đúng công thức cũ chứ không văng đi đâu.
+   */
+  function measureArmClearance(): { left: number; right: number } {
+    const out = { left: 0, right: 0 }
+    try {
+      const raw = (b: BoneName): Obj3D | null => vrm.humanoid?.getRawBoneNode(b) ?? null
+      const under = (roots: Array<Obj3D | null>): Set<Obj3D> => {
+        const set = new Set<Obj3D>()
+        for (const r of roots) r?.traverse((n) => set.add(n))
+        return set
+      }
+      const headBones = under([raw('neck') ?? raw('head')])
+      const armBones = {
+        left: under([raw('leftShoulder') ?? raw('leftUpperArm')]),
+        right: under([raw('rightShoulder') ?? raw('rightUpperArm')])
+      }
+      const foreBones = { left: under([raw('leftLowerArm')]), right: under([raw('rightLowerArm')]) }
+
+      // Tầm bàn tay theo công thức gốc, và đoạn cẳng tay ở dáng nghỉ — mỗi bên một bộ
+      const sides = (['left', 'right'] as const).flatMap((side) => {
+        const rig = arms[side]
+        if (!rig) return []
+        const S = toModel(rig.upper, new THREE.Vector3())
+        const H = toModel(rig.hip, new THREE.Vector3())
+        const t = restTarget(rig.sideX, S, H, NATURAL_REST[side], rig.lenA + rig.lenB)
+        return [
+          {
+            side,
+            rig,
+            handOuter: rig.sideX * t.x,
+            // Dải cao bằng đoạn cẳng tay khi buông: từ dưới bàn tay một chút lên tới khuỷu
+            yLo: t.y - 0.3 * rig.lenB,
+            yHi: t.y + 0.9 * rig.lenB,
+            elbow: toModel(rig.lower, new THREE.Vector3()),
+            wrist: toModel(rig.hand, new THREE.Vector3()),
+            body: [] as number[],
+            sleeve: [] as number[]
+          }
+        ]
+      })
+      if (sides.length === 0) return out
+
+      const p = new THREE.Vector3()
+      const seg = new THREE.Vector3()
+      const rel = new THREE.Vector3()
+      vrm.scene.traverse((o) => {
+        const mesh = o as import('three').SkinnedMesh
+        if (!mesh.isSkinnedMesh) return
+        const pos = mesh.geometry.attributes.position
+        const skinIndex = mesh.geometry.attributes.skinIndex
+        const skinWeight = mesh.geometry.attributes.skinWeight
+        if (!pos || !skinIndex || !skinWeight) return
+        const bones = mesh.skeleton.bones
+        // Lưới vài trăm nghìn đỉnh: lấy mẫu cách quãng, ~60 nghìn điểm là thừa để tìm một cái mép
+        const stride = Math.max(1, Math.ceil(pos.count / 60000))
+        for (let i = 0; i < pos.count; i += stride) {
+          let best = 0
+          let bestW = skinWeight.getX(i)
+          for (let c = 1; c < 4; c++) {
+            const w = skinWeight.getComponent(i, c)
+            if (w > bestW) {
+              bestW = w
+              best = c
+            }
+          }
+          const owner = bones[skinIndex.getComponent(i, best)]
+          if (!owner || headBones.has(owner)) continue
+          mesh.getVertexPosition(i, p)
+          modelFrame.worldToLocal(p.applyMatrix4(mesh.matrixWorld))
+          for (const s of sides) {
+            if (foreBones[s.side].has(owner)) {
+              // Khoảng cách tới trục khuỷu → cổ tay: bán kính tay áo. Chỉ lấy đỉnh chiếu xuống TRONG đoạn đó —
+              // bàn tay và ngón nằm quá cổ tay, tính vào thì tay trần cũng ra "bán kính" 10 cm (đo được).
+              seg.copy(s.wrist).sub(s.elbow)
+              const k = rel.copy(p).sub(s.elbow).dot(seg) / Math.max(seg.lengthSq(), 1e-9)
+              if (k >= 0 && k <= 1) s.sleeve.push(rel.copy(s.elbow).addScaledVector(seg, k).distanceTo(p))
+            } else if (!armBones.left.has(owner) && !armBones.right.has(owner) && p.y >= s.yLo && p.y <= s.yHi) {
+              const outer = s.rig.sideX * p.x
+              if (outer > 0) s.body.push(outer)
+            }
+          }
+        }
+      })
+
+      for (const s of sides) {
+        if (s.body.length < 8 || s.sleeve.length < 8) continue
+        out[s.side] = armClearanceM(s.handOuter, percentile(s.body, 0.95), percentile(s.sleeve, 0.85), s.rig.lenA + s.rig.lenB)
+      }
+    } catch (e) {
+      console.warn('[vrm] không đo được bề rộng thân/tay áo, tay dùng vị trí mặc định:', e)
+      return { left: 0, right: 0 }
+    }
+    return out
+  }
+  const armClearance = measureArmClearance()
 
   /** Vai: vẫn euler cộng thêm vào góc gốc (không gán đè — bẫy `hipsRest` cũ). */
   const lShoulder = arms.left?.shoulder ?? null
@@ -1302,7 +1412,8 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
       const ph = side === 'left' ? 0 : 1.9
 
       // Đích: tương đối khớp háng. Sway / dồn trọng tâm / vi chuyển động chỉ là vài mm dịch đích.
-      spec.lateralM = base.lateralM
+      // + phần đưa ra cho khỏi lún vào quần áo (đo lúc nạp; 0 với model mặc đồ ôm)
+      spec.lateralM = base.lateralM + armClearance[side]
       spec.forwardM = base.forwardM
       spec.reach = base.reach
       let palmBack = base.palmBack

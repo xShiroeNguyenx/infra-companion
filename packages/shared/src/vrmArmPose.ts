@@ -133,6 +133,52 @@ export function restTarget(sideX: number, shoulder: V3, hip: V3, spec: ArmRestSi
   return { x, y: shoulder.y + dy, z }
 }
 
+/**
+ * Bàn tay phải đứng NGOÀI lớp quần áo — thứ `restTarget` không biết.
+ *
+ * `restTarget` đặt bàn tay theo khớp háng, đúng với model mặc đồ ôm. Model có váy xoè hay tay áo
+ * phồng thì chỗ đó nằm TRONG váy: tay bị ép vào thân, tay áo lún vào hông, vai trông như sệ và
+ * lệch ra sau (user chụp đúng cảnh đó trên một model tay áo phồng). Nên nơi gọi đo hình thật của
+ * model lúc nạp — thân rộng bao nhiêu ở tầm bàn tay, cẳng tay (kể cả tay áo) dày bao nhiêu — và
+ * hàm này cho biết phải đưa bàn tay ra thêm bao nhiêu.
+ */
+export const ARM_CLEARANCE = {
+  /**
+   * Bao nhiêu phần bán kính cẳng tay phải nằm ngoài mép thân. 1 = tay áo vừa chạm mép váy chứ không
+   * lún vào. Đo trên ba model: tay áo phồng 8 cm ra 67° (dáng tác giả vẽ là 65°), tay trần và model
+   * mẫu chỉ đổi 2–4°. Ở 0,6 model tay áo phồng mới ra 71°, tay áo vẫn cắt vào váy.
+   */
+  sleeveFrac: 1,
+  /** Trần, tính theo chiều dài tay: một cái đuôi hay đôi cánh gắn vào hông không được bẻ tay ra ngang. */
+  maxFrac: 0.35
+} as const
+
+/**
+ * Phần phải cộng vào `lateralM` (m, ≥ 0) để bàn tay ra khỏi quần áo.
+ *
+ * @param handOuterM   bàn tay đang cách đường giữa thân bao xa theo công thức gốc (`sideX · đích.x`)
+ * @param bodyOuterM   mép ngoài của thân + quần áo ở tầm bàn tay, cùng phía, cùng gốc đo
+ * @param armRadiusM   bán kính cẳng tay kể cả tay áo
+ * @param armLen       chiều dài tay (tay trên + cẳng tay)
+ */
+export function armClearanceM(handOuterM: number, bodyOuterM: number, armRadiusM: number, armLen: number): number {
+  if (![handOuterM, bodyOuterM, armRadiusM, armLen].every(Number.isFinite)) return 0
+  const need = bodyOuterM + Math.max(0, armRadiusM) * ARM_CLEARANCE.sleeveFrac - handOuterM
+  return clamp(need, 0, ARM_CLEARANCE.maxFrac * Math.max(0, armLen))
+}
+
+/**
+ * Giá trị ở phân vị `p` (0–1) của một dãy số; 0 nếu dãy rỗng.
+ *
+ * Dùng thay `max` khi đo hình model: một dải ruy băng hay một sợi tóc lạc không được quyết định
+ * mép thân nằm ở đâu.
+ */
+export function percentile(values: readonly number[], p: number): number {
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  return sorted[Math.round(clamp(p, 0, 1) * (sorted.length - 1))]!
+}
+
 /** Pole khuỷu: ra ngoài, hơi xuống, ra sau — khuỷu người đứng thả lỏng chỉ về phía đó. */
 export function poleFor(sideX: number, spec: ArmRestSide): V3 {
   return normalize3({ x: sideX * spec.poleOut, y: -0.15, z: -spec.poleBack })

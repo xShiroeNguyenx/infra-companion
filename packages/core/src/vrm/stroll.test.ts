@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  cleanStrollPace,
-  cleanWalkStyle,
-  DEFAULT_WALK_STYLE,
+  strollWalkClip,
+  STROLL_WALK_CLIPS,
+  VRM_MOTIONS,
   smoothFactor,
   WALK_LEG_BONES,
   WALK_STYLES,
@@ -11,12 +11,13 @@ import {
   pickStrollTarget,
   stepToward,
   strollFacing,
+  strollDepthScale,
+  strollMaxOffset,
+  STROLL_MAX_SCALE,
   strollLegs,
   strollRange,
   strollSpeed,
   STROLL_FALLBACK_SPEED,
-  STROLL_PACE,
-  STROLL_PACES,
   STROLL_LEGS_MAX,
   STROLL_LEGS_MIN,
   type GaitSample
@@ -108,9 +109,42 @@ describe('đi dạo — bước và hướng', () => {
     expect(stepToward(-90, -100, 50, 1)).toEqual({ offset: -100, arrived: true })
   })
 
-  it('đi sang phải thì xoay +90°, sang trái −90°', () => {
-    expect(strollFacing(1)).toBeCloseTo(Math.PI / 2)
-    expect(strollFacing(-1)).toBeCloseTo(-Math.PI / 2)
+  it('đi ra: mặt hướng chéo 45° về phía người xem, đúng bên đang trượt tới', () => {
+    expect(strollFacing(1, true)).toBeCloseTo(Math.PI / 4)
+    expect(strollFacing(-1, true)).toBeCloseTo(-Math.PI / 4)
+  })
+
+  it('đi về: quay LƯNG chéo 135° — không đi giật lùi', () => {
+    expect(strollFacing(1, false)).toBeCloseTo((3 * Math.PI) / 4)
+    expect(strollFacing(-1, false)).toBeCloseTo((-3 * Math.PI) / 4)
+  })
+
+  it('càng xa chỗ gốc càng to, hai bên như nhau, ở gốc đúng cỡ 1', () => {
+    expect(strollDepthScale(0, 250)).toBe(1)
+    const near = strollDepthScale(100, 250)
+    const far = strollDepthScale(200, 250)
+    expect(near).toBeGreaterThan(1)
+    expect(far).toBeGreaterThan(near)
+    expect(strollDepthScale(-200, 250)).toBeCloseTo(far, 9)
+  })
+
+  it('độ phóng có trần, kể cả khi trượt quá cả khoảng cách camera', () => {
+    expect(strollDepthScale(99_999, 250)).toBe(STROLL_MAX_SCALE)
+    expect(strollDepthScale(99_999, 250, 1.2)).toBe(1.2)
+  })
+
+  it('số đo hỏng thì không phóng — thẻ không nhảy cỡ', () => {
+    expect(strollDepthScale(100, 0)).toBe(1)
+    expect(strollDepthScale(Number.NaN, 250)).toBe(1)
+  })
+
+  it('quãng trượt xa nhất là đúng chỗ độ phóng chạm trần', () => {
+    const max = strollMaxOffset(250)
+    expect(max).toBeGreaterThan(0)
+    expect(strollDepthScale(max, 250)).toBeCloseTo(STROLL_MAX_SCALE, 6)
+    expect(strollDepthScale(max * 0.5, 250)).toBeLessThan(STROLL_MAX_SCALE)
+    expect(strollMaxOffset(0)).toBe(0)
+    expect(strollMaxOffset(250, 1)).toBe(0)
   })
 
   it('số chặng nằm trong khoảng khai báo', () => {
@@ -139,18 +173,6 @@ describe('đi dạo — về đúng chỗ cũ', () => {
   })
 })
 
-describe('đi dạo — nhịp đi đã lưu', () => {
-  it('chỉ nhận đúng ba nhịp cho chọn, giá trị lạ về mặc định', () => {
-    for (const p of STROLL_PACES) expect(cleanStrollPace(p)).toBe(p)
-    expect(cleanStrollPace(0.3)).toBe(STROLL_PACE)
-    expect(cleanStrollPace('0.55')).toBe(STROLL_PACE)
-    expect(cleanStrollPace(undefined)).toBe(STROLL_PACE)
-  })
-
-  it('nhịp mặc định là một trong các nhịp cho chọn — dropdown không bao giờ trống', () => {
-    expect(STROLL_PACES).toContain(STROLL_PACE)
-  })
-})
 
 describe('dáng đi', () => {
   it('dáng gốc không chỉnh gì; dáng mềm mại có cấu hình', () => {
@@ -186,13 +208,6 @@ describe('dáng đi', () => {
     expect(g.elbowMinDeg).toBeGreaterThan(0)
   })
 
-  it('giá trị đã lưu lạ thì về mặc định', () => {
-    expect(cleanWalkStyle('natural')).toBe('natural')
-    expect(cleanWalkStyle('graceful')).toBe('graceful')
-    expect(cleanWalkStyle('sexy')).toBe(DEFAULT_WALK_STYLE)
-    expect(cleanWalkStyle(undefined)).toBe(DEFAULT_WALK_STYLE)
-  })
-
   it('hệ số lọc thấp: 0 ms là không lọc, frame càng dài càng theo kịp', () => {
     expect(smoothFactor(1 / 30, 0)).toBe(1)
     const a = smoothFactor(1 / 60, 70)
@@ -200,5 +215,25 @@ describe('dáng đi', () => {
     expect(a).toBeGreaterThan(0)
     expect(b).toBeGreaterThan(a)
     expect(b).toBeLessThan(1)
+  })
+})
+
+describe('chọn clip đi bộ cho đi dạo', () => {
+  it('ưu tiên clip riêng của dự án khi đã có trên máy', () => {
+    expect(strollWalkClip(['walk', 'pastel-walk', 'idle-x'])).toBe('pastel-walk')
+  })
+
+  it('chưa tải clip riêng thì vẫn đi bằng clip cũ — cập nhật app không được làm tắt đi dạo', () => {
+    expect(strollWalkClip(['walk', 'drink-water'])).toBe('walk')
+  })
+
+  it('không có clip đi bộ nào → null, không đi dạo', () => {
+    expect(strollWalkClip([])).toBeNull()
+    expect(strollWalkClip(['drink-water'])).toBeNull()
+  })
+
+  it('mọi id trong danh sách đều có thật trong danh mục', () => {
+    // Gõ sai một id là nhánh đó im lặng không bao giờ khớp
+    for (const id of STROLL_WALK_CLIPS) expect(VRM_MOTIONS.some((c) => c.id === id), id).toBe(true)
   })
 })

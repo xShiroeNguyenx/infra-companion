@@ -90,14 +90,28 @@ export function registerMonitorIpc(): () => void {
     }
   })
 
+  /**
+   * Tăng mỗi lần "dừng tất cả". Vòng start bên dưới nối TUẦN TỰ từng host (mỗi host có thể mất
+   * vài giây tới 20s nếu máy không trả lời), nên user hoàn toàn có thể bấm Dừng khi vòng còn dở.
+   * `service.stopAll()` chỉ dừng được những host ĐÃ vào map; không có mốc này thì vòng cứ chạy
+   * tiếp và bật nốt các host còn lại SAU khi đã dừng: chúng không hiện ở đâu trên UI (renderer đã
+   * xoá card) nhưng vẫn giữ SSH, vẫn ghi lịch sử và vẫn bắn cảnh báo "mất kết nối".
+   */
+  let stopGeneration = 0
+
   ipcMain.handle(IPC.MONITOR_START, async (event, hosts: Array<{ id: string; label: string }>) => {
     touchActivity()
     addSubscriber(event.sender)
     const verify = makeHostKeyVerifier(event.sender)
+    const generation = stopGeneration
     for (const host of hosts) {
-      labels.set(host.id, host.label)
+      if (generation !== stopGeneration) return
       try {
         const prepared = await prepareConnection(event.sender, host.id)
+        // Dừng trong lúc đang chờ (hỏi mật khẩu, xác nhận host key…): bỏ luôn host này.
+        if (generation !== stopGeneration) return
+        // Ghi nhãn SAU mốc kiểm: ghi trước thì lượt bị cắt để lại nhãn mồ côi trong map.
+        labels.set(host.id, host.label)
         await service.start(
           {
             hostId: host.id,
@@ -110,6 +124,7 @@ export function registerMonitorIpc(): () => void {
           verify
         )
       } catch (error) {
+        if (generation !== stopGeneration) return
         event.sender.send(IPC.MONITOR_SAMPLE, {
           hostId: host.id,
           ts: Date.now(),
@@ -150,6 +165,7 @@ export function registerMonitorIpc(): () => void {
     lastSamples.delete(hostId)
   })
   ipcMain.on(IPC.MONITOR_STOP_ALL, (event) => {
+    stopGeneration++ // cắt mọi vòng start còn đang chạy dở (xem `stopGeneration`)
     service.stopAll()
     engine.clear()
     metrics?.flushAll()

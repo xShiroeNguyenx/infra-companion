@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ARM_CLEARANCE,
+  armClearanceM,
+  percentile,
   ARM_SWING,
   ELBOW_DRIFT,
   elbowDrift,
@@ -389,5 +392,44 @@ describe('kéo nhân vật rồi buông (đàn hồi)', () => {
     release(st, 2)
     expect(st.x).toBe(0)
     expect(st.z).toBe(0)
+  })
+})
+
+describe('bàn tay đứng ngoài lớp quần áo', () => {
+  const armLen = 0.42
+
+  it('model mặc đồ ôm: bàn tay đã cách mép thân hơn một bán kính cẳng tay thì không đẩy thêm', () => {
+    expect(armClearanceM(0.16, 0.11, 0.035, armLen)).toBe(0)
+  })
+
+  it('váy xoè + tay áo phồng: đưa bàn tay ra tới mép váy cộng một phần tay áo', () => {
+    const extra = armClearanceM(0.13, 0.17, 0.09, armLen)
+    expect(extra).toBeCloseTo(0.17 + 0.09 * ARM_CLEARANCE.sleeveFrac - 0.13, 9)
+    expect(extra).toBeGreaterThan(0.08)
+  })
+
+  it('thân càng rộng hay tay áo càng dày thì đẩy càng xa', () => {
+    expect(armClearanceM(0.11, 0.2, 0.05, armLen)).toBeGreaterThan(armClearanceM(0.11, 0.16, 0.05, armLen))
+    expect(armClearanceM(0.11, 0.16, 0.1, armLen)).toBeGreaterThan(armClearanceM(0.11, 0.16, 0.05, armLen))
+  })
+
+  it('có trần theo chiều dài tay: cái đuôi hay đôi cánh gắn vào hông không bẻ tay ra ngang', () => {
+    expect(armClearanceM(0.11, 1.5, 0.05, armLen)).toBeCloseTo(ARM_CLEARANCE.maxFrac * armLen, 9)
+  })
+
+  it('số đo hỏng (NaN, vô cực) thì không đẩy, không lan NaN xuống xương', () => {
+    expect(armClearanceM(Number.NaN, 0.17, 0.09, armLen)).toBe(0)
+    expect(armClearanceM(0.11, Number.POSITIVE_INFINITY, 0.09, armLen)).toBe(0)
+    expect(armClearanceM(0.11, 0.17, 0.09, Number.NaN)).toBe(0)
+  })
+
+  it('phân vị bỏ qua vài điểm lạc mà max thì không', () => {
+    const body = Array.from({ length: 99 }, (_, i) => 0.1 + i * 0.0005)
+    const withRibbon = [...body, 0.6]
+    expect(percentile(withRibbon, 0.95)).toBeLessThan(0.16)
+    expect(Math.max(...withRibbon)).toBe(0.6)
+    expect(percentile([], 0.95)).toBe(0)
+    expect(percentile([3, 1, 2], 0)).toBe(1)
+    expect(percentile([3, 1, 2], 1)).toBe(3)
   })
 })
