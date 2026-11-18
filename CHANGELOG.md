@@ -5,6 +5,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.5.1] — 2026-11-18
+
+### Changed
+
+- **Two more motions are the project's own.** The second idle pose and the celebration when an alert clears replace the third-party clips that used to play there.
+- **The character reacts to five more kinds of tool.** Opening a bulk-run, file-transfer, log, security or monitoring tool now plays a matching motion; before, the character stood still for these. If you already had the motion pack, the new clips are fetched automatically the next time the character opens.
+
+### Fixed
+
+- **Feet stay on the ground during motions.** The character's hips were held rigidly in place while a motion played, so any motion that shifts weight, dips or dances made the feet slide and lift instead. The hips now move as the motion intends, and the character is still kept from walking out of its frame.
+- **Error colours no longer bleed into vi, less or htop.** Lines coloured in the normal terminal could reappear as stray coloured blocks on top of a full-screen program, most visibly right after opening a session. Colours are now removed while such a program is open and restored when it exits.
+
+---
+
 ## [0.5.0] — 2026-11-18
 
 ### Changed

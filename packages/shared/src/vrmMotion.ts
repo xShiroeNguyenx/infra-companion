@@ -174,14 +174,27 @@ export const VRM_MOTIONS: readonly VrmMotionClip[] = [
    */
   // Clip riêng (thay 'idle-01' CC0). ⚠️ CHƯA đo bề ngang trên model thật — xem cảnh báo ngay trên.
   ownClip('pastel-idle', 'Đứng thư giãn', 'idle', 15.38, 'f0af4db043c1acc2fd8b182e4efd6afd20e3cfcf44fff9e49b66088e3c4d49f5', 337304),
-  clip('drink-water', 'Uống nước', 'idle', 23.73, 'ba56122fecb5014f019096dcd014c0c35f1d560dcb0f6b1d55d3d66e5d69740c', 613560, REROFUMI),
+  // Idle thứ hai để luân phiên (clip riêng, thay 'drink-water' CC0). ⚠️ CHƯA đo bề ngang.
+  ownClip('pink-idle', 'Thư giãn', 'idle', 4.96, '2a65ec50aad1813cd34f46efa6c219e48f6c09d467669042c225a3042dcf8e03', 79056),
   // Mở khung chat → gật đầu đón (clip riêng, thay 'speaking-01' CC0)
   ownClip('pastel-agree', 'Gật đầu', 'chat', 4.04, 'abe10c2e8a55c4a3dbb3d644eb03864d64f9b48ec3507bc7418aaacd74db83f5', 109404),
-  // Chạm vào người → TẠO DÁNG (user đổi từ "giật mình")
+  // Chạm vào người → TẠO DÁNG (CC0). Clip nhảy riêng đã thử ở v0.5.1 nhưng chân không bám đất
+  // kể cả khi phát nguyên bản — lỗi nằm trong clip, user gỡ ra để làm lại.
   clip('pose-motion', 'Tạo dáng', 'poke', 20.0, 'e3b06f78b21df2fe1f26d80dd1826fd47941a891d44b46a6197f8a87de05ff2c', 521156, REROFUMI),
   // Có cảnh báo → sợ hãi (clip riêng, thay 'failed-apology' CC0)
   ownClip('pastel-afraid', 'Sợ hãi', 'alert', 2.63, 'ef5e159356576426d67ba43291395cd32e547e41de14fdf2f27016befe9e6d67', 83432),
-  clip('success-cheer', 'Ăn mừng', 'recover', 21.5, '88123be97c20633b926b911c1904aae3cdc790c5416b39788b753749ba087afb', 559496, REROFUMI),
+  // Hết cảnh báo → ăn mừng (clip riêng, thay 'success-cheer' CC0)
+  ownClip('pink-celebrate', 'Ăn mừng', 'recover', 4.96, 'aa8b8e5e3c1da7047dde3b662ef73a520a3bde8f6a41de47d78226f4c6d93a30', 79056),
+  /**
+   * Năm loại việc trước đây KHÔNG có clip nào (nhân vật đứng im khi mở công cụ). Clip riêng, mỗi
+   * cái đúng 4,96 giây. `pink-reading` gán cho `logs` chứ không cho `inspect`: nhóm xem log có 5
+   * công cụ và chưa có gì, còn `inspect` (2 công cụ) vẫn còn clip CC0 bên dưới chờ thay.
+   */
+  ownClip('pink-command', 'Ra hiệu chỉ huy', 'bulk', 4.96, '85f0c5262b7f1d072b799555d2f46ff6c83a8ea985d75f33a7edaacb08e32763', 79056),
+  ownClip('pink-pickup', 'Nhặt đồ', 'transfer', 4.96, '747c96ac0bcc9c54b6aedd6cd83cd2098a8a637f36bb4f06f7896a58dfbaa496', 79056),
+  ownClip('pink-reading', 'Đọc chăm chú', 'logs', 4.96, '29e0e1ffd83a286c55688b21d4babe24bc5c26d44b99ced1e7b1316c7cf79902', 79056),
+  ownClip('pink-guard', 'Đứng gác', 'security', 4.96, '0e702500e195884bfc2140331152bcf1ec4629a41c7fcb00d8d123db5b24c26a', 79056),
+  ownClip('pink-lookout', 'Nhìn xa', 'monitor', 4.96, '0dc58f3331c305dd3f2e4970cb1c1cc4638e7216a3e88af1f46fc01677a19f41', 79056),
   // Mở công cụ ngồi đọc lâu → nhân vật cũng ngồi xem điện thoại cho hợp cảnh
   clip('review-phone', 'Xem điện thoại', 'inspect', 10.43, '54a37ca48a1d4ffb60cfc539013f59fecd48d93375b2069c6c35b5e9f416b726', 281528, REROFUMI),
   // ── Chỉ chạy khi user chọn ─────────────────────────────────────────────────
@@ -252,6 +265,38 @@ export function nextMotionForRole(
   const i = pool.findIndex((m) => m.id === lastId)
   // Không thấy clip cũ trong nhóm (vừa đổi vai trò) → bắt đầu lại từ đầu
   return pool[i < 0 ? 0 : (i + 1) % pool.length]!
+}
+
+/**
+ * ==== Hông của clip: ghim cứng hay cho chuyển động TƯƠNG ĐỐI ====
+ *
+ * Clip tự chạy được "neo" để nhân vật không đi ra khỏi khung hình hẹp. Bản đầu neo bằng cách ghim
+ * cứng hông về chỗ đứng ở MỌI frame. Sai với mọi clip mà hông vốn phải dịch trong khi bàn chân
+ * đứng yên — dồn trọng tâm, nhún, bước nhảy: ghim hông thì chính hai bàn chân trượt và bay quanh
+ * cái hông bất động. User thấy rõ nhất ở hai clip nhảy ("chân bay lung tung, không chân nào chạm
+ * đất"), nhưng `pink-lookout`, `pink-pickup`, `drink-water` cũng trượt chân 13–20 cm vì cùng lý do.
+ *
+ * Cách đúng: giữ nguyên chuyển động của hông **so với frame đầu của clip**, chỉ bỏ phần lệch tuyệt
+ * đối (clip đặt hông ở đâu trong không gian của nó không liên quan tới chỗ nhân vật đang đứng).
+ * Bàn chân nhờ vậy đứng đúng chỗ clip muốn.
+ *
+ * Chỉ ghim cứng khi clip thật sự ĐI XA khỏi chỗ bắt đầu — vượt các ngưỡng dưới đây thì nhân vật ra
+ * khỏi khung. Đo trên 19 clip đang dùng: lệch ngang lớn nhất 0,20 m, trước-sau 0,36 m; cả 19 đều
+ * dưới ngưỡng.
+ */
+/** Lệch ngang tối đa so với frame đầu (m). Lề trong suốt mỗi bên thẻ là ~0,6 lần bề ngang thân. */
+export const HIPS_FREE_MAX_SIDE_M = 0.3
+/** Lệch trước-sau tối đa (m). Rộng hơn chiều ngang: tiến/lùi chỉ làm người to/nhỏ đi một chút. */
+export const HIPS_FREE_MAX_DEPTH_M = 0.5
+
+/**
+ * `true` = clip đi quá xa, phải ghim cứng hông. `false` = cho hông chuyển động tương đối.
+ *
+ * Số đo hỏng (NaN, clip không có track vị trí hông) → ghim: đó là hành vi cũ, an toàn với khung hình.
+ */
+export function shouldPinHips(maxSideM: number, maxDepthM: number): boolean {
+  if (!Number.isFinite(maxSideM) || !Number.isFinite(maxDepthM)) return true
+  return maxSideM > HIPS_FREE_MAX_SIDE_M || maxDepthM > HIPS_FREE_MAX_DEPTH_M
 }
 
 /** Tổng dung lượng phải tải (byte) — hiện trên nút để user biết trước. */

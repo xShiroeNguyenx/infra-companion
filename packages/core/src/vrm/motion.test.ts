@@ -7,6 +7,9 @@ import {
   motionPackBytes,
   motionsForRole,
   nextMotionForRole,
+  shouldPinHips,
+  HIPS_FREE_MAX_DEPTH_M,
+  HIPS_FREE_MAX_SIDE_M,
   OWN_MOTION_AUTHOR,
   OWN_MOTION_LICENSE,
   VRM_MOTIONS,
@@ -64,7 +67,8 @@ describe('thư viện chuyển động', () => {
   })
 
   it('mọi vai trò tự chạy đều có ít nhất một clip', () => {
-    for (const role of ['idle', 'chat', 'poke', 'alert', 'recover', 'inspect'] as const) {
+    // Năm loại việc (bulk…monitor) có clip từ v0.5.1 — trước đó mở các công cụ ấy nhân vật đứng im
+    for (const role of ['idle', 'chat', 'poke', 'alert', 'recover', 'inspect', 'bulk', 'transfer', 'logs', 'security', 'monitor'] as const) {
       expect(motionsForRole(role).length, `vai trò ${role}`).toBeGreaterThan(0)
       expect(motionForRole(role)?.role).toBe(role)
     }
@@ -89,7 +93,7 @@ describe('thư viện chuyển động', () => {
      * chạm vào người, và đó là quyết định của họ — nhưng vẫn phải có trần, clip 40s thì nhân vật
      * đứng như tượng gần một phút sau mỗi cú click.
      */
-    for (const role of ['chat', 'poke', 'alert', 'inspect'] as const) {
+    for (const role of ['chat', 'poke', 'alert', 'inspect', 'bulk', 'transfer', 'logs', 'security', 'monitor'] as const) {
       for (const c of motionsForRole(role)) expect(c.durationSec, c.id).toBeLessThan(25)
     }
   })
@@ -141,5 +145,30 @@ describe('xoay vòng clip cùng vai trò', () => {
 
   it('clip cũ không thuộc nhóm (vừa đổi vai trò) thì bắt đầu lại từ đầu', () => {
     expect(nextMotionForRole('idle', 'không-tồn-tại', idleIds)!.id).toBe(idleIds[0])
+  })
+})
+
+describe('neo hông của clip', () => {
+  it('clip dồn trọng tâm / nhảy tại chỗ → KHÔNG ghim cứng, để bàn chân bám đất', () => {
+    // Số đo thật: pink-idol-dance 0,145 / 0,244 · pink-kpop-dance 0,059 / 0,303 · drink-water 0,197 / 0,080
+    expect(shouldPinHips(0.145, 0.244)).toBe(false)
+    expect(shouldPinHips(0.059, 0.303)).toBe(false)
+    expect(shouldPinHips(0.197, 0.08)).toBe(false)
+    expect(shouldPinHips(0, 0)).toBe(false)
+  })
+
+  it('clip đi xa khỏi chỗ bắt đầu → ghim, không thì nhân vật ra khỏi khung', () => {
+    expect(shouldPinHips(HIPS_FREE_MAX_SIDE_M + 0.01, 0)).toBe(true)
+    expect(shouldPinHips(0, HIPS_FREE_MAX_DEPTH_M + 0.01)).toBe(true)
+    expect(shouldPinHips(0.39, 0.92)).toBe(true)
+  })
+
+  it('đúng ngưỡng vẫn được tự do', () => {
+    expect(shouldPinHips(HIPS_FREE_MAX_SIDE_M, HIPS_FREE_MAX_DEPTH_M)).toBe(false)
+  })
+
+  it('số đo hỏng → ghim (hành vi cũ, an toàn với khung hình)', () => {
+    expect(shouldPinHips(Number.NaN, 0)).toBe(true)
+    expect(shouldPinHips(0, Number.POSITIVE_INFINITY)).toBe(true)
   })
 })

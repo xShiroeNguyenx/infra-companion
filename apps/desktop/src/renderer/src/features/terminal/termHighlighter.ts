@@ -24,7 +24,8 @@ import {
  *  · **Dòng user tự gõ không bị tô cũng không báo động** — `grep -i error app.log` không được
  *    tự kích hoạt mẫu `error`. Pane báo các dòng đó lúc bấm Enter ({@link Highlighter.markInputLine}).
  *  · **Không quét ở màn hình phụ** (vim, less, htop): app ở đó tự vẽ lại cả màn hình liên tục,
- *    tô màu chỉ là nhiễu.
+ *    tô màu chỉ là nhiễu. Và lúc VÀO màn hình phụ phải gỡ màu đã tô ở buffer chính, không thì
+ *    chúng hiện đè lên đó — xem `onBufferChange`.
  *  · **Dòng bị ghi đè tại chỗ thì tô lại.** Decoration bám theo marker của dòng, không theo chữ.
  *    Xoá màn hình (`ESC[J`, lệnh `clear`, Ctrl+L) thì xterm tự huỷ marker của dòng bị reset nên
  *    màu đi theo. Nhưng xoá dòng (`ESC[K` — thanh tiến trình nhiều dòng kiểu `docker pull`,
@@ -358,8 +359,27 @@ export function attachHighlighter(term: Terminal, opts: HighlighterOptions): Hig
     }, 200)
   }
 
+  /**
+   * Vào màn hình phụ (vi, less, htop) → GỠ hết màu; quay ra → quét lại phần gần đây.
+   *
+   * "Không quét ở màn hình phụ" là chưa đủ. Decoration bám marker của buffer CHÍNH, nhưng xterm
+   * tra decoration theo SỐ DÒNG của buffer đang hiện: màn hình phụ luôn là các dòng 0…rows−1, nên
+   * mọi dòng đã tô nằm trong `rows` dòng đầu của buffer chính (phiên mới mở, scrollback còn ngắn)
+   * bị vẽ đè nguyên vị trí lên vi/less — những ô đỏ rải rác chẳng dính gì tới chữ bên dưới. User
+   * chụp được đúng cảnh đó khi mở một file cấu hình bằng vi.
+   *
+   * Quét lại không báo động (`scan(false, …)`) và `notifiedRows` vẫn giữ, nên thoát vi không làm
+   * cảnh báo cũ kêu lại.
+   */
+  const onBufferChange = (): void => {
+    if (disposed) return
+    if (term.buffer.active.type === 'normal') scheduleRescan(false)
+    else clearAll()
+  }
+
   const subs: IDisposable[] = [
     term.onWriteParsed(schedule),
+    term.buffer.onBufferChange(onBufferChange),
     term.onResize(() => scheduleRescan(true)),
     // Trả false để xterm vẫn xử lý chuỗi như bình thường — ở đây chỉ nghe
     term.parser.registerCsiHandler({ final: 'K' }, () => {

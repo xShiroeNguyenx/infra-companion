@@ -29,6 +29,7 @@ import {
   elbowDriftReach,
   lookArmOffset,
   LOOK_ARM,
+  shouldPinHips,
   MICRO_ARM,
   NATURAL_REST,
   armClearanceM,
@@ -800,6 +801,11 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
   }
   /** Giữ nhân vật tại chỗ trong lúc clip chạy — xem chú thích ở `tick`. */
   let anchorHips = false
+  /**
+   * Vị trí hông ở FRAME ĐẦU của clip đang neo (khung model). Có giá trị = hông được chuyển động
+   * tương đối quanh chỗ đứng; `null` = ghim cứng. Xem `shouldPinHips` ở `vrmMotion.ts`.
+   */
+  let hipsBase: { x: number; z: number } | null = null
 
   /**
    * ==== DÁNG ĐI — chỉnh clip đi bộ lúc chạy (`WALK_STYLES` ở `vrmStroll.ts`) ====
@@ -1945,8 +1951,14 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
        * thì một dòng và giữ nguyên phần nhún theo trục đứng (clip ngồi xổm vẫn hạ xuống được).
        */
       if (anchorHips && hips) {
-        hips.position.x = hipsRest.x
-        hips.position.z = hipsRest.z
+        if (hipsBase) {
+          // Giữ chuyển động của hông so với frame đầu của clip → bàn chân đứng đúng chỗ clip muốn
+          hips.position.x = hipsRest.x + (hips.position.x - hipsBase.x)
+          hips.position.z = hipsRest.z + (hips.position.z - hipsBase.z)
+        } else {
+          hips.position.x = hipsRest.x
+          hips.position.z = hipsRest.z
+        }
       }
       if (walkStyle) applyWalkStyle(dt)
     } else {
@@ -2197,6 +2209,7 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
       mixer = null
       clipEndsAt = 0
       anchorHips = opts?.anchor === true
+      hipsBase = null
       if (!bytes) return 0
       if (opts?.measureGait) gait = 0
       // Dáng đi chỉ áp cho đúng lượt có `style` — clip khác (cảnh báo, chạm) chạy nguyên bản
@@ -2218,6 +2231,24 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
         // không còn là thứ đang hiện trên màn hình
         snapshotPose()
         const clip = vrmaMod.createVRMAnimationClip(anim as never, vrm)
+        /**
+         * Đo track vị trí hông: clip chỉ dồn trọng tâm / nhún / nhảy tại chỗ thì cho hông chuyển
+         * động tương đối, không ghim cứng — ghim là bàn chân trượt và bay quanh cái hông đứng im.
+         * Không thấy track (hoặc clip đi xa) thì `hipsBase` để `null` = ghim như cũ.
+         */
+        if (anchorHips && hips) {
+          const track = clip.tracks.find((t) => t.name === `${hips.name}.position`)
+          const v = track?.values
+          if (v && v.length >= 3) {
+            let side = 0
+            let depth = 0
+            for (let i = 0; i + 2 < v.length; i += 3) {
+              side = Math.max(side, Math.abs(v[i]! - v[0]!))
+              depth = Math.max(depth, Math.abs(v[i + 2]! - v[2]!))
+            }
+            if (!shouldPinHips(side, depth)) hipsBase = { x: v[0]!, z: v[2]! }
+          }
+        }
         const m = new THREE.AnimationMixer(vrm.scene)
         const action = m.clipAction(clip)
         /**

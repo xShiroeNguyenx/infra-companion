@@ -129,8 +129,8 @@ describe('effectiveRole / motionsForRole — gán đè vai trò clip CC0', () =>
 
   it('clip KHÁC không bị ảnh hưởng', () => {
     const over = { 'pastel-idle': 'alert' } as const
-    // `drink-water` cũng là idle mặc định, gán đè pastel-idle không được kéo nó theo
-    expect(motionsForRole('idle', over).some((c) => c.id === 'drink-water')).toBe(true)
+    // `pink-idle` cũng là idle mặc định, gán đè pastel-idle không được kéo nó theo
+    expect(motionsForRole('idle', over).some((c) => c.id === 'pink-idle')).toBe(true)
   })
 
   it('nextMotionForRole tôn trọng gán đè', () => {
@@ -144,7 +144,7 @@ describe('effectiveRole / motionsForRole — gán đè vai trò clip CC0', () =>
   it('cleanFolderMotions giữ `manual` cho clip CC0 nhưng BỎ ở clip tự nạp', () => {
     const got = cleanFolderMotions({
       roles: { 'a.vrma': 'manual' },
-      builtinRoles: { 'pastel-idle': 'manual', 'drink-water': 'bịa' }
+      builtinRoles: { 'pastel-idle': 'manual', 'pink-idle': 'bịa' }
     })
     expect(got.roles).toEqual({}) // clip tự nạp không nhận `manual`
     expect(got.builtinRoles).toEqual({ 'pastel-idle': 'manual' }) // clip CC0 thì có, giá trị lạ bị bỏ
