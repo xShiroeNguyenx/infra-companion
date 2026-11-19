@@ -35,7 +35,8 @@ export interface VrmSampleModel {
 }
 
 /**
- * Danh sách model mẫu. Hiện chỉ một — thêm nữa thì UI tự hiện thành danh sách chọn.
+ * Danh sách model mẫu. UI hiện mỗi model chưa tải thành một thẻ "Tải về và dùng"; màn hình cài
+ * đặt lần đầu chỉ dùng phần tử **đầu tiên**.
  *
  * Từ v0.5.0 model chính là **nhân vật riêng của dự án** (Pink Pastel), thay cho model CC0 lấy từ
  * bên ngoài. Vì là của chính tác giả repo nên nó KHÔNG cần giấy phép "cho phân phối lại": tác giả
@@ -63,6 +64,23 @@ export const VRM_SAMPLE_MODELS: readonly VrmSampleModel[] = [
     sha256: '4a7657acfddf05944a164af391702eef1a27f080244f9b711bdc5e41dece6433',
     sizeBytes: 5_636_424,
     fileName: 'pink-pastel.vrm'
+  },
+  {
+    // Nhân vật riêng thứ hai — đứng SAU Pink Pastel: màn hình cài đặt lần đầu (`StartScreen`) lấy
+    // phần tử đầu, nên người mới vẫn nhận Pink Pastel; Lavender Cat mời tải trong cài đặt nhân vật.
+    // Cùng release `vrm-sample-v2` (đính kèm thêm file, không tạo tag mới).
+    // ⚠️ Thêm model vào đây là AN TOÀN với `retireOldSamples`, nhưng BỎ một model khỏi danh sách
+    // thì app sẽ xoá file đó trên máy mọi người ở lần mở kế tiếp.
+    id: 'lavender-cat',
+    label: 'Lavender Cat',
+    note: 'Cô mèo tóc oải hương mùa đông — nhân vật riêng của Infra Companion',
+    author: 'xShiroeNguyenx',
+    license: 'Giữ bản quyền — chỉ dùng trong Infra Companion',
+    licenseUrl: 'https://vrm.dev/licenses/1.0/',
+    url: 'https://github.com/xShiroeNguyenx/infra-companion/releases/download/vrm-sample-v2/lavender-cat.vrm',
+    sha256: '217a3b1a6c66e42e95fe0098148e9cdd0f5077eee7bb60bbfc5f9db9d3e6b3c1',
+    sizeBytes: 8_284_168,
+    fileName: 'lavender-cat.vrm'
   }
 ]
 

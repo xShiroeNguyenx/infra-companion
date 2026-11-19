@@ -5,6 +5,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.5.2] — 2026-11-19
+
+### Added
+
+- **A second character: Lavender Cat.** A winter cat girl with lavender hair, also made for Infra Companion. It is an 8 MB download offered in the character settings, next to Pink Pastel, and it uses the same motions and expressions. New users still get Pink Pastel from the first-time setup; switch between the two in the model list at any time.
+
+---
+
 ## [0.5.1] — 2026-11-18
 
 ### Changed

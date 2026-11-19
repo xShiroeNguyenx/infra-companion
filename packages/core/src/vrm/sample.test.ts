@@ -17,6 +17,24 @@ describe('danh sách model mẫu', () => {
     expect(new Set(VRM_SAMPLE_MODELS.map((m) => m.id)).size).toBe(VRM_SAMPLE_MODELS.length)
   })
 
+  it('tên file không trùng nhau (không phân biệt hoa/thường)', () => {
+    // Hai model cùng tên file thì tải cái sau là ghi đè cái trước trong `vrm-samples/`
+    const names = VRM_SAMPLE_MODELS.map((m) => m.fileName.toLowerCase())
+    expect(new Set(names).size).toBe(names.length)
+  })
+
+  it('tên file trên máy trùng tên asset trên release', () => {
+    // Lệch thì người đăng dễ đính kèm nhầm tên → mọi lượt tải 404
+    for (const m of VRM_SAMPLE_MODELS) expect(m.url.endsWith('/' + m.fileName)).toBe(true)
+  })
+
+  it('model mẫu hiện hành không bao giờ bị coi là thu hồi', () => {
+    // Quên đưa model mới vào danh sách tên file thì app sẽ xoá nó ngay sau khi tải
+    const dir = 'C:\\Users\\deploy\\AppData\\Roaming\\app\\vrm-samples'
+    const current = VRM_SAMPLE_MODELS.map((m) => m.fileName)
+    for (const m of VRM_SAMPLE_MODELS) expect(isRetiredSamplePath(dir + '\\' + m.fileName, dir, current)).toBe(false)
+  })
+
   it('luôn ghi tác giả và giấy phép', () => {
     // Repo public: đưa model của người khác vào mà không nói giấy phép là chỗ dễ sai nhất
     for (const m of VRM_SAMPLE_MODELS) {
