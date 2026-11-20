@@ -192,6 +192,13 @@ interface UiState {
   vrmPanelOpen: boolean
   setVrmPanelOpen: (v: boolean) => void
   toggleVrmPanel: () => void
+  /**
+   * Có lối vào (sidebar, palette…) vừa xin mở khung cài đặt nhân vật. Panel đặt lại `false` khi
+   * đã mở khung, hoặc khi nó đang ở màn hình có khung (chưa có model / lỗi) — ở đó các nút chỉnh
+   * đã hiện sẵn. Đóng panel cũng xoá cờ, để lần mở sau bằng đường khác không tự bật bảng.
+   */
+  vrmSettingsRequested: boolean
+  setVrmSettingsRequested: (v: boolean) => void
 }
 
 const SIDEBAR_KEY = 'infra.sidebar.collapsed'
@@ -285,14 +292,19 @@ export const useUiStore = create<UiState>((set) => ({
     // trong lúc user làm việc khác, nên không được chiếm ô `modal` duy nhất.
     if (modal === 'vrm') {
       /**
-       * BẬT/TẮT, không phải luôn bật.
+       * MỞ KHUNG CÀI ĐẶT toàn màn hình, không còn bật/tắt.
        *
-       * Nhân vật là panel nổi **không có backdrop**, nên bấm "Nhân vật" lúc nó đang hiện mà chỉ
-       * `set(true)` thì không có gì xảy ra — user bấm rồi bấm lại, tưởng mục menu hỏng. Mọi lối
-       * vào (menu ⋯, palette, lưới công cụ, sidebar) đều đi qua đây nên sửa một chỗ là đủ.
-       * Cùng cách Ctrl+I làm với Trợ lý AI.
+       * Bản trước bật/tắt (bấm lúc đang hiện mà chỉ `set(true)` thì không thấy gì, user tưởng mục
+       * menu hỏng). Nhưng bật/tắt làm mục menu thành "nút giết nhân vật": muốn chỉnh gì cũng phải
+       * biết click phải lên người → ⚙. Nay bấm là luôn thấy một thứ rõ ràng — khung cài đặt —
+       * và tắt nhân vật nằm ngay ở chân khung đó ("Tắt trợ lý ảo"). Mọi lối vào (menu ⋯, palette,
+       * lưới công cụ, sidebar) đều đi qua đây nên sửa một chỗ là đủ.
+       *
+       * Cờ `vrmSettingsRequested` chứ không mở thẳng: khung cài đặt là state BÊN TRONG panel và
+       * chỉ dựng được khi nhân vật đã nạp xong (khe giữa đo theo bề ngang model). Panel tự tiêu
+       * thụ cờ khi sẵn sàng — xem `VrmPanel`.
        */
-      set((s) => ({ vrmPanelOpen: !s.vrmPanelOpen }))
+      set({ vrmPanelOpen: true, vrmSettingsRequested: true })
       return
     }
     // AI chẩn đoán cũng là DOCK: một phiên chạy nhiều bước, mỗi bước chờ user duyệt — có backdrop
@@ -400,6 +412,9 @@ export const useUiStore = create<UiState>((set) => ({
   cmdHistoryOpen: false,
   setCmdHistoryOpen: (cmdHistoryOpen) => set({ cmdHistoryOpen }),
   vrmPanelOpen: false,
-  setVrmPanelOpen: (vrmPanelOpen) => set({ vrmPanelOpen }),
-  toggleVrmPanel: () => set((s) => ({ vrmPanelOpen: !s.vrmPanelOpen }))
+  setVrmPanelOpen: (vrmPanelOpen) => set(vrmPanelOpen ? { vrmPanelOpen } : { vrmPanelOpen, vrmSettingsRequested: false }),
+  toggleVrmPanel: () =>
+    set((s) => (s.vrmPanelOpen ? { vrmPanelOpen: false, vrmSettingsRequested: false } : { vrmPanelOpen: true })),
+  vrmSettingsRequested: false,
+  setVrmSettingsRequested: (vrmSettingsRequested) => set({ vrmSettingsRequested })
 }))

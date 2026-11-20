@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  heartBurst,
   MOTION_IDLE_EVERY_MAX_MS,
   MOTION_IDLE_EVERY_MIN_MS,
   motionForRole,
@@ -145,6 +146,50 @@ describe('xoay vòng clip cùng vai trò', () => {
 
   it('clip cũ không thuộc nhóm (vừa đổi vai trò) thì bắt đầu lại từ đầu', () => {
     expect(nextMotionForRole('idle', 'không-tồn-tại', idleIds)!.id).toBe(idleIds[0])
+  })
+})
+
+describe('hiệu ứng đi kèm clip', () => {
+  it('mốc hiệu ứng nằm TRỌN trong clip — lệch ra ngoài thì tim bung lúc nhân vật đã làm việc khác', () => {
+    for (const c of VRM_MOTIONS.filter((x) => x.effect)) {
+      expect(c.effect!.atSec, c.id).toBeGreaterThanOrEqual(0)
+      expect(c.effect!.untilSec, c.id).toBeGreaterThan(c.effect!.atSec)
+      expect(c.effect!.untilSec, c.id).toBeLessThanOrEqual(c.durationSec)
+    }
+  })
+
+  it('chạm vào người lần ĐẦU ra trái tim, và vẫn luân phiên với "Tạo dáng"', () => {
+    const poke = motionsForRole('poke').map((c) => c.id)
+    expect(poke[0]).toBe('lilac-heart')
+    expect(poke).toContain('pose-motion')
+    expect(nextMotionForRole('poke', null, poke)!.effect?.kind).toBe('hearts')
+    expect(nextMotionForRole('poke', 'lilac-heart', poke)!.id).toBe('pose-motion')
+  })
+
+  it('clip bắn tim bật bám đất — đo được chân lơ lửng 9–10 cm suốt lúc giữ dáng', () => {
+    expect(VRM_MOTIONS.find((c) => c.id === 'lilac-heart')?.groundFeet).toBe(true)
+  })
+
+  it('đợt tim: đúng số lượng, trải trong cửa sổ, tim đầu bung ngay giữa', () => {
+    let s = 1
+    const rng = (): number => ((s = (s * 16807) % 2147483647) / 2147483647)
+    const span = 2300
+    const hs = heartBurst(rng, span, 9)
+    expect(hs).toHaveLength(9)
+    expect(hs[0]).toMatchObject({ x: 0, delayMs: 0 })
+    for (const h of hs) {
+      expect(h.delayMs).toBeGreaterThanOrEqual(0)
+      expect(h.delayMs).toBeLessThan(span)
+      expect(Math.abs(h.x)).toBeLessThanOrEqual(0.6)
+      expect(h.lifeMs).toBeGreaterThan(0)
+    }
+    // Không dồn cục: tim cuối sinh ở nửa sau cửa sổ
+    expect(hs[8]!.delayMs).toBeGreaterThan(span / 2)
+  })
+
+  it('tham số hỏng không vỡ', () => {
+    expect(heartBurst(() => 0.5, -10, 0)).toHaveLength(1)
+    expect(heartBurst(() => 0.5, 1000, 1)[0]!.delayMs).toBe(0)
   })
 })
 

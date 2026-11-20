@@ -562,8 +562,18 @@ clip CC0 còn trong danh mục vẫn tải từ đó.
 
 | | Tag | File |
 |---|---|---|
-| Model | `vrm-sample-v2` | `pink-pastel.vrm` (5.636.424 byte) |
-| Clip | `vrm-motions-v2` | `pastel-idle.vrma`, `pastel-agree.vrma`, `pastel-afraid.vrma`, `pastel-walk.vrma` |
+| Model | `vrm-sample-v2` | `pink-pastel.vrm` (5.636.424 byte), `lavender-cat.vrm` (v0.5.2), `lilac-bloom.vrm` (v0.5.3, 6.852.932 byte) |
+| Clip | `vrm-motions-v2` | `pastel-*`, `pink-*`, và từ v0.5.3: `lilac-heart.vrma`, `lilac-bow.vrma`, `lilac-look-around.vrma` |
+
+- **`lilac-heart` (Bắn tim, vai chạm vào)**: có `effect` (tim bay lên từ giữa hai bàn tay, 1,7 → 4,0 s
+  của clip, `VrmHeartBurst.tsx`) và `groundFeet`. Lý do cờ thứ hai: track hông của clip PHẲNG trong
+  khi đầu gối gập, nên phát nguyên bản thì suốt lúc giữ dáng **cả hai bàn chân lơ lửng 9–10 cm**
+  (đo bằng FK trên file). `groundFeet` hạ hông mỗi frame cho bàn chân thấp nhất về sàn của frame đầu.
+  Chỉ bật theo từng clip: clip có cú nhảy thật mà bật thì cú nhảy bị đè thành dáng khuỵu gối.
+- **Clip đã xem nhưng KHÔNG đưa vào** (v0.5.3): `lavender-cat-dance_01` (hông dời 0,83 m, vượt ngưỡng
+  neo → sẽ bị ghim cứng và trượt chân); `lavender-cat-*-dance_04` (hai bản giống hệt nhau từng byte;
+  chân trụ trượt tổng 1,76 m trong 10,8 s, gấp ~13 lần `pink-celebrate`); `snow-angel-preview-angry_03`
+  (giận dữ, không có vai nào hợp, chân thấp nhất có lúc nhấc 23 cm).
 
 - **`scripts/vrm-license.cjs` báo ❌ với `pink-pastel.vrm` là đúng**: metadata cố ý ghi cấm phân phối
   lại và cấm chỉnh sửa. Công cụ đó trả lời câu "người khác có được đăng lại không"; chủ sở hữu tự

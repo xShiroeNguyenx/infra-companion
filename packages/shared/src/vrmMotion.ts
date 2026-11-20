@@ -74,6 +74,28 @@ export interface VrmMotionClip {
    * chỉ user chủ động chọn.
    */
   locomotion?: boolean
+  /**
+   * Kéo hông xuống cho bàn chân thấp nhất chạm sàn, ở mọi frame.
+   *
+   * Cho clip mà track hông PHẲNG trong khi đầu gối gập: đo `lilac-heart` thì suốt lúc giữ dáng
+   * (1,6 → 4,0 s) **cả hai bàn chân lơ lửng 9–10 cm**, hông không hạ chút nào. Chỉ bật theo từng
+   * clip: clip có bước nhảy thật mà bật cờ này thì cú nhảy bị đè bẹp thành dáng khuỵu gối.
+   */
+  groundFeet?: boolean
+  /** Hiệu ứng vẽ thêm trên màn hình trong lúc clip chạy — xem `VrmMotionEffect`. */
+  effect?: VrmMotionEffect
+}
+
+/**
+ * Hiệu ứng đi kèm clip, canh theo **giây của chính clip** chứ không theo cú click: hiệu ứng tim mà
+ * bung ra lúc tay còn buông thõng thì trông như hai thứ không liên quan.
+ */
+export interface VrmMotionEffect {
+  kind: 'hearts'
+  /** Lúc tay vừa thành hình — đo từ file, không đoán. */
+  atSec: number
+  /** Lúc tay bắt đầu buông — sau mốc này không sinh thêm tim. */
+  untilSec: number
 }
 
 /**
@@ -111,7 +133,8 @@ function ownClip(
   role: VrmMotionRole,
   durationSec: number,
   sha256: string,
-  sizeBytes: number
+  sizeBytes: number,
+  extra?: Pick<VrmMotionClip, 'groundFeet' | 'effect'>
 ): VrmMotionClip {
   return {
     id,
@@ -125,7 +148,8 @@ function ownClip(
     url: `${RELEASE_OWN}/${id}.vrma`,
     sha256,
     sizeBytes,
-    fileName: `${id}.vrma`
+    fileName: `${id}.vrma`,
+    ...extra
   }
 }
 
@@ -176,8 +200,26 @@ export const VRM_MOTIONS: readonly VrmMotionClip[] = [
   ownClip('pastel-idle', 'Đứng thư giãn', 'idle', 15.38, 'f0af4db043c1acc2fd8b182e4efd6afd20e3cfcf44fff9e49b66088e3c4d49f5', 337304),
   // Idle thứ hai để luân phiên (clip riêng, thay 'drink-water' CC0). ⚠️ CHƯA đo bề ngang.
   ownClip('pink-idle', 'Thư giãn', 'idle', 4.96, '2a65ec50aad1813cd34f46efa6c219e48f6c09d467669042c225a3042dcf8e03', 79056),
+  /**
+   * Idle thứ ba (v0.5.3): ngó quanh, 15,6 s. Đo: hông lệch ≤ 1 cm, chân thấp nhất không rời sàn
+   * quá 1,1 cm, bề ngang hai tay 0,44 m — hẹp ngang `pastel-idle` (0,45 m) nên vừa khung.
+   */
+  ownClip('lilac-look-around', 'Ngó quanh', 'idle', 15.58, '9cd38cc385a505ba3f4dbd2d2e48d87939cb4e41926c13810ea497127a9ba0b0', 324984),
   // Mở khung chat → gật đầu đón (clip riêng, thay 'speaking-01' CC0)
   ownClip('pastel-agree', 'Gật đầu', 'chat', 4.04, 'abe10c2e8a55c4a3dbb3d644eb03864d64f9b48ec3507bc7418aaacd74db83f5', 109404),
+  // Mở chat lần kế → cúi chào, luân phiên với gật đầu (v0.5.3). Hông đứng yên, tay không quá 0,38 m.
+  ownClip('lilac-bow', 'Cúi chào', 'chat', 6.04, '153db97a57a023804143d91f61578601fccabefd85696917cb1c9c03ca9270b7', 156628),
+  /**
+   * Chạm vào người → **TẠO HÌNH TRÁI TIM** (v0.5.3), kèm tim bay lên từ giữa hai bàn tay.
+   *
+   * Đứng TRƯỚC `pose-motion` để cú chạm đầu tiên ra trái tim; hai clip luân phiên nhau.
+   * Mốc hiệu ứng đo bằng FK trên file: hai tay rời nhau lúc 1,2 s, lên tới ngực và đứng yên từ
+   * ~1,7 s, bắt đầu hạ lúc 4,0 s. `groundFeet`: xem chú thích của cờ đó — clip này chân lơ lửng.
+   */
+  ownClip('lilac-heart', 'Bắn tim', 'poke', 5.42, 'c09da245e4fe3a368db65624187f7d54707533d4c543951b2fa9e509f2c026cb', 80252, {
+    groundFeet: true,
+    effect: { kind: 'hearts', atSec: 1.7, untilSec: 4.0 }
+  }),
   // Chạm vào người → TẠO DÁNG (CC0). Clip nhảy riêng đã thử ở v0.5.1 nhưng chân không bám đất
   // kể cả khi phát nguyên bản — lỗi nằm trong clip, user gỡ ra để làm lại.
   clip('pose-motion', 'Tạo dáng', 'poke', 20.0, 'e3b06f78b21df2fe1f26d80dd1826fd47941a891d44b46a6197f8a87de05ff2c', 521156, REROFUMI),
@@ -297,6 +339,45 @@ export const HIPS_FREE_MAX_DEPTH_M = 0.5
 export function shouldPinHips(maxSideM: number, maxDepthM: number): boolean {
   if (!Number.isFinite(maxSideM) || !Number.isFinite(maxDepthM)) return true
   return maxSideM > HIPS_FREE_MAX_SIDE_M || maxDepthM > HIPS_FREE_MAX_DEPTH_M
+}
+
+/** Một trái tim của hiệu ứng `hearts` — mọi số đều tương đối, nơi vẽ tự đổi ra pixel. */
+export interface HeartParticle {
+  /** Lệch ngang lúc sinh ra, theo bề rộng vai (−1…1). */
+  x: number
+  /** Trôi ngang thêm trong lúc bay lên, cùng đơn vị với `x`. */
+  drift: number
+  /** Trễ so với lúc đợt tim bắt đầu (ms). */
+  delayMs: number
+  /** Bay bao lâu (ms). */
+  lifeMs: number
+  /** Cỡ chữ (px) — tim là ký tự, không phải ảnh. */
+  sizePx: number
+}
+
+/**
+ * Sinh một đợt tim. Hàm thuần nhận `rng` để test được và để hai đợt liền nhau không giống hệt.
+ *
+ * Trải đều theo `spanMs` (cửa sổ `atSec → untilSec` của clip) thay vì bung cả đợt một lần: tay
+ * GIỮ dáng hơn 2 giây, mà tim chỉ bay trong 0,3 giây đầu thì phần lớn lúc giữ dáng không có gì.
+ */
+export function heartBurst(rng: () => number, spanMs: number, count = 9): HeartParticle[] {
+  const n = Math.max(1, Math.round(count))
+  const span = Math.max(0, spanMs)
+  const out: HeartParticle[] = []
+  for (let i = 0; i < n; i++) {
+    out.push({
+      // Tim đầu bung ngay chính giữa, các tim sau toả dần ra hai bên
+      x: i === 0 ? 0 : (rng() * 2 - 1) * 0.6,
+      drift: (rng() * 2 - 1) * 0.5,
+      // Trải theo chỉ số + nhiễu nhỏ: đều hơn bốc ngẫu nhiên thuần (không dồn cục một chỗ)
+      // Tim đầu bung ĐÚNG lúc tay thành hình — trễ một nhịp là thấy hai thứ rời nhau
+      delayMs: i === 0 ? 0 : Math.round((span * i) / n + rng() * (span / n) * 0.5),
+      lifeMs: Math.round(1400 + rng() * 600),
+      sizePx: Math.round(i === 0 ? 30 : 14 + rng() * 12)
+    })
+  }
+  return out
 }
 
 /** Tổng dung lượng phải tải (byte) — hiện trên nút để user biết trước. */

@@ -134,8 +134,13 @@ export function VrmSettingsFrame({
  * WebGL vẽ liên tục là mỗi khung hình phải tính lại blur — đã có model lag vì GPU. Nền đục 70% +
  * nhân vật mờ 55% là đủ đọc mà không tốn gì.
  */
+/**
+ * `overflow-x-hidden`: chỉ đặt `overflow-y-auto` thì trình duyệt tự đổi trục ngang thành `auto`
+ * luôn, và một phần tử con hơi rộng (thanh trượt, URL giấy phép) là hiện thanh cuộn NGANG giữa
+ * bảng cài đặt. Bảng này không bao giờ cần cuộn ngang.
+ */
 const COL_CLASS =
-  'bg-elevated/70 border-edge/60 pointer-events-auto flex min-h-0 min-w-0 flex-col gap-3 overflow-y-auto overscroll-contain rounded-xl border p-3'
+  'bg-elevated/70 border-edge/60 pointer-events-auto flex min-h-0 min-w-0 flex-col gap-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border p-3'
 
 /**
  * Một NHÓM trong cột: tiêu đề nhỏ in hoa + đường kẻ, rồi tới nội dung.
@@ -149,13 +154,19 @@ const COL_CLASS =
  */
 export function SettingsGroup({
   title,
-  children
+  children,
+  grow
 }: {
   readonly title: string
   readonly children: ReactNode
+  /**
+   * Giãn kín phần còn lại của cột (và cho con bên trong tự cuộn). Dùng cho nhóm có danh sách dài,
+   * để cột không dừng ở lưng chừng với một khung cuộn bé tí trong khi cột bên kia đầy.
+   */
+  readonly grow?: boolean
 }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className={`flex flex-col gap-2 ${grow ? 'min-h-0 flex-1' : ''}`}>
       <h3 className="text-accent border-edge/50 flex items-center gap-1.5 border-b pb-1 text-[10px] font-bold tracking-wider uppercase">
         {title}
       </h3>

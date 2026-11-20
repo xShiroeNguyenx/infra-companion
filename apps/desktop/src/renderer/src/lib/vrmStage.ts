@@ -258,8 +258,24 @@ export interface VrmStage {
    */
   playAnimation(
     bytes: Uint8Array | null,
-    opts?: { once?: boolean; anchor?: boolean; measureGait?: boolean; timeScale?: number; style?: WalkStyleSpec | null }
+    opts?: {
+      once?: boolean
+      anchor?: boolean
+      measureGait?: boolean
+      timeScale?: number
+      style?: WalkStyleSpec | null
+      /** Hạ hông cho bàn chân thấp nhất chạm sàn — xem `VrmMotionClip.groundFeet`. */
+      groundFeet?: boolean
+    }
   ): Promise<number>
+  /**
+   * Trung điểm của các xương, chiếu ra toạ độ chuẩn hoá của canvas ([-1, 1], gốc ở giữa, y hướng
+   * lên — cùng hệ với `hitTest`). `null` nếu model thiếu hết các xương đó.
+   *
+   * Cho lớp hiệu ứng DOM bám theo cơ thể (tim bay ra từ giữa hai bàn tay): đoán vị trí theo tỉ lệ
+   * khung thì lệch ngay khi user zoom, xoay, hay model có tay dài ngắn khác nhau.
+   */
+  projectBones(names: readonly string[]): { nx: number; ny: number } | null
   /**
    * Tốc độ đi (m/s) đo từ bàn chân của clip nạp gần nhất với `measureGait`; `0` = chưa đo/không đo được.
    *
@@ -806,6 +822,41 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
    * tương đối quanh chỗ đứng; `null` = ghim cứng. Xem `shouldPinHips` ở `vrmMotion.ts`.
    */
   let hipsBase: { x: number; z: number } | null = null
+  /** Clip đang chạy có bật bám đất không — xem `VrmMotionClip.groundFeet`. */
+  let groundFeet = false
+  /**
+   * Độ cao sàn (khung cha của hông) = bàn chân thấp nhất ở FRAME ĐẦU của clip. `null` = chưa đo,
+   * đo ở frame kế tiếp. Lấy từ chính clip chứ không từ tư thế idle trước đó: idle tự sinh có thể
+   * đang nhún, còn frame đầu của clip là dáng đứng tác giả đặt.
+   */
+  let groundFloorY: number | null = null
+  const gV = new THREE.Vector3()
+  const footL = bone('leftFoot')
+  const footR = bone('rightFoot')
+
+  /**
+   * Hạ hông để bàn chân thấp nhất về đúng sàn. Chạy SAU `mixer.update` và neo hông.
+   *
+   * Tính trong khung CHA của hông: dời hông một đoạn Δ trong khung đó thì mọi xương con (kể cả hai
+   * bàn chân) dời đúng Δ — không phải đổi đơn vị hay lo `vrm.scene` đang bị kéo níu, xoay, zoom.
+   *
+   * Chỉ HẠ, không nâng: chân thấp hơn sàn (clip ngồi xổm, nhún) là ý của clip, đẩy lên là sai.
+   */
+  function groundHips(h: Obj3D): void {
+    if (!footL || !footR || !h.parent) return
+    h.updateWorldMatrix(true, true)
+    const yl = h.parent.worldToLocal(footL.getWorldPosition(gV)).y
+    const yr = h.parent.worldToLocal(footR.getWorldPosition(gV)).y
+    const low = Math.min(yl, yr)
+    if (groundFloorY === null) {
+      groundFloorY = low
+      return
+    }
+    if (low > groundFloorY) {
+      h.position.y -= low - groundFloorY
+      h.updateWorldMatrix(false, true)
+    }
+  }
 
   /**
    * ==== DÁNG ĐI — chỉnh clip đi bộ lúc chạy (`WALK_STYLES` ở `vrmStroll.ts`) ====
@@ -1960,6 +2011,7 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
           hips.position.z = hipsRest.z
         }
       }
+      if (groundFeet && hips?.parent) groundHips(hips)
       if (walkStyle) applyWalkStyle(dt)
     } else {
       /**
@@ -2171,6 +2223,20 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
       const q = n.getWorldQuaternion(new THREE.Quaternion())
       return { x: q.x, y: q.y, z: q.z, w: q.w }
     },
+    projectBones(names) {
+      let x = 0
+      let y = 0
+      let n = 0
+      for (const name of names) {
+        const b = vrm.humanoid?.getNormalizedBoneNode(name as BoneName)
+        if (!b) continue
+        b.getWorldPosition(gV).project(camera)
+        x += gV.x
+        y += gV.y
+        n++
+      }
+      return n > 0 ? { nx: x / n, ny: y / n } : null
+    },
     readBoneWorld(name) {
       const n = vrm.humanoid?.getNormalizedBoneNode(name as BoneName)
       if (!n) return null
@@ -2210,6 +2276,8 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
       clipEndsAt = 0
       anchorHips = opts?.anchor === true
       hipsBase = null
+      groundFeet = false
+      groundFloorY = null
       if (!bytes) return 0
       if (opts?.measureGait) gait = 0
       // Dáng đi chỉ áp cho đúng lượt có `style` — clip khác (cảnh báo, chạm) chạy nguyên bản
@@ -2269,6 +2337,8 @@ export async function createVrmStage(opts: VrmStageOptions, signal?: AbortSignal
           gaitMeanReady = true
         }
         walkStyle = opts?.style ?? null
+        // Bật SAU `sampleGait` (nó tua mixer, không đi qua `tick`) — sàn đo ở frame đầu thật
+        groundFeet = opts?.groundFeet === true
         // Đặt SAU khi đo: `gaitSpeed()` là tốc độ ở nhịp GỐC, nơi gọi tự nhân với cùng tỉ lệ này
         if (opts?.timeScale && opts.timeScale > 0) action.timeScale = opts.timeScale
         mixer = m

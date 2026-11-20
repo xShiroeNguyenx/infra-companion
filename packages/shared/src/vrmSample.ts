@@ -81,6 +81,23 @@ export const VRM_SAMPLE_MODELS: readonly VrmSampleModel[] = [
     sha256: '217a3b1a6c66e42e95fe0098148e9cdd0f5077eee7bb60bbfc5f9db9d3e6b3c1',
     sizeBytes: 8_284_168,
     fileName: 'lavender-cat.vrm'
+  },
+  {
+    // Nhân vật riêng thứ ba (v0.5.3), cùng release `vrm-sample-v2`. VRM 1.0, khai đủ 9 biểu cảm
+    // (có `happy` — hiệu ứng "Bắn tim" dùng tới). Bộ clip `lilac-*` làm cho nhân vật này, nhưng là
+    // clip humanoid nên chạy trên mọi model.
+    // Tên "Lilac Bloom" chứ không "Lilac" trơn: đứng cạnh "Lavender Cat" (cùng tông tím) thì một
+    // chữ màu không đủ phân biệt; "Bloom" theo bộ váy bèo nhún kết hoa.
+    id: 'lilac-bloom',
+    label: 'Lilac Bloom',
+    note: 'Cô gái tóc tím hoa cà, váy bèo kết hoa — nhân vật riêng của Infra Companion',
+    author: 'xShiroeNguyenx',
+    license: 'Giữ bản quyền — chỉ dùng trong Infra Companion',
+    licenseUrl: 'https://vrm.dev/licenses/1.0/',
+    url: 'https://github.com/xShiroeNguyenx/infra-companion/releases/download/vrm-sample-v2/lilac-bloom.vrm',
+    sha256: '4a92d72c5527099ec7ebd2ecfcedd8e25984fdbdc1547ce163311e48a0ab502b',
+    sizeBytes: 6_852_932,
+    fileName: 'lilac-bloom.vrm'
   }
 ]
 

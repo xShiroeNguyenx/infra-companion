@@ -5,6 +5,22 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.5.3] — 2026-11-20
+
+### Added
+
+- **A third character: Lilac Bloom.** A girl in lilac with a frilled, flower-trimmed dress, made for Infra Companion. It is a 7 MB download offered in the character settings, next to Pink Pastel and Lavender Cat.
+- **Click the character and she makes a heart with her hands.** Hearts float up from between her hands while she holds the pose, and she smiles. Clicks alternate between the heart and the earlier "Pose" motion.
+- **Two more motions.** Opening the chat now alternates between a nod and a bow, and the idle rotation gains a third motion where she looks around.
+
+### Changed
+
+- **"Character" in the menu, palette and sidebar always opens the character settings**, instead of hiding the character when it was already showing. "Turn off the assistant" now sits at the bottom of the settings, away from the everyday items in the radial menu where it was easy to hit by accident.
+- **The character settings are reorganised.** Everything about who is on screen (model info, switching, adding a file, downloading a character) is in one group, and the motion list fills the rest of its column instead of scrolling in a small box.
+- **Loading your own `.vrma` clips from a folder has been removed.** Clips assigned that way no longer play on their own; the built-in motions and their role settings are unchanged.
+
+---
+
 ## [0.5.2] — 2026-11-19
 
 ### Added
